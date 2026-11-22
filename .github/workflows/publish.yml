@@ -2,7 +2,7 @@ name: Economic monitor
 on:
   push:
     branches: [main]
-    paths: ['EconomicsPages.zip', '.github/workflows/publish.yml']
+    paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/publish.yml']
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -19,11 +19,20 @@ jobs:
       - name: Restore archive and build
         run: |
           unzip -q EconomicsPages.zip -d monitor
+          cp site/* monitor/
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 build.py --refresh
           python3 -c "import sqlite3; s=sqlite3.connect('data/monitor.db'); d=sqlite3.connect('../history/monitor.db'); s.backup(d); d.close(); s.close()"
+      - name: Check rendered analyst dashboard
+        working-directory: monitor/public
+        run: |
+          python3 -m http.server 8765 > /tmp/monitor-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=налог' > /tmp/monitor-dom.html
+          python3 -c "from pathlib import Path; s=Path('/tmp/monitor-dom.html').read_text(); assert 'Найдено материалов: 0' not in s and 'Найдено материалов: ' in s and '<svg ' in s and '<tbody><tr>' in s and 'Изменение валового выпуска:' in s"
       - name: Save updated history
         run: |
           git config user.name 'github-actions[bot]'
