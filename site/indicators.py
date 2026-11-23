@@ -1,3 +1,4 @@
+import json
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
@@ -85,7 +86,9 @@ def publish(page,out,rows,checks):
             if end-1 in data:
                 delta_unit = "п. п." if unit.startswith("%") else unit
                 body+=f'<p>Пример по опубликованным значениям: {end} минус {end-1} год. {data[end]:.5g} − ({data[end-1]:.5g}) ≈ {data[end]-data[end-1]:.5g} {delta_unit}. Для расчёта использованы значения до округления.</p>'
-            body+=chart(data,unit)
+            years=list(range(min(data),max(data)+1))
+            payload=json.dumps(dict(code=code,name=title,unit=unit,years=years,values=[data.get(y) for y in years]),ensure_ascii=False)
+            body+=chart(data,unit)+f'<div><script type="application/json" id="figure-data">{payload}</script></div>' 
             end=max(data)
             with (out/(code+'.csv')).open('w',encoding='utf-8-sig',newline='') as f:
                 w=csv.writer(f,delimiter=';');w.writerow(['Год','Значение','Единица','Код WDI','Страна','Источник','Проверено UTC'])

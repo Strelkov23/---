@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
           const delta=s.values[common.at(-1)]-s.values[common[0]];
           box.append(node('p','Изменение за общий период: '+fmt(delta)+' '+(s.unit.startsWith('%')?'п. п.':s.unit)));
         }
-        box.append(trend(s,years),a);el('pair-summary').append(box);
+        box.append(trend(s,years),a); if(years.some(y=>s.values[y]!=null))chartTools(box,s.title,s.unit,years,[{name:s.title,code:el(fields[i]).value,values:years.map(y=>s.values[y])}]);el('pair-summary').append(box);
       }
       el('pair-csv').disabled=!years.length;
       el('pair-csv').onclick=()=>csv('comparison.csv',[[...headers,'Источник 1','Источник 2'],...rows.map(r=>[...r,...fields.slice(0,2).map(id=>'https://data.worldbank.org/indicator/'+el(id).value+'?locations=RU')])]);

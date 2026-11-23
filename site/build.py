@@ -81,3 +81,7 @@ page("index.html",Path("home.html").read_text())
 import atlas
 atlas.publish(page, out)
 page('machinery.html',Path('machinery.html').read_text())
+
+import bulletin
+bulletin.publish(page,out)
+shutil.copy('chart-export.js',out)

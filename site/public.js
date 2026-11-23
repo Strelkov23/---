@@ -71,6 +71,7 @@ async function stats(){
  const legend=node('div','');legend.className='legend';
  codes.forEach((code,i)=>{const a=node('a',d.series[code]);a.href='https://data.worldbank.org/indicator/'+code+'?locations=RU';legend.append(a)});
  el('chart').append(legend,lineChart(years,maps.map(m=>years.map(y=>m.get(y)))));
+ if(maps.some(m=>years.some(y=>m.has(y))))chartTools(el("chart"),"Добавленная стоимость отраслей","% ВВП",years,codes.map((code,i)=>({code,name:d.series[code],values:years.map(y=>maps[i].get(y))})));
  const common=years.filter(y=>maps.every(m=>m.has(y)));
  if(common.length>=2){
  const from=common[0],to=common.at(-1),summary=node('p','Изменение за '+from+'–'+to+' гг. по общим наблюдениям: ');
