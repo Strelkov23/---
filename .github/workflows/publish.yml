@@ -24,6 +24,7 @@ jobs:
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 build.py --refresh
+          git rev-parse HEAD > public/version.txt
           python3 -c "import sqlite3; s=sqlite3.connect('data/monitor.db'); d=sqlite3.connect('../history/monitor.db'); s.backup(d); d.close(); s.close()"
       - name: Check rendered analyst dashboard
         working-directory: monitor/public
@@ -37,8 +38,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add history/monitor.db
+          mkdir -p history/published
+          cp monitor/public/*.json history/published/
+          git add history/monitor.db history/published
           if ! git diff --cached --quiet; then git commit -m 'Update economic archive'; git push; fi
+          git rev-parse HEAD > monitor/public/version.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: monitor/public
