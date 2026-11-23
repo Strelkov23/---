@@ -43,8 +43,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     el('basket-count').textContent = 'Выбрано: '+basket.size+(persistent ? '' : ' · Доступно только до закрытия страницы');
     el('basket').replaceChildren(...Array.from(basket.values(),card));
     el('desk-export').disabled = !basket.size;
+    renderBrief();
     save(fields);
   }
+  const note=el('brief-note');
+  let scenarios={};
+  try{
+    note.value=localStorage.getItem('economics-brief-note')||'';
+    scenarios=JSON.parse(localStorage.getItem('economics-brief-models')||'{}');
+  }catch{ el('note-status').textContent='Локальное сохранение недоступно' }
+  note.oninput=()=>{
+    try{localStorage.setItem('economics-brief-note',note.value)}
+    catch{el('note-status').textContent='Текст доступен только на этой странице'}
+  };
+  function renderBrief(){
+    el('brief-sources').replaceChildren(node('h3','Источники подборки'));
+    for(const item of basket.values()){
+      const line=node('p',''), a=node('a',item.title);
+      a.href=item.url; line.append(a,node('small',' · '+item.source+' · '+item.date+' · '+item.url));el('brief-sources').append(line);
+    }
+    el('brief-models').replaceChildren();
+    for(const [key,s] of Object.entries(scenarios)){
+      const box=node('article',''),link=node('a','Параметры сценария');
+      link.href=s.url;
+      box.append(node('h3',s.name+' · '+s.percent+'%'),...s.steps.map(t=>node('p',t)),link);
+      const remove=node('button','Убрать расчёт');
+      remove.onclick=()=>{delete scenarios[key];try{localStorage.setItem('economics-brief-models',JSON.stringify(scenarios))}catch{el('note-status').textContent='Не удалось сохранить изменение'}renderBrief()};
+      box.append(remove);el('brief-models').append(box);
+    }
+  }
+  el('brief-print').onclick=()=>{
+    const text=node('p',note.value);text.className='print-note';note.after(text);
+    window.addEventListener('afterprint',()=>text.remove(),{once:true});window.print();
+  };
   const sets = await Promise.allSettled([load('archive.json'),load('literature.json')]);
   if (sets[0].status === 'fulfilled') records.push(...sets[0].value.map(r => ({
     title:r.title,url:r.url,date:(r.published||'').slice(0,10),type:sourceKind(r),source:r.source,topics:r.topics,authors:''

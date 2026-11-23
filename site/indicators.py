@@ -77,7 +77,14 @@ def publish(page,out,rows,checks):
         body=f'<p>{theme} · Россия</p><h1>{title}</h1><p>{unit} · {coverage}</p>'
         body+=f'<p>Поставщик данных: {link("https://data.worldbank.org/indicator/"+code+"?locations=RU","Всемирный банк, WDI")}. {link(api,"Данные API")}. Профильное ведомство: {link(AGENCIES[agency],agency)}.</p>'
         body+=f'<p>Последняя успешная проверка UTC: {escape(status.get("success") or "нет")}. Состояние: {escape(status.get("status","нет сведений"))}.</p>'
+        body+=f'<h2>Как получено значение</h2><p>Сайт берёт готовое годовое наблюдение для России (RUS), код {code}. Для каждого года выбирается последняя сохранённая версия. Пропуски остаются пустыми. {link("https://databank.worldbank.org/metadataglossary/world-development-indicators/series/"+code,"Определение, исходные источники и методика WDI")}.</p>'
+        if unit == "% ВВП":
+            body+='<p>Единица показывает величину показателя в процентах от ВВП. Разность двух таких долей выражается в процентных пунктах. При интерпретации учитывайте изменения как числителя, так и ВВП.</p>'
         if data:
+            end=max(data)
+            if end-1 in data:
+                delta_unit = "п. п." if unit.startswith("%") else unit
+                body+=f'<p>Пример по опубликованным значениям: {end} минус {end-1} год. {data[end]:.5g} − ({data[end-1]:.5g}) ≈ {data[end]-data[end-1]:.5g} {delta_unit}. Для расчёта использованы значения до округления.</p>'
             body+=chart(data,unit)
             end=max(data)
             with (out/(code+'.csv')).open('w',encoding='utf-8-sig',newline='') as f:

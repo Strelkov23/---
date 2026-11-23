@@ -83,11 +83,51 @@ async function stats(){
  for(const id of ['first','second','span'])el(id).onchange=()=>{save(['first','second','span']);draw()};draw()
 }
 async function model(){
- const m=await load('sectors.json');m.names.forEach((s,i)=>el('industry').add(new Option(s,i)));el('industry').value='8';restore(['industry','shock']);
- function draw(){el('effects').replaceChildren();if(!el('shock').value||!el('shock').validity.valid){el('effect').textContent='Укажите изменение от −20 до 20%';return}
- const v=m.effects.map(r=>r[+el('industry').value]*Number(el('shock').value)/100000);
- el('effect').textContent='Изменение валового выпуска: '+fmt(v.reduce((a,b)=>a+b,0))+' млрд ₽';
- v.map((amount,i)=>({amount,name:m.names[i]})).sort((a,b)=>Math.abs(b.amount)-Math.abs(a.amount)).forEach(({amount,name})=>el('effects').append(node('p',name+' · '+fmt(amount)+' млрд ₽')))}
+ const m=await load('sectors.json');
+ m.names.forEach((s,i)=>el('industry').add(new Option(s,i)));
+ el('industry').value='8';
+ restore(['industry','shock']);
+ function draw(){
+   const field=el('shock'), g=Number(el('industry').value), percent=field.valueAsNumber;
+   const details=el('protocol'), download=el('scenario-csv');
+   const add=el("add-scenario"); add.disabled=true; add.textContent="Добавить расчёт в справку";
+   details.replaceChildren(); el('effects').replaceChildren(); download.disabled=true;
+   if(!field.value || !field.validity.valid || !Number.isFinite(percent)){
+     el('effect').textContent='Укажите изменение от −20 до 20%'; return;
+   }
+   const base=m.demand[g]/1000, direct=base*percent/100;
+   const changes=m.effects.map(row=>row[g]*percent/100000);
+   const total=changes.reduce((sum,value)=>sum+value,0), indirect=total-direct;
+   const imports=m.imports[g]*percent/100000;
+   el('effect').textContent='Изменение валового выпуска: '+fmt(total)+' млрд ₽';
+   const steps=[
+     'Конечный спрос на отечественные продукты группы в 2021 году: '+fmt(base)+' млрд ₽. Изменение спроса: '+fmt(base)+' × ('+fmt(percent)+' / 100) = '+fmt(direct)+' млрд ₽.',
+     'Для каждого из 113 продуктов изменение выпуска равно сумме изменений спроса, умноженных на коэффициенты его строки матрицы L = (I − A)⁻¹. В каждом столбце A поставки продукта разделены на выпуск потребляющей отрасли.',
+     'Сумма изменений выпуска всех продуктов: '+fmt(total)+' млрд ₽. Из неё исходное изменение спроса составляет '+fmt(direct)+' млрд ₽, а дополнительные поставки по производственным цепочкам — '+fmt(indirect)+' млрд ₽.',
+     'Импортные промежуточные затраты: '+fmt(imports)+' млрд ₽. Расчёт суммирует изменения выпуска по продуктам с весами, равными их прямым импортным затратам на рубль выпуска. Эта величина показана отдельно.'
+   ];
+   const list=node('ol','');
+   steps.forEach(s=>list.append(node('li',s)));
+   details.append(list,node('p','Сценарий сохраняет цены и структуру затрат 2021 года. Свободные мощности и сроки поставок в расчёт не входят. Валовой выпуск включает повторный счёт промежуточных поставок; для оценки ВВП нужны коэффициенты добавленной стоимости.'));
+   const profile=node('a','Состав отрасли и крупнейшие поставщики'); profile.href='sector-'+(g+1)+'.html'; details.append(profile);
+   changes.map((amount,i)=>({amount,name:m.names[i]})).sort((a,b)=>Math.abs(b.amount)-Math.abs(a.amount)).forEach(({amount,name})=>el('effects').append(node('p',name+' · '+fmt(amount)+' млрд ₽')));
+   add.disabled=false;
+   add.onclick=()=>{
+     const url=new URL(location.href); url.hash='model';
+     if(version) url.searchParams.set('snapshot',version);
+     try{
+       const key='economics-brief-models', saved=JSON.parse(localStorage.getItem(key)||'{}');
+       saved[url.href]={name:m.names[g],percent,steps,url:url.href};
+       localStorage.setItem(key,JSON.stringify(saved));
+       add.textContent='Расчёт добавлен в справку';
+     }catch{add.textContent='Сохранение недоступно — скачайте CSV'}
+   };
+   download.disabled=false;
+   download.onclick=()=>csv('scenario-2021.csv',[
+     ['Группа',m.names[g]],['Год',2021],['Единица денежных показателей','млрд рублей базового года'],['Метод','Δx = L × Δy'],['Источник','https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'],
+     ['Базовый спрос',base],['Изменение, %',percent],['Прямой эффект',direct],['Косвенный эффект',indirect],['Валовой выпуск, изменение',total],['Импортные затраты, изменение',imports],
+     ['Отрасль','Изменение выпуска, млрд ₽'],...m.names.map((name,i)=>[name,changes[i]])]);
+ }
  el('industry').onchange=el('shock').oninput=()=>{save(['industry','shock']);draw()};draw();
 }
 async function start(){

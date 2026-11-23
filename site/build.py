@@ -77,3 +77,7 @@ for name in ["desk.html","compare.html"]:
 for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())
+
+import atlas
+atlas.publish(page, out)
+page('machinery.html',Path('machinery.html').read_text())
