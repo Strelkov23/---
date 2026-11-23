@@ -1,5 +1,7 @@
 """Monthly industrial production, Russia, corresponding month of previous year = 100."""
 import re
+import ssl
+from pathlib import Path
 from html import unescape
 from urllib.request import Request, urlopen
 
@@ -8,7 +10,9 @@ SEED = [("2026-07",100.4,289138),("2026-08",99.4,290839),("2026-09",101.8,293145
 MONTHS = "январе феврале марте апреле мае июне июле августе сентябре октябре ноябре декабре".split()
 
 def read(url):
-    with urlopen(Request(url, headers={"User-Agent":"EconomicsMonitor/1.0"}),timeout=15) as response:
+    context = ssl.create_default_context()
+    context.load_verify_locations(cafile=str(Path(__file__).with_name("rosstat-root.pem")))
+    with urlopen(Request(url, headers={"User-Agent":"EconomicsMonitor/1.0"}),timeout=15,context=context) as response:
         return response.read(3000000).decode("utf-8")
 
 def collect(db, stamp):
