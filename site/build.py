@@ -49,6 +49,11 @@ with m.connect() as db:
     latest=[dict(r) for r in db.execute("""select code,year,value,seen from
         (select *,row_number() over(partition by code,year order by seen desc) rn from annual)
         where rn=1 order by year""")]
+    comparison = {code: dict(title=meta[1], unit=meta[2], values={}) for code, meta in indicators.META.items()}
+    for r in latest:
+        if r["code"] in comparison and int(r["year"]) >= 1991:
+            comparison[r["code"]]["values"][r["year"]] = r["value"]
+    write("compare.json", comparison)
     indicators.publish(page,out,latest,checks)
     write("stats.json",{"series":m.SERIES,"values":[r for r in latest if r["code"] in m.SERIES]})
     literature.sync(db,m.now(),"--refresh" in sys.argv)
@@ -67,6 +72,8 @@ with m.connect() as db:
     months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
     write("industry.json", months)
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-for f in ["papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
+for name in ["desk.html","compare.html"]:
+    page(name,Path(name).read_text())
+for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())

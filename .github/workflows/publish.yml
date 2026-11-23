@@ -38,6 +38,9 @@ jobs:
           python3 -c "from pathlib import Path; s=Path('/tmp/mobile.html').read_text(); assert 'Танзания' in s and 'Найдено материалов: 0' not in s and '2026-09' in s"
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/papers.html' > /tmp/papers-dom.html
           python3 -c "from pathlib import Path; import json; s=Path('/tmp/papers-dom.html').read_text(); a=json.loads(Path('literature.json').read_text())['articles']; assert a and 'Найдено статей:' in s and 'https://doi.org/' in s; assert '<svg' in Path('indicator-NY.GDP.MKTP.KD.ZG.html').read_text()"
+          google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/desk.html?words=инвестиц' > /tmp/desk.html
+          google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/compare.html?begin=2010&finish=2020' > /tmp/pair.html
+          python3 -c "from pathlib import Path; assert 'В подборку</button>' in Path('/tmp/desk.html').read_text(); s=Path('/tmp/pair.html').read_text(); assert 'Совместных наблюдений: 11' in s and s.count('<svg') == 2"
       - name: Save updated history
         run: |
           git config user.name 'github-actions[bot]'
