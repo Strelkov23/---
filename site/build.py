@@ -6,6 +6,8 @@ from html import escape
 from pathlib import Path
 import monitor as m
 import industry
+import indicators
+import literature
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -47,9 +49,17 @@ with m.connect() as db:
     latest=[dict(r) for r in db.execute("""select code,year,value,seen from
         (select *,row_number() over(partition by code,year order by seen desc) rn from annual)
         where rn=1 order by year""")]
-    write("stats.json",{"series":m.SERIES,"values":latest})
+    indicators.publish(page,out,latest,checks)
+    write("stats.json",{"series":m.SERIES,"values":[r for r in latest if r["code"] in m.SERIES]})
+    literature.sync(db,m.now(),"--refresh" in sys.argv)
+    papers=[dict(r) for r in db.execute("select * from literature order by published desc,title,doi")]
+    journal_counts=Counter(r["journal"] for r in papers)
+    journal_checks=[dict(r,journal=literature.JOURNALS[r["issn"]],count=journal_counts[literature.JOURNALS[r["issn"]]]) for r in db.execute("select * from journal_checks")]
+    write("literature.json",dict(articles=papers,checks=journal_checks))
+    page("papers.html",Path("papers.html").read_text())
     active = {feed[2] for feed in m.FEEDS}
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
+    failures.extend(r["journal"]+" · "+r["status"] for r in journal_checks if r["status"]!="Проверено")
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
     industry_error = industry.collect(db,m.now())
     if industry_error:
@@ -57,6 +67,6 @@ with m.connect() as db:
     months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
     write("industry.json", months)
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-for f in ["sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
+for f in ["papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())

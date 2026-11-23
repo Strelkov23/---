@@ -14,6 +14,10 @@ function save(ids){
 function stem(word){
  return word.length<5?word:word.replace(/(иями|ями|ами|ого|его|ому|ему|ыми|ими|иях|иям|ией|ия|ии|ий|ию|ие|ях|ах|ам|ом|ов|ем|ая|ые|ый|ой|ую|а|ы|у|и|е|я|ю)$/u,'')
 }
+function sourceKind(r){
+ if(r.source==='Официальное опубликование правовых актов')return 'Правовой акт';
+ return ['Ведомости','ПРАЙМ','ТАСС','Интерфакс','Коммерсантъ','Парламентская газета'].includes(r.source)?'СМИ':'Ведомство'
+}
 function russianContext(r){
  return r.url.includes('publication.pravo.gov.ru/')||['Правительство России','ФНС России','Банк России','Росстат','Минпромторг России'].includes(r.source)||/росси|россий|москв|рубл|кремл|госдум|минфин|минпромторг|(^|[^а-я])(рф|цб)([^а-я]|$)/iu.test(r.title)
 }
@@ -28,14 +32,14 @@ async function archive(){
  const rows=await load('archive.json'),params=new URLSearchParams(location.search);
  for(const [id,values] of [['publisher',rows.map(r=>r.source)],['sector',rows.flatMap(r=>(r.topics||'').split(' · '))]]){
  el(id).add(new Option('Все',''));for(const v of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru')))el(id).add(new Option(v,v))}
- const ids=['q','publisher','sector','start','end','mode','geo'];restore(ids); if(params.get('publisher')==='Правительство РФ')el('publisher').value='Правительство России';
+ const ids=['q','publisher','sector','start','end','mode','geo','kind'];restore(ids); if(params.get('publisher')==='Правительство РФ')el('publisher').value='Правительство России';
  for(const [v,label] of [[fmt(rows.length),'материалов в архиве'],[fmt(new Set(rows.map(r=>r.source)).size),'источников в архиве'],[rows.map(r=>r.published?.slice(0,10)).filter(Boolean).sort().at(-1) || '—','последняя дата публикации']]){
  const box=node('div','');box.className='metric';box.append(node('b',v),node('span',label));el('overview').append(box)}
  let limit=20,matches=[];
  function draw(){
  const words=el('q').value.toLowerCase().trim().split(/\s+/),start=el('start').value,end=el('end').value;
  const query=words.map(w=>el('mode').value==='literal'?w:stem(w.replaceAll('ё','е')));
- matches=rows.filter(r=>{const date=(r.published||'').slice(0,10);return (!start||date>=start)&&(!end||date&&date<=end)&&(!el('publisher').value||r.source===el('publisher').value)&&(!el('sector').value||(r.topics||'').split(' · ').includes(el('sector').value))&&(!el('geo').value||russianContext(r)===(el('geo').value==='ru'))&&query.every(w=>[r.title,r.source,r.topics].join(' ').toLowerCase().replaceAll('ё',el('mode').value==='literal'?'ё':'е').includes(w))});
+ matches=rows.filter(r=>{const date=(r.published||'').slice(0,10);return (!el('kind').value||sourceKind(r)===el('kind').value)&&(!start||date>=start)&&(!end||date&&date<=end)&&(!el('publisher').value||r.source===el('publisher').value)&&(!el('sector').value||(r.topics||'').split(' · ').includes(el('sector').value))&&(!el('geo').value||russianContext(r)===(el('geo').value==='ru'))&&query.every(w=>[r.title,r.source,r.topics].join(' ').toLowerCase().replaceAll('ё',el('mode').value==='literal'?'ё':'е').includes(w))});
  el('count').textContent=start&&end&&start>end?'Начальная дата позже конечной':('Найдено материалов: '+fmt(matches.length));el('list').replaceChildren();
  for(const r of matches.slice(0,limit)){const card=node('article',''),h=node('h3',''),a=node('a',r.title);a.href=r.url;h.append(a);card.append(node('small',[r.published?.slice(0,10),r.source,r.topics].filter(Boolean).join(' · ')),h);el('list').append(card)}
  el('more').hidden=matches.length<=limit;el('newscsv').disabled=!matches.length;
