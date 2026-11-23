@@ -71,6 +71,12 @@ def init():
         legislation.setup(db)
         for row in json.loads((ROOT/"initial.json").read_text()):
             put(db,*row,now(),update=False)
+ECONOMIC_RUBRICS = {
+    "https://tass.ru/rss/v2.xml": {"Экономика и бизнес"},
+    "https://www.pnp.ru/rss/index.xml": {"Экономика"},
+    "https://www.interfax.ru/rss.asp": {"Экономика", "Бизнес"},
+}
+
 def items(xml, base):
     root = ET.fromstring(xml)
     for el in root.iter():
@@ -79,6 +85,9 @@ def items(xml, base):
         raise ValueError("Ответ источника не является RSS/Atom")
     for entry in root.iter():
         if entry.tag not in ("item","entry"):
+            continue
+        allowed = ECONOMIC_RUBRICS.get(base)
+        if allowed and not any(tag.text in allowed for tag in entry.findall("category")):
             continue
         link = next((x.get("href") or x.text for x in entry.findall("link") if x.get("rel","alternate")=="alternate"),"")
         title = (entry.findtext("title") or "").strip()

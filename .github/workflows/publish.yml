@@ -34,6 +34,8 @@ jobs:
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=налог' > /tmp/monitor-dom.html
           python3 -c "from pathlib import Path; s=Path('/tmp/monitor-dom.html').read_text(); assert 'Найдено материалов: 0' not in s and 'Найдено материалов: ' in s and '<svg ' in s and '<tbody><tr>' in s and 'Изменение валового выпуска:' in s"
+          google-chrome --headless --no-sandbox --disable-gpu --window-size=390,844 --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=инвестиции&publisher=ПРАЙМ&start=2026-11-20&end=2026-11-20' > /tmp/mobile.html
+          python3 -c "from pathlib import Path; s=Path('/tmp/mobile.html').read_text(); assert 'Танзания' in s and 'Найдено материалов: 0' not in s and '2026-09' in s"
       - name: Save updated history
         run: |
           git config user.name 'github-actions[bot]'

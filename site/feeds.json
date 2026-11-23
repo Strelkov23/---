@@ -1,0 +1,200 @@
+[
+  [
+    "Экономика",
+    "Коммерсантъ",
+    "https://www.kommersant.ru/rss/section-economics.xml",
+    "https://www.kommersant.ru/rubric/163"
+  ],
+  [
+    "Макроэкономика и бюджет",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/economics/macro",
+    "https://www.vedomosti.ru/economics"
+  ],
+  [
+    "Финансы",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/finance",
+    "https://www.vedomosti.ru/finance"
+  ],
+  [
+    "Мировая экономика",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/economics/global",
+    "https://www.vedomosti.ru/economics"
+  ],
+  [
+    "Налоги",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/economics/taxes",
+    "https://www.vedomosti.ru/economics"
+  ],
+  [
+    "Технологии",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/technology",
+    "https://www.vedomosti.ru/technology"
+  ],
+  [
+    "Недвижимость",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/realty",
+    "https://www.vedomosti.ru/realty"
+  ],
+  [
+    "Компании и рынки",
+    "ПРАЙМ",
+    "https://1prime.ru/export/rss2/index.xml",
+    "https://1prime.ru/"
+  ],
+  [
+    "Энергетика",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/business/energy",
+    "https://www.vedomosti.ru/business"
+  ],
+  [
+    "Промышленность",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/business/industry",
+    "https://www.vedomosti.ru/business"
+  ],
+  [
+    "Транспорт",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/business/transport",
+    "https://www.vedomosti.ru/business"
+  ],
+  [
+    "АПК",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/business/agriculture",
+    "https://www.vedomosti.ru/business"
+  ],
+  [
+    "Торговля",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/business/retail",
+    "https://www.vedomosti.ru/business"
+  ],
+  [
+    "Банки",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/finance/banks",
+    "https://www.vedomosti.ru/finance"
+  ],
+  [
+    "Фондовый рынок",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/finance/markets",
+    "https://www.vedomosti.ru/finance"
+  ],
+  [
+    "Страхование",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/finance/insurance",
+    "https://www.vedomosti.ru/finance"
+  ],
+  [
+    "Предпринимательство",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/management/entrepreneurship",
+    "https://www.vedomosti.ru/management"
+  ],
+  [
+    "Автопром",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/auto/auto_industry",
+    "https://www.vedomosti.ru/auto"
+  ],
+  [
+    "Новости регулятора",
+    "Банк России",
+    "https://www.cbr.ru/rss/eventrss",
+    "https://www.cbr.ru/press/"
+  ],
+  [
+    "Решения Банка России",
+    "Банк России",
+    "https://www.cbr.ru/rss/RssPress",
+    "https://www.cbr.ru/press/"
+  ],
+  [
+    "Телекоммуникации",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/technology/telecom",
+    "https://www.vedomosti.ru/technology"
+  ],
+  [
+    "ИТ-бизнес",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/technology/it_business",
+    "https://www.vedomosti.ru/technology"
+  ],
+  [
+    "Инфраструктура",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/realty/infrastructure",
+    "https://www.vedomosti.ru/realty"
+  ],
+  [
+    "Жилищный рынок",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/realty/housing",
+    "https://www.vedomosti.ru/realty"
+  ],
+  [
+    "Коммерческая недвижимость",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/realty/commercial_property",
+    "https://www.vedomosti.ru/realty"
+  ],
+  [
+    "Госинвестиции",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/economics/state_investments",
+    "https://www.vedomosti.ru/economics"
+  ],
+  [
+    "Решения правительства",
+    "Правительство России",
+    "http://government.ru/news/rss/",
+    "http://government.ru/news/"
+  ],
+  [
+    "Новости ведомств",
+    "Правительство России",
+    "http://government.ru/dep_news/rss/",
+    "http://government.ru/dep_news/"
+  ],
+  [
+    "Налоги и администрирование",
+    "ФНС России",
+    "https://www.nalog.gov.ru/rn77/rss/",
+    "https://www.nalog.gov.ru/"
+  ],
+  [
+    "Менеджмент",
+    "Ведомости",
+    "https://www.vedomosti.ru/rss/rubric/management",
+    "https://www.vedomosti.ru/management"
+  ],
+  [
+    "Экономика и бизнес",
+    "ТАСС",
+    "https://tass.ru/rss/v2.xml",
+    "https://tass.ru/ekonomika"
+  ],
+  [
+    "Экономика",
+    "Парламентская газета",
+    "https://www.pnp.ru/rss/index.xml",
+    "https://www.pnp.ru/economics/"
+  ],
+  [
+    "Экономика",
+    "Интерфакс",
+    "https://www.interfax.ru/rss.asp",
+    "https://www.interfax.ru/business/"
+  ]
+]

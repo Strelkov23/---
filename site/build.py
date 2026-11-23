@@ -5,6 +5,7 @@ from collections import Counter
 from html import escape
 from pathlib import Path
 import monitor as m
+import industry
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -47,8 +48,14 @@ with m.connect() as db:
         (select *,row_number() over(partition by code,year order by seen desc) rn from annual)
         where rn=1 order by year""")]
     write("stats.json",{"series":m.SERIES,"values":latest})
-    failures=[r["url"] for r in checks if r["status"].startswith("Ошибка")]
+    active = {feed[2] for feed in m.FEEDS}
+    failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
+    industry_error = industry.collect(db,m.now())
+    if industry_error:
+        failures.append("Месячная промышленность · " + industry_error)
+    months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
+    write("industry.json", months)
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 for f in ["sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
     shutil.copy(f,out/f)

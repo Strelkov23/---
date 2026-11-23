@@ -93,6 +93,9 @@ async function start(){
  const total=sources.reduce((sum,r)=>sum+r[1],0);
  el('health').textContent='Сборка '+new Date(status.built).toLocaleString('ru',{timeZone:'Europe/Moscow'})+' МСК · ежедневно в 06:17 МСК. '+(status.failures.length?'Частичное обновление: '+status.failures.join(', '):'Проверки прошли успешно.')+(total?' Доля «'+sources[0][0]+'» в новостях: '+fmt(100*sources[0][1]/total)+'%.':'');
  const cite=node('button','Закрепить версию данных в ссылке');cite.onclick=()=>{const url=new URL(location.href);url.searchParams.set('snapshot',version);history.replaceState(null,'',url);cite.textContent='Скопируйте адрес страницы — версия закреплена'};el('health').after(cite);
+ if(el('monthly')){
+   load('industry.json').then(rows=>{for(const row of rows){const tr=el('monthly').insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);const link=node('a','Выпуск Росстата');link.href=row.url;tr.insertCell().append(link)}}).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
+ }
  for(const [fn,id] of [[archive,'count'],[model,'effect'],[stats,'chart']])fn().catch(()=>el(id).textContent='Не удалось загрузить данные. Обновите страницу.')
 }
 start().catch(()=>{if(el('health'))el('health').textContent='Снимок недоступен. Проверьте адрес или откройте главную страницу.'})
