@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-24T13:39:19+00:00",
+  "built": "2026-11-24T13:44:29+00:00",
   "errors": [],
   "warnings": [
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
@@ -17,7 +17,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7477,
+    "archive": 7480,
     "papers": 8166,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -38,12 +38,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "2ef648c23c27703cbd9b68f6dcfd4142c95022ecc86dd00afa680f8ab0274ccc",
-      "bytes": 3628959
+      "sha256": "124595dfa83f9a11261eadb34fad6c4e5e61dea29196fa076cb1b39b19d2f241",
+      "bytes": 3629886
     },
     "literature.json": {
-      "sha256": "0104a01a86b7de4b88e45c9391e1159b69d2529d9ecbf3ad5ad8f3655a481cf9",
-      "bytes": 3423817
+      "sha256": "b68bd7993daf8978f243525f55d02b29b4e80cc346fe24da824a208a0c25148b",
+      "bytes": 3436814
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -58,11 +58,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "2dfbd14e4f338930dae3362497265e6f6e5d4ebaff551f38bb4f7edc7b9c0f4f",
+      "sha256": "28ffcab6d72b492b6a02b5ce81a34ae57cf2915e4a2ea1cdc6afc98cf7ecc555",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "8420691c190cbb5154ddf929f5afa7d24595186e7486b193a6ba1a459151c213",
+      "sha256": "f1fb8ddc88fe8334539e06512b63c67ecdc5175e54e7e1b5076cfcf9c0bd66e7",
       "bytes": 55538
     },
     "sectors.json": {
@@ -70,27 +70,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "3f781f69380f6d68bdaf207781d88726f802c54341f93bcb38905d38f179e63d",
+      "sha256": "f0e6de96356b4a77d3a1b765d0e27517bd84f0091877e0c9608e074f6b062744",
       "bytes": 34616
     },
     "links.json": {
-      "sha256": "60fb863eec5087dc404c2645be927442ec9623f2d3f615def1ce07d5b0c7052d",
-      "bytes": 1382870
+      "sha256": "d2a27f3ed95d1b5eebfcd52fde00693d053ada950140a02373adffec78ec32a9",
+      "bytes": 1384918
     },
     "national.json": {
-      "sha256": "49f57998d3151ed20b967a8c47636646617d330041c48480c878510babf33473",
+      "sha256": "7fc78d306ad06f09044398f9f43ec3845f25ce06f7d759e123872990b24a0fb3",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "143cd4896dd19e2a9f763910b67e0293aa45dd0d8d9116fe9a2fcd316812b424",
+      "sha256": "d23f8df54a03e1623f96ec787695a09ee4f94a93c0e44d0647534c8f22c30370",
       "bytes": 79758
     },
     "industrial.json": {
-      "sha256": "125ea325ea28f5c57c3fd5feb54c78a900350a170232f42af36696046bf5d634",
+      "sha256": "ec4ad69bdd187d49e28ed4f61db4852b662fa1feff07635c1edeeb60f1e5ca6f",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "4d152fb14ec6fedacbbeff2d65a249c9b0fc7e5e3c7a16684db634ec98e10243",
+      "sha256": "baeed583094e19a887e9c78f381a1e1a815a31998efbaac7dca33f1d6e7549b3",
       "bytes": 116117
     },
     "regional-data/GRP_95b8dd2585.json": {
