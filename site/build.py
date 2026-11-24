@@ -87,9 +87,16 @@ with m.connect() as db:
     if industry_error:
         failures.append("Месячная промышленность · " + industry_error)
     db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
-    months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
+    db.execute("create table if not exists industry_verified(period text,value real,url text,checked text,primary key(period,value,url))")
+    months = [dict(r) for r in db.execute("""select m.period,m.value,m.url,v.checked as verified
+        from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) m
+        left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
+        where m.rn=1 order by m.period""")]
     write("industry.json", months)
     cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
+    for c in json.loads((out/"cbr.json").read_text()).values():
+        if c["status"].startswith("Ошибка"):
+            failures.append(c["title"]+" · "+c["status"])
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html"]:
     page(name,Path(name).read_text())
@@ -107,3 +114,6 @@ shutil.copy('chart-export.js',out)
 
 import link_audit
 link_audit.publish(page,out,m.connect,m.now(),"--refresh" in sys.argv)
+
+import quality_gate
+quality_gate.publish(out, Path("../history/published"),m.now())
