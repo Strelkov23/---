@@ -50,6 +50,30 @@ class HistoricalTests(unittest.TestCase):
                 db.execute("insert into hist_sources values(?,?,null,?,?)",(code,"2026-11-24","Ошибка","[]"))
             second=historical.choose_sections(db,"2026-11-24")
             self.assertFalse(set(first)&set(second))
+
+    def test_emiss_retry_rotation_and_migration(self):
+        import sqlite3,emiss_archive
+        with sqlite3.connect(":memory:") as db:
+            db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
+            stamp="2026-11-25"
+            for code in emiss_archive.SPECS:
+                db.execute("insert into hist_sources values(?,?,null,?,?)",("emiss_"+code,"2026-11-24","Ошибка: "+code+".csv.gz: HTTP Error 404","[]"))
+            picked=historical.choose_emiss_codes(db,stamp)
+            self.assertEqual(len(picked),2)
+            for code in picked:
+                historical.import_status(db,"emiss_"+code,code,emiss_archive.primary(code),stamp,"Ошибка: API НЦСЭД: unavailable",False)
+            second=historical.choose_emiss_codes(db,stamp)
+            self.assertEqual(len(second),2)
+            self.assertFalse(set(picked)&set(second))
+            for code in second:
+                historical.import_status(db,"emiss_"+code,code,emiss_archive.primary(code),stamp,"Ошибка: API НЦСЭД: unavailable",False)
+            third=historical.choose_emiss_codes(db,stamp)
+            self.assertEqual(len(third),2)
+            self.assertFalse(set(picked+second)&set(third))
+            for code in third:
+                historical.import_status(db,"emiss_"+code,code,emiss_archive.primary(code),stamp,"Ошибка: API НЦСЭД: unavailable",False)
+            self.assertEqual(historical.choose_emiss_codes(db,stamp),[])
+            self.assertEqual(historical.choose_emiss_codes(db,"2026-12-02"),picked)
     def test_budget_queue_fairness(self):
         import sqlite3
         with sqlite3.connect(":memory:") as db:
