@@ -27,6 +27,17 @@ def state(checked,success,status,now,days,archive=False,available=True):
     if days and now-success>timedelta(days=days):return "overdue"
     return "ok"
 
+def historical_latest(record,series):
+    # Discovery success only means that a catalogue was read, not that its data
+    # were imported. Archive import status may use the primary page as URL.
+    code=record.get("code","")
+    urls={record.get("url")}
+    if code.startswith(("import_","budget_import_")) or re.fullmatch(r"emiss_\d+",code):
+        if not record.get("success"):return None
+        urls.update(f.get("url") for f in record.get("files",[]) if f.get("format") in ("xlsx","zip","parquet","csv.gz","csv","xls"))
+    urls.discard(None);urls.discard("")
+    return latest(x.get("last") for x in series if x.get("source") in urls)
+
 def collect(out,stamp):
     now=dt(stamp)
     if not now:raise ValueError("invalid build timestamp")
@@ -70,8 +81,9 @@ def collect(out,stamp):
     for r in hist.get("sources",[]):
         url=r.get("url","");key=r.get("code") or hashlib.sha256(url.encode()).hexdigest()[:12]
         # The latest year is known for a series, not for every discovery endpoint.
-        periods=[x.get("last") for x in hist["series"] if x.get("source")==url]
-        add("hist-"+key,"Региональная статистика",r.get("title",key),url,r,latest(periods),policy=r.get("retry_policy","Ротация источников и повторная проверка при сборке"),not_before=dt(r.get("next_due")),href="historical.html")
+        observation=historical_latest(r,hist["series"])
+        group="Государственные финансы" if key.startswith(("budget","minfin","import_minfin")) else "Региональная статистика"
+        add("hist-"+key,group,r.get("title",key),url,r,observation,policy=r.get("retry_policy","Ротация источников и повторная проверка при сборке"),not_before=dt(r.get("next_due")),href="historical.html")
     for i,r in enumerate(read("industrial.json").get("sources",[])):
         add("industrial-"+str(i),"Промышленность",r["title"],r["url"],r,policy="Проверка официальных файлов при сборке",href="industrial.html")
     lit=read("literature.json")
