@@ -3,7 +3,7 @@ const node=(tag,text)=>Object.assign(document.createElement(tag),{textContent:te
 const fmt=v=>v.toLocaleString('ru',{maximumFractionDigits:2});
 const params=new URLSearchParams(location.search);
 const requestedSnapshot=params.get('snapshot')||'';
-const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html','historical.html','industrial.html','sector-passports.html']);
+const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html','historical.html','industrial.html','sector-passports.html','monitoring.html','data-centre.html','sectors.html','analysis-centre.html','research-centre.html','quality-centre.html']);
 const currentPage=location.pathname.split('/').at(-1)||'';
 const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnapshot)?requestedSnapshot:'';
 const root=/^[0-9a-f]{40}$/i.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
@@ -151,5 +151,5 @@ start().catch(()=>{if(el('health'))el('health').textContent='Снимок нед
 document.addEventListener('DOMContentLoaded',()=>{
  const n=el('snapshot-notice');if(!n)return;
  if(requestedSnapshot&&!pinned){n.hidden=false;n.textContent='Эта статическая страница отображает текущую сборку, а не закреплённую версию. Для исторических данных используйте статистический центр или сравнение.';const a=node('a',' Открыть закреплённый статистический центр');a.href='statistics.html?snapshot='+encodeURIComponent(requestedSnapshot);n.append(a)}
- else if(pinned){n.hidden=false;n.textContent='Закреплённая версия динамических данных: '+pinned+'. Статические страницы и методические тексты относятся к текущей сборке.';for(const a of document.querySelectorAll('header nav a')){const u=new URL(a.href);if(u.origin===location.origin&&dynamicPages.has(u.pathname.split('/').at(-1))){u.searchParams.set('snapshot',pinned);a.href=u.href}}}
+ else if(pinned){n.hidden=false;n.textContent='Закреплённая версия динамических данных: '+pinned+'. Статические страницы и методические тексты относятся к текущей сборке.';for(const a of document.querySelectorAll('header nav a,.section-nav a,.portal-grid a')){const u=new URL(a.href);if(u.origin===location.origin&&dynamicPages.has(u.pathname.split('/').at(-1))){u.searchParams.set('snapshot',pinned);a.href=u.href}}}
 });
