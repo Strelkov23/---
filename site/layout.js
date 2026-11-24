@@ -10,6 +10,9 @@
    const wrap=document.createElement('div');wrap.className='table-scroll';
    parent.insertBefore(wrap,table);wrap.append(table);
   }
+  for(const svg of root.querySelectorAll('.regional-figure-scroll svg')){
+   const width=svg.viewBox.baseVal.width;if(width>0&&svg.style.minWidth!==width+'px')svg.style.minWidth=width+'px';
+  }
   for(const wrap of root.querySelectorAll(known)){
    if(!wrap.querySelector('table'))continue;
    if(!wrap.hasAttribute('tabindex'))wrap.tabIndex=0;
@@ -22,7 +25,7 @@
   enhance(main);
   let scheduled=false;
   new MutationObserver(records=>{
-   if(scheduled||!records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches('table')||n.querySelector('table')))))return;
+   if(scheduled||!records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches('table,svg')||n.querySelector('table,svg')))))return;
    scheduled=true;queueMicrotask(()=>{scheduled=false;enhance(main)});
   }).observe(main,{childList:true,subtree:true});
  }
