@@ -202,7 +202,7 @@ def select_mirror(rows,section,limit=4):
         candidates=[(k,v) for k,v in by.items() if k not in picked and re.search(pat,norm(v[0]["title"]))]
         if candidates:
             # Prefer the largest complete historical series, not the first arbitrary CSV row.
-            picked.append(max(candidates,key=lambda item:(len(item[1]),item[0]))[0])
+            picked.append(max(candidates,key=lambda item:(len(item[1]),item[1][0]["unit"]=="млн руб.",item[0]))[0])
     if not picked:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
