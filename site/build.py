@@ -14,6 +14,7 @@ import historical
 import industrial_data
 import sector_passports
 import routes
+import navigation
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -30,7 +31,7 @@ def page(name, body):
     match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
     title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
     shell=Path("shell.html").read_text()
-    (out / name).write_text(shell.replace("<!--TITLE-->",escape(title)).replace("<!--BODY-->",body),encoding="utf-8")
+    (out / name).write_text(shell.replace("<!--TITLE-->",escape(title)).replace("<!--NAV-->",navigation.primary(name)).replace("<!--SECTION-NAV-->",navigation.secondary(name)).replace("<!--BODY-->",body),encoding="utf-8")
 
 with m.connect() as db:
     articles = [dict(r) for r in db.execute("""select a.title,a.url,a.published,a.seen,a.source,
@@ -120,7 +121,8 @@ for name in ["desk.html","compare.html","statistics.html","diagnostics.html","sc
     page(name,Path(name).read_text())
 for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js","historical.js","regional-disparities.js","industrial.js","sector-passports.js"]:
     shutil.copy(f,out/f)
-page("index.html",Path("home.html").read_text())
+page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navigation.cards()))
+navigation.publish(page)
 
 import atlas
 atlas.publish(page, out)
