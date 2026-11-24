@@ -2,11 +2,14 @@ const el=id=>document.getElementById(id);
 const node=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 const fmt=v=>v.toLocaleString('ru',{maximumFractionDigits:2});
 const params=new URLSearchParams(location.search);
-const pinned=params.get('snapshot')||'';
+const requestedSnapshot=params.get('snapshot')||'';
+const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html']);
+const currentPage=location.pathname.split('/').at(-1)||'';
+const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnapshot)?requestedSnapshot:'';
 const root=/^[0-9a-f]{40}$/.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
 async function load(file){const r=await fetch(root+file);if(!r.ok)throw Error();return r.json()}
 function restore(ids){
- for(const id of ids){const value=params.get(id);if(value!==null){const field=el(id);if(field.tagName!=='SELECT'||Array.from(field.options).some(o=>o.value===value))field.value=value}}
+ for(const id of ids){const value=params.get(id);if(value!==null){const field=el(id);if(!field)continue;if(field.tagName!=='SELECT'||Array.from(field.options).some(o=>o.value===value))field.value=value}}
 }
 function save(ids){
  const url=new URL(location.href);for(const id of ids){if(el(id).value)url.searchParams.set(id,el(id).value);else url.searchParams.delete(id)}history.replaceState(null,'',url)
@@ -136,7 +139,7 @@ async function start(){
  if(!version){const response=await fetch('version.txt');if(!response.ok)throw Error();version=(await response.text()).trim()}
  const status=await load('status.json'), sources=Object.entries(status.news).sort((a,b)=>b[1]-a[1]);
  const total=sources.reduce((sum,r)=>sum+r[1],0);
- el('health').textContent='Сборка '+new Date(status.built).toLocaleString('ru',{timeZone:'Europe/Moscow'})+' МСК · ежедневно в 06:17 МСК. '+(status.failures.length?'Частичное обновление: '+status.failures.join(', '):'Проверки прошли успешно.')+(total?' Доля «'+sources[0][0]+'» в новостях: '+fmt(100*sources[0][1]/total)+'%.':'');
+ el('health').textContent='Сборка '+new Date(status.built).toLocaleString('ru',{timeZone:'Europe/Moscow'})+' МСК · ежедневно в 06:17 МСК. '+(status.failures.length?'Частичное обновление: '+status.failures.length+' источников; подробности в методологии.':'Зарегистрированных ошибок нет.')+(total?' Доля «'+sources[0][0]+'» в новостях: '+fmt(100*sources[0][1]/total)+'%.':'');
  const cite=node('button','Закрепить версию данных в ссылке');cite.onclick=()=>{const url=new URL(location.href);url.searchParams.set('snapshot',version);history.replaceState(null,'',url);cite.textContent='Скопируйте адрес страницы — версия закреплена'};el('health').after(cite);
  if(el('monthly')){
    load('industry.json').then(rows=>{for(const row of rows){const tr=el('monthly').insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);const link=node('a','Выпуск Росстата');link.href=row.url;tr.insertCell().append(link)}}).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
@@ -144,3 +147,9 @@ async function start(){
  for(const [fn,id] of [[archive,'count'],[model,'effect'],[stats,'chart']])fn().catch(()=>el(id).textContent='Не удалось загрузить данные. Обновите страницу.')
 }
 start().catch(()=>{if(el('health'))el('health').textContent='Снимок недоступен. Проверьте адрес или откройте главную страницу.'})
+
+document.addEventListener('DOMContentLoaded',()=>{
+ const n=el('snapshot-notice');if(!n)return;
+ if(requestedSnapshot&&!pinned){n.hidden=false;n.textContent='Эта статическая страница отображает текущую сборку, а не закреплённую версию. Для исторических данных используйте статистический центр или сравнение.';const a=node('a',' Открыть закреплённый статистический центр');a.href='statistics.html?snapshot='+encodeURIComponent(requestedSnapshot);n.append(a)}
+ else if(pinned){n.hidden=false;n.textContent='Закреплённая версия динамических данных: '+pinned+'. Статические страницы и методические тексты относятся к текущей сборке.';for(const a of document.querySelectorAll('header nav a')){const u=new URL(a.href);if(u.origin===location.origin&&dynamicPages.has(u.pathname.split('/').at(-1))){u.searchParams.set('snapshot',pinned);a.href=u.href}}}
+});
