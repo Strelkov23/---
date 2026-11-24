@@ -9,6 +9,7 @@ from urllib.request import Request,urlopen
 from datetime import date
 from collections import defaultdict
 import emiss_archive
+import regional_seed
 
 SOURCES=[
  ("regions","Росстат · Социально-экономические показатели субъектов","https://rosstat.gov.ru/folder/210/document/47652"),
@@ -218,6 +219,10 @@ def publish(db,stamp,out,refresh):
                 accepted.append((*key,r["value"],stamp,url,json.dumps(r,ensure_ascii=False)))
         with db:db.executemany("insert or ignore into hist_values values(?,?,?,?,?,?,?,?)",accepted)
         return sum(1 for rr in grouped.values() if len(set(r["value"] for r in rr))==1)
+    # Stable published bulletin, kept as its own dated edition (also available offline).
+    seed=list(regional_seed.rows())
+    n=store(seed,regional_seed.SOURCE,regional_seed.TITLE,"Росстат · опубликованный бюллетень, текстовая транскрипция")
+    sources.append(dict(code="nw_bulletin_2026q1",title=regional_seed.TITLE,url=regional_seed.SOURCE,checked=None,success=None,status="Транскрипция опубликованных таблиц: "+str(n)+" наблюдений; повторная доступность PDF не подтверждена",files=[]))
     if refresh:
         # At most one official workbook for each concept per run; no guessing of columns.
         for code,title,pat,unit,exclude in SPECS:
