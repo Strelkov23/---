@@ -173,6 +173,37 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(historical.parse_budget(blob(base+"01.01.2025, миллионах рублей"),"0503117.xlsx"),[])
         self.assertEqual(historical.parse_budget(blob(base+"01.01.2025, рубли",(120,100)),"0503117.xlsx"),[])
         self.assertEqual(historical.parse_budget(blob(base+"01.01.2025 и 01.02.2025, рубли"),"0503117.xlsx"),[])
+
+    def test_documented_treasury_two_sheet_form(self):
+        b=openpyxl.Workbook();inc=b.active;inc.title="Доходы без АД"
+        inc.append(["Отчет об исполнении федерального бюджета 0503117 на 1 января 2026 г."])
+        inc.append(["Единица измерения: рубли; ОКЕИ 383"])
+        for i in range(13):inc.append([None])
+        inc.append(["Наименование","Код строки","Глава","КБК","Назначения","Исполнено","Неисполнено"])
+        inc.append(["Доходы бюджета – всего в том числе:", "010", "000", "x", 150, 100, 50])
+        inc.append(["Налоговые доходы", "010", "000", "10101010000000000", 60, 50, 10])
+        exp=b.create_sheet("Расходы ФБ")
+        exp.append(["1 января 2026 г."])
+        for i in range(4):exp.append([None])
+        exp.append(["Наименование","Код строки","Глава","Раздел","ЦСР","ВР","Назначения","Исполнено","Неисполнено"])
+        exp.append(["Расходы бюджета – всего","200","x","x","x","x",140,110,30])
+        exp.append(["Результат исполнения бюджета","450","x","x","x","x",10,-10,20])
+        def blob():
+            f=io.BytesIO();b.save(f);return f.getvalue()
+        rows=historical.parse_budget(blob(),"ф. 0503117 на 01.01.2026.xlsx")
+        self.assertEqual([(r["indicator"],r["value"],r["row"],r["column"]) for r in rows],[("BUD_REV",100,17,6),("BUD_EXP",110,7,8),("BUD_BAL",-10,8,8)])
+        self.assertTrue(rows[0]["sheet"].endswith("Доходы без АД"))
+        self.assertTrue(rows[1]["sheet"].endswith("Расходы ФБ"))
+        self.assertEqual({r["year"] for r in rows},{2025})
+        exp["A1"]="1 февраля 2026 г."
+        self.assertEqual(historical.parse_budget(blob(),"0503117.xlsx"),[])
+        exp["A1"]="1 января 2026 г."
+        exp["H6"]="Назначения"
+        self.assertEqual(historical.parse_budget(blob(),"0503117.xlsx"),[])
+    def test_budget_candidate_year_labels(self):
+        self.assertTrue(historical.budget_candidate(dict(format="zip",url="https://roskazna.gov.ru/a.zip",title="Отчет об исполнении ФБ на 1 января 2026")))
+        self.assertTrue(historical.budget_candidate(dict(format="zip",url="https://roskazna.gov.ru/a.zip",title="Годовой отчет об исполнении за 2025 год")))
+        self.assertFalse(historical.budget_candidate(dict(format="zip",url="https://roskazna.gov.ru/a.zip",title="Отчет об исполнении на 1 февраля 2026")))
     def test_emiss_catalogue_html_and_validation(self):
         import emiss_archive
         valid="https://storage.yandexcloud.net/example/61483.parquet"
