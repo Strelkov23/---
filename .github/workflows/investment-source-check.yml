@@ -60,3 +60,19 @@ jobs:
                       else:print("TYPES",i,[type(x).__name__ for x in row],flush=True)
           finally:b.close()
           PY
+
+      - name: Parse Amur workbook with validated schema
+        working-directory: site
+        run: |
+          python3 -m unittest -v test_amur_projects.py
+          python3 - <<'PY'
+          import amur_projects as a
+          from collections import Counter
+          raw=a.fetch(a.BASELINE)
+          rows=a.parse(raw,a.BASELINE)
+          print("AMUR_PARSED",len(rows),flush=True)
+          print("AMUR_STATUS",dict(Counter(r["status"] for r in rows)),flush=True)
+          print("AMUR_SECTORS",len({r["sector"] for r in rows}),flush=True)
+          print("AMUR_MUNICIPALITIES",len({r["municipality"] for r in rows}),flush=True)
+          print("AMUR_VALUES",dict(Counter(r["cost_state"] for r in rows)),dict(Counter(r["jobs_state"] for r in rows)),flush=True)
+          PY

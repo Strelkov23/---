@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -253,6 +253,14 @@ def check(out,previous,stamp):
         if not projects["rows"]:warnings.append("Инвестиционные проекты: нет подтвержденного импорта")
         if projects.get("error"):warnings.append("Инвестиционные проекты: "+projects["error"])
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Инвестиционные проекты: "+str(e))
+    try:
+        import amur_projects as apr
+        amur=data["amur-projects.json"]
+        counts.update(apr.quality(amur))
+        apr.verify_csv(out/"amur-projects.csv",amur)
+        if not amur["rows"]:warnings.append("Амурская область: нет подтвержденного импорта проектов")
+        if amur.get("error"):warnings.append("Амурская область: "+amur["error"])
+    except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Амурская область: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

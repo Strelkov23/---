@@ -126,6 +126,8 @@ def collect(out,stamp):
     add("adm1","География","Границы субъектов Natural Earth",r.get("documentation"),dict(r,success=r.get("downloaded")),policy="Проверка при смене календарного месяца; не юридический реестр",href="economic-map.html")
     projects=read("investment-projects.json")
     add("regional-investment-projects","Предприятия","Бурятия · инвестиционные проекты",projects.get("source") or projects["source_page"],projects,projects.get("edition"),days=7,available=bool(projects["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; HTML при недоступности книги",href="investment-projects.html",failure_days=2)
+    amur=read("amur-projects.json")
+    add("amur-investment-projects","Предприятия","Амурская область · инвестиционные проекты",amur.get("source") or amur["source_page"],amur,amur.get("edition"),days=7,available=bool(amur["rows"]),policy="Проверка раз в 7 суток; при ошибке через 2 суток; отдельный региональный охват",href="amur-projects.html",failure_days=2)
     frp=read("frp-snapshot.json")
     add("frp-documentary","Предприятия","ФРП · документальный снимок итогов",frp["source"],dict(status="Ручной снимок; прямой запрос HTTP 403"),None,archive=True,available=bool(frp["rows"]),policy="Дата итогов не указана; повторная документальная проверка",href="frp-snapshot.html")
     cert=read("park-certificates.json")

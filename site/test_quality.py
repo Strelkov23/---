@@ -43,6 +43,8 @@ class QualityTests(unittest.TestCase):
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
+        import amur_projects
+        amur_projects.publish(lambda *args:None,self.out,self.prev,"2026-11-24",False)
         import investment_projects
         investment_projects.publish(lambda *args:None,self.out,self.prev,"2026-11-24",False)
         import frp_snapshot
