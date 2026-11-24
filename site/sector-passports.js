@@ -8,7 +8,12 @@ const SectorPassports=(()=>{
  const regionGroups={"agriculture":["R_9b96293c7c45f30c_f2cb408b61","R_d7e928d7b9e2a713_f2cb408b61"],"food":["MFG_food_099b62c9d9"],"mining":["R_5f09b90031e93f90_031d7fe105","SHIP_mining_total_099b62c9d9","SHIP_coal_099b62c9d9","SHIP_oil_gas_099b62c9d9","SHIP_metal_ores_099b62c9d9","SHIP_other_mining_099b62c9d9","SHIP_mining_services_099b62c9d9"],"manufacturing":["R_425e9fbbe745e4e6_031d7fe105","MFG_total_099b62c9d9","MFG_food_099b62c9d9","MFG_light_099b62c9d9","MFG_wood_099b62c9d9","MFG_print_099b62c9d9","MFG_oil_rubber_099b62c9d9","MFG_chemical_099b62c9d9","MFG_minerals_099b62c9d9","MFG_metal_099b62c9d9","MFG_electronics_099b62c9d9","MFG_machinery_099b62c9d9","MFG_vehicles_099b62c9d9","MFG_furniture_099b62c9d9","MFG_repair_099b62c9d9"],"machinery":["MFG_electronics_099b62c9d9","MFG_machinery_099b62c9d9","MFG_vehicles_099b62c9d9"],"light":["MFG_light_099b62c9d9"],"chemical":["MFG_chemical_099b62c9d9"],"pharma":["MFG_chemical_099b62c9d9"],"metal":["MFG_metal_099b62c9d9"],"wood":["MFG_wood_099b62c9d9"],"materials":["MFG_oil_rubber_099b62c9d9","MFG_minerals_099b62c9d9"],"energy":["R_975b9c501d870374_099b62c9d9","SHIP_energy_total_099b62c9d9","SHIP_electricity_099b62c9d9","SHIP_gas_distribution_099b62c9d9","SHIP_heat_099b62c9d9"],"utilities":[],"construction":["R_71188b5f455e6cd2_1cd8b8a232","R_fca0666f3b1929ac_1cd8b8a232","R_88230ed30f2f2738_bf6a5a3983"],"transport":["R_305945e51ba007cf_3ff9a059d6","R_84a6f15f95d32308_3ff9a059d6","R_a9a6e02e2fd5305c_3ff9a059d6","R_fcf23e371a2160e4_3ff9a059d6"],"digital":[],"services":["R_1f8efa58e94578b7_fca0b9a0b9","R_d20ed9bce6fc8595_fca0b9a0b9","R_4ea7f66d299541fc_fca0b9a0b9"],"finance":[],"social":[],"technology":["R_74c11af622ab2ebd_d4010eb82b"]};
  function relatedBalance(profile,balance){return (balanceGroups[profile]||[]).flatMap(name=>{const indexes=balance.names.flatMap((n,i)=>n===name?[i]:[]);return indexes.length===1?[{name,i:indexes[0]}]:[]})}
  function relatedRegional(profile,catalog){const by=new Map(catalog.map(r=>[r.code,r]));return (regionGroups[profile]||[]).map(k=>by.get(k)).filter(Boolean)}
- return {financeDelta,relatedBalance,relatedRegional}
+ const capitalScopes={"agriculture":{"assets":["A"],"products":[]},"food":{"assets":[],"products":["meat","poultry","sausages","canned-meat","canned-vegetables","oil","milk","butter","cheese","condensed","flour","groats","bread","sugar","sweets","beer","water","drinks"]},"mining":{"assets":["B"],"products":["coal","sand","stone"]},"manufacturing":{"assets":["C"],"products":["meat","poultry","sausages","canned-meat","canned-vegetables","oil","milk","butter","cheese","condensed","flour","groats","bread","sugar","sweets","beer","water","drinks","cotton","wool","linen","hosiery","knit","shoes","wood","plywood","board","paper","coke","refining","acid","ammonia","fertilizer","plastic","paint","fiber","tires","plastic-pipes","wall-tile","floor-tile","brick","cement","concrete","slate","flat-slate","asbestos-pipes","roofing","pig-iron","steel","stainless","alloy","rolled","steel-pipes","boilers","steam-turbine","gas-turbine","bearings","cranes","tractors","machine-tools","presses","excavators","bulldozers","fridges","motors","cars","trucks","bus-heavy","bus-light"]},"machinery":{"assets":[],"products":["boilers","steam-turbine","gas-turbine","bearings","cranes","tractors","machine-tools","presses","excavators","bulldozers","fridges","motors","cars","trucks","bus-heavy","bus-light"]},"light":{"assets":[],"products":["cotton","wool","linen","hosiery","knit","shoes"]},"chemical":{"assets":[],"products":["acid","ammonia","fertilizer","plastic","paint","fiber"]},"pharma":{"assets":[],"products":[]},"metal":{"assets":[],"products":["pig-iron","steel","stainless","alloy","rolled","steel-pipes"]},"wood":{"assets":[],"products":["wood","plywood","board","paper"]},"materials":{"assets":[],"products":["tires","plastic-pipes","wall-tile","floor-tile","brick","cement","concrete","slate","flat-slate","asbestos-pipes","roofing"]},"energy":{"assets":["D"],"products":[]},"utilities":{"assets":["E"],"products":[]},"construction":{"assets":["F"],"products":[]},"transport":{"assets":["H"],"products":[]},"digital":{"assets":["J"],"products":[]},"services":{"assets":["G","H","I","J","K","L","M","N","O","P","Q","R","S"],"products":[]},"finance":{"assets":["K"],"products":[]},"social":{"assets":["P","Q"],"products":[]},"technology":{"assets":["M"],"products":[]}};
+ function capitalRows(profile,data,year){
+  const scope=capitalScopes[profile]||{assets:[],products:[]};
+  return {assets:(data.assets||[]).filter(r=>r.year===year&&scope.assets.includes(r.code)),products:(data.capacity||[]).filter(r=>r.year===year&&scope.products.includes(r.code))};
+ }
+ return {financeDelta,relatedBalance,relatedRegional,capitalRows}
 })();
 if(typeof module!=='undefined')module.exports=SectorPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -37,6 +42,30 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const [wdi,industry,national]=datasets.map(d=>d.status==='fulfilled'?d.value:null);
   const industrialById=new Map((industry?.series||[]).map(s=>[s.id,s]));
   let balance=null;try{balance=await load('sectors.json')}catch{}
+  let capital=null,capitalHash='',capitalFingerprint='';
+  try{const manifest=await Provenance.validateManifest(await load('data-manifest.json'));const entry=await Provenance.get(manifest,'capital-data.json',root);capital=entry.data;capitalHash=entry.sha256;capitalFingerprint=manifest.data_fingerprint}catch{}
+  const capitalYear=$('sp-capital-year'),capitalStatus=$('sp-capital-status'),capitalAsset=$('sp-capital-assets'),capacityHost=$('sp-capacity-table'),capitalExport=$('sp-capital-export');
+  if(capital){
+   const years=[...new Set([...capital.assets,...capital.capacity].map(r=>r.year))].sort((a,b)=>b-a);
+   capitalYear.replaceChildren(...years.map(y=>new Option(String(y),String(y))));restore(['sp-capital-year']);capitalYear.disabled=false;
+  }
+  function capitalDraw(profile=profiles.find(p=>p.id===picker.value)){
+   if(!profile)return;
+   capitalAsset.replaceChildren();capacityHost.replaceChildren();capitalExport.disabled=true;
+   if(!capital){capitalStatus.textContent='Проверенный документальный снимок недоступен для этой версии.';return}
+   const year=Number(capitalYear.value),rows=SectorPassports.capitalRows(profile.id,capital,year),value=v=>Number.isFinite(v)?fmt(v):'—';
+   capitalStatus.textContent=year+' · разделов фондов: '+rows.assets.length+' · продуктов: '+rows.products.length+' · '+capital.verification;
+   function table(host,headers,values){
+    if(!values.length){host.append(node('p','Нет однозначно связанных записей. Общий итог отрасли не подставляется.'));return}
+    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();for(const label of headers)h.append(node('th',label));for(const row of values){const tr=body.insertRow();for(const v of row)tr.insertCell().textContent=v}host.append(t)
+   }
+   table(capitalAsset,['ОКВЭД2','Раздел деятельности','Фонды, млн руб.','Износ, %','Обновление, %','Выбытие, %'],rows.assets.map(r=>[r.code,r.title,value(r.stock_mrub),value(r.wear_pct),value(r.renewal_pct),value(r.disposal_pct)]));
+   table(capacityHost,['Продукт','Использование мощности, %','Незагруженная доля, %','Условный прирост к выпуску, %','Охват'],rows.products.map(r=>[r.title,value(r.utilization_pct),value(r.unused_share_pct),value(r.theoretical_extra_vs_output_pct),r.coverage]));
+   capitalExport.disabled=!(rows.assets.length||rows.products.length);
+   capitalExport.onclick=()=>csv('sector-capital-'+profile.id+'-'+year+'.csv',[['Паспорт','Год','Тип ряда','Код','Наименование','Показатель','Значение','Единица','Охват','Таблица','Страница','Источник','Проверка','SHA-256 JSON','Отпечаток манифеста','Примечание'],...rows.assets.flatMap(r=>[['stock_mrub','Полная учётная стоимость','млн руб.'],['wear_pct','Износ','%'],['renewal_pct','Обновление','%'],['disposal_pct','Выбытие','%']].map(([key,label,unit])=>[profile.id,year,'ОКВЭД2',r.code,r.title,label,r[key],unit,'Раздел деятельности',r.tables,r.pages,r.source,capital.verification,capitalHash,capitalFingerprint,capital.note])),...rows.products.flatMap(r=>[['utilization_pct','Использование мощности'],['unused_share_pct','Незагруженная доля'],['theoretical_extra_vs_output_pct','Условный прирост к выпуску']].map(([key,label])=>[profile.id,year,'Продукт',r.code,r.title,label,r[key],'%',r.coverage,r.table,r.page,r.source,capital.verification,capitalHash,capitalFingerprint,r.note]))]);save(['sp-capital-year']);
+  }
+  capitalYear.onchange=()=>capitalDraw();
+
   let regional=[];try{regional=(await load('historical.json')).series}catch{}
 
 
@@ -112,7 +141,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   if(financeYear)financeYear.onchange=()=>financeDraw();
   function draw(){
-   const p=profiles.find(p=>p.id===picker.value);if(!p)return;financeDraw(p);
+   const p=profiles.find(p=>p.id===picker.value);if(!p)return;financeDraw(p);capitalDraw(p);
    const q=norm($('sp-q').value.trim()),cov=$('sp-coverage').value,src=provider.value;
    const rows=p.rows.filter(r=>(!src||src===r.provider)&&(!cov||(cov==='yes'?r.count>0:r.count===0))&&norm([r.title,r.id,r.unit].join(' ')).includes(q));
    prepareCharts(rows);
