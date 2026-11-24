@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       const common=years.filter(y=>first.values[y]!=null && second.values[y]!=null);
       el('pair-summary').replaceChildren(); el('pair-table').replaceChildren();
       el('pair-status').textContent=common.length ? 'Совместных наблюдений: '+common.length+' · '+common[0]+'–'+common.at(-1) : 'За выбранный период общих наблюдений нет.';
+      el('pair-method-warning').textContent=first.unit!==second.unit?'Разные единицы: численные уровни не сравниваются напрямую.':'Одинаковые единицы не доказывают сопоставимость: проверьте знаменатели, цены, определения и охват. Графики имеют независимые шкалы.';
       const headers=['Год',first.title+' ('+first.unit+')',second.title+' ('+second.unit+')'];
       const table=node('table',''),head=table.createTHead().insertRow();
       for(const h of headers) head.append(node('th',h));
@@ -63,7 +64,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
           const delta=s.values[common.at(-1)]-s.values[common[0]];
           box.append(node('p','Изменение за общий период: '+fmt(delta)+' '+(s.unit.startsWith('%')?'п. п.':s.unit)));
         }
-        box.append(trend(s,years),a); if(years.some(y=>s.values[y]!=null))chartTools(box,s.title,s.unit,years,[{name:s.title,code:el(fields[i]).value,values:years.map(y=>s.values[y])}]);el('pair-summary').append(box);
+        const method=node('a','Паспорт методики и ограничения');method.href='data-registry.html?id='+encodeURIComponent('wdi:'+el(fields[i]).value);box.append(trend(s,years),a,node('p',''),method); if(years.some(y=>s.values[y]!=null))chartTools(box,s.title,s.unit,years,[{name:s.title,code:el(fields[i]).value,values:years.map(y=>s.values[y])}]);el('pair-summary').append(box);
       }
       el('pair-csv').disabled=!years.length;
       el('pair-csv').onclick=()=>csv('comparison.csv',[[...headers,'Источник 1','Источник 2'],...rows.map(r=>[...r,...fields.slice(0,2).map(id=>'https://data.worldbank.org/indicator/'+el(id).value+'?locations=RU')])]);

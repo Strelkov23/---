@@ -146,6 +146,8 @@ with sync_playwright() as p:
         page.locator("#registry-group").select_option("capital")
         page.locator("#registry-q").fill("износ")
         assert page.locator("#registry-list article").count()==20
+        page.locator("#registry-list article summary").first.click()
+        assert "Формула или способ получения" in page.locator("#registry-list article details").first.inner_text()
         page.locator("#registry-list article button").first.click()
         page.locator("#registry-selected").check()
         assert page.locator("#registry-list article").count()==1
@@ -161,8 +163,14 @@ with sync_playwright() as p:
         assert d.value.suggested_filename=="data-registry-observations.csv"
         content=d.value.path().read_text(encoding="utf-8-sig")
         assert "wear_pct" in content and "2024" in content and "Наблюдение" in content
+        assert "method_formula" in content and "method_caution" in content
         page.locator("#registry-clear").click()
         assert page.locator("#registry-list article").count()==0
+        page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
+        assert page.locator("#registry-list article").count()==1
+        page.goto("http://localhost:8765/method-passports.html",wait_until="load")
+        assert page.locator("main .portal-grid article").count()==26
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

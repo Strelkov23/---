@@ -14,3 +14,6 @@ assert.equal(v.kind,'Расчётная экстраполяция');assert.equa
 const a={...w,group:'capital',code:'C.wear_pct',count:1};
 assert.equal(R.observations(a,{assets:[{code:'C',year:2024,wear_pct:54.4},{code:'D',year:2024,wear_pct:51.6}]}).at(0).value,54.4);
 console.log('Deterministic registry search and observations export tests passed');
+
+assert.deepEqual(R.filter(rows,{...p,exactId:"b"},new Set()).map(x=>x.id),["b"]);
+assert.deepEqual(R.filter([{...rows[0],method_level:"source"},{...rows[1],method_level:"explained"}],{...p,methodLevel:"source"},new Set()).map(x=>x.id),["a"]);
