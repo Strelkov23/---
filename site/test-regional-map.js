@@ -99,3 +99,21 @@ assert.equal(F(profitCurrent,[{...profitPrev,year:2023}]),null);
 assert.equal(F(profitCurrent,[{...profitPrev,local_code:'21'}]),null);
 assert.equal(F(profitCurrent,[{...profitPrev,metric:'assets'}]),null);
 assert.equal(F(profitCurrent,[profitPrev,profitPrev]),null);
+
+const regionRow=(code,unit,value,year=2024,region='Московская область')=>({code,unit,r:{region,year,value}});
+const profile=[
+ regionRow('R_88230ed30f2f2738_bf6a5a3983','В фактически действовавших ценах, миллионов рублей',200),
+ regionRow('GRP_95b8dd2585','млн руб.',1000),
+ regionRow('R_65254a01945743d3_1db3db8e79','Тысяч человек',5),
+ regionRow('R_77976ed27f49b4fd_28f4b5b380','млн руб.',80),
+ regionRow('R_8728bc736516e87c_28f4b5b380','млн руб.',100),
+ regionRow('R_88f3fb354016c809_4c391d1044','Число родившихся на 1000 человек населения',7),
+ regionRow('R_2308ddd83ecf600c_4c391d1044','Число умерших на 1000 человек населения',10)
+];
+assert.deepEqual(M.deriveProfile(profile).map(x=>x.value),[20,200000,-20,-3]);
+assert.deepEqual(M.deriveProfile([]).map(x=>x.value),[null,null,null,null]);
+assert.equal(M.deriveProfile(profile.map((x,i)=>i===1?{...x,r:{...x.r,year:2023}}:x))[0].value,null);
+assert.equal(M.deriveProfile(profile.map((x,i)=>i===1?{...x,r:{...x.r,region:'Москва'}}:x))[1].value,null);
+assert.equal(M.deriveProfile(profile.map((x,i)=>i===2?{...x,r:{...x.r,value:0}}:x))[1].value,null);
+assert.equal(M.deriveProfile(profile.map((x,i)=>i===3?{...x,unit:'млрд руб.'}:x))[2].value,null);
+assert.equal(M.deriveProfile(profile.map((x,i)=>i===5?{...x,r:{...x.r,value:0}}:x))[3].value,-10);
