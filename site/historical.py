@@ -37,6 +37,17 @@ REGIONAL_ZIPS={
  "farming":"farming","manufacturing":"industry",
  "living":"03","capital":"09","ict":"17","prices":"20","foreign_trade":"21"
 }
+MIRROR_TITLES={
+ "population":"Население","labor":"Рынок труда","grp":"Валовой региональный продукт",
+ "investment":"Инвестиции","industry":"Промышленность","finance":"Финансы и бюджеты",
+ "enterprises":"Предприятия и организации","agriculture":"Сельское хозяйство",
+ "construction":"Строительство","trade":"Торговля и услуги","transport":"Транспорт",
+ "innovation":"Наука и инновации","farming":"АПК · специализированные таблицы",
+ "manufacturing":"Промышленность · специализированные таблицы","living":"Уровень жизни и доходы",
+ "capital":"Основные фонды","ict":"Связь и цифровая инфраструктура",
+ "prices":"Цены","foreign_trade":"Внешняя торговля"
+}
+def mirror_title(section):return "Архив регионов · "+MIRROR_TITLES[section]
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
 PRIMARY="https://rosstat.gov.ru/folder/210/document/13204"
@@ -713,14 +724,14 @@ def publish(db,stamp,out,refresh):
                 status="Ключей выбранных основных показателей: "+str(n)
                 db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,status,"[]"))
                 if section=="industry":db.execute("insert or replace into hist_sources values(?,?,?,?,?)",("mirror_industry_activity_v2",stamp,stamp,status,"[]"))
-                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=stamp,status=status,files=[]))
+                sources.append(dict(code=code,title=mirror_title(section),url=url,checked=stamp,success=stamp,status=status,files=[]))
             except Exception as e:
                 status="Ошибка: "+str(e)[:160]
                 db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,status,"[]"))
                 if section=="industry":
                     db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",("mirror_industry_activity_v2",stamp,status,"[]"))
                 old=db.execute("select success from hist_sources where code=?",(code,)).fetchone()
-                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=old[0] if old else None,status=status,files=[]))
+                sources.append(dict(code=code,title=mirror_title(section),url=url,checked=stamp,success=old[0] if old else None,status=status,files=[]))
     # Include historical check metadata even if this build used cached data.
     present={s["code"] for s in sources}
     for code,checked,success,status,raw_files in db.execute("select code,checked,success,status,files from hist_sources"):
@@ -755,7 +766,7 @@ def publish(db,stamp,out,refresh):
         if code in present:continue
         row=db.execute("select checked,success,status from hist_sources where code=?",(code,)).fetchone()
         url=mirror_url(section)
-        sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=row[0] if row else None,success=row[1] if row else None,status=row[2] if row else "Ожидается загрузка",files=[]))
+        sources.append(dict(code=code,title=mirror_title(section),url=url,checked=row[0] if row else None,success=row[1] if row else None,status=row[2] if row else "Ожидается загрузка",files=[]))
     for s in sources:
         code=s["code"]
         if code.startswith("mirror_"):sd,fd=30,2
@@ -765,6 +776,8 @@ def publish(db,stamp,out,refresh):
         else:continue
         s["next_due"]=due_date(s.get("checked"),s.get("success"),stamp,sd,fd)
         s["retry_policy"]=f"После успеха: {sd} суток; после ошибки: {fd} суток; очередь ограничена."
+        if code.startswith("mirror_"):
+            s["retry_policy"]+=" Фиксированный архивный выпуск, не оперативная статистика."
         if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
             if not s.get("success") and s["status"].startswith("Ошибка: "+code[6:]+".csv.gz:"):
                 s["next_due"]=stamp[:10]
