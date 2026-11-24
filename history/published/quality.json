@@ -1,8 +1,8 @@
 {
-  "built": "2026-11-24T18:37:21+00:00",
+  "built": "2026-11-24T18:46:27+00:00",
   "errors": [],
   "warnings": [
-    "https://www.pnp.ru/rss/index.xml",
+    "FAOSTAT: неполная детализация использования: 75",
     "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T18:43:43+00:00",
     "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T18:43:43+00:00",
     "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T18:43:43+00:00",
@@ -31,7 +31,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7771,
+    "archive": 7785,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -49,16 +49,21 @@
     "industrial_observations": 33806,
     "sector_passports": 14,
     "sector_linked_series": 179,
+    "fbs_product_years": 105,
+    "fbs_observations": 1074,
+    "fbs_complete_resource_balances": 105,
+    "fbs_resource_discrepancies": 0,
+    "fbs_incomplete_use": 75,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "ddd4ef8a07d528c6f3e2edcad99a2b1b2ca97ef05071ff14c49638abf5e0e455",
-      "bytes": 3758277
+      "sha256": "4b9c023014a19309d9bffef5f3553fdc90f57906a5c721f8f657e46ae79c6e03",
+      "bytes": 3765680
     },
     "literature.json": {
-      "sha256": "48fe2679bdec52795dfeaedaed5c33788f8e439fea82fa0ce0e4d8fb4e46cfbb",
-      "bytes": 4821030
+      "sha256": "50aef5936ab9d93da1e7ae696357cdd634a4fcc8c5dde4160722fd02223eb310",
+      "bytes": 4836168
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -73,11 +78,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "9ae7e4bf876bedc705f2eb2c04fe86cac7b74aa204185b7ed798b7ab2920588b",
+      "sha256": "d780fc036014bcac32bd7ce26cee7a977ca6ae49048dd56471fe7008d872f8c4",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "058dcd8d897a458db851c4c9ca69e763ff2d0182212aa7cf42e7569d1aef3e62",
+      "sha256": "785c93a1e8d6fc7a7473e86811dac31474ec13eedc5bf9cd35c15687f8cfd48e",
       "bytes": 55538
     },
     "sectors.json": {
@@ -85,32 +90,36 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "9679fae32c16fda6e5cd63e665c7d2a579a15f84a6a8ce596b7fa2c9f92ee35f",
-      "bytes": 36405
+      "sha256": "101459fe5f187462c0181c6d4b022515cfaab2e6f6b043f71e8ba08ab8ca9fde",
+      "bytes": 36366
     },
     "links.json": {
-      "sha256": "b645e1338d32035c0aea49c511b74fde581e70331b8a28b18a93e1eb105ab0b0",
-      "bytes": 1473727
+      "sha256": "44b5a945bfafbc6639d50ee5a1134beb5bc11cd2da959404643bbdd63b73ffc6",
+      "bytes": 1476786
     },
     "national.json": {
-      "sha256": "897c76abfbd338e22d37e8b0b09ded17fc150432cf327d12185ec251d6e94dde",
+      "sha256": "22866fa47a24eea1b28a79d1ff3fbbcfc7eeb416e63d50e23d87aae96e02b3c6",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "4c7798e3c9b116d0be9bd2a94858127428ed22ea2ffdae14fe947bec4b3cf73d",
+      "sha256": "1f2643b51750570708301f97a7db9d8b1d25ec5ecd6d6babb9c1e52b0822248f",
       "bytes": 95441
     },
     "industrial.json": {
-      "sha256": "3b9a749e4dff26e6a465e6c69983e237949599c4e6930ccaa3c607b607408119",
+      "sha256": "fb1bc7659d92bca7a353ad42661ccdb9de420acf573793b483574b912c56b326",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "5d8e567c41c687ca809c6c5091ec6deb0501e7f538a22559558a73594e5cffcd",
+      "sha256": "ca389cf81ce1b10f81ad57f6e8ccd56e3706ba8ab751e35310f3ac48064a0021",
       "bytes": 116117
     },
     "regional-boundaries.json": {
       "sha256": "3e0a823031129c349888b0d87cdbd8cac66202b34b1b9d57c5cbb697f982bcd0",
       "bytes": 436
+    },
+    "food-balance.json": {
+      "sha256": "e29f270b7419155335e1ea4218d9217f50672340694f8378e5681e64ff5fc5aa",
+      "bytes": 76801
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
@@ -243,6 +252,10 @@
     "regional-boundaries.geojson": {
       "sha256": "b1c32477d1aa7973e449e9fead6f73565b870acfaa4b856b6764be8ced33436f",
       "bytes": 3001035
+    },
+    "food-balance.csv": {
+      "sha256": "ddc08e76ea3065e468750c6c3e3f43cf8680d11de40a90fbaee4ba27ed3c3c42",
+      "bytes": 181798
     }
   }
 }
