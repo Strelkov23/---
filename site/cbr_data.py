@@ -49,7 +49,7 @@ def publish(db,stamp,out,refresh):
     def ru(d):return d.strftime("%d.%m.%Y")
     specs=[
         ("KEY","Ключевая ставка","% годовых",KEY_PAGE,KEY_PAGE+"?"+urlencode({"UniDbQuery.Posted":"True","UniDbQuery.From":ru(start),"UniDbQuery.To":ru(today)}),key_rows),
-        ("USD","Официальный курс доллара США","₽ за 1 USD",FX_PAGE,FX_URL+"?"+urlencode({"date_req1":ru(start),"date_req2":ru(today),"VAL_NM_RQ":"R01235"}),lambda raw:fx_rows(raw,"R01235")),
+        ("USD","Официальный курс доллара США","₽ за 1 USD",FX_PAGE,FX_URL+"?"+urlencode({"date_req1":start.strftime("%d/%m/%Y"),"date_req2":today.strftime("%d/%m/%Y"),"VAL_NM_RQ":"R01235"}),lambda raw:fx_rows(raw,"R01235")),
     ]
     result={}
     for code,title,unit,page,url,parse in specs:
