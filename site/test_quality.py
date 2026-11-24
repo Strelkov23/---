@@ -33,6 +33,7 @@ class QualityTests(unittest.TestCase):
             "historical.json":{"series":[],"sources":[]},
             "sector-passports.json":{"profiles":[]},
             "regional-boundaries.json":{"status":"unavailable"},
+            "stat-revisions.json":{"schema":1,"builds":[]},
             "freshness.json":{"schema":1,"built":"2026-11-24","rows":[{"id":"fixture","state":"waiting"}]},
         }
         for name,value in self.data.items():self.put(name,value)

@@ -408,6 +408,11 @@ with sync_playwright() as p:
             with page.expect_download() as metal:
                 page.locator("#metal-export").click()
             assert metal.value.suggested_filename.startswith("metal-output-")
+        page.goto("http://localhost:8765/stat-revisions.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#rev-status').textContent.startsWith('Снимок')",timeout=30000)
+        assert page.locator("#rev-build option").count()>0
+        page.locator("#rev-kind").select_option("revised")
+        assert "найдено" in page.locator("#rev-status").inner_text()
         page.goto("http://localhost:8765/freshness.html",wait_until="load")
         page.wait_for_function("document.querySelector('#fresh-status').textContent.startsWith('Срез контроля:')",timeout=30000)
         assert page.locator("#fresh-table tbody tr").count()>0

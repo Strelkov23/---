@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -159,6 +159,11 @@ def check(out,previous,stamp):
         counts.update({"freshness_"+k:v for k,v in freshness.quality(data["freshness.json"]).items()})
     except (ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("Контроль обновлений: "+str(e))
+    try:
+        import stat_revisions
+        counts.update(stat_revisions.quality(data["stat-revisions.json"]))
+    except (ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("Пересмотры статистики: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
