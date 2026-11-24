@@ -3,10 +3,10 @@ const node=(tag,text)=>Object.assign(document.createElement(tag),{textContent:te
 const fmt=v=>v.toLocaleString('ru',{maximumFractionDigits:2});
 const params=new URLSearchParams(location.search);
 const requestedSnapshot=params.get('snapshot')||'';
-const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html']);
+const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html']);
 const currentPage=location.pathname.split('/').at(-1)||'';
 const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnapshot)?requestedSnapshot:'';
-const root=/^[0-9a-f]{40}$/.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
+const root=/^[0-9a-f]{40}$/i.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
 async function load(file){const r=await fetch(root+file);if(!r.ok)throw Error();return r.json()}
 function restore(ids){
  for(const id of ids){const value=params.get(id);if(value!==null){const field=el(id);if(!field)continue;if(field.tagName!=='SELECT'||Array.from(field.options).some(o=>o.value===value))field.value=value}}
