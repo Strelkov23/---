@@ -34,7 +34,8 @@ SOURCES=[
 REGIONAL_ZIPS={
  "population":"01","labor":"02","grp":"08","investment":"10","industry":"12","finance":"19",
  "enterprises":"11","agriculture":"13","construction":"14","trade":"15","transport":"16","innovation":"18",
- "farming":"farming","manufacturing":"industry"
+ "farming":"farming","manufacturing":"industry",
+ "living":"03","capital":"09","ict":"17","prices":"20","foreign_trade":"21"
 }
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
@@ -283,6 +284,15 @@ INDUSTRY_ACTIVITY=[
  r"обеспечени[ея]\s+электрической энергией|производств[ао]\s+и распределени[ея]\s+электроэнергии"]
 MIRROR_PRIORITY["farming"]=MIRROR_PRIORITY["agriculture"]+[r"^продукция сельского хозяйства",r"^валовой сбор зерна",r"^поголовье крупного рогатого скота"]
 MIRROR_PRIORITY["manufacturing"]=MIRROR_PRIORITY["industry"]
+MIRROR_PRIORITY.update({
+ "living":[r"^среднедушевые денежные доходы населения",r"^уровень бедности",r"^численность населения с денежными доходами ниже",r"^реальные располагаемые денежные доходы"],
+ "capital":[r"^наличие основных фондов",r"^степень износа основных фондов",r"^коэффициент обновления основных фондов",r"^коэффициент выбытия основных фондов"],
+ "ict":[r"^число абонентов фиксированного широкополосного доступа",r"^число абонентов мобильного широкополосного доступа",r"^удельный вес домашних хозяйств.*доступ.*интернет",r"^удельный вес организаций.*интернет"],
+ "prices":[r"^индекс[ы]? потребительских цен",r"^стоимость фиксированного набора потребительских товаров и услуг",r"^стоимость условного.*минимального набора продуктов питания",r"^индекс цен производителей промышленных товаров"],
+ "foreign_trade":[r"^экспорт товаров(?:$|:| \()",r"^импорт товаров(?:$|:| \()",r"^внешнеторговый оборот(?:$|:| \()",r"^сальдо торгового баланса"]
+})
+STRICT_MIRROR_SECTIONS={"enterprises","agriculture","construction","trade","transport","innovation","farming","manufacturing","living","capital","ict","prices","foreign_trade"}
+
 def select_mirror(rows,section,limit=4):
     by=defaultdict(list)
     for r in rows:by[r["indicator"]].append(r)
@@ -292,7 +302,7 @@ def select_mirror(rows,section,limit=4):
         if candidates:
             # Prefer the largest complete historical series, not the first arbitrary CSV row.
             picked.append(max(candidates,key=lambda item:(len(item[1]),item[1][0]["unit"]=="млн руб.",item[0]))[0])
-    if not picked and section not in {'enterprises','agriculture','construction','trade','transport','innovation','farming','manufacturing'}:
+    if not picked and section not in STRICT_MIRROR_SECTIONS:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
     if section in ('industry','manufacturing'):
@@ -308,13 +318,22 @@ def select_mirror(rows,section,limit=4):
     return selected
 def mirror_rows(raw,section,selected=False):
     """Accept only explicit long-format schemas. Never infer which field is value."""
-    result=[];recognized=False
+    result=[];recognized=False;headers=[];scanned=0
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
-        candidates=[x for x in z.infolist() if x.filename.lower().endswith(".csv") and x.file_size<60_000_000]
+        all_csv=[x for x in z.infolist() if x.filename.lower().endswith(".csv") and not x.is_dir()]
+        if not all_csv:raise ValueError("В архиве отсутствуют CSV-файлы")
+        # Stream selected large sections rather than rejecting them at 60 MB.
+        # The bounds apply to actual declared uncompressed CSV size and row count.
+        if len(all_csv)>40 or sum(x.file_size for x in all_csv)>200_000_000:
+            raise ValueError("CSV-архив превышает лимит 200 МБ или 40 файлов")
+        candidates=all_csv
         for member in candidates:
             with z.open(member) as f:
                 reader=csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig"),delimiter=";")
-                fields={norm(x):x for x in (reader.fieldnames or [])}
+                header=reader.fieldnames or []
+                headers.append(member.filename+": "+", ".join(header)[:220])
+                fields={norm(x):x for x in header}
+                if len(fields)!=len(header):raise ValueError("Повтор заголовка CSV: "+member.filename)
                 def field(*names):return next((fields[n] for n in names if n in fields),None)
                 keys={
                   "region":field("region","region_name","territory","территория","регион","name_region","object_name"),
@@ -328,6 +347,9 @@ def mirror_rows(raw,section,selected=False):
                 if any(not keys[k] for k in ("region","year","value","title","unit")):continue
                 recognized=True
                 for r in reader:
+                    scanned+=1
+                    if scanned>1_500_000:raise ValueError("Превышен лимит 1,5 млн строк CSV")
+                    if None in r or any(v is None for v in r.values()):raise ValueError("Некорректное число полей CSV: "+member.filename+" / "+str(reader.line_num))
                     def val(k):return str(r.get(keys[k],"") or "").strip()
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
                     if not y or v is None or not title or not unit or not region:continue
@@ -342,14 +364,16 @@ def mirror_rows(raw,section,selected=False):
                             unit="млн руб."
                         else:continue
                     # For new large sections retain only indicators selected by the declared concepts.
-                    if selected and section in {'enterprises','agriculture','construction','trade','transport','innovation','farming'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
+                    if selected and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
                     result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
                     if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
-    if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV")
-    return select_mirror(result,section) if selected else result
+    if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV: "+"; ".join(headers)[:350])
+    result=select_mirror(result,section) if selected else result
+    if not result:raise ValueError("Нет наблюдений выбранных показателей")
+    return result
 
 def minfin_annual_candidates(files):
     return [f for f in files if f["format"]=="xlsx" and urlsplit(f["url"]).hostname=="minfin.gov.ru" and re.search(r"prilozhenie_3_dannye_109-111_.*_god\.xlsx$",unquote(urlsplit(f["url"]).path),re.I)]
