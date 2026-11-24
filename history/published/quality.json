@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-24T21:21:28+00:00",
+  "built": "2026-11-24T21:30:13+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
@@ -35,7 +35,7 @@
     "История · Архив регионов: agriculture · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7826,
+    "archive": 7833,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -71,25 +71,27 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 0,
-    "freshness_ok": 190,
+    "freshness_ok": 192,
     "freshness_unavailable": 18,
     "freshness_waiting": 1,
     "freshness_cached": 11,
     "freshness_archive": 1,
-    "revision_builds": 3,
+    "revision_builds": 4,
     "revision_events": 0,
     "consistency_согласовано": 1443,
     "consistency_нет данных": 96,
+    "finance_workbook_years": 2,
+    "finance_workbook_observations": 244,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "df0e77c23c96e8b1c8b2aa68a2c98315e9be0b964b610c1dbe097e821243a285",
-      "bytes": 3779274
+      "sha256": "b5313f008b52b6140c33165dd07bc2468ad0095d530a36eb4c4792fd1e2f17f1",
+      "bytes": 3781566
     },
     "literature.json": {
-      "sha256": "1a89afb45abe6cd34835610b9e1b4f3cb4ab015b90b4e326e74355f3cc49d29f",
-      "bytes": 5030254
+      "sha256": "2e6a6435870a658f4f1c7b4172d9d1be509c7c6da33c7efbb3c95de8618b0917",
+      "bytes": 5043002
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -104,11 +106,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "c1acc45b0b6190f2a6764a31c64f4477d9a7e6382890a15f2cc7c9805a55a7f2",
+      "sha256": "69b46421f229d565415a0ba1837fbeebd2160436fc9a52a99fe4380d6ef0e37d",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "4b5fab3267cd6ed5113f1b40e4eed0b6f0f172840f1f74c2a33f590fa085b201",
+      "sha256": "d546ecee5e3246233d49f0e21262c9736c9c94b1923e7c96a378adc6da6d5449",
       "bytes": 55538
     },
     "sectors.json": {
@@ -116,27 +118,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "c3c6badd576bc1afe4374485ae9a4bc10db7e5ff6e3d2721bb423a66d987c2c0",
+      "sha256": "ca753cd9d4bfdbe8cf7ef508111686ccdf959d909984ecff7c242a58d547229b",
       "bytes": 36692
     },
     "links.json": {
-      "sha256": "a20b1b2398aad312193e4fbac8529e323fcb33f943882871aec1b4cb43fcccfa",
-      "bytes": 1498716
+      "sha256": "36737c7b614254d0749fb8d8702cda9ee9bcda45889ddda43a80829f7d2d954c",
+      "bytes": 1500793
     },
     "national.json": {
-      "sha256": "8ff16fa4c48727fb8741306b289f7e262c004186c56353e52363899499c3965e",
+      "sha256": "a34ef61636e45f2e703811583c29d57a7b81d8b061f97136e0880ff9cd63e254",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "62f3590e6355d0a22e6a5c2c63b80b90bda986e49ff450c647f55b13af8889c1",
+      "sha256": "8016c9873adff963a6d25ae477084bb79d78200739a96a67b969ec5ff74a012f",
       "bytes": 116542
     },
     "industrial.json": {
-      "sha256": "517f9a0ba99d95d7e27d87874cc4bfef7866f4ed60a07bf5692bde51af63ad08",
+      "sha256": "e6a8c1580d3b0177df0cf5224e005f84c4dc947ab0cc93c8dfc297d6c79ff24c",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "40c5a691a32d23c50bc888febf45044e4107ad861891c5dd13ca8bc9c2489b0b",
+      "sha256": "50196adfe910e64e4789ce7a52e0664693881ca5f329b6d72215b22e5288367f",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -164,16 +166,20 @@
       "bytes": 508
     },
     "freshness.json": {
-      "sha256": "ca6048c27591ff847d807d276692675a7c67654a7d436792892ba7e5f745e70a",
-      "bytes": 128778
+      "sha256": "12e84c24f9625b611d2a098a08da603b60c065f7e1632a6bf6037abf96786cf4",
+      "bytes": 129991
     },
     "stat-revisions.json": {
-      "sha256": "b1dcd000d9b81a6296f66f61f6135a441f3f0197268f7ae01e22b89954df9a04",
-      "bytes": 784
+      "sha256": "23142b8fb2281304b07e68febb4740f20dcd236c0446f3c8b0834097820df8ed",
+      "bytes": 1013
     },
     "consistency.json": {
-      "sha256": "49274e9afe94028851dded64242e58ba771741c88fb74a1b6b965a39e83b7d9b",
+      "sha256": "fce1ffe96774d903deb426f1776c2827f04ab0870cf1ff983bcfc4a4a2d512b6",
       "bytes": 257217
+    },
+    "finance-workbooks.json": {
+      "sha256": "5ea5a75f3e349f60160cea3680a21911255a8a30405b3753e2982ba82d26c763",
+      "bytes": 100071
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
