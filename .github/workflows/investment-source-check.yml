@@ -39,3 +39,24 @@ jobs:
           print("PARSED",len(rows),dict(Counter(r["status"] for r in rows)),flush=True)
           print("VALUES",sum(r["cost_mln_rub"] is not None for r in rows),sum(r["jobs"] is not None for r in rows))
           PY
+      - name: Inspect Amur regional workbook schema (no import yet)
+        working-directory: site
+        run: |
+          python3 - <<'PY'
+          import investment_projects as p
+          import io,hashlib,openpyxl,zipfile
+          url="https://www.invest.amurobl.ru/upload/iblock/f3b/3p1q88k692k67ub94yaa643moq6cyd8w/Reestr-investitsionnyy-proektov-01.10.2026.xlsx"
+          raw=p.fetch(url)
+          print("AMUR_XLSX",len(raw),hashlib.sha256(raw).hexdigest(),flush=True)
+          with zipfile.ZipFile(io.BytesIO(raw)) as z:
+              if sum(x.file_size for x in z.infolist())>50000000:raise ValueError("XLSX expansion")
+          b=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+          try:
+              for ws in b:
+                  print("SHEET",ws.title,ws.max_row,ws.max_column,flush=True)
+                  for i,row in enumerate(ws.iter_rows(min_row=1,max_row=8,max_col=min(ws.max_column or 30,30),values_only=True),1):
+                      # Log only header and cell types, not individual project contact details.
+                      if i<=4:print("HEADER",i,[str(x)[:160] if x is not None and not isinstance(x,(int,float)) else type(x).__name__ for x in row],flush=True)
+                      else:print("TYPES",i,[type(x).__name__ for x in row],flush=True)
+          finally:b.close()
+          PY

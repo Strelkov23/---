@@ -118,6 +118,8 @@ def parse_html(raw,url):
     # End of table is an explicit heading in the published page.
     if "Архив реестров" not in text:raise ValueError("HTML: нет границы таблицы")
     text=text.split("Архив реестров",1)[0].strip()
+    # Tilda inserts the literal UI label after the final record; do not strip other text.
+    text=re.sub(r"(?<=\d)\s+Button$", "", text)
     digest=hashlib.sha256(raw).hexdigest();rows=[]
     for n in range(1,64):
         if not text.startswith(str(n)+";"):raise ValueError("HTML: пропущена запись "+str(n))
