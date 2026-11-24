@@ -275,6 +275,12 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#cost-export").click()
         assert d.value.suggested_filename=="cost-scenario.csv"
+        page.locator("#cost-mode").select_option("detailed")
+        assert page.locator("#cost-export").is_disabled()
+        assert page.locator("#cost-shocks input").count()==8
+        page.locator("#cost-shocks input").nth(1).fill("10")
+        page.locator("#cost-run").click()
+        assert "100,16" in page.locator("#cost-result").inner_text()
         page.locator("#cost-year").select_option("2023")
         assert page.locator("#cost-export").is_disabled()
         assert not errors,errors
