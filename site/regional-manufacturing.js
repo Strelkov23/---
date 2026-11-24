@@ -30,8 +30,14 @@ const ManufacturingAtlas=(()=>{
   }
   return {rows:result,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,excluded:checked.excluded,ambiguous:checked.ambiguous}
  }
+ // Compare only identical source territories, group and archive version.
+ // Different statistical editions are expected for different observed years.
+ function changeBetween(a,b){
+  if(!a||!b||a.year>=b.year||a.group!==b.group||a.region!==b.region||a.level!==b.level||a.okato!==b.okato||a.oktmo!==b.oktmo||a.version!==b.version)return null;
+  return {from:a.year,to:b.year,valueDelta:finite(a.value)&&finite(b.value)?b.value-a.value:null,nominalChange:finite(a.value)&&a.value>0&&finite(b.value)?100*(b.value/a.value-1):null,shareDelta:finite(a.share)&&finite(b.share)?b.share-a.share:null,localizationDelta:finite(a.localization)&&finite(b.localization)?b.localization-a.localization:null}
+ }
  function localizationBin(v){return !finite(v)?-1:v<.5?0:v<1?1:v<1.5?2:v<2?3:4}
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -50,10 +56,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   // dataset must be visible, not prevent reading the verified original.
   let extra=null,extraError='';
   try{extra=await Provenance.get(manifest,'regional-mining-energy.json',root)}catch(e){extraError=String(e.message||e)}
-  const data=manufacturing.data,sha256=manufacturing.sha256;
+  const data=manufacturing.data;
   const groups=[...data.groups.map(g=>({...g,section:'C'})),...(extra?.data.groups||[])];
   const combined={groups,rows:[...data.rows,...(extra?.data.rows||[])]};
   const bySection={C:manufacturing,B:extra,D:extra};
+  if(pinned)for(const a of document.querySelectorAll('a[href="regional-manufacturing.json"],a[href="regional-mining-energy.json"]')){const name=a.getAttribute('href');if(manifest.files[name])a.href=root+name;else a.removeAttribute('href')}
+  if(pinned)for(const a of document.querySelectorAll('a[href="regional-manufacturing.csv"],a[href="regional-mining-energy.csv"]')){a.removeAttribute('href');a.textContent+=' (используйте расчётную выгрузку этой версии)'};
   source.replaceChildren(link('Архив «Если быть точным» · '+data.license,data.catalog),document.createTextNode(' · '),link('Исходный ZIP',data.source),document.createTextNode(' · '),link('Росстат: статистические издания',data.primary));
   if(extraError)source.append(node('p','Добыча и энергетика недоступны в этой версии: '+extraError));
   for(const [label,entry] of [['Обработка',manufacturing],['Добыча и энергетика',extra]]){
@@ -93,7 +101,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const svg=document.createElementNS(ns,'svg');for(const [k,v] of Object.entries({viewBox:'0 0 '+w+' '+h,width:w,height:h,role:'img','aria-label':group.title+' — '+metricLabels[metric]}))svg.setAttribute(k,v);
    shape(svg,'rect',{width:w,height:h,fill:'#fff'});const by=new Map(items.map(r=>[r.key,r]));
    const thresholds=RegionalMap.classes(items.map(r=>r[metric]));
-   const theme=group.section==='B'?'industry':group.section==='D'?'energy':RegionalMap.theme('MFG_'+group.id+'_atlas','',group.title);
+   const theme=group.section==='B'?'mining':group.section==='D'?'energy':RegionalMap.theme('MFG_'+group.id+'_atlas','',group.title);
    const palette=metric==='localization'?['#b74e42','#f0b5a0','#dce8e2','#6eae9b','#176c60']:RegionalMap.palette(theme);
    for(const f of features){
     const row=counts.get(f.key)===1?by.get(f.key):null,v=row?.[metric],bin=metric==='localization'?ManufacturingAtlas.localizationBin(v):RegionalMap.bin(v,thresholds);
@@ -126,6 +134,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const table=node('table',''),head=table.createTHead().insertRow();for(const h of ['Группа','Отгрузка, млн руб.','Доля, %','Локализация'])head.append(node('th',h));
     const body=table.createTBody();for(const g of groups.filter(g=>g.section===group.section)){const r=ManufacturingAtlas.calculate(combined,g.id,year,RegionalStats.sample).rows.get(chosen.key);const tr=body.insertRow();const button=node('button',g.title);button.type='button';button.onclick=()=>{$('rm-group').value=g.id;draw()};tr.insertCell().append(button);for(const v of [r?.value,r?.share,r?.localization])tr.insertCell().textContent=number(v)}
     const scroll=node('div','');scroll.className='table-scroll';scroll.append(table);detail.append(scroll,link('Открыть экономическую карту региона',current('economic-map.html',{'geo-region':chosen.code,'geo-year':year})));
+    const sectionYears=years.filter(y=>combined.rows.some(r=>r.year===y&&groups.find(g=>g.id===r.group)?.section===group.section)).sort((a,b)=>a-b);
+    if(sectionYears.length>=2){
+     const start=sectionYears[0],end=sectionYears.at(-1),t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+     for(const label of ['Группа','Отгрузка '+start+', млн руб.','Отгрузка '+end+', млн руб.','Изменение в текущих ценах, %','Изменение доли, п. п.','Изменение локализации'])h.append(node('th',label));
+     for(const g of groups.filter(g=>g.section===group.section)){
+      const a=ManufacturingAtlas.calculate(combined,g.id,start,RegionalStats.sample).rows.get(chosen.key),b=ManufacturingAtlas.calculate(combined,g.id,end,RegionalStats.sample).rows.get(chosen.key),change=ManufacturingAtlas.changeBetween(a,b);
+      const tr=body.insertRow();tr.insertCell().textContent=g.title;
+      for(const v of [a?.value,b?.value,change?.nominalChange,change?.shareDelta,change?.localizationDelta])tr.insertCell().textContent=number(v);
+     }
+     const wrap=node('div','');wrap.className='table-scroll';wrap.append(t);wrap.id='rm-change-table';
+     detail.append(node('h3','Изменение структуры: '+start+'–'+end+' гг.'),node('p','Это два отдельных наблюдения. Изменение отгрузки в текущих ценах не является индексом физического объёма; промежуточные годы не восстановлены. При несовпадении территориального кода или отсутствии значения изменение не рассчитывается.'),wrap);
+    }
    }else detail.append(node('p','Выберите регион на карте или в списке, чтобы открыть его отраслевое досье.'));
    const chart=$('rm-rank-chart');chart.replaceChildren();if(known.length){
     const top=known.slice(0,10),height=68+top.length*29,w=900,svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+w+' '+height);svg.setAttribute('role','img');svg.setAttribute('aria-label','Десять наибольших значений: '+metricLabels[metric]);
