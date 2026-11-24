@@ -3,6 +3,26 @@ from pathlib import Path
 import openpyxl
 import historical
 class HistoricalTests(unittest.TestCase):
+    def test_minfin_annual(self):
+        book=openpyxl.Workbook();s=book.active;s.title="год"
+        s.append(["Приложение 3.1"]);s.append(["Краткая информация об исполнении федерального бюджета (млрд руб.)"])
+        s.append([None,None,2020,2021,2022,2023,2024])
+        s.append([1,"Доходы, всего",100,101,102,103,104])
+        s.append([2,"Расходы, всего",110,111,112,113,114])
+        s.append([3,"Дефицит (-)/Профицит (+)",-10,-10,-10,-10,-10])
+        def blob():
+            b=io.BytesIO();book.save(b);return b.getvalue()
+        rows=historical.parse_minfin_annual(blob())
+        self.assertEqual(len(rows),15)
+        self.assertEqual(rows[2]["value"],-10)
+        self.assertEqual(rows[0]["unit"],"млрд руб.")
+        s["C6"]=-9
+        with self.assertRaises(ValueError):historical.parse_minfin_annual(blob())
+    def test_minfin_discovery(self):
+        base="https://minfin.gov.ru/ru/statistics/fedbud/execute/"
+        links=historical.discover('<a href="/common/Prilozhenie_3_dannye_109-111_—_god.xlsx">Год</a><a href="/common/Prilozhenie_3_dannye_109-111_—_mes.xlsx">Месяц</a>',base)
+        self.assertEqual(len(historical.minfin_annual_candidates(links)),1)
+        self.assertEqual(historical.year(2024.0),2024)
     def test_discovery(self):
         links=historical.discover('<a href="/storage/mediabank/test.xlsx">ВРП</a><a href="https://evil.example/data.xlsx">Bad</a>',"https://rosstat.gov.ru/statistics/accounts")
         self.assertEqual(len(links),1)

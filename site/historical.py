@@ -26,6 +26,7 @@ SOURCES=[
  ("emiss_open","ЕМИСС · Открытые данные","https://fedstat.ru/opendata/"),
  ("emiss","ЕМИСС · Паспорт среднегодового населения","https://fedstat.ru/indicator/31556"),
  ("emiss_grp","ЕМИСС · Валовой региональный продукт","https://fedstat.ru/indicator/61497"),
+ ("minfin_budget","Минфин · Исполнение федерального бюджета","https://minfin.gov.ru/ru/statistics/fedbud/execute/"),
  ("budget","Казначейство · Федеральный бюджет","https://roskazna.gov.ru/ispolnenie-byudzhetov/federalnyj-byudzhet"),
  ("budget_consolidated","Казначейство · Консолидированный бюджет РФ","https://roskazna.gov.ru/ispolnenie-byudzhetov/konsolidirovannyj-byudzhet-rf-i-byudzhetov-gosudarstvennyh-vnebyudzhetnyh-fondov"),
  ("budget_regions","Казначейство · Бюджеты субъектов","https://roskazna.gov.ru/ispolnenie-byudzhetov/konsolidirovannye-byudzhety-subektov-rossijskoj-federacii"),
@@ -45,7 +46,7 @@ def norm(v):return " ".join(str(v if v is not None else "").lower().replace("ё"
 def allowed(url):
     try:
         u=urlsplit(url);h=u.hostname or ""
-        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net","repository.nsedc.ru") or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru")))
+        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net","repository.nsedc.ru") or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru","minfin.gov.ru")))
     except ValueError:return False
 class Anchors(HTMLParser):
     def __init__(self):super().__init__(convert_charrefs=True);self.links=[];self.href=None;self.label=[]
@@ -87,6 +88,7 @@ def numeric(v):
         x=float(v);return x if math.isfinite(x) else None
     except (ValueError,TypeError):return None
 def year(v):
+    if type(v) in (int,float) and math.isfinite(v) and v==int(v) and 1980<=v<=2029:return int(v)
     x=norm(v)
     m=re.fullmatch(r"(19[89]\d|20[0-2]\d)(?:\s*г\.?)?",x)
     return int(m[1]) if m else None
@@ -333,6 +335,42 @@ def mirror_rows(raw,section,selected=False):
     if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV")
     return select_mirror(result,section) if selected else result
 
+def minfin_annual_candidates(files):
+    return [f for f in files if f["format"]=="xlsx" and urlsplit(f["url"]).hostname=="minfin.gov.ru" and re.search(r"prilozhenie_3_dannye_109-111_.*_god\.xlsx$",unquote(urlsplit(f["url"]).path),re.I)]
+def parse_minfin_annual(raw):
+    """Independent annual aggregate from Minfin appendix 3.1, not Treasury form 0503117."""
+    import openpyxl
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        if sum(x.file_size for x in z.infolist())>30_000_000:raise ValueError("Превышен размер XLSX")
+    book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+    try:
+        if "год" not in book.sheetnames:raise ValueError("Нет годового листа")
+        s=book["год"]
+        if (s.max_row or 0)>500 or (s.max_column or 0)>100:raise ValueError("Неожиданный размер")
+        rows=list(s.iter_rows(values_only=True))
+        header=" ".join(norm(v) for row in rows[:2] for v in row)
+        if not re.search(r"краткая информация об исполнении федерального бюджета",header) or not re.search(r"млрд\.?\s*руб",header):raise ValueError("Не совпадает понятие или единица")
+        columns=[(j,year(v)) for j,v in enumerate(rows[2]) if year(v)]
+        if len(columns)<5 or any(b!=a+1 for a,b in zip([y for _,y in columns],[y for _,y in columns][1:])):raise ValueError("Неоднозначные годы")
+        patterns={"MINFIN_REV":r"^доходы,?\s*всего$","MINFIN_EXP":r"^расходы,?\s*всего$","MINFIN_BAL":r"^дефицит\s*\([-−–]\)\s*/\s*профицит\s*\(\+\)$"}
+        indexes={}
+        for i,row in enumerate(rows[3:],4):
+            label=norm(row[1] if len(row)>1 else None).rstrip("* ").strip()
+            for k,pat in patterns.items():
+                if re.fullmatch(pat,label):
+                    if k in indexes:raise ValueError("Повтор агрегата")
+                    indexes[k]=(i,row)
+        if set(indexes)!=set(patterns):raise ValueError("Не найдены три итоговых агрегата")
+        labels={"MINFIN_REV":"Минфин: доходы федерального бюджета","MINFIN_EXP":"Минфин: расходы федерального бюджета","MINFIN_BAL":"Минфин: сальдо федерального бюджета"}
+        result=[]
+        for j,y in columns:
+            vals={k:numeric(row[j]) if j<len(row) else None for k,(i,row) in indexes.items()}
+            if any(v is None for v in vals.values()):raise ValueError("Неполный год")
+            if vals["MINFIN_REV"]<0 or vals["MINFIN_EXP"]<0 or abs(vals["MINFIN_REV"]-vals["MINFIN_EXP"]-vals["MINFIN_BAL"])>0.2:raise ValueError("Нарушено бюджетное тождество за "+str(y))
+            for k,(i,row) in indexes.items():
+                result.append(dict(indicator=k,title=labels[k],region="Российская Федерация",year=y,value=vals[k],unit="млрд руб.",sheet=s.title,row=i,column=j+1,note="Минфин, годовое приложение 3.1. Доходы − расходы = сальдо; допуск 0,2 млрд руб. Не форма 0503117."))
+        return result
+    finally:book.close()
 def parse_budget(raw,filename=""):
     """Annual actual federal budget totals from 0503117 only.
     Require year-end date, rubles, single actual-execution column, balance identity.
@@ -424,6 +462,19 @@ def publish(db,stamp,out,refresh):
                 sources.append(import_status(db,"import_"+code,title,url,stamp,"Ключей: "+str(n)+(f"; отклонено альтернатив: {len(errors)}" if errors else ""),True,[dict(url=url,title=title,format="xlsx")]))
             except Exception as e:
                 sources.append(import_status(db,"import_"+code,title,url,stamp,"Ошибка: "+str(e)[:400],False))
+        # Independent Ministry of Finance aggregate, never substituted into Treasury rows.
+        if due(db,"import_minfin_budget",stamp,7,2):
+            catalog=next((s for s in sources if s["code"]=="minfin_budget"),None)
+            files=minfin_annual_candidates(catalog["files"] if catalog else [])
+            url=catalog["url"] if catalog else "https://minfin.gov.ru/ru/statistics/fedbud/execute/"
+            try:
+                if len(files)!=1:raise ValueError("Не обнаружен единственный годовой файл Минфина")
+                url=files[0]["url"];raw,_=get(url,12_000_000)
+                rows=parse_minfin_annual(raw);n=store(rows,url,"Минфин · Федеральный бюджет","Минфин · годовая статистика исполнения")
+                if not n:raise ValueError("Нет наблюдений")
+                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ключей: "+str(n),True,files))
+            except Exception as e:
+                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ошибка: "+str(e)[:200],False))
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
         budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
         for f in budget_files[:3]:
@@ -475,6 +526,7 @@ def publish(db,stamp,out,refresh):
             title=emiss_archive.SPECS[code[6:]][0];url=emiss_archive.primary(code[6:])
         else:
             title=files[0]["title"] if files else next((t for k,t,*_ in SPECS if code=="import_"+k),code)
+            if not url and code=="import_minfin_budget":url="https://minfin.gov.ru/ru/statistics/fedbud/execute/";title="Годовые итоги федерального бюджета Минфина"
             if not url and code.startswith("import_"):url=DIRECT_FILES.get(code[7:])
         if url:sources.append(dict(code=code,title=title,url=url,checked=checked,success=success,status=status,files=files))
     # Keep every configured regional source visible even between scheduled attempts.
