@@ -207,30 +207,51 @@ jobs:
 
 
 
-      - name: Inspect alternate official editions
+
+      - name: Inspect statistical yearbook and test comparable industrial cross section
         if: github.head_ref == 'stage-03-assets-capacity'
         working-directory: monitor
         run: |
           python3 - <<'PY'
-          import historical as h,openpyxl,io,re
-          from concurrent.futures import ThreadPoolExecutor
-          names=['Nal_of_pus_ved-2024.xlsx','St_izn_of_ved-2024.xlsx','Vvod_of_ved-2024.xlsx','Urov_motsh_2017-2024.xlsx','fin_sost org_2025.xlsx','Koef_of-2024.xlsx']
-          urls=['https://rosstat.gov.ru/storage/mediabank/'+n for n in names]
-          def probe(url):
+          import historical as h,industrial_data as d,openpyxl,io,sqlite3,json
+          from pathlib import Path
+          from unittest.mock import patch
+          for name in ('Pril_Prom_2025.xlsx','Pril_Prom_2023.xlsx'):
+              url='https://www.rosstat.gov.ru/storage/mediabank/'+name
               try:
-                  raw,enc=h.get(url,35000000)
-                  if url.endswith('.xlsx'):
-                      w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
-                      lines=['FILE '+url]
-                      for s in list(w)[:4]:
-                          lines.append(f'SHEET {s.title!r} {s.max_row} {s.max_column}')
-                          for i,r in enumerate(s.iter_rows(values_only=True,max_row=12,max_col=15),1):lines.append(f'ROW {i} {r!r}'[:1200])
-                      w.close()
-                      print('\n'.join(lines),flush=True)
-                  else:
-                      p=h.Anchors();p.feed(raw.decode(enc,errors='replace'))
-                      print('EDITION',url,[(label,href) for href,label in p.links if re.search(r'2025|\.xlsx|\.zip|\.xls|\.htm',href,re.I)][:100],flush=True)
+                  raw,_=h.get(url,35000000)
+                  w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                  print('YEARBOOK',name,len(raw),w.sheetnames[:150],flush=True)
+                  for s in w:
+                      if s.title.lower().strip() in ('содержание','оглавление','contents'):
+                          for r in s.iter_rows(values_only=True,max_row=min(200,s.max_row or 200),max_col=8):
+                              if any('фонд' in str(v).lower() or 'мощност' in str(v).lower() or 'рентабель' in str(v).lower() for v in r):print('INDEX',s.title,repr(r),flush=True)
+                      else:
+                          header=list(s.iter_rows(values_only=True,max_row=10,max_col=15))
+                          title=' '.join(str(v).lower() for row in header[:5] for v in row[:4] if v is not None)
+                          if any(x in title for x in ('степень износа','наличие основных фондов','рентабельность','использования среднегодовой','ввод в действие основных фондов','сальдированный финансовый результат')):
+                              print('TARGET',name,s.title,flush=True)
+                              for i,r in enumerate(header,1):print('ROW',i,repr(r)[:1200],flush=True)
+                  w.close()
               except Exception as e:print('UNAVAILABLE',url,str(e),flush=True)
-          urls+=['https://rosstat.gov.ru/storage/mediabank/Prom_proiz_2025.htm','https://www.rosstat.gov.ru/folder/210/document/13225']
-          with ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(probe,urls))
+          filename='ind_baza_2023.xlsx';url=d.BASE+filename;raw,enc=h.get(url,35000000)
+          with sqlite3.connect(':memory:') as db,patch.dict(d.FILES,{filename:d.FILES[filename]},clear=True),patch('industrial_data.h.get',return_value=(raw,enc)):
+              assert not d.publish(db,'2026-11-24',Path('public'),True)
+          data=json.loads(Path('public/industrial.json').read_text())
+          s=next(s for s in data['series'] if s['kind']=='Индекс производства г/г' and s['code']=='C')
+          Path('/tmp/industrial-query').write_text(s['id'])
+          PY
+          cd public
+          python3 -m http.server 8765 > /tmp/industrial-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/industrial.html > /dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom "http://localhost:8765/industrial.html?ind-series=$(cat /tmp/industrial-query)" > /tmp/cross-dom.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('/tmp/cross-dom.html').read_text()
+          m=re.search(r'Позиций в срезе: (\d+)',s)
+          assert m and int(m[1])>50
+          assert 'Индекс производства г/г' in s and 'Скачать срез CSV' in s
+          print('INDUSTRIAL CROSS SECTION PASSED',m[1])
           PY
