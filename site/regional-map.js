@@ -43,6 +43,7 @@ const RegionalMap=(()=>{
   food:['#fff4cf','#f5d88a','#dcb14d','#ad7b12','#704b07'],
   metal:['#e8edf2','#bfcbd7','#8da3b7','#536f8b','#263f57'],
   machinery:['#e4f4f8','#aadce7','#68b8ca','#277e96','#104c66'],
+  mining:['#efe9df','#d8c5a7','#b89b70','#886a43','#503b23'],
   energy:['#fff2d9','#ffd19c','#f4a458','#c96519','#87340c'],
   agriculture:['#edf4d7','#c9dea2','#91bd67','#548b36','#2d551c'],
   investment:['#f4edfa','#d9c6e9','#b09ad2','#8263b2','#503980'],
@@ -67,6 +68,8 @@ const RegionalMap=(()=>{
  }
  const manufacturingThemes={total:'industry',light:'light',chemical:'chemical',food:'food',metal:'metal',wood:'industry',print:'industry',oil_rubber:'industry',minerals:'industry',electronics:'machinery',machinery:'machinery',vehicles:'machinery',furniture:'industry',repair:'industry'};
  function theme(code,source='',title=''){
+ if(/^SHIP_(?:mining_total|coal|oil_gas|metal_ores|other_mining|mining_services)_/.test(code))return 'mining';
+ if(/^SHIP_(?:energy_total|electricity|gas_distribution|heat)_/.test(code))return 'energy';
  const mfg=Object.keys(manufacturingThemes).find(k=>String(code).startsWith('MFG_'+k+'_'));if(mfg)return manufacturingThemes[mfg];
  const sub=industryTheme(title,source);if(sub)return sub;
  if(/\/data_farming_102_v20260313\.zip$/.test(String(source)))return 'agriculture';
@@ -81,7 +84,7 @@ const RegionalMap=(()=>{
  return 'all';
 }
  function inTheme(s,id){
-  const t=theme(s.code,s.source,s.title);return id==='all'||id===t||(id==='industry'&&industryThemes.some(x=>x[0]===t))
+  const t=theme(s.code,s.source,s.title);return id==='all'||id===t||(id==='industry'&&(t==='mining'||industryThemes.some(x=>x[0]===t)))
  }
  function coverage(catalog,id){
   const items=catalog.filter(s=>inTheme(s,id)),years=items.map(s=>s.last).filter(Number.isInteger),regions=items.map(s=>s.regions).filter(Number.isInteger);
@@ -116,7 +119,7 @@ const RegionalMap=(()=>{
     ratio:value!==null&&Number.isFinite(base)&&base>0&&value>=0?100*value/base:null};
   }).filter(Boolean)
  }
- function passportTheme(id){return ({industry:'manufacturing',light:'light',chemical:'chemical',food:'food',metal:'metal',machinery:'machinery',energy:'energy',agriculture:'agriculture',transport:'transport',ict:'digital',innovation:'technology'})[id]||null}
+ function passportTheme(id){return ({industry:'manufacturing',mining:'mining',light:'light',chemical:'chemical',food:'food',metal:'metal',machinery:'machinery',energy:'energy',agriculture:'agriculture',transport:'transport',ict:'digital',innovation:'technology'})[id]||null}
  function rankProfileCandidates(catalog,id,limit=4){
   return catalog.filter(s=>theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||Number(isGrowth(b.code,b.title,b.unit))-Number(isGrowth(a.code,a.title,a.unit))||b.count-a.count||String(a.code).localeCompare(String(b.code))).slice(0,limit)
  }
