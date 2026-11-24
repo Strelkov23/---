@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     const keys=[...by.keys()].sort(),[y,m]=keys[0].split('-').map(Number),[endY,endM]=keys.at(-1).split('-').map(Number);
     const rows=[];for(let i=y*12+m-1;i<=endY*12+endM-1;i++){
      const k=Math.floor(i/12)+'-'+String(i%12+1).padStart(2,'0'),r=by.get(k);
-     const source=r?node('span',''):'—';if(r){source.append(a('Росстат',r.url));if(r.alternative_url)source.append(document.createTextNode(' · '),a('Бюллетень',r.alternative_url))}rows.push([k,r?f(r.value):'Нет наблюдения',r?f(r.value-100):'—',source,r?(r.verified?'Подтверждено '+r.verified.slice(0,10):'Архивное, повторно не подтверждено'):'—'])
+     const source=r?node('span',''):'—';if(r){source.append(a('Исходная публикация',r.url));if(r.alternative_url)source.append(document.createTextNode(' · '),a('Бюллетень',r.alternative_url));source.append(document.createTextNode(' · '),a('Официальный раздел промышленности','https://www.rosstat.gov.ru/enterprise_industrial'))}rows.push([k,r?f(r.value):'Нет наблюдения',r?f(r.value-100):'—',source,r?(r.verified?'Подтверждено '+r.verified.slice(0,10):'Архивное, повторно не подтверждено'):'—'])
     }
     table($('month-list'),['Месяц','Индекс, %','Прирост г/г, %','Источник','Верификация'],rows)
    }else $('month-list').textContent='Нет доступных наблюдений';
