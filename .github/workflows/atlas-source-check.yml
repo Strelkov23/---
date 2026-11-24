@@ -82,6 +82,21 @@ jobs:
           import hashlib,json
           with urlopen(Request(m.SOURCE,headers={"User-Agent":"Mozilla/5.0"}),timeout=30) as f:
               raw=f.read(35000001)
+          import io,csv,zipfile
+          from decimal import Decimal,InvalidOperation
+          with zipfile.ZipFile(io.BytesIO(raw)) as z:
+              fn=next(x for x in z.namelist() if x.endswith("data_industry_102_v20260313.csv"))
+              with z.open(fn) as f:
+                  all_rows=[r for r in csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig"),delimiter=";") if r["indicator_code"]==m.CODE]
+          print("SOURCE YEARS",sorted({r["year"] for r in all_rows}))
+          print("SOURCE LEVELS",dict(Counter(r["object_level"] for r in all_rows)))
+          print("SOURCE VERSIONS",dict(Counter(r["version_date"] for r in all_rows)))
+          print("SOURCE COUNTRIES",dict(Counter(r["object_name"] for r in all_rows if r["object_level"]=="Страна")))
+          bad=[]
+          for r in all_rows:
+              try:m.number(r["indicator_value"])
+              except ValueError as e:bad.append((r["indicator_value"],r["comment"],r["source"],str(e)))
+          print("INVALID VALUE MARKERS",json.dumps([list(x)+[n] for x,n in Counter(bad).items()],ensure_ascii=False)[:12000])
           rows=m.parse(raw)
           print("MANUFACTURING",json.dumps({"sha256":hashlib.sha256(raw).hexdigest(),"years":sorted({r["year"] for r in rows}),"count":len(rows),"numeric":sum(r["value"] is not None for r in rows),"groups":dict(Counter(r["group"] for r in rows))},ensure_ascii=False))
           PY
