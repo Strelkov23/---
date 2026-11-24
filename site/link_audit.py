@@ -83,6 +83,12 @@ def publish(page,out,connect,stamp,refresh):
         external.update(r[0] for r in db.execute("select url from checks where url is not null") if r[0])
         catalogue=json.loads((out/"literature.json").read_text())
         for m in catalogue.get("registry",{}).values():external.update([m.get("site",""),*m.get("sources",[])])
+        historical=out/"historical.json"
+        if historical.exists():
+            data=json.loads(historical.read_text())
+            for item in data.get("sources",[]):
+                external.add(item["url"])
+                external.update(f["url"] for f in item.get("files",[]))
         external.discard("")
         old={r[0]:(r[1],r[2],r[3]) for r in db.execute("select url,status,detail,checked from site_links")}
         if refresh:
