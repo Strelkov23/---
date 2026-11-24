@@ -353,7 +353,7 @@ def mirror_rows(raw,section,selected=False):
 
 def minfin_annual_candidates(files):
     return [f for f in files if f["format"]=="xlsx" and urlsplit(f["url"]).hostname=="minfin.gov.ru" and re.search(r"prilozhenie_3_dannye_109-111_.*_god\.xlsx$",unquote(urlsplit(f["url"]).path),re.I)]
-def parse_minfin_annual(raw):
+def parse_minfin_annual(raw,diagnostics=None):
     """Independent annual aggregate from Minfin appendix 3.1, not Treasury form 0503117."""
     import openpyxl
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -383,8 +383,15 @@ def parse_minfin_annual(raw):
         result=[]
         for j,y in columns:
             vals={k:numeric(row[j]) if j<len(row) else None for k,(i,row) in indexes.items()}
-            if any(v is None for v in vals.values()):raise ValueError("Неполный год")
-            if vals["MINFIN_REV"]<0 or vals["MINFIN_EXP"]<0 or abs(vals["MINFIN_REV"]-vals["MINFIN_EXP"]-vals["MINFIN_BAL"])>0.2:raise ValueError("Нарушено бюджетное тождество за "+str(y))
+            problem=None
+            if any(v is None for v in vals.values()):problem="Неполный год "+str(y)
+            else:
+                delta=vals["MINFIN_REV"]-vals["MINFIN_EXP"]-vals["MINFIN_BAL"]
+                if vals["MINFIN_REV"]<0 or vals["MINFIN_EXP"]<0 or abs(delta)>0.2:
+                    problem=f"Нарушено бюджетное тождество за {y}: доходы {vals['MINFIN_REV']:.8g}, расходы {vals['MINFIN_EXP']:.8g}, сальдо {vals['MINFIN_BAL']:.8g}, остаток {delta:.8g} млрд руб."
+            if problem:
+                if diagnostics is None:raise ValueError(problem)
+                diagnostics.append(problem);continue
             for k,(i,row) in indexes.items():
                 result.append(dict(indicator=k,title=labels[k],region="Российская Федерация",year=y,value=vals[k],unit="млрд руб.",sheet=s.title,row=i,column=j+1,note="Минфин, годовое приложение 3.1. Доходы − расходы = сальдо; допуск 0,2 млрд руб. Не форма 0503117."))
         return result
@@ -563,18 +570,25 @@ def publish(db,stamp,out,refresh):
             except Exception as e:
                 sources.append(import_status(db,"import_"+code,title,url,stamp,"Ошибка: "+str(e)[:400],False))
         # Independent Ministry of Finance aggregate, never substituted into Treasury rows.
-        if due(db,"import_minfin_budget",stamp,7,2):
+        prior_minfin=db.execute("select status from hist_sources where code='import_minfin_budget'").fetchone()
+        retry_new_parser=bool(prior_minfin and prior_minfin[0].startswith("Ошибка: Нарушено бюджетное тождество за ") and "остаток" not in prior_minfin[0])
+        if retry_new_parser or due(db,"import_minfin_budget",stamp,7,2):
             catalog=next((s for s in sources if s["code"]=="minfin_budget"),None)
             files=minfin_annual_candidates(catalog["files"] if catalog else [])
             url=catalog["url"] if catalog else "https://minfin.gov.ru/ru/statistics/fedbud/execute/"
             try:
                 if len(files)!=1:raise ValueError("Не обнаружен единственный годовой файл Минфина")
                 url=files[0]["url"];raw,_=get(url,12_000_000)
-                rows=parse_minfin_annual(raw);n=store(rows,url,"Минфин · Федеральный бюджет","Минфин · годовая статистика исполнения")
+                excluded=[]
+                rows=parse_minfin_annual(raw,excluded)
+                if not rows:raise ValueError("Нет прошедших проверку годов: "+"; ".join(excluded)[:700])
+                n=store(rows,url,"Минфин · Федеральный бюджет","Минфин · годовая статистика исполнения")
                 if not n:raise ValueError("Нет наблюдений")
-                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ключей: "+str(n),True,files))
+                status="Ключей: "+str(n)
+                if excluded:status+="; частичный импорт; исключено годов: "+str(len(excluded))+"; "+"; ".join(excluded)[:800]
+                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,status,True,files))
             except Exception as e:
-                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ошибка: "+str(e)[:200],False))
+                sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ошибка: "+str(e)[:900],False))
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
         budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if budget_candidate(f)]
         for f in choose_budget_files(db,budget_files,stamp):
