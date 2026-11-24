@@ -100,3 +100,17 @@ jobs:
           rows=m.parse(raw)
           print("MANUFACTURING",json.dumps({"sha256":hashlib.sha256(raw).hexdigest(),"years":sorted({r["year"] for r in rows}),"count":len(rows),"numeric":sum(r["value"] is not None for r in rows),"groups":dict(Counter(r["group"] for r in rows))},ensure_ascii=False))
           PY
+      - name: Check existing published historical archive for numeric missing markers
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,re,collections
+          from pathlib import Path
+          for p in sorted(Path("history/published/regional-data").glob("*.json")):
+              d=json.loads(p.read_text())
+              if "tochno-st-catalog/Rosstat/" not in d.get("source",""):continue
+              rows=d["values"]
+              bad=[r for r in rows if re.fullmatch(r"-([1-9])\1{5,}(?:\.0+)?",str(r["value"]))]
+              if bad:
+                  print("ARCHIVE MARKERS",json.dumps({"file":p.name,"title":d["title"],"markers":dict(collections.Counter(str(r["value"]) for r in bad)),"notes":list(dict.fromkeys(r["note"][:450] for r in bad))[:3]},ensure_ascii=False))
+          PY
