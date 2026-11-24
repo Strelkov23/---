@@ -205,7 +205,12 @@ def select_mirror(rows,section,limit=4):
             picked.append(max(candidates,key=lambda item:(len(item[1]),item[0]))[0])
     if not picked:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
-    return [r for k in picked[:limit] for r in by[k]]
+    selected=[r for k in picked[:limit] for r in by[k]]
+    # Include a separate nationwide budget unit only when its exact indicator title is selected.
+    if section=="finance":
+        titles={r["title"] for r in selected}
+        selected.extend(r for k,v in by.items() if k not in picked and v[0]["title"] in titles and v[0]["unit"]=="млрд руб." for r in v)
+    return selected
 def mirror_rows(raw,section,selected=False):
     """Accept only explicit long-format schemas. Never infer which field is value."""
     result=[]
@@ -230,9 +235,19 @@ def mirror_rows(raw,section,selected=False):
                     def val(k):return str(r.get(keys[k],"") or "").strip()
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
                     if not y or v is None or not title or not unit or not region:continue
+                    # The publisher explicitly uses mixed units for nationwide budget totals.
+                    original_unit=unit
+                    if "для значений в целом по россии" in norm(unit):
+                        if not re.fullmatch(r"миллионов рублей; для значений в целом по россии: млрд руб\.?",norm(unit)):continue
+                        level=norm(r.get("object_level"))
+                        if norm(region) in ("российская федерация","россия") or level in ("страна","россия","рф"):
+                            unit="млрд руб."
+                        elif level in ("регион","федеральный округ","фо"):
+                            unit="млн руб."
+                        else:continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
-                    note=val("note")+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
+                    note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
                     result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
                     if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Не распознана документированная структура CSV")
