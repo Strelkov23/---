@@ -89,9 +89,8 @@ with m.connect() as db:
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
     failures.extend(industrial_data.publish(db,m.now(),out,"--refresh" in sys.argv))
     industrial=json.loads((out/"industrial.json").read_text())
-    aggregate=[s for s in industrial["series"] if s["kind"]=="Индекс производства г/г" and s["code"]=="BCDE" and s["source"]==industrial_data.BASE+"ind_baza_2023.xlsx"]
     # Use the official systematic workbook ahead of obsolete bulletin URLs.
-    primary=aggregate[0] if len(aggregate)==1 else None
+    primary=industrial_data.aggregate_months(industrial,[])
     industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv and not primary else ""
     if industry_error:
         failures.append("Месячная промышленность · " + industry_error)
@@ -102,14 +101,10 @@ with m.connect() as db:
         left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
         where m.rn=1 order by m.period""")]
     if primary:
-        by_period={r["period"]:r for r in months}
-        check=next((x for x in industrial["sources"] if x["url"]==primary["source"]),{})
-        for r in primary["values"]:
-            by_period[r["period"]]=dict(period=r["period"],value=r["value"],url=primary["source"],verified=check.get("success") or r["seen"],sheet=primary["sheet"],row=r["row"],column=r["column"])
-        months=sorted(by_period.values(),key=lambda r:r["period"])
+        months=industrial_data.aggregate_months(industrial,months)
     for row in months:
         alternative=industry.ALTERNATIVES.get(row["period"])
-        if alternative and abs(alternative[0]-row["value"])<1e-8:
+        if not row.get("sheet") and alternative and abs(alternative[0]-row["value"])<1e-8:
             row["alternative_url"]=alternative[1]
     write("industry.json", months)
     cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
