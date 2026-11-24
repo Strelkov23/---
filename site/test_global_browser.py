@@ -185,7 +185,7 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==32
+        assert page.locator("main .portal-grid article").count()==33
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
@@ -283,6 +283,13 @@ with sync_playwright() as p:
         assert "100,16" in page.locator("#cost-result").inner_text()
         page.locator("#cost-year").select_option("2023")
         assert page.locator("#cost-export").is_disabled()
+        page.goto("http://localhost:8765/food-balance.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#fbs-run').disabled")
+        page.locator("#fbs-run").click()
+        assert "сальдо: 0" in page.locator("#fbs-result").inner_text()
+        with page.expect_download() as d:
+            page.locator("#fbs-export").click()
+        assert d.value.suggested_filename=="food-scenario.csv"
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
