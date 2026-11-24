@@ -37,7 +37,7 @@ def norm(v):return " ".join(str(v if v is not None else "").lower().replace("ё"
 def allowed(url):
     try:
         u=urlsplit(url);h=u.hostname or ""
-        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h=="storage.yandexcloud.net" or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru")))
+        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net","repository.nsedc.ru") or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru")))
     except ValueError:return False
 class Anchors(HTMLParser):
     def __init__(self):super().__init__(convert_charrefs=True);self.links=[];self.href=None;self.label=[]
@@ -268,10 +268,9 @@ def publish(db,stamp,out,refresh):
         for code,(title,agency,unit) in emiss_archive.SPECS.items():
             url=emiss_archive.resource(code)
             try:
-                raw,_=get(url,18_000_000)
-                rows=emiss_archive.parse(raw,code,numeric,year)
+                rows,url=emiss_archive.retrieve(code,get,numeric,year)
                 n=store(rows,url,title,agency+" · ЕМИСС, архив НЦСЭД (CC BY)")
-                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="CSV (архив НЦСЭД)",format="csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
+                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
         # One bounded independent processed archive per update; rotate sections.
