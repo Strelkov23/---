@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const s=selected,start=Number($('hist-from').value),end=Number($('hist-to').value),rows=s.values.filter(r=>r.region===region.value&&r.year>=start&&r.year<=end).sort((a,b)=>a.year-b.year);
    $('hist-passport').replaceChildren(node('h2',s.title),node('p',region.value+' · '+s.unit+' · '+s.kind),a('Файл источника',s.source),node('p','Границы территорий и методология соответствуют источнику; пропуски не заполняются.'));
    if(s.kind.includes('Если быть точным'))$('hist-passport').append(a('Описание и лицензия CC BY 4.0',data.mirror));
+   const emiss=s.code.match(/^E_(\d+)_/);if(emiss)$('hist-passport').append(document.createTextNode(' · '),a('Первичный паспорт ЕМИСС','https://fedstat.ru/indicator/'+emiss[1]),document.createTextNode(' · '),a('Карточка и лицензия НЦСЭД','https://repository.nsedc.ru/dataset/emiss_'+emiss[1]));
    const graph=$('hist-graph'),host=$('hist-table');graph.replaceChildren();host.replaceChildren();$('hist-export').disabled=!rows.length;
    status.textContent='Наблюдений: '+rows.length;save(fields);if(!rows.length)return;
    const years=Array.from({length:rows.at(-1).year-rows[0].year+1},(_,i)=>rows[0].year+i),map=new Map(rows.map(r=>[r.year,r.value])),values=years.map(y=>map.get(y)??null);
