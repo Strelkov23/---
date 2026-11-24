@@ -2,6 +2,7 @@
 import os
 import csv
 import io
+import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -164,6 +165,20 @@ with sync_playwright() as p:
         content=d.value.path().read_text(encoding="utf-8-sig")
         assert "wear_pct" in content and "2024" in content and "Наблюдение" in content
         assert "method_formula" in content and "method_caution" in content
+        assert "source_file_sha256" in content and "data_fingerprint" in content
+        manifest=json.loads(Path("data-manifest.json").read_text())
+        assert manifest["files"]["capital-data.json"]["sha256"] in content
+        assert manifest["data_fingerprint"] in content
+        # Same record count, different bytes: the browser must refuse the export.
+        def corrupt(route):
+            response=route.fetch()
+            payload=response.json()
+            payload["assets"][0]["stock_mrub"]+=1
+            route.fulfill(response=response,json=payload)
+        page.route("**/capital-data.json",corrupt)
+        page.locator("#registry-values").click()
+        page.wait_for_function("document.querySelector('#registry-values-status').textContent.includes('Контрольная сумма или размер не совпадают')")
+        page.unroute("**/capital-data.json",corrupt)
         page.locator("#registry-clear").click()
         assert page.locator("#registry-list article").count()==0
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
@@ -171,6 +186,10 @@ with sync_playwright() as p:
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
         assert page.locator("main .portal-grid article").count()==26
+        page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
+        page.locator("#repro-verify").click()
+        page.wait_for_function("document.querySelector('#repro-result').textContent.includes('Совпадает:')")
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
