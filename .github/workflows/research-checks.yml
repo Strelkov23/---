@@ -51,3 +51,29 @@ jobs:
             monitor/public/links.json
           if-no-files-found: ignore
           retention-days: 14
+
+
+      - name: Verify real public regional statistical files
+        if: github.head_ref == 'stage-02-regional-schema' || github.event_name == 'workflow_dispatch'
+        working-directory: monitor
+        run: |
+          python3 - <<'PY'
+          import historical as h
+          from collections import Counter
+          from concurrent.futures import ThreadPoolExecutor
+          tasks=[("vrp",h.DIRECT_FILES["GRP"])]
+          tasks += [(n,h.MIRROR+"data_"+code+"_socio_economic_102_v20260313.zip") for n,code in h.REGIONAL_ZIPS.items()]
+          def probe(task):
+              name,url=task
+              raw,_=h.get(url,35000000)
+              rows=h.parse_vrp(raw) if name=="vrp" else h.mirror_rows(raw,name,selected=True)
+              print("VERIFIED",name,len(rows),"observations",len({r["region"] for r in rows}),"territories",min(r["year"] for r in rows),max(r["year"] for r in rows),flush=True)
+              for (title,unit),n in Counter((r["title"],r["unit"]) for r in rows).items():
+                  print("SERIES",name,n,title,unit,flush=True)
+              assert len(rows)>100 and len({r["region"] for r in rows})>50,name
+              return rows
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              results=list(pool.map(probe,tasks))
+          assert len({r["indicator"] for r in results[0]})>=7
+          print("TOTAL VERIFIED OBSERVATIONS",sum(map(len,results)),flush=True)
+          PY
