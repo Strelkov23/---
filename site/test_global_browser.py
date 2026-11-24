@@ -223,6 +223,15 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/news-map.html",wait_until="load")
         page.wait_for_function("document.querySelector('#news-geo-status').textContent.startsWith('Период до')",timeout=30000)
         assert page.locator("#news-geo-map svg").count()==1
+        assert "Сборка архива:" in page.locator("#news-geo-freshness").inner_text()
+        page.locator("#news-geo-update").click()
+        page.wait_for_function("document.querySelector('#news-geo-freshness').textContent.includes('новых сборок нет')")
+        assert page.locator("#news-geo-map svg").count()==1
+        page.route("**/data-manifest.json",lambda route:route.abort())
+        page.locator("#news-geo-update").click()
+        page.wait_for_function("document.querySelector('#news-geo-freshness').textContent.includes('сохранена предыдущая версия')")
+        assert page.locator("#news-geo-map svg").count()==1
+        page.unroute("**/data-manifest.json")
         page.locator("#news-geo-map .map-controls button").nth(1).click()
         assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
         page.locator("#news-geo-map .map-controls button").nth(2).click()

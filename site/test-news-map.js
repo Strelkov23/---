@@ -14,3 +14,11 @@ assert.equal(N.windowRows(rows,'2026-11-24',7,'Инвестиции','').length,
 assert.equal(N.windowRows([...rows,rows[0]],'2026-11-24',7,'','москва').length,1);
 console.log('Regional news mapping and calendar tests passed');
 assert.deepEqual(codes('В Ямало-Ненецком автономном округе'),['RU-YAN']);
+
+const old={built:'2026-11-23T08:00:00Z',data_fingerprint:'a'},fresh={built:'2026-11-24T08:00:00Z',data_fingerprint:'b'};
+assert.equal(N.updateState(null,old),'initial');
+assert.equal(N.updateState(old,{...old}),'unchanged');
+assert.equal(N.updateState(old,fresh),'new');
+assert.throws(()=>N.updateState(fresh,old));
+assert.throws(()=>N.updateState(old,{...old,data_fingerprint:'c'}));
+assert.throws(()=>N.updateState(old,{built:'bad'}));

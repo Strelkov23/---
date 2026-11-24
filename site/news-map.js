@@ -37,14 +37,22 @@ const NewsGeo=(()=>{
    seen.add(r.url);return true
   }).sort((a,b)=>String(b.published).localeCompare(String(a.published)))
  }
- return {norm,dictionary,mentions,windowRows}
+ function updateState(previous,next){
+  if(!next||!Number.isFinite(Date.parse(next.built)))throw Error('Некорректная дата сборки');
+  if(!previous)return 'initial';
+  if(previous.data_fingerprint===next.data_fingerprint&&previous.built===next.built)return 'unchanged';
+  if(Date.parse(next.built)<=Date.parse(previous.built))throw Error('Получена более старая или противоречивая версия');
+  return 'new';
+ }
+ return {norm,dictionary,mentions,windowRows,updateState}
 })();
 if(typeof module!=='undefined')module.exports=NewsGeo;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),form=$('news-geo-form');if(!form)return;
  const status=$('news-geo-status'),host=$('news-geo-map'),list=$('news-geo-list'),region=$('news-geo-region'),days=$('news-geo-days'),topic=$('news-geo-topic'),query=$('news-geo-query'),more=$('news-geo-more'),exp=$('news-geo-export');
  const fields=['news-geo-days','news-geo-topic','news-geo-region','news-geo-query'];
- let limit=25,selected='',rows=[],groups=new Map(),manifest,names,dict,polygons,archive,end;
+ let limit=25,selected='',rows=[],groups=new Map(),manifest,names,dict,polygons,archive,end,checking=false;
+ const updateButton=$('news-geo-update'),freshness=$('news-geo-freshness');
  const label=code=>{const s=names[code]||code||'—';return s[0].toUpperCase()+s.slice(1)};
  const ns='http://www.w3.org/2000/svg';
  function renderList(){
@@ -99,16 +107,54 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   status.textContent='Период до '+end+' · публикаций: '+rows.length+' · с региональными упоминаниями: '+n+' · без привязки: '+(rows.length-n)+' · регионов: '+groups.size;
   drawMap();select(selected)
  }
- try{
-  manifest=await Provenance.validateManifest(await load('data-manifest.json'));end=String(manifest.built).slice(0,10);
-  const get=async n=>(await Provenance.get(manifest,n,root)).data;
-  const geo=await get('regional-boundaries.geojson');archive=await get('archive.json');
-  names={...RegionalMap.regionNames(),'RU-ARK':'архангельская область','RU-TYU':'тюменская область'};
-  const counts=new Map();for(const f of geo.features){const c=f.properties?.iso_3166_2;if(c)counts.set(c,(counts.get(c)||0)+1)}
-  names=Object.fromEntries(Object.entries(names).filter(([c])=>counts.get(c)===1));dict=NewsGeo.dictionary(names);
-  polygons=geo.features.map(f=>({code:f.properties?.iso_3166_2,name:f.properties?.name,rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
-  const topics=[...new Set(archive.flatMap(r=>String(r.topics||'').split(' · ')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));for(const t of topics)topic.add(new Option(t,t));
-  restore(['news-geo-days','news-geo-topic','news-geo-query']);selected=new URLSearchParams(location.search).get('news-geo-region')||'';
-  days.onchange=topic.onchange=refresh;query.oninput=refresh;region.onchange=()=>select(region.value);more.onclick=()=>{limit+=25;renderList()};form.onsubmit=e=>e.preventDefault();refresh()
- }catch(e){status.textContent='Карта недоступна для этой версии: '+e.message;exp.disabled=true}
+ async function fetchManifest(){
+  const r=await fetch(root+'data-manifest.json',{cache:'no-cache'});if(!r.ok)throw Error('Манифест недоступен');return Provenance.validateManifest(await r.json())
+ }
+ async function liveVersion(){
+  if(pinned)return pinned;
+  const r=await fetch('version.txt',{cache:'no-cache'});if(!r.ok)throw Error('Версия сайта недоступна');
+  const v=(await r.text()).trim();if(!/^[a-f0-9]{40}$/i.test(v))throw Error('Некорректная версия сайта');return v
+ }
+ function freshnessText(){
+  const latest=archive.map(r=>String(r.published||'').slice(0,10)).filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&v<=end).sort().at(-1)||'нет датированных публикаций';
+  const stamp=new Date(manifest.built).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'});
+  return 'Сборка архива: '+stamp+' МСК · последняя дата публикации: '+latest;
+ }
+ async function checkUpdate(){
+  if(checking)return;checking=true;updateButton.disabled=true;
+  const hadData=Boolean(manifest);
+  freshness.textContent=hadData?freshnessText()+' · проверяем обновление…':'Проверка опубликованного архива…';
+  try{
+   const before=await liveVersion(),candidate=await fetchManifest(),state=NewsGeo.updateState(manifest,candidate);
+   if(state==='unchanged'){freshness.textContent=freshnessText()+' · проверено, новых сборок нет';return}
+   const get=async n=>(await Provenance.get(candidate,n,root)).data;
+   const [geo,nextArchive]=await Promise.all([get('regional-boundaries.geojson'),get('archive.json')]);
+   if(!Array.isArray(nextArchive)||!Array.isArray(geo.features))throw Error('Некорректные данные карты');
+   const counts=new Map();for(const f of geo.features){const c=f.properties?.iso_3166_2;if(c)counts.set(c,(counts.get(c)||0)+1)}
+   const nextNames=Object.fromEntries(Object.entries({...RegionalMap.regionNames(),'RU-ARK':'архангельская область','RU-TYU':'тюменская область'}).filter(([c])=>counts.get(c)===1));
+   const nextDict=NewsGeo.dictionary(nextNames);
+   const nextPolygons=geo.features.map(f=>({code:f.properties?.iso_3166_2,name:f.properties?.name,rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
+   // Do not mix files from overlapping deployments.
+   if(!pinned){const [after,confirm]=await Promise.all([liveVersion(),fetchManifest()]);if(before!==after||candidate.data_fingerprint!==confirm.data_fingerprint||candidate.built!==confirm.built)throw Error('Публикация ещё обновляется; повторим проверку')}
+   const oldTopic=topic.value;
+   const topics=[...new Set(nextArchive.flatMap(r=>String(r.topics||'').split(' · ')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+   manifest=candidate;archive=nextArchive;names=nextNames;dict=nextDict;polygons=nextPolygons;end=String(candidate.built).slice(0,10);version=before;
+   topic.replaceChildren(new Option('Все темы',''),...topics.map(t=>new Option(t,t)));
+   if(!hadData){restore(['news-geo-days','news-geo-topic','news-geo-query']);selected=new URLSearchParams(location.search).get('news-geo-region')||''}
+   else if(topics.includes(oldTopic))topic.value=oldTopic;
+   refresh();
+   freshness.textContent=freshnessText()+(pinned?' · закреплённый архив, автообновление выключено':hadData?' · получена новая сборка':' · автоматическая проверка каждые 5 минут');
+  }catch(e){
+   if(hadData)freshness.textContent=freshnessText()+' · проверка не удалась, сохранена предыдущая версия: '+e.message;
+   else{status.textContent='Карта недоступна для этой версии: '+e.message;freshness.textContent='Архив не загружен';exp.disabled=true}
+  }finally{checking=false;updateButton.disabled=Boolean(pinned)}
+ }
+ days.onchange=topic.onchange=()=>{if(manifest)refresh()};query.oninput=()=>{if(manifest)refresh()};region.onchange=()=>{if(manifest)select(region.value)};more.onclick=()=>{limit+=25;renderList()};form.onsubmit=e=>e.preventDefault();
+ updateButton.onclick=checkUpdate;
+ await checkUpdate();
+ if(!pinned){
+  setInterval(()=>{if(!document.hidden)checkUpdate()},300000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+  window.addEventListener('online',checkUpdate)
+ }
 });
