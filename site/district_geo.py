@@ -53,13 +53,14 @@ def publish(out,previous,stamp,refresh):
         quality(previous,old)
         if old["status"] in ("ok","cached"):
             raw=(previous/path.name).read_bytes();meta.update(old);meta["status"]="cached"
+        elif old["status"]=="unavailable":meta.update(old)
     except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
-    if raw is None and refresh:
+    if raw is None and refresh and (meta["status"]!="unavailable" or str(meta.get("checked",""))[:10]!=stamp[:10]):
         try:
             with urlopen(Request(SOURCE,headers={"User-Agent":"EconomicMonitor/2.5"}),timeout=45) as response:payload=response.read(MAX+1)
             inv=validate(payload);raw=payload
-            meta.update(status="ok",downloaded=stamp,sha256=hashlib.sha256(raw).hexdigest(),inventory=inv)
-        except Exception as e:meta.update(status="unavailable",error=str(e)[:200])
+            meta.update(status="ok",checked=stamp,downloaded=stamp,sha256=hashlib.sha256(raw).hexdigest(),inventory=inv);meta.pop("error",None)
+        except Exception as e:meta.update(status="unavailable",checked=stamp,error=str(e)[:200])
     if raw is not None:path.write_bytes(raw)
     elif path.exists():path.unlink()
     meta_path.write_text(json.dumps(meta,ensure_ascii=False,allow_nan=False),encoding="utf-8")

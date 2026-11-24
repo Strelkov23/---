@@ -7,6 +7,21 @@ class HistoricalTests(unittest.TestCase):
         links=historical.discover('<a href="/storage/mediabank/test.xlsx">ВРП</a><a href="https://evil.example/data.xlsx">Bad</a>',"https://rosstat.gov.ru/statistics/accounts")
         self.assertEqual(len(links),1)
         self.assertEqual(links[0]["url"],"https://rosstat.gov.ru/storage/mediabank/test.xlsx")
+    def test_retry_policy(self):
+        self.assertEqual(historical.due_date("2026-11-24","2026-11-24","2026-11-24",7,2),"2026-12-01")
+        self.assertEqual(historical.due_date("2026-11-24","2026-11-23","2026-11-24",7,2),"2026-11-26")
+        self.assertEqual(historical.due_date(None,None,"2026-11-24"),"2026-11-24")
+    def test_queue(self):
+        import sqlite3
+        with sqlite3.connect(":memory:") as db:
+            db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
+            first=historical.choose_sections(db,"2026-11-24")
+            self.assertEqual(len(first),3)
+            for s in first:
+                code="mirror_industry_activity_v2" if s=="industry" else "mirror_"+s
+                db.execute("insert into hist_sources values(?,?,null,?,?)",(code,"2026-11-24","Ошибка","[]"))
+            second=historical.choose_sections(db,"2026-11-24")
+            self.assertFalse(set(first)&set(second))
     def test_import_fallback(self):
         from unittest.mock import patch
         spec=historical.SPECS[1]

@@ -67,7 +67,7 @@ def collect(out,stamp):
         url=r.get("url","");key=r.get("code") or hashlib.sha256(url.encode()).hexdigest()[:12]
         # The latest year is known for a series, not for every discovery endpoint.
         periods=[x.get("last") for x in hist["series"] if x.get("source")==url]
-        add("hist-"+key,"Региональная статистика",r.get("title",key),url,r,latest(periods),policy="Ротация источников и повторная проверка при сборке",href="historical.html")
+        add("hist-"+key,"Региональная статистика",r.get("title",key),url,r,latest(periods),policy=r.get("retry_policy","Ротация источников и повторная проверка при сборке"),not_before=dt(r.get("next_due")),href="historical.html")
     for i,r in enumerate(read("industrial.json").get("sources",[])):
         add("industrial-"+str(i),"Промышленность",r["title"],r["url"],r,policy="Проверка официальных файлов при сборке",href="industrial.html")
     lit=read("literature.json")

@@ -6,7 +6,7 @@ from pathlib import Path
 from html.parser import HTMLParser
 from urllib.parse import urljoin,urlsplit,unquote,quote,urlunsplit
 from urllib.request import Request,urlopen
-from datetime import date
+from datetime import date,timedelta
 from collections import defaultdict
 import emiss_archive
 import regional_seed
@@ -122,6 +122,31 @@ def import_candidates(code,pat,unit,exclude,sources,fetch=None):
             return rows,f["url"],errors
         except Exception as e:errors.append(f["url"]+" · "+str(e)[:100])
     raise ValueError("; ".join(errors)[:600] or "Нет подходящего файла в каталоге")
+def due_date(checked,success,stamp,success_days=1,failure_days=1):
+    """Calendar-day retry policy, independent of repeated deployments."""
+    if not checked:return stamp[:10]
+    try:
+        last=date.fromisoformat(checked[:10])
+        return (last+timedelta(days=success_days if success==checked else failure_days)).isoformat()
+    except (TypeError,ValueError):return stamp[:10]
+
+def due(db,code,stamp,success_days=1,failure_days=1):
+    row=db.execute("select checked,success from hist_sources where code=?",(code,)).fetchone()
+    return not row or due_date(*row,stamp,success_days,failure_days)<=stamp[:10]
+
+def choose_sections(db,stamp,limit=3):
+    """Untried first, then longest overdue; a failing section cannot monopolise the queue."""
+    options=[]
+    for section in REGIONAL_ZIPS:
+        code="mirror_"+section
+        if section=="industry" and not db.execute("select success from hist_sources where code='mirror_industry_activity_v2' and success is not null").fetchone():
+            code="mirror_industry_activity_v2"
+        row=db.execute("select checked,success from hist_sources where code=?",(code,)).fetchone()
+        if not row:options.append((0,"",section));continue
+        if due_date(*row,stamp,30,2)<=stamp[:10]:
+            options.append((1,row[0] or "",section))
+    return [s for _,__,s in sorted(options)[:limit]]
+
 def import_status(db,code,title,url,stamp,status,success,files=None):
     """Persist actual attempt and most recent success independently, also across failed builds."""
     old=db.execute("select success,files from hist_sources where code=?",(code,)).fetchone()
@@ -259,7 +284,7 @@ def select_mirror(rows,section,limit=4):
     return selected
 def mirror_rows(raw,section,selected=False):
     """Accept only explicit long-format schemas. Never infer which field is value."""
-    result=[]
+    result=[];recognized=False
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         candidates=[x for x in z.infolist() if x.filename.lower().endswith(".csv") and x.file_size<60_000_000]
         for member in candidates:
@@ -277,6 +302,7 @@ def mirror_rows(raw,section,selected=False):
                   "code":field("indicator_id","indicator_code","id_indicator","code","код показателя"),
                 }
                 if any(not keys[k] for k in ("region","year","value","title","unit")):continue
+                recognized=True
                 for r in reader:
                     def val(k):return str(r.get(keys[k],"") or "").strip()
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
@@ -298,7 +324,7 @@ def mirror_rows(raw,section,selected=False):
                     note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
                     result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
                     if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
-    if not result:raise ValueError("Не распознана документированная структура CSV")
+    if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV")
     return select_mirror(result,section) if selected else result
 
 def parse_budget(raw,filename=""):
@@ -381,6 +407,7 @@ def publish(db,stamp,out,refresh):
     if refresh:
         # Try up to three catalogued official workbooks per concept, retaining prior successes.
         for code,title,pat,unit,exclude in SPECS:
+            if not due(db,'import_'+code,stamp,7,2):continue
             matches=candidates_for(code,pat,exclude,sources)
             if not matches:continue
             url=matches[0]["url"]
@@ -394,6 +421,7 @@ def publish(db,stamp,out,refresh):
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
         budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
         for f in budget_files[:3]:
+            if not due(db,'budget_import_'+hashlib.sha256(f['url'].encode()).hexdigest()[:12],stamp,30,2):continue
             try:
                 raw,_=get(f["url"],35_000_000);rows=parse_budget(raw,unquote(urlsplit(f["url"]).path.rsplit("/",1)[-1]))
                 if not rows:raise ValueError("Годовая форма 0503117 не распознана")
@@ -402,6 +430,7 @@ def publish(db,stamp,out,refresh):
             except Exception as e:sources.append(import_status(db,"budget_import_"+hashlib.sha256(f["url"].encode()).hexdigest()[:12],"Годовое исполнение бюджета",f["url"],stamp,"Ошибка: "+str(e)[:160],False))
         # EMISS publisher-coded historical archives: preserve every dimension and cite the primary portal.
         for code,(title,agency,unit) in emiss_archive.SPECS.items():
+            if not due(db,'emiss_'+code,stamp,30,7):continue
             url=emiss_archive.resource(code)
             try:
                 rows,url=emiss_archive.retrieve(code,get,numeric,year)
@@ -412,21 +441,8 @@ def publish(db,stamp,out,refresh):
                 failed=import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ошибка: "+str(e)[:250],False)
                 if not failed["files"]:failed["files"]=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]
                 sources.append(failed)
-        # Backfill up to three not-yet-loaded sections per refresh to keep builds bounded. Afterwards rotate one per day.
-        # Use published provider ZIPs with exact original indicator and unit, not derived values.
-        sections=[]
-        for section in REGIONAL_ZIPS:
-            saved=db.execute("select success from hist_sources where code=?",("mirror_"+section,)).fetchone()
-            if not saved or not saved[0]:sections.append(section)
-        expanded=db.execute("select success from hist_sources where code=?",("mirror_industry_activity_v2",)).fetchone()
-        if not expanded or not expanded[0]:
-            sections=[s for s in sections if s!="industry"]
-            sections.insert(0,"industry")
-        if sections:
-            # A permanently failing source must not starve later sections.
-            offset=date.fromisoformat(stamp[:10]).toordinal()%len(sections)
-            sections=(sections[offset:]+sections[:offset])[:3]
-        else:sections=[list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]]
+        # Bounded fair queue: retry failures after two days; refresh fixed editions monthly.
+        sections=choose_sections(db,stamp)
         for section in sections:
             code="mirror_"+section
             url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
@@ -440,7 +456,10 @@ def publish(db,stamp,out,refresh):
             except Exception as e:
                 status="Ошибка: "+str(e)[:160]
                 db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,status,"[]"))
-                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status=status,files=[]))
+                if section=="industry":
+                    db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",("mirror_industry_activity_v2",stamp,status,"[]"))
+                old=db.execute("select success from hist_sources where code=?",(code,)).fetchone()
+                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=old[0] if old else None,status=status,files=[]))
     # Include historical check metadata even if this build used cached data.
     present={s["code"] for s in sources}
     for code,checked,success,status,raw_files in db.execute("select code,checked,success,status,files from hist_sources"):
@@ -448,8 +467,27 @@ def publish(db,stamp,out,refresh):
         files=json.loads(raw_files);url=files[0]["url"] if files else None
         if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
             title=emiss_archive.SPECS[code[6:]][0];url=emiss_archive.primary(code[6:])
-        else:title=files[0]["title"] if files else code
+        else:
+            title=files[0]["title"] if files else next((t for k,t,*_ in SPECS if code=="import_"+k),code)
+            if not url and code.startswith("import_"):url=DIRECT_FILES.get(code[7:])
         if url:sources.append(dict(code=code,title=title,url=url,checked=checked,success=success,status=status,files=files))
+    # Keep every configured regional source visible even between scheduled attempts.
+    present={s["code"] for s in sources}
+    for section,number in REGIONAL_ZIPS.items():
+        code="mirror_"+section
+        if code in present:continue
+        row=db.execute("select checked,success,status from hist_sources where code=?",(code,)).fetchone()
+        url=MIRROR+"data_"+number+"_socio_economic_102_v20260313.zip"
+        sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=row[0] if row else None,success=row[1] if row else None,status=row[2] if row else "Ожидается загрузка",files=[]))
+    for s in sources:
+        code=s["code"]
+        if code.startswith("mirror_"):sd,fd=30,2
+        elif code.startswith("import_"):sd,fd=7,2
+        elif code.startswith("budget_import_"):sd,fd=30,2
+        elif code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:sd,fd=30,7
+        else:continue
+        s["next_due"]=due_date(s.get("checked"),s.get("success"),stamp,sd,fd)
+        s["retry_policy"]=f"После успеха: {sd} суток; после ошибки: {fd} суток; очередь ограничена."
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
