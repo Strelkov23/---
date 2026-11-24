@@ -141,6 +141,21 @@ def due(db,code,stamp,success_days=1,failure_days=1):
     row=db.execute("select checked,success from hist_sources where code=?",(code,)).fetchone()
     return not row or due_date(*row,stamp,success_days,failure_days)<=stamp[:10]
 
+def choose_emiss_codes(db,stamp,limit=2):
+    """Bound network retries, prioritising never-tried sources and old failed parsers."""
+    options=[]
+    for code in emiss_archive.SPECS:
+        row=db.execute("select checked,success,status from hist_sources where code=?",("emiss_"+code,)).fetchone()
+        if not row or not row[0]:
+            options.append((0,"",code));continue
+        checked,success,status=row
+        # Prior parser did not record API/HTML diagnostics. Recheck once under the
+        # new parser; its status will no longer start with the old filename.
+        legacy=not success and (status or "").startswith("Ошибка: "+code+".csv.gz:")
+        if legacy or due_date(checked,success,stamp,30,7)<=stamp[:10]:
+            options.append((1,checked,code))
+    return [code for _,__,code in sorted(options)[:limit]]
+
 def choose_sections(db,stamp,limit=3):
     """Untried first, then longest overdue; a failing section cannot monopolise the queue."""
     options=[]
@@ -624,8 +639,8 @@ def publish(db,stamp,out,refresh):
                 sources.append(import_status(db,code,"Годовое исполнение бюджета",f["url"],stamp,"Ключей: "+str(n),True,[f]))
             except Exception as e:sources.append(import_status(db,code,"Годовое исполнение бюджета",f["url"],stamp,"Ошибка: "+str(e)[:160],False))
         # EMISS publisher-coded historical archives: preserve every dimension and cite the primary portal.
-        for code,(title,agency,unit) in emiss_archive.SPECS.items():
-            if not due(db,'emiss_'+code,stamp,30,7):continue
+        for code in choose_emiss_codes(db,stamp):
+            title,agency,unit=emiss_archive.SPECS[code]
             url=emiss_archive.resource(code)
             try:
                 rows,url=emiss_archive.retrieve(code,get,numeric,year)
@@ -662,6 +677,7 @@ def publish(db,stamp,out,refresh):
         files=json.loads(raw_files);url=files[0]["url"] if files else None
         if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
             title=emiss_archive.SPECS[code[6:]][0];url=emiss_archive.primary(code[6:])
+            if not files:files=[dict(url=emiss_archive.card(code[6:]),title="Карточка архива НЦСЭД",format="html")]
         elif code.startswith("budget_import_"):
             title="Годовое исполнение бюджета"
             if not url:
@@ -675,6 +691,12 @@ def publish(db,stamp,out,refresh):
         if attempt and attempt[2]==checked:
             url,title=attempt[:2]
         if url:sources.append(dict(code=code,title=title,url=url,checked=checked,success=success,status=status,files=files))
+    # List every EMISS source even if bounded queue has not tried it yet.
+    present={s["code"] for s in sources}
+    for id,(title,agency,unit) in emiss_archive.SPECS.items():
+        code="emiss_"+id
+        if code not in present:
+            sources.append(dict(code=code,title=title,url=emiss_archive.primary(id),checked=None,success=None,status="Ожидается загрузка",files=[dict(url=emiss_archive.card(id),title="Карточка архива НЦСЭД",format="html")]))
     # Keep every configured regional source visible even between scheduled attempts.
     present={s["code"] for s in sources}
     for section,number in REGIONAL_ZIPS.items():
@@ -692,6 +714,10 @@ def publish(db,stamp,out,refresh):
         else:continue
         s["next_due"]=due_date(s.get("checked"),s.get("success"),stamp,sd,fd)
         s["retry_policy"]=f"После успеха: {sd} суток; после ошибки: {fd} суток; очередь ограничена."
+        if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
+            if not s.get("success") and s["status"].startswith("Ошибка: "+code[6:]+".csv.gz:"):
+                s["next_due"]=stamp[:10]
+            s["retry_policy"]+=" До двух показателей ЕМИСС за сборку."
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
     # Legacy series IDs remain stable unless a source actually publishes more than
