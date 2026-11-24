@@ -23,6 +23,7 @@ jobs:
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
+          python3 -m unittest test_catalogue.py
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt
           python3 -c "import sqlite3; s=sqlite3.connect('data/monitor.db'); d=sqlite3.connect('../history/monitor.db'); s.backup(d); d.close(); s.close()"
