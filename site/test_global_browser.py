@@ -254,11 +254,11 @@ with sync_playwright() as p:
                 assert page.locator(".geo-business dd").count()==4
             page.locator("#geo-detail .geo-profile summary").click()
             page.wait_for_function("document.querySelector('#geo-detail .geo-profile [role=status]').textContent.startsWith('Доступно:')",timeout=30000)
-            assert page.locator("#geo-detail .geo-profile tbody tr").count()==43
+            assert page.locator("#geo-detail .geo-profile-observations tbody tr").count()==43
             assert page.locator("#geo-detail .geo-profile select option").count()==13
             assert "ошибок загрузки" not in page.locator("#geo-detail .geo-profile [role=status]").inner_text()
             with page.expect_download() as profile:
-                page.locator("#geo-detail .geo-profile button").click()
+                page.get_by_role("button",name="Скачать досье CSV",exact=True).click()
             assert profile.value.suggested_filename.startswith("regional-profile-")
             with open(profile.value.path(),encoding="utf-8-sig",newline="") as f:
                 profile_rows=list(csv.reader(f,delimiter=";"))
@@ -266,15 +266,23 @@ with sync_playwright() as p:
             assert len({len(r) for r in profile_rows})==1
             assert "SHA-256 JSON" in profile_rows[0]
             page.locator("#geo-detail .geo-profile select").select_option("Инвестиции и фонды")
-            assert page.locator("#geo-detail .geo-profile tbody tr").count()==4
+            assert page.locator("#geo-detail .geo-profile-observations tbody tr").count()==4
             page.locator("#geo-detail .geo-profile input[type=checkbox]").check()
-            assert page.locator("#geo-detail .geo-profile tbody tr").count()<=4
+            assert page.locator("#geo-detail .geo-profile-observations tbody tr").count()<=4
             with page.expect_download() as filtered:
-                page.locator("#geo-detail .geo-profile button").click()
+                page.get_by_role("button",name="Скачать досье CSV",exact=True).click()
             with open(filtered.value.path(),encoding="utf-8-sig",newline="") as f:
                 filtered_rows=list(csv.reader(f,delimiter=";"))
             assert all(r[3]=="Инвестиции и фонды" for r in filtered_rows[1:])
-            assert len(filtered_rows)==page.locator("#geo-detail .geo-profile tbody tr").count()+1
+            assert len(filtered_rows)==page.locator("#geo-detail .geo-profile-observations tbody tr").count()+1
+            assert page.locator("#geo-detail .geo-derived tbody tr").count()==4
+            with page.expect_download() as calculated:
+                page.get_by_role("button",name="Скачать расчётные показатели CSV",exact=True).click()
+            with open(calculated.value.path(),encoding="utf-8-sig",newline="") as f:
+                calc_rows=list(csv.reader(f,delimiter=";"))
+            assert len(calc_rows)==5
+            assert len({len(r) for r in calc_rows})==1
+            assert "Первый SHA-256 JSON" in calc_rows[0]
             page.locator("#geo-theme").select_option("agriculture")
             page.wait_for_function("document.querySelector('#geo-status').textContent.startsWith('Год:') || document.querySelector('#geo-status').textContent.includes('нет загруженных рядов')")
         page.goto("http://localhost:8765/district-map.html",wait_until="load")
