@@ -145,3 +145,15 @@ def publish(db,stamp,out,refresh):
         sources.append(dict(title=title,url=BASE+filename,checked=r[0] if r else None,success=r[1] if r else None,status=r[2] if r else "Ожидается загрузка"))
     (out/"industrial.json").write_text(json.dumps(dict(built=stamp,series=sorted(result,key=lambda s:(s["kind"],s["code"],s["title"],s["frequency"])),sources=sources),ensure_ascii=False,separators=(",",":"),allow_nan=False),encoding="utf-8")
     return [s["title"]+" · "+s["status"] for s in sources if s["status"].startswith("Ошибка")]
+
+
+def aggregate_months(data,legacy):
+    """Prefer the official national YoY workbook without erasing older archive rows."""
+    matches=[s for s in data["series"] if s["kind"]=="Индекс производства г/г" and s["code"]=="BCDE" and s["source"]==BASE+"ind_baza_2023.xlsx"]
+    if len(matches)!=1:return None
+    primary=matches[0]
+    check=next((s for s in data["sources"] if s["url"]==primary["source"]),{})
+    by_period={r["period"]:dict(r) for r in legacy}
+    for r in primary["values"]:
+        by_period[r["period"]]=dict(period=r["period"],value=r["value"],url=primary["source"],verified=check.get("success") or r.get("seen"),sheet=primary["sheet"],row=r["row"],column=r["column"])
+    return sorted(by_period.values(),key=lambda r:r["period"])

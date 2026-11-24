@@ -27,6 +27,17 @@ class IndustrialTests(unittest.TestCase):
         self.assertEqual(len(rows),2)
         self.assertEqual(next(s for s in rows if s["frequency"]=="годовая")["values"][0]["value"],500)
         self.assertEqual(next(s for s in rows if s["frequency"]=="месячная")["values"][0]["value"],40)
+    def test_aggregate_precedence(self):
+        source=d.BASE+"ind_baza_2023.xlsx"
+        data={"series":[{"kind":"Индекс производства г/г","code":"BCDE","source":source,"sheet":"2","values":[{"period":"2025-01","value":101.5,"row":6,"column":3,"seen":"2026-11-24"}]}],"sources":[{"url":source,"success":"2026-11-24"}]}
+        legacy=[{"period":"2025-01","value":102.0,"url":"https://example.org/old"},{"period":"2019-12","value":99,"url":"https://example.org/old"}]
+        rows=d.aggregate_months(data,legacy)
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows[1]["value"],101.5)
+        self.assertEqual(rows[1]["verified"],"2026-11-24")
+        self.assertEqual(rows[0],legacy[1])
+        self.assertEqual(legacy[0]["value"],102.0)
+        self.assertIsNone(d.aggregate_months({"series":[],"sources":[]},legacy))
     def test_persistence(self):
         raw=workbook([["К содержанию"],["Объем отгруженных товаров собственного производства (млн. рублей)"],[],["Наименование вида деятельности","Код ОКВЭД2","2023 год2","2024 год2","2025 год2"],["Уголь","05",10,20,30]])
         with tempfile.TemporaryDirectory() as folder,sqlite3.connect(":memory:") as db:

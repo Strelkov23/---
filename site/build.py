@@ -87,7 +87,11 @@ with m.connect() as db:
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
     failures.extend(r["journal"]+" · "+r["status"] for r in journal_checks if r["status"]!="Проверено")
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
-    industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv else ""
+    failures.extend(industrial_data.publish(db,m.now(),out,"--refresh" in sys.argv))
+    industrial=json.loads((out/"industrial.json").read_text())
+    # Use the official systematic workbook ahead of obsolete bulletin URLs.
+    primary=industrial_data.aggregate_months(industrial,[])
+    industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv and not primary else ""
     if industry_error:
         failures.append("Месячная промышленность · " + industry_error)
     db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
@@ -96,9 +100,11 @@ with m.connect() as db:
         from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) m
         left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
         where m.rn=1 order by m.period""")]
+    if primary:
+        months=industrial_data.aggregate_months(industrial,months)
     for row in months:
         alternative=industry.ALTERNATIVES.get(row["period"])
-        if alternative and abs(alternative[0]-row["value"])<1e-8:
+        if not row.get("sheet") and alternative and abs(alternative[0]-row["value"])<1e-8:
             row["alternative_url"]=alternative[1]
     write("industry.json", months)
     cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
@@ -107,7 +113,6 @@ with m.connect() as db:
             failures.append(c["title"]+" · "+c["status"])
     failures.extend(national.publish(db,m.now(),out,"--refresh" in sys.argv))
     failures.extend(historical.publish(db,m.now(),out,"--refresh" in sys.argv))
-    failures.extend(industrial_data.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html"]:
     page(name,Path(name).read_text())
