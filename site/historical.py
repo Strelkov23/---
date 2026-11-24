@@ -49,15 +49,61 @@ def allowed(url):
         u=urlsplit(url);h=u.hostname or ""
         return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net","repository.nsedc.ru") or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru","minfin.gov.ru")))
     except ValueError:return False
+FILE_EXT=r"\.(xlsx|xls|csv|zip|rar|pdf)$"
+VOID_TAGS={"area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"}
+def clean_label(text):
+    return " ".join(re.sub(r"[\ue000-\uf8ff]","",text or "").split())
+def meaningful_label(text):
+    s=clean_label(text)
+    if not s or len(s)>350:return False
+    if re.fullmatch(r"(?:документ\s+)?(?:xlsx|xls|csv|zip|rar|pdf)(?:\s*[,;]?\s*[\d.,]+\s*(?:kb|mb|кб|мб))?",s,re.I):return False
+    return bool(re.search(r"[а-яёa-z]",s,re.I))
 class Anchors(HTMLParser):
-    def __init__(self):super().__init__(convert_charrefs=True);self.links=[];self.href=None;self.label=[]
+    """Retain nearby label only within a bounded container with one file link."""
+    def __init__(self,base):
+        super().__init__(convert_charrefs=True)
+        self.base=base;self.stack=[];self.links=[]
     def handle_starttag(self,tag,attrs):
-        if tag=="a":self.href=dict(attrs).get("href");self.label=[]
+        attrs=dict(attrs)
+        if tag in VOID_TAGS:return
+        # Close omitted list-item/paragraph/cell endings conservatively.
+        if tag in ("li","p","tr","td","th") and self.stack and self.stack[-1]["tag"]==tag:self.stack.pop()
+        node={"tag":tag,"text":[],"length":0,"files":0,"attrs":attrs}
+        if tag=="a" and attrs.get("href"):
+            url=urljoin(self.base,attrs["href"])
+            try:is_file=bool(re.search(FILE_EXT,unquote(urlsplit(url).path),re.I))
+            except ValueError:is_file=False
+            if is_file:
+                for parent in self.stack:parent["files"]+=1
+                self.links.append((url,node,list(self.stack[-6:])))
+        self.stack.append(node)
+    def handle_startendtag(self,tag,attrs):
+        self.handle_starttag(tag,attrs)
+        if tag not in VOID_TAGS:self.handle_endtag(tag)
     def handle_data(self,s):
-        if self.href:self.label.append(s)
+        if any(n["tag"] in ("script","style") for n in self.stack):return
+        for n in self.stack:
+            if n["length"]<=450:
+                n["text"].append(s[:451])
+                n["length"]+=len(s)
     def handle_endtag(self,tag):
-        if tag=="a" and self.href:
-            self.links.append((self.href," ".join(" ".join(self.label).split())));self.href=None
+        for i in range(len(self.stack)-1,-1,-1):
+            if self.stack[i]["tag"]==tag:
+                del self.stack[i:];break
+def anchor_title(node,parents,filename):
+    attrs=node["attrs"]
+    for candidate in (attrs.get("title"),attrs.get("aria-label")," ".join(node["text"])):
+        if meaningful_label(candidate):return clean_label(candidate),"anchor"
+    for n in reversed(parents):
+        if n["tag"] not in ("li","tr","td","div","p","article"):continue
+        if n["files"]!=1 or n["length"]>450:continue
+        label=clean_label(" ".join(n["text"]))
+        # Remove only standalone download metadata, not economic title words.
+        label=re.sub(r"\b(?:документ\s+)?(?:xlsx|xls|csv|zip|rar|pdf)\b(?:\s*[,;]?\s*[\d.,]+\s*(?:kb|mb|кб|мб)\b)?","",label,flags=re.I)
+        label=" ".join(label.split()).strip(" ,;·")
+        if len(label)>=12 and re.search(r"[а-яё]",label,re.I) and meaningful_label(label):
+            return label,"container"
+    return filename,"filename"
 def get(url,limit):
     if not allowed(url):raise ValueError("Неразрешённый источник")
     context=ssl.create_default_context()
@@ -71,14 +117,15 @@ def get(url,limit):
         if len(b)>limit:raise ValueError("Превышен размер")
         return b,r.headers.get_content_charset() or "utf-8"
 def discover(raw,base):
-    p=Anchors();p.feed(raw);result={}
-    for href,title in p.links:
-        url=urljoin(base,href)
+    p=Anchors(base);p.feed(raw);result={}
+    rank={"filename":0,"container":1,"anchor":2}
+    for url,node,parents in p.links:
+        if not allowed(url):continue
         path=unquote(urlsplit(url).path).lower()
-        if allowed(url) and re.search(r"\.(xlsx|xls|csv|zip|rar|pdf)$",path):
-            filename=unquote(urlsplit(url).path.rsplit("/",1)[-1])
-            meaningful=re.sub(r"[\ue000-\uf8ff]","",title).strip()
-            result[url]={"url":url,"title":filename if not meaningful or meaningful.lower() in ("xlsx","xls","csv","zip","rar","pdf") else title,"format":path.rsplit(".",1)[-1]}
+        filename=unquote(urlsplit(url).path.rsplit("/",1)[-1])
+        title,kind=anchor_title(node,parents,filename)
+        row={"url":url,"title":title,"format":path.rsplit(".",1)[-1],"title_origin":kind}
+        if url not in result or rank[kind]>rank[result[url]["title_origin"]]:result[url]=row
     return list(result.values())
 def numeric(v):
     if isinstance(v,bool) or v is None:return None
@@ -563,11 +610,15 @@ def publish(db,stamp,out,refresh):
     db.execute("create table if not exists hist_sources(code text primary key,checked text,success text,status text,files text)")
     db.execute("create table if not exists hist_attempts(code text primary key,url text not null,title text not null,attempted text not null)")
     db.execute("create table if not exists hist_values(indicator text,region text,year integer,unit text,value real,seen text,source text,payload text,primary key(indicator,region,year,unit,source,seen))")
+    db.execute("create table if not exists hist_catalog_versions(code text primary key,version integer not null)")
     sources=[]
     for code,title,url in SOURCES:
         old=db.execute("select checked,success,status,files from hist_sources where code=?",(code,)).fetchone()
         files=json.loads(old[3]) if old else []
-        if refresh and (not old or (old[0] or "")[:10]!=stamp[:10]):
+        version=db.execute("select version from hist_catalog_versions where code=?",(code,)).fetchone()
+        needs_upgrade=code in ("industry","investment","costs","finance") and (not version or version[0]<2)
+        if refresh and (needs_upgrade or not old or (old[0] or "")[:10]!=stamp[:10]):
+            db.execute("insert or replace into hist_catalog_versions values(?,?)",(code,2))
             try:
                 raw,enc=get(url,5_000_000);found=discover(raw.decode(enc,errors="replace"),url)
                 if not found and code not in ("emiss","emiss_grp","emiss_open"):raise ValueError("Ссылки на файлы не распознаны")
