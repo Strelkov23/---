@@ -80,13 +80,24 @@ const RegionalMap=(()=>{
   if(name)return name[0].toUpperCase()+name.slice(1);
   return typeof original==='string'&&original.trim()?original:'Контур без названия';
  }
+ // Compare only observations from the same exact series and consecutive calendar years.
+ function trend(current,previous,unit,index=false){
+  if(!current||!Number.isFinite(current.value))return null;
+  if(index)return {type:'index',delta:current.value-100,base:100,year:current.year};
+  if(!previous||previous.year!==current.year-1||!Number.isFinite(previous.value))return null;
+  const delta=current.value-previous.value;
+  const percentage=/процент|%/i.test(String(unit));
+  if(percentage)return {type:'points',delta,base:previous.value,year:previous.year};
+  if(previous.value<=0||current.value<0)return {type:'absolute',delta,base:previous.value,year:previous.year};
+  return {type:'relative',delta:100*delta/previous.value,base:previous.value,year:previous.year}
+ }
  function profileObservation(values,key,year,sample){
   if(!key||!Number.isInteger(year))return null;
   const years=[...new Set(values.map(r=>r.year).filter(y=>Number.isInteger(y)&&y<=year))].sort((a,b)=>b-a);
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,isGrowth,growthBin,displayName,profileObservation,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,isGrowth,growthBin,displayName,profileObservation,trend,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -152,7 +163,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const box=node('section','');box.className='geo-brief';box.append(node('h4','Последние доступные сведения о регионе'));
   const state=node('p','Загрузка справки…');state.setAttribute('role','status');box.append(state);
   const cards=node('div','');cards.className='geo-brief-grid';box.append(cards);details.append(box);
-  const y=new Date().getUTCFullYear();
+  const y=Math.max(0,...catalog.map(s=>s.last).filter(Number.isInteger));
   const primary=[['Численность населения','R_f39e59bbabc208f3_4c391d1044'],['ВРП на человека','GRP_PC_95b8dd2585'],['Промышленный индекс','R_347ab451705a6d33_031d7fe105'],['Безработица','R_a4138d558584b81a_1db3db8e79']];
   const subsectors=RegionalMap.industryThemes.map(([id,label,symbol])=>{
    const candidates=catalog.filter(s=>RegionalMap.theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||b.count-a.count);
@@ -165,13 +176,33 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    try{
     const data=await profileFile(m.file),r=RegionalMap.profileObservation(data.values,f.key,y,RegionalStats.sample);
     if(!r){card.append(node('p','Нет наблюдения для региона'));return false}
-    card.append(node('p',fmtValue(r.value)+' '+m.unit),node('small',String(r.year)+' · '+m.title));if(/^https?:\/\//i.test(data.source))card.append(link('Источник',data.source));
+    card.append(node('p',fmtValue(r.value)+' '+m.unit),node('small',String(r.year)+' · '+m.title));
+    const previous=RegionalStats.sample(data.values.filter(v=>v.year===r.year-1)).out.get(f.key);
+    const index=RegionalMap.isGrowth(m.code)||(/^индекс/i.test(m.title)&&/к предыдущему году/i.test(m.unit));
+    const change=RegionalMap.trend(r,previous,m.unit,index);
+    if(change){
+     const unit=change.type==='index'||change.type==='points'?'п. п.':change.type==='relative'?'%':m.unit;
+     const indicator=node('p',(change.delta>0?'↑ +':change.delta<0?'↓ ':'= ')+fmtValue(change.delta)+' '+unit+' · '+(change.type==='index'?'к уровню предыдущего года (100%)':'к '+change.year+' г.'));
+     indicator.className='geo-trend';indicator.dataset.direction=change.delta>0?'up':change.delta<0?'down':'flat';card.append(indicator)
+    }else card.append(node('small','Нет сопоставимой базы предыдущего года'));
+    const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',m.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const history=node('a','Динамика');history.href=u.href;card.append(history);
+    if(/^https?:\/\//i.test(data.source)){card.append(document.createTextNode(' · '),link('Источник',data.source))}
     return true
    }catch{card.append(node('p','Ряд не удалось проверить'));return false}
   }
+  const business=node('article','');business.className='geo-business';business.append(node('h4','Малый и средний бизнес · ФНС'));const businessStatus=node('p','Проверка реестра…');business.append(businessStatus);box.append(business);
+  profileFile('sme-regions.json').then(data=>{
+   if(!business.isConnected)return;
+   const code=f.f.properties.iso_3166_2;
+   const row=data.rows.find(r=>SMEMap.key(r.code)===code);
+   if(!row){businessStatus.textContent='Нет однозначно сопоставимых данных реестра';return}
+   businessStatus.textContent='Срез '+data.period+(data.status==='cached'?' · сохранённая версия':'')+' · зарегистрированные субъекты, не производственные площадки.';
+   const dl=node('dl','');for(const [label,k] of [['Субъекты МСП','total'],['Юридические лица','legal'],['ИП','individual'],['Работники по реестру','workers']]){dl.append(node('dt',label),node('dd',Number.isInteger(row[k])?row[k].toLocaleString('ru-RU'):'нет данных'))}business.append(dl);
+   const u=new URL('facility-map.html#sme-map-section',location.href);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Карта и таблица МСП');a.href=u.href;business.append(a,document.createTextNode(' · '),link('Источник ФНС',data.documentation))
+  }).catch(()=>{businessStatus.textContent='Срез реестра недоступен в данной версии'});
   Promise.all([...primary,...subsectors].map(item)).then(results=>{
    if(!box.isConnected)return;
-   state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
+   state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Стрелки означают изменение показателя, а не оценку качества экономики. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
   })
  }
  const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region','geo-palette'].filter(id=>$(id))];

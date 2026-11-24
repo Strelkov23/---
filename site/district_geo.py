@@ -13,7 +13,7 @@ MAX=45_000_000
 def validate(raw):
     if not 0<len(raw)<=MAX:raise ValueError("invalid ADM2 size")
     g=json.loads(raw);fs=g.get("features")
-    if g.get("type")!="FeatureCollection" or not isinstance(fs,list) or len(fs)!=COUNT:raise ValueError("unexpected ADM2 collection")
+    if g.get("type")!="FeatureCollection" or not isinstance(fs,list) or len(fs)!=COUNT:raise ValueError("unexpected ADM2 collection: type="+str(g.get("type"))+"; features="+str(len(fs) if isinstance(fs,list) else None)+"; expected="+str(COUNT))
     ids=set();vertices=0
     for f in fs:
         p=f.get("properties") or {};ident=p.get("shapeID");name=p.get("shapeName")

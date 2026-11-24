@@ -39,3 +39,10 @@ assert.equal(M.industryTheme('Производство текстильных и
 assert.ok(M.palette('light')[4]!==M.palette('chemical')[4]);
 assert.deepEqual(M.palette('light','auto',true),M.palette('chemical','contrast',true));
 assert.equal(M.theme('new',industrySource,'Объем отгруженных товаров: металлургическое производство'),'metal');
+
+assert.deepEqual(M.trend({year:2024,value:110},{year:2023,value:100},'млн руб.'),{type:'relative',delta:10,base:100,year:2023});
+assert.deepEqual(M.trend({year:2024,value:4},{year:2023,value:6},'%'),{type:'points',delta:-2,base:6,year:2023});
+assert.deepEqual(M.trend({year:2024,value:103},null,'%',true),{type:'index',delta:3,base:100,year:2024});
+assert.equal(M.trend({year:2024,value:100},{year:2022,value:80},'руб.'),null);
+assert.equal(M.trend({year:2024,value:100},null,'руб.'),null);
+assert.equal(M.trend({year:2024,value:5},{year:2023,value:0},'руб.').type,'absolute');

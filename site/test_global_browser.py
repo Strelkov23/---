@@ -231,6 +231,12 @@ with sync_playwright() as p:
             page.locator("#geo-region").select_option("RU-MOW")
             page.wait_for_function("document.querySelector('.geo-brief [role=status]').textContent.startsWith('Доступно')",timeout=30000)
             assert page.locator(".geo-brief-item").count()==10
+            assert page.locator(".geo-brief-item .geo-trend").count()>0
+            assert page.locator(".geo-brief-item a").count()>0
+            page.wait_for_function("!document.querySelector('.geo-business p').textContent.startsWith('Проверка')")
+            sme=json.loads(Path("sme-regions.json").read_text())
+            if any(r["code"]=="77" for r in sme["rows"]):
+                assert page.locator(".geo-business dd").count()==4
             page.locator("#geo-detail .geo-profile summary").click()
             page.wait_for_function("document.querySelector('#geo-detail .geo-profile [role=status]').textContent.startsWith('Доступно:')",timeout=30000)
             assert page.locator("#geo-detail .geo-profile tbody tr").count()==15
