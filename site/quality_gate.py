@@ -67,7 +67,7 @@ def check(out,previous,stamp):
     counts["historical_series"]=len(hist["series"])
     counts["historical_observations"]=0
     counts["historical_suppressed_legacy_markers"]=hist.get("suppressed_legacy_markers",0)
-    if counts["historical_suppressed_legacy_markers"]:warnings.append("Исторические ряды: исключено служебных маркеров конфиденциальности "+str(counts["historical_suppressed_legacy_markers"]))
+    if counts["historical_suppressed_legacy_markers"]:warnings.append("Исторические ряды: исключено служебных кодов пропусков и конфиденциальности "+str(counts["historical_suppressed_legacy_markers"]))
     counts["official_files"]=sum(len(s["files"]) for s in hist["sources"])
     for s in hist["series"]:
         path=out/s["file"]
@@ -78,7 +78,7 @@ def check(out,previous,stamp):
             if any(h.get(k)!=s.get(k) for k in ("title","unit","kind","source")):raise ValueError("Метаданные ряда расходятся с каталогом")
             if not rows or len(rows)!=s["count"] or len({(r["region"],r["year"]) for r in rows})!=len(rows) or any(not finite(r["value"]) or type(r["year"]) is not int for r in rows):raise ValueError("Некорректные наблюдения")
             if s.get("regions")!=len({r["region"] for r in rows}) or s.get("first")!=min(r["year"] for r in rows) or s.get("last")!=max(r["year"] for r in rows):raise ValueError("Охват ряда расходится с каталогом")
-            if "tochno-st-catalog/Rosstat/" in s["source"] and any(r["value"]==-77777777 for r in rows):raise ValueError("Служебный маркер вместо наблюдения")
+            if "tochno-st-catalog/Rosstat/" in s["source"] and any(r["value"] in (-77777777,-99999999) for r in rows):raise ValueError("Служебный маркер вместо наблюдения")
             counts["historical_observations"]+=len(rows)
             hashes[s["file"]]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
         except (OSError,ValueError,KeyError) as e:issues.append("Исторический ряд "+s["code"]+": "+str(e))
