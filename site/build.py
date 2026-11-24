@@ -113,6 +113,7 @@ bulletin.publish(page,out)
 shutil.copy('chart-export.js',out)
 
 import link_audit
+(out/"quality.json").write_text("{}",encoding="utf-8")
 link_audit.publish(page,out,m.connect,m.now(),"--refresh" in sys.argv)
 
 import quality_gate
