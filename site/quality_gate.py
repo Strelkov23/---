@@ -73,7 +73,9 @@ def check(out,previous,stamp):
             raw=path.read_bytes()
             h=json.loads(raw)
             rows=h["values"]
-            if len(rows)!=s["count"] or len({(r["region"],r["year"]) for r in rows})!=len(rows) or any(not finite(r["value"]) for r in rows):raise ValueError("Некорректные наблюдения")
+            if any(h.get(k)!=s.get(k) for k in ("title","unit","kind","source")):raise ValueError("Метаданные ряда расходятся с каталогом")
+            if not rows or len(rows)!=s["count"] or len({(r["region"],r["year"]) for r in rows})!=len(rows) or any(not finite(r["value"]) or type(r["year"]) is not int for r in rows):raise ValueError("Некорректные наблюдения")
+            if s.get("regions")!=len({r["region"] for r in rows}) or s.get("first")!=min(r["year"] for r in rows) or s.get("last")!=max(r["year"] for r in rows):raise ValueError("Охват ряда расходится с каталогом")
             counts["historical_observations"]+=len(rows)
             hashes[s["file"]]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
         except (OSError,ValueError,KeyError) as e:issues.append("Исторический ряд "+s["code"]+": "+str(e))
