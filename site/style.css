@@ -144,3 +144,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #cost-table table,#cost-detail table{min-width:760px}#cost-chart svg{display:block;width:100%;height:auto;max-width:900px}#cost-status,#cost-result{overflow-wrap:anywhere}#cost-trend table{table-layout:fixed}#cost-trend td,#cost-trend th{min-width:0;overflow-wrap:anywhere}
 
 #fbs-table table{min-width:620px}#fbs-status,#fbs-check,#fbs-result{overflow-wrap:anywhere}
+
+#electric-table table{min-width:740px}#electric-status,#electric-result,#electric-checks{overflow-wrap:anywhere}#electric-chart svg{width:100%;height:auto;display:block;max-width:900px}
