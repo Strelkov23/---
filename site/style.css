@@ -116,3 +116,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #forecast-series,#forecast-horizon,#forecast-board-period,#forecast-board-target{display:block;width:100%;min-width:0;max-width:100%}.forecast-control{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:100%;min-width:0;margin:.6rem 0}#forecast-board table{min-width:850px}#forecast-chart{min-width:0;max-width:100%}#forecast-chart svg{display:block;width:100%;min-width:0}#forecast-board-status{overflow-wrap:anywhere}
 
 .capital-control{display:grid;grid-template-columns:minmax(0,1fr);max-width:100%;margin:.6rem 0}.capital-control select,.capital-control input{width:100%;min-width:0}#capital-table table,#capacity-table table{min-width:780px}
+
+#capital-trend-chart,#capacity-trend-chart{min-width:0;max-width:100%;overflow-wrap:anywhere}#capital-trend-chart svg,#capacity-trend-chart svg{display:block;width:100%;height:auto;max-width:800px}#capital-trend-chart table,#capacity-trend-chart table{table-layout:fixed}#capital-trend-chart td,#capacity-trend-chart td,#capital-trend-chart th,#capacity-trend-chart th{min-width:0;overflow-wrap:anywhere}

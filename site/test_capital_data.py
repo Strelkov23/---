@@ -24,6 +24,7 @@ class CapitalDataTests(unittest.TestCase):
             c.publish(pages.__setitem__,p)
             data=json.loads((p/"capital-data.json").read_text())
             self.assertEqual(len(data["reconciliation"]),3)
+            self.assertTrue(all(r["difference_mrub"]==0 for r in data["reconciliation"]))
             self.assertTrue((p/"fixed-assets.csv").exists())
             self.assertTrue((p/"capacity-utilization.csv").exists())
             self.assertIn("не подставляются автоматически",pages["capital.html"])

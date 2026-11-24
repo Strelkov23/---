@@ -128,6 +128,12 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/capital.html",wait_until="load")
         page.wait_for_function("document.querySelector('#capital-status').textContent.includes('Разделов деятельности: 19')")
         assert page.locator("#capital-table tbody tr").count()==20
+        assert page.locator("#capital-trend-chart tbody tr").count()==3
+        assert page.locator("#capacity-trend-chart tbody tr").count()==3
+        page.locator("#capital-trend").select_option("C")
+        assert "54,4" in page.locator("#capital-trend-chart tbody tr").last.inner_text()
+        page.locator("#capacity-trend").select_option("machine-tools")
+        assert "40,5" in page.locator("#capacity-trend-chart tbody tr").last.inner_text()
         assert page.locator("#capacity-table tbody tr").count()==72
         page.locator("#capacity-query").fill("тракторы")
         assert page.locator("#capacity-table tbody tr").count()==1
