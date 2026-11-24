@@ -69,10 +69,52 @@ jobs:
           import amur_projects as a
           from collections import Counter
           raw=a.fetch(a.BASELINE)
-          rows=a.parse(raw,a.BASELINE)
+          import openpyxl,io
+          b=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+          try:
+              ws=b["Новая версия"]; previous=None;counts=Counter();numbered=0
+              for i,v in enumerate(ws.iter_rows(max_col=13,values_only=True),1):
+                  if i<6:continue
+                  if not any(x is not None for x in v):continue
+                  no=v[0];counts[str(v[5])]+=1
+                  if not isinstance(no,int) or previous is not None and no!=previous+1:
+                      print("AMUR_BOUNDARY",i,repr(no),repr(previous),"sector",str(v[4])[:100],"status",str(v[5])[:100],"name_type",type(v[1]).__name__,flush=True)
+                  if isinstance(no,int):numbered+=1
+                  previous=no if isinstance(no,int) else None
+                  for k in (11,12):
+                      try:a.numeric(v[k],k==12)
+                      except ValueError:print("AMUR_MARKER",i,k,repr(v[k])[:100],flush=True)
+              print("AMUR_NUMBERED",numbered,"STATUS",dict(counts),flush=True)
+          finally:b.close()
+          try:rows=a.parse(raw,a.BASELINE)
+          except ValueError as e:
+              print("AMUR_PARSE_REJECTED",str(e),flush=True)
+              rows=[]
           print("AMUR_PARSED",len(rows),flush=True)
           print("AMUR_STATUS",dict(Counter(r["status"] for r in rows)),flush=True)
           print("AMUR_SECTORS",len({r["sector"] for r in rows}),flush=True)
           print("AMUR_MUNICIPALITIES",len({r["municipality"] for r in rows}),flush=True)
           print("AMUR_VALUES",dict(Counter(r["cost_state"] for r in rows)),dict(Counter(r["jobs_state"] for r in rows)),flush=True)
+          PY
+
+      - name: Inspect Buryatia original and Krasnodar workbook headers
+        working-directory: site
+        run: |
+          python3 - <<'PY'
+          import investment_projects as p
+          import openpyxl,io,hashlib,zipfile
+          for label,url in (("BURYATIA",p.BASELINE),("KRASNODAR","https://new.investkuban.ru/upload/iblock/c65/qzhzi1g82lrwkv29in0xpayrr0e8xm89.xlsx")):
+              try:
+                  raw=p.fetch(url);print(label,"XLSX",len(raw),hashlib.sha256(raw).hexdigest(),flush=True)
+                  with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                      if sum(x.file_size for x in z.infolist())>50000000:raise ValueError("XLSX expansion")
+                  b=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                  try:
+                      for ws in b:
+                          print(label,"SHEET",ws.title,ws.max_row,ws.max_column,flush=True)
+                          for i,row in enumerate(ws.iter_rows(min_row=1,max_row=8,max_col=min(ws.max_column or 30,30),values_only=True),1):
+                              if i<=4:print(label,"HEADER",i,[str(x)[:200] if x is not None else "" for x in row],flush=True)
+                              else:print(label,"TYPES",i,[type(x).__name__ for x in row],flush=True)
+                  finally:b.close()
+              except Exception as e:print(label,"UNAVAILABLE",type(e).__name__,str(e),flush=True)
           PY
