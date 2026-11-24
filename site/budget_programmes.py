@@ -24,8 +24,8 @@ TOTALS=[
 PROGRAMMES=[
  ("social","Социальная поддержка граждан","3487681.6","3150144.4","3145627.7",SOCIAL,
   "Суммы приведены в заключении комитета; опубликованное отношение к закону (89,7%) не совпадает с отношением указанных сумм. Здесь показан собственный расчёт, расхождение требует сверки."),
- ("health","Развитие здравоохранения","1557061.8","1605652.5","1595623.0",HEALTH,
-  "Строка сводной таблицы заключения комитета по охране здоровья."),
+ ("health","Развитие здравоохранения","1550591.5","1605652.5","1595623.0",HEALTH,
+  "Исходный закон и закон с изменениями приведены отдельно по столбцам 1 и 2 таблицы заключения."),
 ]
 def d(v):return Decimal(v) if v is not None else None
 def q(v,places="0.1"):
@@ -45,8 +45,9 @@ def records():
             note="Факт: статья 1 закона № 340-ФЗ от 19.10.2026; план: закон № 419-ФЗ с изменениями, округление до 0,1 млрд руб. в заключении комитета."))
     for code,title,law,appropriation,raw,source,note in PROGRAMMES:
         l,s,a=map(d,(law,appropriation,raw))
+        amended=d("1557061.8") if code=="health" else None
         rows.append(dict(id=code,year=2025,title=title,scope="Отдельная госпрограмма, федеральный бюджет",unit="млн руб.",initial_law=float(l),
-            amended_law=None,appropriation=float(s),actual=float(a),ratio_initial=ratio(a,l),ratio_amended=None,
+            amended_law=float(amended) if amended is not None else None,appropriation=float(s),actual=float(a),ratio_initial=ratio(a,l),ratio_amended=ratio(a,amended),
             ratio_appropriation=ratio(a,s),change_appropriation=change(s,l),unspent=change(s,a),
             plan_source=source,actual_source=source,note=note))
     if d(TOTALS[1][2])-d(TOTALS[0][2])!=d(TOTALS[2][2]):raise ValueError("Federal balance identity failed")
@@ -69,4 +70,5 @@ def publish(out):
     for r in rows:
         if r["initial_law"] is None:continue
         body+='<article><h4>'+escape(r["title"])+'</h4><p>Изменение росписи относительно исходного закона: <strong>'+fmt(r["change_appropriation"])+' млн руб.</strong></p><p>Исполнение относительно исходной суммы: '+fmt(r["ratio_initial"],2)+'%<br>Исполнение относительно росписи: '+fmt(r["ratio_appropriation"],2)+'%</p></article>'
-    return body+'</div><p>Две программы — выборка, а не полный перечень; её нельзя складывать с итоговыми федеральными расходами. Высокое кассовое исполнение не означает достижение результатов. Отсутствующие назначения не восстановлены расчётным путём.</p></section>'
+    import health_projects
+    return body+'</div>'+health_projects.publish(out)+'<p>Две программы — выборка, а не полный перечень; её нельзя складывать с итоговыми федеральными расходами. Высокое кассовое исполнение не означает достижение результатов. Отсутствующие назначения не восстановлены расчётным путём.</p></section>'
