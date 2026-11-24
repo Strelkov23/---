@@ -16,7 +16,7 @@ function chartTools(host, title, unit, years, series, options={}) {
     svg.setAttribute('font-family','Arial, sans-serif');
     shape('rect',{width,height,fill:'white'});
     const label=(x,y,text,size=21)=>shape('text',{x,y,'font-size':size,fill:'#152b33'},text);
-    label(35,42,title,26);label(35,79,'Россия · '+years[0]+'–'+years.at(-1)+' · '+unit);
+    label(35,42,title,26);label(35,79,(options.territory||'Россия')+' · '+years[0]+'–'+years.at(-1)+' · '+unit);
     const vals=series.flatMap(s=>s.values.filter(Number.isFinite));
     let lo=Math.min(...vals),hi=Math.max(...vals);
     if(lo===hi){hi+=1;lo-=1}
