@@ -1,0 +1,8 @@
+{
+  "source": "https://maps.pispace.eu/data-download/?file=russia-regions.geojson&set=russia",
+  "documentation": "https://maps.pispace.eu/data/russia/",
+  "license": "Public domain (Natural Earth; distributed by PiSpace Maps)",
+  "checked": "2026-11-24T14:51:19+00:00",
+  "status": "unavailable",
+  "error": "Нет названия территории"
+}
