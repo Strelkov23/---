@@ -27,6 +27,12 @@ TABLES={
 GROUPS={g[0]:dict(id=g[0],title=g[1],okved=g[2],subsection=g[3],section=t[0],table=code) for code,t in TABLES.items() for g in t[3]}
 ALIASES={(g["table"],g["subsection"]):g["id"] for g in GROUPS.values()}
 METHOD="Отгруженные товары собственного производства, работы и услуги собственными силами. Текущие цены, млн руб. ОКВЭД2, разделы B и D; итоги каждого раздела и его группы показываются отдельно. Не физическая добыча, не установленная мощность и не ВРП."
+LEGACY_LABELS={
+    "R_"+hashlib.sha256((g["table"]+"|"+TABLES[g["table"]][2]+"|"+UNIT+"|"+g["subsection"]).encode()).hexdigest()[:16]:g["title"] for g in GROUPS.values()
+}
+def legacy_title(indicator,source,original):
+    label=LEGACY_LABELS.get(indicator) if source==SOURCE else None
+    return original+" · "+label if label else original
 def value(raw):
     if str(raw).strip() in ("-99999999","-99999999.0"):return None
     return m.number(raw)
