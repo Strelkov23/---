@@ -31,7 +31,7 @@ jobs:
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           rm -rf public
@@ -66,6 +66,8 @@ jobs:
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom 'http://localhost:8765/industrial.html' > /tmp/industrial-dom.html
           python3 -c "from pathlib import Path; import json; d=json.loads(Path('industrial.json').read_text()); s=Path('/tmp/industrial-dom.html').read_text(); assert 'Источников' in s and (not d['series'] or 'Наблюдений:' in s)"
           curl --fail --silent http://localhost:8765/industrial/ > /dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom 'http://localhost:8765/sector-passports.html?sp-sector=agriculture' > /tmp/sector-dom.html
+          python3 -c "from pathlib import Path; import json; d=json.loads(Path('sector-passports.json').read_text()); assert len(d['profiles'])==14; assert 'Показателей в выборке: 12' in Path('/tmp/sector-dom.html').read_text()"
       - name: Retain validation reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,7 +144,7 @@ jobs:
             sleep 10
           done
           test "$actual" = "$EXPECTED_VERSION"
-          for route in index.html statistics.html national.html historical.html historical.json industrial.html industrial.json industrial/ papers.html atlas.html methodology.html links.html quality.json 404.html archive/ regions/ history/ budget/; do
+          for route in index.html statistics.html national.html historical.html historical.json industrial.html industrial.json industrial/ sector-passports.html sector-passports.json sector-passports/ papers.html atlas.html methodology.html links.html quality.json 404.html archive/ regions/ history/ budget/; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route" > /dev/null
           done
           echo "Public version verified: $EXPECTED_VERSION"
