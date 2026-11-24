@@ -18,7 +18,10 @@ class ResearchTests(unittest.TestCase):
         xml=b'<ValCurs ID="R01235"><Record Date="01.02.2026"><Nominal>10</Nominal><Value>900,50</Value></Record></ValCurs>'
         self.assertAlmostEqual(cbr_data.fx_rows(xml,"R01235")["2026-02-01"],90.05)
     def test_rosstat(self):
-        self.assertEqual(industry.parse_months("в марте 2026 г. по сравнению с мартом 2025 г. – 102,3%"),{"2026-03":102.3})
+        self.assertEqual(industry.parse_months("Индекс промышленного производства в марте 2026 г. по сравнению с мартом 2025 г. – 102,3%"),{"2026-03":102.3})
+    def test_industry_rejects_unrelated(self):
+        self.assertEqual(industry.parse_months("в марте 2026 г. по сравнению с мартом 2025 г. – 102,3%"),{})
+        self.assertEqual(industry.parse_months("Индекс промышленного производства в марте 2026 г. по сравнению с январем 2025 г. – 102,3%"),{})
     def test_revisions(self):
         db=sqlite3.connect(":memory:")
         self.addCleanup(db.close)
