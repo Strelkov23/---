@@ -87,11 +87,13 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const fields=m.names.map(name=>{const e=document.createElement('input');e.type='number';e.min=0;e.max=20;e.step=.1;e.value=3;e.setAttribute('aria-label','Годовой прирост спроса: '+name);return e});
   table(controls,['Группа продукции','Годовой прирост целевого спроса, %'],m.names.map((n,i)=>[n,fields[i]]));
   let rows=[];
+  const global=typeof GlobalPlan!=='undefined'?GlobalPlan.mount(m):null;
   function showDetail(){const r=rows.find(r=>r.year===Number(select.value));if(!r){detail.replaceChildren();return}table(detail,['Группа','Требуемый прирост выпуска','Доступный прирост','Реализуемый прирост','Прямой целевой спрос','Инвестиции для следующего года','Доп. мощность следующего года','Ограничение'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.demand,g.invest,g.nextExtra].map(fmtNum),g.binding?'Связывает сценарий':'—']))}
   function draw(){
-   for(const e of [metrics,out,detail,chart,alternatives,sensitivityHost,compareChart])e.replaceChildren();download.disabled=true;compareDownload.disabled=true;rows=[];
+   for(const e of [metrics,out,detail,chart,alternatives,sensitivityHost,compareChart])e.replaceChildren();download.disabled=true;compareDownload.disabled=true;rows=[];if(global)global.setParams(null);
    const p=Object.fromEntries(['years','spare','investment','capitalRatio','depreciation','importLimit'].map(k=>[k,$('dyn-'+k).valueAsNumber]));p.growth=fields.map(e=>e.valueAsNumber);p.allocation=$('dyn-allocation').value;
    try{if([...form.querySelectorAll('input'),...fields].some(e=>!e.validity.valid))throw Error('Invalid controls');rows=DynamicPlan.calculate(m,p)}catch(e){status.textContent='Проверьте параметры: '+e.message;return}
+   if(global)global.setParams(p);
    const last=rows.at(-1);status.textContent='Рассчитано периодов: '+rows.length+' · условный сценарий в ценах баланса 2021 года, млрд ₽.';
    for(const [label,v] of [['Реализуемая доля целевого прироста в последнем году',fmtNum(last.alpha*100)+'%'],['Требуемый прирост валового выпуска',fmtNum(last.required)+' млрд ₽'],['Реализуемый прирост валового выпуска',fmtNum(last.realized)+' млрд ₽']]){const d=document.createElement('div');d.className='metric';const b=document.createElement('b'),s=document.createElement('span');b.textContent=v;s.textContent=label;d.append(b,s);metrics.append(d)}
    table(out,['Период','Целевой прирост выпуска','Реализуемый прирост','Доля, %','Промежуточный импорт','Инвестиции','Неисп. инвест. лимит','Доля следующего периода, %','Локальный максимум, %','Главный ограничитель'],rows.map(r=>[r.year,...[r.required,r.realized,r.alpha*100,r.actualImport,r.investment,r.unusedInvestment,r.nextAlpha*100,r.nextUpper*100].map(fmtNum),[...(r.importBinding?['Импорт']:[]),...r.groups.filter(g=>g.binding).map(g=>g.name)].join('; ')||'Нет связывающего ограничения']));

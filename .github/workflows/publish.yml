@@ -47,6 +47,7 @@ jobs:
           node test-reproduction-plan.js
           node test-resource-plan.js
           node test-dynamic-plan.js
+          node test-global-plan.js
           rm -rf public
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt
@@ -88,6 +89,7 @@ jobs:
           python3 -m http.server 8765 > /tmp/layout-http.log 2>&1 &
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
           CHROME_BIN=$(command -v google-chrome) python3 ../layout_audit.py http://localhost:8765/ /tmp/layout-audit
       - name: Retain validation reports
         if: always()
