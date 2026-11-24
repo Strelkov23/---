@@ -17,3 +17,8 @@ console.log('Deterministic registry search and observations export tests passed'
 
 assert.deepEqual(R.filter(rows,{...p,exactId:"b"},new Set()).map(x=>x.id),["b"]);
 assert.deepEqual(R.filter([{...rows[0],method_level:"source"},{...rows[1],method_level:"explained"}],{...p,methodLevel:"source"},new Set()).map(x=>x.id),["a"]);
+
+const debt={id:'debt:payable',group:'debt',code:'payable',territory:'Россия',title:'Кредиторская задолженность',unit:'млрд руб.',source:'https://example.org',count:2};
+const debtRows=R.observations(debt,{coverage:'test',debt:[{period:'2025-12',payable:100,table:'5'},{period:'2026-01',payable:110,table:'12'}]});
+assert.deepEqual(debtRows.map(x=>x.value),[100,110]);
+assert.equal(debtRows[0].period,'2025-12');

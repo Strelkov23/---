@@ -61,6 +61,10 @@ def make(out):
     for (code,metric),items in grouped.items():
         vals=[r for r in items if r["value"] is not None];first,last=bounds(r["year"] for r in vals)
         add("finance",code+"."+metric,items[0]["title"]+" — "+fin["metrics"][metric]["title"],"%","годовая","Россия",len(vals),first,last,fin["source"],None,None,fin["status"],"manual","finance.html","finance-data.json","Отрицательные значения без величины исключены из числового ряда, сохранены в исходном наборе; "+items[0]["level"],"ОКВЭД2; локальный идентификатор")
+    state=load(out,"financial-state.json")
+    for code,title in state["labels"].items():
+        items=state["debt"];first,last=bounds(x["period"] for x in items)
+        add("debt",code,title+" организаций на конец месяца","млрд руб.","месячная","Россия",len(items),first,last,items[0]["source"],None,None,state["verification"],"manual","financial-state.html","financial-state.json","Запас на конец месяца; "+state["coverage"],"Росстат; оперативная отчётность")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])
