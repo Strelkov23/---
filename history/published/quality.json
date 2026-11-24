@@ -1,10 +1,8 @@
 {
-  "built": "2026-11-24T13:01:48+00:00",
+  "built": "2026-11-24T13:24:00+00:00",
   "errors": [],
   "warnings": [
     "Часть месячных данных унаследована из архива и не подтверждена повторно",
-    "Правовой портал 2026-11-24",
-    "Правовой портал 2026-11-23",
     "Месячная промышленность · Месячный выпуск не подтверждён при текущем обновлении; Недоступных страниц: 11; HTTP Error 404: Not Found",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
@@ -12,18 +10,16 @@
     "История · Казначейство · Федеральный бюджет · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Консолидированный бюджет РФ · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Бюджеты субъектов · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
-    "История · Валовой региональный продукт в текущих основных ценах · Ошибка: Не распознана однозначная таблица",
     "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: HTTP Error 404: Not Found",
     "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: 61483.csv.gz: HTTP Error 404: Not Found; 61483.parquet: HTTP Error 404: Not Found",
     "История · Доля городского населения на 1 января · Ошибка: 36057.csv.gz: HTTP Error 404: Not Found; 36057.parquet: HTTP Error 404: Not Found",
     "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: 60421.csv.gz: HTTP Error 404: Not Found; 60421.parquet: HTTP Error 404: Not Found",
     "История · Введённые жилые помещения на 1000 человек населения · Ошибка: 45454.csv.gz: HTTP Error 404: Not Found; 45454.parquet: HTTP Error 404: Not Found",
     "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: 59049.csv.gz: HTTP Error 404: Not Found; 59049.parquet: HTTP Error 404: Not Found",
-    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found",
-    "История · Архив регионов: industry · Ошибка: Не распознана документированная структура CSV"
+    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7300,
+    "archive": 7315,
     "papers": 8166,
     "indicators": 105,
     "indicators_with_data": 105,
@@ -33,19 +29,21 @@
     "cbr_USD": 741,
     "national_series": 13,
     "national_observations": 4133,
-    "historical_series": 2,
-    "historical_observations": 52,
+    "historical_series": 32,
+    "historical_observations": 55214,
     "official_files": 445,
+    "industrial_series": 2209,
+    "industrial_observations": 33806,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "ca64ce41cf425095a68c2801bac76b2c380a0d792e904c1f005e1c2f2ef9b6d0",
-      "bytes": 3508268
+      "sha256": "681f631227c1382c484436138278ba323490b748d6cc39e79b96ec2f11320f7b",
+      "bytes": 3513060
     },
     "literature.json": {
-      "sha256": "3c7d67c43d3ba60037c8c9ecdeaa33f161254bde0ebdc577ac36983b8084a14c",
-      "bytes": 3362776
+      "sha256": "a439d4366c381ceee010ea14eddd01b88b058f8da856455bc2e758d1f4bb9a2a",
+      "bytes": 3378976
     },
     "compare.json": {
       "sha256": "0c3d8766cceb77f4c1f8bf031a5e544b961edf5c596e702d0bca422e5b9f9e55",
@@ -64,7 +62,7 @@
       "bytes": 1048
     },
     "cbr.json": {
-      "sha256": "dd2554d93c9b0662b3d6bc5d2d4d681a9dde47d88409270ffef3885e96c47871",
+      "sha256": "5d7fac73ab6988b20c299a465556f063eb578d37eda930846d3c075b883908ba",
       "bytes": 55538
     },
     "sectors.json": {
@@ -72,20 +70,52 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "832d57cf9468897733a24cab6df1754f5a50843b4e9215b854bbd3bd9c8fd3d9",
-      "bytes": 34612
+      "sha256": "b6d49d3ef5390e77bf527bf425679a16a247698862fc2e2bbb95172123a246c2",
+      "bytes": 34147
     },
     "links.json": {
-      "sha256": "48dfa592adaa9a19870f943638f3938538624dd3684856158a0142fd08b7ef13",
-      "bytes": 1352207
+      "sha256": "57329df00a1ac1d7e7afb8fdf2c5ef2149975f7ffc4c614b5d8c2b2a532cc1bf",
+      "bytes": 1356533
     },
     "national.json": {
-      "sha256": "a74902a131c6b62d0c7d126b71529daa582d874e6023eecf520a24230dfa9c53",
+      "sha256": "0caf8f18296c5a97bed001592bc9eafa9ffd6b8eeb0b09b9f2b24837b121b8b8",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "86473000bdd52e709afcdcce7af7c7ad18c601736988cdc1632bb92b1d5e81d8",
-      "bytes": 63392
+      "sha256": "b52a92d34ec6b7b1e601424f996082acc5b2055274d101428dd5d0d795666f36",
+      "bytes": 81794
+    },
+    "industrial.json": {
+      "sha256": "f6d1529f0960b969f2e9403b7316039eddd882b3b07493a71ff21e7ebd35e56a",
+      "bytes": 6051460
+    },
+    "regional-data/GRP_95b8dd2585.json": {
+      "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
+      "bytes": 1510755
+    },
+    "regional-data/GRP_PC_95b8dd2585.json": {
+      "sha256": "ee3b53bbe9f4a5ac3b6eec38735099533f6f095b3dcbfaf4f907a00c49baf538",
+      "bytes": 1450282
+    },
+    "regional-data/GRP_PC_VOLUME_95b8dd2585.json": {
+      "sha256": "f0439c2042e34229e316c06f7b95dcab0c96d1cd29344329af76807cc4139415",
+      "bytes": 1167729
+    },
+    "regional-data/GRP_SHARE_95b8dd2585.json": {
+      "sha256": "1e853bc20212e7a542091f1cf18b8c1be4d56b89dd6a526a32787e09f77e2273",
+      "bytes": 1375222
+    },
+    "regional-data/GRP_VOLUME_95b8dd2585.json": {
+      "sha256": "6992fefbc982af22890ea976e3f084ce5557e2ba5b003e5b12d25c28a4f5e0b2",
+      "bytes": 1556206
+    },
+    "regional-data/HH_CONS_95b8dd2585.json": {
+      "sha256": "1762ba3e21ab2f32572ad1d6d27b70f91a4137633beb1395e27529b4e7498adf",
+      "bytes": 496085
+    },
+    "regional-data/HH_CONS_PC_95b8dd2585.json": {
+      "sha256": "0eff056974456ca87149ce73b6cecd463a737deca5fd041954c655a2f09bd973",
+      "bytes": 509121
     },
     "regional-data/NW_GRP_2026Q1_ecd0c71d74.json": {
       "sha256": "27d797882d8342d4bee8fc2bbad48b014c1fa2f121c0d56070a8707321f43dc5",
@@ -94,6 +124,98 @@
     "regional-data/NW_GRP_PC_2026Q1_ecd0c71d74.json": {
       "sha256": "10e5d0c47b0eca68998bd48f3a69a6b79fc71aafcba84859fdf277a87d0ccf80",
       "bytes": 14744
+    },
+    "regional-data/R_024d9416ea6f54dc_84c74d6e51.json": {
+      "sha256": "d57de05929dea907909c61be337eb09218af9c7367aab27139f6583b29b092fb",
+      "bytes": 1443037
+    },
+    "regional-data/R_2308ddd83ecf600c_4c391d1044.json": {
+      "sha256": "5392df24ddf08d6c4f2ee13561f44ea1e8a4c8d530653a5ac1e4ba802d039470",
+      "bytes": 1729333
+    },
+    "regional-data/R_347ab451705a6d33_031d7fe105.json": {
+      "sha256": "e998bb7f5ebee6a0bc62775d3127d9c19b8757823265c7041439f6452e47b4f7",
+      "bytes": 1509574
+    },
+    "regional-data/R_425e9fbbe745e4e6_031d7fe105.json": {
+      "sha256": "c62438bcb8916812694d548f843349e86637a00a190077ecff17f319b0f0349e",
+      "bytes": 1313834
+    },
+    "regional-data/R_510509d40d0cb785_28f4b5b380.json": {
+      "sha256": "15f411889b6c56366bdcced31c168bff48f49efbe12c774e3ebb3aaf42b01171",
+      "bytes": 18479
+    },
+    "regional-data/R_5f09b90031e93f90_031d7fe105.json": {
+      "sha256": "7133b66188bc12782a77abf17b8afa031c8a9bc577ed089a0d31bea6bbec63ed",
+      "bytes": 1313745
+    },
+    "regional-data/R_65254a01945743d3_1db3db8e79.json": {
+      "sha256": "cbb853c3e8832b7dc9ea2bf151304c96c153c075d7e762277d5cb3eebec56b84",
+      "bytes": 3654398
+    },
+    "regional-data/R_66b96177c45a01ad_bf6a5a3983.json": {
+      "sha256": "15815bd4a10bd89b4c5751d3546e462c8e792358c84278b7145d3a399dcf5e47",
+      "bytes": 1546503
+    },
+    "regional-data/R_6887143295c72599_84c74d6e51.json": {
+      "sha256": "4a32e1b66aff5322edf578c278133dd709772e790c638988223537088d17adf9",
+      "bytes": 1519441
+    },
+    "regional-data/R_77976ed27f49b4fd_28f4b5b380.json": {
+      "sha256": "a6968a0986255a3689e7653462a95c0d5b11dcad06ca5f9fc135d70405947902",
+      "bytes": 1689562
+    },
+    "regional-data/R_7e8fd799d1d06897_84c74d6e51.json": {
+      "sha256": "de1f3716c5d004f5e983c899879f2fbc2565dfa6d11f0081757d794acf79d53c",
+      "bytes": 1299828
+    },
+    "regional-data/R_8728bc736516e87c_28f4b5b380.json": {
+      "sha256": "882a8eb1a3f0916ba30da0b7fcf03b47482747faa76a9ff352732663b292212a",
+      "bytes": 1689988
+    },
+    "regional-data/R_88230ed30f2f2738_bf6a5a3983.json": {
+      "sha256": "da5af0767326f465cc8e7346d58191fa7d676ed846f456a36b3ab17f1b7e8c33",
+      "bytes": 1512393
+    },
+    "regional-data/R_88f3fb354016c809_4c391d1044.json": {
+      "sha256": "d76ecbe8d2209495df4a196159592522d85efaa71e405f9a9d230694f88666ae",
+      "bytes": 1743541
+    },
+    "regional-data/R_90575f546cc99ce3_bf6a5a3983.json": {
+      "sha256": "9340b117a2257630a7d047da25b09eec4c7c0fa5d09fa097a23df93798d5621f",
+      "bytes": 1950885
+    },
+    "regional-data/R_a4138d558584b81a_1db3db8e79.json": {
+      "sha256": "ff505c904cdbcceb3018fa5fffcd77ed54964de95371e3ecbbe7c4cfb9d2e5a2",
+      "bytes": 2170968
+    },
+    "regional-data/R_b772cc7700d0fcd7_4c391d1044.json": {
+      "sha256": "355aa0b25c98bbbe957f4b982116efcc0b40915388f2b4e65b2ad248a8ed7a31",
+      "bytes": 1314536
+    },
+    "regional-data/R_b7f9afa8b1ac06d9_28f4b5b380.json": {
+      "sha256": "495bda1886d9ca9fc1cb0ace08b8a786faa6ad308a7ad4c0d6ee3c63c1a0b0ff",
+      "bytes": 18481
+    },
+    "regional-data/R_b8ff4db9a1b3092e_1db3db8e79.json": {
+      "sha256": "0896cd3f2655f7cf6136b71d674795f742d98738c1a0b60ed831d1be629944d8",
+      "bytes": 2183636
+    },
+    "regional-data/R_c4e8751efbd23309_031d7fe105.json": {
+      "sha256": "90560808d6440f70cff76932bf2f7fdf47874d04dfecf56b53ee017758565159",
+      "bytes": 1195185
+    },
+    "regional-data/R_e8fd80380742955e_1db3db8e79.json": {
+      "sha256": "a7114af3bbd059ff83ccda76456b75a0ee8eab1fae6e1fedb2ef513e9e2dbe1b",
+      "bytes": 2840910
+    },
+    "regional-data/R_f39e59bbabc208f3_4c391d1044.json": {
+      "sha256": "534766ad3aba903b19b1971fa9f6109d874b390a1de87e3eda50ee0e06791eb9",
+      "bytes": 1369727
+    },
+    "regional-data/R_f54f02504bfb051e_84c74d6e51.json": {
+      "sha256": "cf7463f9cb493c368343dc10f3a5bd8360fa4b67727416cc6529567f1205b0fb",
+      "bytes": 1459610
     }
   }
 }
