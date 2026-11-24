@@ -143,6 +143,7 @@ with m.connect() as db:
     if manufacturing["status"].startswith("Ошибка"):failures.append("Отраслевая структура регионов · "+manufacturing["status"])
     import regional_industry_extra
     mining_energy=regional_industry_extra.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+    if mining_energy["status"].startswith("Ошибка"):failures.append("Добыча и энергетика регионов · "+mining_energy["status"])
     failures.extend(historical.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
