@@ -109,6 +109,8 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#forecast-status').textContent.includes('Рассчитано')")
         assert page.locator("#forecast-methods tbody tr").count()==4
         assert page.locator("#forecast-holdout tbody tr").count()==5
+        assert page.locator("#forecast-range-check tbody tr").count()==5
+        assert page.locator("#forecast-board tbody tr").count()==12
         page.locator("#forecast-series").select_option("CPI_YOY")
         assert page.locator("#forecast-methods tbody tr").count()==5
         page.locator("#forecast-series").select_option("INDUSTRY_YOY")
@@ -118,8 +120,14 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#forecast-export").click()
         assert d.value.suggested_filename=="forecast-selected.csv"
+        page.locator("#forecast-board-period").select_option("monthly")
+        assert page.locator("#forecast-board tbody tr").count()==5
+        with page.expect_download() as d:
+            page.locator("#forecast-board-export").click()
+        assert d.value.suggested_filename=="forecast-overview.csv"
         assert not errors,errors
-        assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth+3")
+        overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
+        assert overflow["scroll"]<=overflow["width"]+3,overflow
         page.close()
         print("Global worker/browser regression passed:",width,flush=True)
     browser.close()

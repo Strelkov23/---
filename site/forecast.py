@@ -84,18 +84,31 @@ def evaluate(values,h,monthly,bounds):
     test_scores={m:metrics(test_results[m]) for m in methods}
     naive=test_scores['last']['mae']
     skill=100*(1-test_scores[winner]['mae']/naive) if naive>0 else None
+    # Exploratory independent-on-holdout range diagnostic: the radius is frozen
+    # using development errors, before inspecting any control outcomes.
+    development_errors=sorted(abs(r["error"]) for r in dev_results[winner])
+    early_radius=development_errors[math.ceil(.8*len(development_errors))-1]
+    def interval(point,radius):
+        lo,hi=point-radius,point+radius
+        if bounds:
+            if bounds[0] is not None:lo=max(lo,bounds[0])
+            if bounds[1] is not None:hi=min(hi,bounds[1])
+        return lo,hi
+    interval_checks=[]
+    for fold in test_results[winner]:
+        lo,hi=interval(fold["prediction"],early_radius)
+        interval_checks.append(dict(origin=fold["origin"],target=fold["target"],low=lo,high=hi,actual=fold["actual"],covered=lo<=fold["actual"]<=hi))
+    calibration=dict(radius=early_radius,n=len(interval_checks),covered=sum(x["covered"] for x in interval_checks),folds=interval_checks,
+        development_n=len(development_errors),note="Описательная проверка диапазона по ранним ошибкам; не вероятностная калибровка.")
     errs=sorted(abs(r["error"]) for r in test_results[winner])
     # Descriptive range based on the held-out errors, not a calibrated prediction interval.
     # With five errors the 80th nearest-rank absolute error is the fourth.
     radius=errs[math.ceil(.8*len(errs))-1]
     point=predict(y,h,winner,bounds)
-    lo,hi=point-radius,point+radius
-    if bounds:
-        if bounds[0] is not None:lo=max(lo,bounds[0])
-        if bounds[1] is not None:hi=min(hi,bounds[1])
+    lo,hi=interval(point,radius)
     return dict(horizon=h,selected=winner,origin=period_name(values[-1][0],monthly),
       target=period_name(values[-1][0]+h,monthly),point=point,low=lo,high=hi,error_radius=radius,
-      development=scores,holdout=test_scores,skill_vs_last_pct=skill,development_folds=dev_results,holdout_folds=test_results,
+      development=scores,holdout=test_scores,skill_vs_last_pct=skill,range_check=calibration,development_folds=dev_results,holdout_folds=test_results,
       selection_cutoff=period_name(values[test[0]][0],monthly),holdout_start=period_name(values[test[0]+h][0],monthly))
 def series(code,title,unit,raw,monthly,bounds,source,checked,stamp):
     block=tail(raw)
@@ -141,11 +154,11 @@ def publish(out,stamp):
     data=dict(built=stamp,methods=LABELS,series=rows,notice="Последние редакции исторических наблюдений; не реальное историческое наличие данных. Диапазон — описательный по пяти контрольным ошибкам, не вероятностный интервал.")
     (out/"forecast.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"forecast.csv").open("w",encoding="utf-8-sig",newline="") as f:
-        w=csv.writer(f);w.writerow(["code","title","unit","source","last_observation","horizon","target","method","point","descriptive_low","descriptive_high","holdout_mae","holdout_rmse","holdout_bias","holdout_n","skill_vs_last_pct","selection_cutoff","built"])
+        w=csv.writer(f);w.writerow(["code","title","unit","source","last_observation","horizon","target","method","point","descriptive_low","descriptive_high","holdout_mae","holdout_rmse","holdout_bias","holdout_n","skill_vs_last_pct","early_range_radius","early_range_covered","early_range_n","selection_cutoff","built"])
         for s in rows:
             for r in s["results"]:
                 score=r["holdout"][r["selected"]]
-                w.writerow([s["code"],s["title"],s["unit"],s["source"],s["last"],r["horizon"],r["target"],r["selected"],r["point"],r["low"],r["high"],score["mae"],score["rmse"],score["bias"],score["n"],r["skill_vs_last_pct"],r["selection_cutoff"],stamp])
+                w.writerow([s["code"],s["title"],s["unit"],s["source"],s["last"],r["horizon"],r["target"],r["selected"],r["point"],r["low"],r["high"],score["mae"],score["rmse"],score["bias"],score["n"],r["skill_vs_last_pct"],r["range_check"]["radius"],r["range_check"]["covered"],r["range_check"]["n"],r["selection_cutoff"],stamp])
     with (out/"forecast-backtests.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.writer(f);w.writerow(["code","unit","horizon","split","method","selected","origin","target","prediction","actual","error","source","built"])
         for s in rows:

@@ -16,12 +16,17 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(r["holdout"][r["selected"]]["mae"],0)
         self.assertEqual(r["holdout"][r["selected"]]["n"],5)
         self.assertEqual(r["skill_vs_last_pct"],100)
+        self.assertEqual(r["range_check"]["covered"],5)
+        self.assertEqual(r["range_check"]["radius"],0)
         flat=f.evaluate([(2000+i,1) for i in range(30)],1,False,None)
         self.assertIsNone(flat["skill_vs_last_pct"])
         self.assertTrue(all(x["target"]<=r["selection_cutoff"] for rows in r["development_folds"].values() for x in rows))
         self.assertTrue(all(x["target"]>=r["holdout_start"] for rows in r["holdout_folds"].values() for x in rows))
         changed=values[:-3]+[(t,100000) for t,_ in values[-3:]]
-        self.assertEqual(f.evaluate(changed,3,False,None)["selected"],r["selected"])
+        q=f.evaluate(changed,3,False,None)
+        self.assertEqual(q["selected"],r["selected"])
+        self.assertEqual(q["range_check"]["radius"],r["range_check"]["radius"])
+        self.assertLess(q["range_check"]["covered"],5)
     def test_insufficient(self):
         self.assertIsNone(f.evaluate([(i,float(i)) for i in range(10)],1,False,None))
     def test_month(self):
