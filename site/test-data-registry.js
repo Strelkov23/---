@@ -22,3 +22,7 @@ const debt={id:'debt:payable',group:'debt',code:'payable',territory:'Росси�
 const debtRows=R.observations(debt,{coverage:'test',debt:[{period:'2025-12',payable:100,table:'5'},{period:'2026-01',payable:110,table:'12'}]});
 assert.deepEqual(debtRows.map(x=>x.value),[100,110]);
 assert.equal(debtRows[0].period,'2025-12');
+
+const electricity={id:'electricity:ues.capacity',group:'electricity',code:'ues.capacity',territory:'ЕЭС России',title:'Мощность',unit:'ГВт',source:'https://example.org',count:1};
+const electricRows=R.observations(electricity,{rows:[{scope:'ues',year:2025,values:{capacity:264.9},source:'https://example.org/2025',mode:'document'},{scope:'all',year:2025,values:{capacity:270.3}}]});
+assert.equal(electricRows[0].value,264.9);assert.equal(electricRows[0].territory,'ЕЭС России');assert.equal(electricRows[0].source,'https://example.org/2025');

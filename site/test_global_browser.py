@@ -301,6 +301,11 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#electric-export").click()
         assert d.value.suggested_filename=="electricity-scenario.csv"
+        page.locator("#electric-scope").select_option("ues")
+        assert "264,9" in page.locator("#electric-table tbody").inner_text()
+        page.goto("http://localhost:8765/data-registry.html?id=electricity%3Aues.capacity",wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
+        assert "ГВт" in page.locator("#registry-list article").inner_text()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
