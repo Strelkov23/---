@@ -1,10 +1,10 @@
 {
-  "built": "2026-11-24T18:57:26+00:00",
+  "built": "2026-11-24T19:21:59+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
     "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
-    "Пространственная и региональная экономика · Crossref HTTP 429; повтор не ранее 2026-11-24T19:54:16+00:00",
+    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
     "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
     "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
     "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
@@ -32,7 +32,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7788,
+    "archive": 7794,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -59,12 +59,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "82ef8d917f88c2991658a57d846545c5262f03b4f6be108986ed49b0b95ff56f",
-      "bytes": 3766704
+      "sha256": "d1bf518e8d8a4de6252f8b6c5864f5690899efe2c9bc538c4b84f29af194d5fd",
+      "bytes": 3768757
     },
     "literature.json": {
-      "sha256": "6fd86759d59b8088c08aba9baf2f47bb1ff4372ea2e6f74e5950044b833436c6",
-      "bytes": 4852341
+      "sha256": "f9a764886efc0a095ccc55c71bf53feb58fbca09a957505c71a28c6ed071b0c0",
+      "bytes": 4867737
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -79,11 +79,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "0df0a6e18f5523e6890f356825a207c51b94619283dedef8aa9397a6e044a30d",
+      "sha256": "25170dc82ffddf8b90765c4331fc66cef9fbae42c733aacbca986d2618130a89",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "1366d4d34de6315c0114947b4c55128d4ee4f2c81c54af7beda54ae94b10ae78",
+      "sha256": "6fb50b8d136d46d3c9237976018efed4f3380af1b34e78146dee2f66f76bd279",
       "bytes": 55538
     },
     "sectors.json": {
@@ -91,27 +91,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "866672b65b8173f790083153d8a90b9af8442a14060bcf3f8162bcd22a083b39",
-      "bytes": 36424
+      "sha256": "499d8adda554d797c0c8921d0eec5116f5acca632052b04df2afba0ec12871af",
+      "bytes": 36418
     },
     "links.json": {
-      "sha256": "df2372cc915e260c752d2fddab358985790f4060726cc72593a855cd18f8b97f",
-      "bytes": 1478388
+      "sha256": "4ac730348de8570b98caf456af009cf45b011313a2f90b1dda72dff84f26c544",
+      "bytes": 1480214
     },
     "national.json": {
-      "sha256": "f9846eb6d197f3b908f93571c70500bb98bbdfde01899c7893b072c7d10fcea7",
+      "sha256": "28b38289e866368042f4ac0057275527e11b596180ce4e897d6b9d02224eaf87",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "cb59852b72aba77a5afbc0822d409395436d2cc6f85eb6c8b471f6f17247bbbb",
+      "sha256": "1112956b308a3447345e391f8f6f0c9846923ae9767342824a41caafe8bfd4b6",
       "bytes": 95441
     },
     "industrial.json": {
-      "sha256": "5628e95f7c2cc5827e691cde0bf9ede9ab90b3eaee6d7f21b1b5499af8816a46",
+      "sha256": "4f1f4fbc0b3caacfcfdcca5867304a410d41ffd017e3427f5e1df7e89b6882a4",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "09acca1d6f551c5dd58e677cd22532a810193959df4436d4fa663135edfda582",
+      "sha256": "35e2ae1cfa7bb1f9ae233b0f1c7a27a11a832feee98e1853d8aa363731055947",
       "bytes": 116117
     },
     "regional-boundaries.json": {
