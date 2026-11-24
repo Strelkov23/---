@@ -3,7 +3,7 @@ import csv,io,json,hashlib,re,math,zipfile
 from datetime import date,timedelta
 import calendar
 from html import escape
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,unquote
 import historical as h
 CATALOGS={
  "capital":"https://rosstat.gov.ru/folder/14304",
@@ -21,14 +21,14 @@ RULES={
  "debt":(r"(?:кредиторская|дебиторская|суммарная) задолженность",r"миллиард[а-я]* рубл|млрд\.?\s*руб","млрд руб.","debt")}
 HINTS={
  "capital":r"основн.*фонд|износ|обновлен|выбыт",
- "capacity":r"мощност|mosh|mo[sš]chn",
+ "capacity":r"мощност|mosh|mo[sš]chn|urov_motsh",
  "cost":r"структур.*затрат|zatraty_god",
  "debt":r"финансов.*состояни|задолженност|fin_sost"}
 def allowed(url):
     u=urlsplit(url)
     return h.allowed(url) and (u.hostname=="rosstat.gov.ru" or u.hostname.endswith(".rosstat.gov.ru")) and u.path.lower().endswith((".xlsx",".xls"))
 def candidates(group,files):
-    return [f for f in files if allowed(f["url"]) and re.search(HINTS[group],h.norm(f["title"]+" "+f["url"])) and not re.search(r"субъект|региональн|федеральн.*округ",h.norm(f["title"]))]
+    return [f for f in files if allowed(f["url"]) and re.search(HINTS[group],h.norm(f["title"]+" "+unquote(f["url"]))) and not re.search(r"по субъектам|в разрезе субъектов|по федеральным округам|региональн",h.norm(f["title"]))]
 COST_FIELDS={
  "cost_materials":r"^материальные затраты$",
  "cost_labor":r"^затраты на оплату труда$|^оплата труда$",
@@ -190,6 +190,7 @@ def parse(raw,group,url,now_year):
 def sync(db,stamp,refresh,out):
     db.execute("create table if not exists rosstat_workbooks(url text primary key,grp text,checked text,success text,status text,sha text,rows text)")
     db.execute("create table if not exists rosstat_workbook_catalog(grp text primary key,checked text,success text,status text,files text)")
+    db.execute("create table if not exists rosstat_catalog_versions(grp text primary key,version integer not null)")
     historical=json.loads((out/"historical.json").read_text(encoding="utf-8"))
     for group,url in CATALOGS.items():
         source=next((s for s in historical["sources"] if s["url"]==url),None)
@@ -197,7 +198,8 @@ def sync(db,stamp,refresh,out):
         if source and source.get("files"):
             files=candidates(group,source["files"])
             db.execute("insert or replace into rosstat_workbook_catalog values(?,?,?,?,?)",(group,source.get("checked"),source.get("success"),source["status"],json.dumps(files,ensure_ascii=False)))
-        elif refresh and (not old or not old[0] or (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=7):
+        elif refresh and (not old or not old[0] or not db.execute("select 1 from rosstat_catalog_versions where grp=? and version=2",(group,)).fetchone() or (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=7):
+            db.execute("insert or replace into rosstat_catalog_versions values(?,?)",(group,2))
             try:
                 raw,enc=h.get(url,5_000_000);files=candidates(group,h.discover(raw.decode(enc,errors="replace"),url))
                 if not files:raise ValueError("Не обнаружено подходящих XLS/XLSX")
