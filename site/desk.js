@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function card(item) {
     const box = node('article',''), heading = node('h3',''), link = node('a',item.title);
-    link.href = item.url;
+    if(/^https?:\/\//i.test(item.url)){link.href=item.url;link.target='_blank';link.rel='noopener noreferrer'}
     heading.append(link);
     const button = node('button',basket.has(item.url) ? 'Убрать из подборки' : 'В подборку');
     button.onclick = () => toggle(item);
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     el('brief-sources').replaceChildren(node('h3','Источники подборки'));
     for(const item of basket.values()){
       const line=node('p',''), a=node('a',item.title);
-      a.href=item.url; line.append(a,node('small',' · '+item.source+' · '+item.date+' · '+item.url));el('brief-sources').append(line);
+      if(/^https?:\/\//i.test(item.url)){a.href=item.url;a.target='_blank';a.rel='noopener noreferrer'}; line.append(a,node('small',' · '+item.source+' · '+item.date+' · '+item.url));el('brief-sources').append(line);
     }
     el('brief-models').replaceChildren();
     for(const [key,s] of Object.entries(scenarios)){
@@ -80,8 +80,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (sets[0].status === 'fulfilled') records.push(...sets[0].value.map(r => ({
     title:r.title,url:r.url,date:(r.published||'').slice(0,10),type:sourceKind(r),source:r.source,topics:r.topics,authors:''
   }))); else missing.push('новости и акты');
-  if (sets[1].status === 'fulfilled') records.push(...sets[1].value.articles.map(r => ({
-    title:r.title,url:'https://doi.org/'+r.doi,date:r.published,type:'Научная статья',source:r.journal,topics:r.topics,authors:r.authors
+  if (sets[1].status === 'fulfilled') records.push(...sets[1].value.articles.filter(r=>/^10\.\d{4,9}\/\S+$/.test(r.doi||'')).map(r => ({
+    title:r.title,url:'https://doi.org/'+String(r.doi||'').split('/').map(encodeURIComponent).join('/'),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics,authors:r.authors
   }))); else missing.push('журналы');
   for (const item of records) item.search = [item.title,item.authors,item.topics,item.source,item.url].join(' ').toLowerCase();
   records.sort((a,b)=>b.date.localeCompare(a.date));
