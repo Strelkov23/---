@@ -54,3 +54,32 @@ jobs:
           node test-food-balance.js
           node test-electricity-balance.js
           node test-energy-output.js
+      - name: Build from the saved archive without refreshing sources
+        run: |
+          mkdir -p monitor/data
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
+          elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db
+          else echo "Saved database missing"; exit 1; fi
+          cd monitor
+          ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
+          git rev-parse HEAD > public/source-version.txt
+          cp public/source-version.txt public/version.txt
+          python3 -c "import json; from pathlib import Path; d=json.loads(Path('public/quality.json').read_text()); print(d); assert not d['errors'],d['errors']"
+      - name: Browser regression on saved data
+        run: |
+          cd monitor
+          python3 -m pip install playwright==1.51.0
+          cd public
+          python3 -m http.server 8765 > /tmp/layout-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          for i in $(seq 1 30); do if curl --silent --fail http://localhost:8765/index.html > /dev/null; then break; fi; sleep 1; done
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
+      - name: Save offline quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-quality
+          path: |
+            monitor/public/quality.json
+            monitor/public/data-manifest.json
+          if-no-files-found: ignore
