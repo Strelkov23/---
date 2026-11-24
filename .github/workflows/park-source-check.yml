@@ -1,0 +1,39 @@
+name: Park source inspection
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/park-source-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect public catalogue markup without collecting addresses
+        run: |
+          python3 - <<'PY'
+          from urllib.request import urlopen,Request
+          from html.parser import HTMLParser
+          from collections import Counter
+          class Inspect(HTMLParser):
+              def __init__(self):
+                  super().__init__();self.stack=[];self.classes=Counter();self.hits=[]
+              def handle_starttag(self,tag,attrs):
+                  a=dict(attrs);c=a.get('class','');self.classes[(tag,c)]+=1
+                  if tag not in ('meta','link','input','img','br','hr','source','area','wbr'):self.stack.append((tag,c,a.get('id','')))
+              def handle_endtag(self,tag):
+                  for i in range(len(self.stack)-1,-1,-1):
+                      if self.stack[i][0]==tag:self.stack=self.stack[:i];break
+              def handle_data(self,s):
+                  v=s.strip()
+                  if v in ('Астраханская область','ОЭЗ Лотос','Фабрика','Гринфилд','Сертифицирован','Действующие','Создаваемые','Название:','Субъект РФ:','№55 АИП','Найдено 530 предложений') and len(self.hits)<35:self.hits.append((v,self.stack[-7:]))
+          for url in ('https://indparks.ru/catalog/regions/','https://indparks.ru/catalog/','https://indparks.ru/certification/parks/'):
+              try:
+                  with urlopen(Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=25) as f:raw=f.read(15000001)
+                  if len(raw)>15000000:raise ValueError('oversized')
+                  p=Inspect();p.feed(raw.decode('utf-8'))
+                  print('PAGE',url,len(raw));print('CLASSES',p.classes.most_common(60));print('HITS',p.hits)
+              except Exception as e:print('FAILED',url,type(e).__name__,str(e))
+          PY
