@@ -41,6 +41,7 @@ jobs:
           for script in *.js; do node --check "$script"; done
           node test-regional-disparities.js
           node test-regional-map.js
+          node test-news-map.js
           node test-chain-stress.js
           node test-chart-layout.js
           node test-macro-diagnostics.js

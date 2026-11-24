@@ -194,6 +194,13 @@ with sync_playwright() as p:
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0
             assert page.locator("#geo-map g[role=button]").count()<=8
+        page.goto("http://localhost:8765/news-map.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#news-geo-status').textContent.startsWith('Период до')",timeout=30000)
+        assert page.locator("#news-geo-map svg").count()==1
+        page.locator("#news-geo-days").select_option("90")
+        if page.locator("#news-geo-region option").count()>1:
+            page.locator("#news-geo-region").select_option(index=1)
+            assert page.locator("#news-geo-list article a[href^='http']").count()>0
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
         methods=json.loads(Path("method-passports.json").read_text())
         assert len(methods)>=33

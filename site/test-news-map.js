@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),N=require('./news-map.js'),M=require('./regional-map.js');
+const d=N.dictionary(M.regionNames()),codes=s=>N.mentions(s,d).map(x=>x.code);
+assert.deepEqual(codes('Новый завод в Кемеровской области'),['RU-KEM']);
+assert.deepEqual(codes('Инвестиции в Краснодарском крае'),['RU-KDA']);
+assert.deepEqual(codes('В Москве и Татарстане обсудили инвестиции').sort(),['RU-MOW','RU-TA']);
+assert.deepEqual(codes('Московская компания и Алтайский край'),['RU-ALT']);
+assert.deepEqual(codes('Республика Алтай'),['RU-AL']);
+assert.deepEqual(codes('Общероссийский индекс промышленности'),[]);
+assert.deepEqual(codes('Белгородский завод'),[]);
+assert.deepEqual(codes('В Ленинградской области'),['RU-LEN']);
+const rows=[{published:'2026-11-24',url:'https://a.test/1',title:'Москва',topics:'Промышленность'},{published:'2026-11-18',url:'https://a.test/2',title:'Татарстан',topics:'Промышленность · Инвестиции'},{published:'2026-11-17',url:'https://a.test/3',title:'Москва',topics:'Промышленность'},{published:'2026-11-25',url:'https://a.test/4',title:'Москва',topics:'Промышленность'}];
+assert.equal(N.windowRows(rows,'2026-11-24',7,'Промышленность','').length,2);
+assert.equal(N.windowRows(rows,'2026-11-24',7,'Инвестиции','').length,1);
+assert.equal(N.windowRows([...rows,rows[0]],'2026-11-24',7,'','москва').length,1);
+console.log('Regional news mapping and calendar tests passed');
