@@ -66,6 +66,7 @@ def scan(out):
             elif path:path=posixpath.normpath(posixpath.join(posixpath.dirname(name),path))
             else:path=name
             if path.endswith("/") or path in ("","."):path=posixpath.join(path,"index.html").lstrip("./")
+            elif path not in files and path+"/index.html" in files:path+="/index.html"
             if path not in files:
                 issues.append((name,href,"Файл не найден"))
             elif u.fragment and path in pages and unquote(u.fragment) not in pages[path].ids and not u.fragment.startswith(":~:text="):
