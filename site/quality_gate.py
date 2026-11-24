@@ -204,6 +204,7 @@ def check(out,previous,stamp):
         old_file=previous/"regional-manufacturing.json"
         old=json.loads(old_file.read_text(encoding="utf-8")) if old_file.is_file() else None
         counts.update(rm.quality(data["regional-manufacturing.json"],old))
+        rm.verify_csv(out/"regional-manufacturing.csv",data["regional-manufacturing.json"])
         if not data["regional-manufacturing.json"]["rows"]:warnings.append("Специализация обрабатывающей промышленности: нет импортированных данных")
         if data["regional-manufacturing.json"]["status"].startswith("Ошибка"):warnings.append("Специализация обрабатывающей промышленности: "+data["regional-manufacturing.json"]["status"])
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Специализация обрабатывающей промышленности: "+str(e))
