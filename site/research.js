@@ -142,7 +142,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const s=await load('status.json'),c=await load('catalog.json'),d=await load('compare.json');
    const entries=Object.entries(c),news=Object.entries(s.news).sort((a,b)=>b[1]-a[1]),n=news.reduce((a,b)=>a+b[1],0);
    const h=$('quality-status');h.replaceChildren(node('p','Сборка: '+s.built+' · версия '+(version||'не определена')),node('p','Ряды с наблюдениями: '+entries.filter(([k])=>Object.keys(d[k]?.values||{}).length).length+' из '+entries.length),node('p','Ошибки активных источников: '+s.failures.length),node('p','Доля крупнейшего СМИ / источника в архиве: '+(n?f(100*news[0][1]/n)+'% · '+news[0][0]:'нет данных')));
-   const list=node('ul','');s.failures.forEach(x=>list.append(node('li',x)));h.append(list)
+   const list=node('ul','');s.failures.forEach(x=>list.append(node('li',x)));h.append(list);
+   try{const q=await load('quality.json');h.append(node('h3','Контроль целостности'),node('p','Ошибок: '+q.errors.length+' · предупреждений: '+q.warnings.length+' · внутренних ссылок с ошибками: '+q.counts.internal_link_errors));const ul=node('ul','');[...q.errors,...q.warnings].forEach(x=>ul.append(node('li',x)));h.append(ul);const report=node('a','Открыть протокол этой версии');report.href=root+'quality.json';h.append(report)}catch{h.append(node('p','Протокол контроля качества для выбранной версии недоступен.'))}
   }catch(e){console.error(e);$('quality-status').textContent=missing}
  }
 });
