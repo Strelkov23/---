@@ -118,7 +118,7 @@ with m.connect() as db:
 sector_passports.publish(out)
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html","sector-passports.html"]:
     page(name,Path(name).read_text())
-for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js","historical.js","industrial.js","sector-passports.js"]:
+for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js","historical.js","regional-disparities.js","industrial.js","sector-passports.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())
 
