@@ -113,6 +113,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const rows=p.rows.filter(r=>(!src||src===r.provider)&&(!cov||(cov==='yes'?r.count>0:r.count===0))&&norm([r.title,r.id,r.unit].join(' ')).includes(q));
    prepareCharts(rows);
    const host=$('sp-scope');host.replaceChildren(node('h2',p.title),node('p',p.note));
+   const rmGroup=({manufacturing:'total',light:'light',chemical:'chemical',pharma:'chemical',food:'food',metal:'metal',wood:'wood',materials:'minerals',machinery:'machinery'})[p.id];
+   if(rmGroup){host.append(node('p','Региональный источник имеет собственную агрегацию; химия и фармацевтика, например, объединены.'),link('Региональная специализация по отгрузке',local('regional-manufacturing.html?rm-group='+rmGroup)))}
+
    const sources=node('p','Профильные официальные каталоги: ');p.sources.forEach((url,i)=>{if(i)sources.append(document.createTextNode(' · '));sources.append(link(new URL(url).hostname,url))});host.append(sources);
    status.textContent='Показателей в выборке: '+rows.length+' · с наблюдениями: '+rows.filter(r=>r.count).length+' · версия: '+(version||'не определена');
    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
