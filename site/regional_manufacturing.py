@@ -12,6 +12,7 @@ CATALOG="https://tochno.st/datasets/regions_collection"
 PRIMARY="https://rosstat.gov.ru/folder/210/document/13204"
 LICENSE="CC BY 4.0"
 RELEASE="v20260313"
+EXPECTED_SHA256="70aa400bc0318c413ebd17f50780e9e1d10e47a44c8b60db9d323bd766b9b6bf"
 EDITIONS={2022:"Промышленное производство в России 2023",2024:"Промышленное производство в России 2025"}
 CODE="Y477090010"
 TITLE="Объем отгруженных товаров собственного производства, выполненных работ и услуг собственными силами по видам экономической деятельности раздела обрабатывающие производства"
@@ -46,7 +47,7 @@ def legacy_title(indicator,source,original):
     title=LEGACY_LABELS.get(indicator)
     return TITLE+" · "+title if title else original
 def number(raw):
-    s=str(raw or "").strip().replace("\u00a0","").replace(" ","").replace(",",".")
+    s=str(raw if raw is not None else "").strip().replace("\u00a0","").replace(" ","").replace(",",".")
     if s in ("","…","...","-","–","—","х","Х","x","X","н/д"):return None
     try:v=Decimal(s)
     except InvalidOperation:raise ValueError("Неизвестное числовое обозначение: "+s[:60])
@@ -94,7 +95,7 @@ def empty(stamp):
 def quality(d,previous=None):
     if d["schema"]!=1 or d["source"]!=SOURCE or d["release"]!=RELEASE or d["groups"]!=list(LABELS.values()) or d["indicator"]!=CODE or d["unit"]!=UNIT:raise ValueError("Метаданные отраслевой таблицы")
     rows=d["rows"];keys=set();line_numbers=set()
-    if rows and (not d["success"] or not re.fullmatch("[0-9a-f]{64}",d["sha256"] or "")):raise ValueError("Нет хеша исходного файла")
+    if rows and (not d["success"] or d["sha256"]!=EXPECTED_SHA256):raise ValueError("Нет хеша исходного файла")
     for r in rows:
         key=(r["group"],r["region"],r["level"],r["okato"],r["oktmo"],r["year"])
         if key in keys or LOOKUP.get(r["subsection"])!=r["group"] or r["version"]!=RELEASE or r["value"]!=number(r["raw_value"]) or not isinstance(r["row"],int) or r["row"]<2:raise ValueError("Неверная строка отраслевого архива")
@@ -120,6 +121,7 @@ def publish(out,previous,stamp,refresh):
     if refresh and due:
         try:
             raw,_=historical.get(SOURCE,35_000_000)
+            if hashlib.sha256(raw).hexdigest()!=EXPECTED_SHA256:raise ValueError("Изменился хеш фиксированного выпуска; требуется проверка источника")
             candidate={**empty(stamp),"checked":stamp,"success":stamp,"status":"Импортировано","sha256":hashlib.sha256(raw).hexdigest(),"rows":parse(raw)}
             quality(candidate,old);d=candidate
         except Exception as e:
