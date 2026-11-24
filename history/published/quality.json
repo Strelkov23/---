@@ -1,44 +1,59 @@
 {
-  "built": "2026-11-24T21:47:59+00:00",
+  "built": "2026-11-24T22:45:54+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
     "Площадки WRI: архив 2021 года, текущий статус работы не подтверждён",
     "Площадки WRI: нет наблюдаемой годовой выработки в импортированных полях",
     "ADM2: simplified 2017 release contains 2327 of 2328 declared units; not present-day legal boundaries",
-    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Вопросы инновационной экономики · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Вопросы теоретической экономики · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Информатизация в цифровой экономике · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Экономика сельскохозяйственных и перерабатывающих предприятий · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
+    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Вопросы инновационной экономики · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Экономика сельскохозяйственных и перерабатывающих предприятий · Crossref HTTP 429; повтор не ранее 2026-11-24T23:41:36+00:00",
+    "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
+    "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-24T23:41:36+00:00",
     "Правовой портал 2026-11-24",
     "Правовой портал 2026-11-23",
+    "Ключевая ставка · Ошибка: HTTP Error 403: Forbidden",
+    "Инфляция потребительских цен · Ошибка: HTTP Error 403: Forbidden",
+    "Ключевая ставка на конец месяца · Ошибка: HTTP Error 403: Forbidden",
+    "Цель по инфляции · Ошибка: HTTP Error 403: Forbidden",
+    "Международные резервы · Ошибка: HTTP Error 403: Forbidden",
+    "Валютные резервы · Ошибка: HTTP Error 403: Forbidden",
+    "Иностранная валюта в резервах · Ошибка: HTTP Error 403: Forbidden",
+    "Счёт в СДР · Ошибка: HTTP Error 403: Forbidden",
+    "Резервная позиция в МВФ · Ошибка: HTTP Error 403: Forbidden",
+    "Монетарное золото · Ошибка: HTTP Error 403: Forbidden",
+    "Денежный агрегат М0 · Ошибка: HTTP Error 403: Forbidden",
+    "Денежный агрегат М1 · Ошибка: HTTP Error 403: Forbidden",
+    "Денежный агрегат М2 · Ошибка: HTTP Error 403: Forbidden",
+    "Широкая денежная масса М2Х · Ошибка: HTTP Error 403: Forbidden",
+    "Денежные агрегаты XLSX · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
     "История · Казначейство · Федеральный бюджет · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Консолидированный бюджет РФ · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Бюджеты субъектов · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
+    "История · Годовые итоги федерального бюджета Минфина · Ошибка: HTTP Error 403: Forbidden",
+    "История · Доля городского населения на 1 января · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/36057.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/36057.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/36057.parquet: HTTP Error 404: Not Found",
+    "История · Введённые жилые помещения на 1000 человек населения · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/45454.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/45454.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/45454.parquet: HTTP Error 404: Not Found",
+    "История · Архив регионов · Внешняя торговля · Ошибка: Структура CSV распознана, но нет наблюдений выбранных показателей",
+    "История · Архив регионов · Связь и цифровая инфраструктура · Ошибка: Структура CSV распознана, но нет наблюдений выбранных показателей",
     "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: https://rosstat.gov.ru/storage/mediabank/Invest_sub_2000-2025.xlsx · HTTP Error 404: Not Found",
     "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: 61483.csv.gz: HTTP Error 404: Not Found; 61483.parquet: HTTP Error 404: Not Found",
-    "История · Доля городского населения на 1 января · Ошибка: 36057.csv.gz: HTTP Error 404: Not Found; 36057.parquet: HTTP Error 404: Not Found",
     "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: 60421.csv.gz: HTTP Error 404: Not Found; 60421.parquet: HTTP Error 404: Not Found",
-    "История · Введённые жилые помещения на 1000 человек населения · Ошибка: 45454.csv.gz: HTTP Error 404: Not Found; 45454.parquet: HTTP Error 404: Not Found",
     "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: 59049.csv.gz: HTTP Error 404: Not Found; 59049.parquet: HTTP Error 404: Not Found",
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found",
-    "История · Годовые итоги федерального бюджета Минфина · Ошибка: Нарушено бюджетное тождество за 2022",
-    "История · Архив регионов: agriculture · Ошибка: Не распознана документированная структура CSV"
+    "История · Архив регионов · Сельское хозяйство · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7844,
+    "archive": 7852,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -48,16 +63,17 @@
     "cbr_USD": 741,
     "national_series": 13,
     "national_observations": 4133,
-    "historical_series": 52,
-    "historical_observations": 86294,
-    "official_files": 563,
+    "historical_series": 53,
+    "historical_observations": 88598,
+    "official_files": 569,
     "geographic_features": 86,
     "geographic_unique_codes": 83,
     "geographic_unmatched_contours": 3,
     "industrial_series": 2209,
     "industrial_observations": 33806,
-    "sector_passports": 14,
+    "sector_passports": 20,
     "sector_linked_series": 179,
+    "sector_finance_linked_observations": 800,
     "fbs_product_years": 105,
     "fbs_observations": 1074,
     "fbs_complete_resource_balances": 105,
@@ -74,29 +90,34 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 2327,
-    "freshness_ok": 197,
-    "freshness_unavailable": 20,
-    "freshness_waiting": 1,
-    "freshness_cached": 11,
-    "freshness_archive": 2,
-    "revision_builds": 6,
+    "freshness_ok": 188,
+    "freshness_unavailable": 25,
+    "freshness_cached": 23,
+    "freshness_waiting": 39,
+    "freshness_archive": 3,
+    "revision_builds": 7,
     "revision_events": 0,
     "consistency_согласовано": 1443,
-    "consistency_нет данных": 96,
-    "finance_workbook_years": 6,
-    "finance_workbook_observations": 732,
+    "consistency_нет данных": 192,
+    "finance_workbook_years": 8,
+    "finance_workbook_observations": 976,
+    "finance_reconciliation_exact_numeric": 339,
+    "finance_reconciliation_same_sign": 27,
     "rosstat_workbook_files": 0,
     "rosstat_workbook_observations": 0,
+    "federal_budget_law_years": 16,
+    "federal_budget_law_observations": 48,
+    "federal_budget_law_identities": 16,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "e1e87bfe47ee1ea629a42bd3f46dc8aa804a60a533e566f68dfec920bbaf45da",
-      "bytes": 3785369
+      "sha256": "5d1186b48ca0b179f8d9ca8f3d8eed92acdac3adfec040900d4fd66b269434d7",
+      "bytes": 3787848
     },
     "literature.json": {
-      "sha256": "dad2caf7ef8af42de39fbfb63c87718aeb93b6ab961f16911ee78d939f8aff28",
-      "bytes": 5074197
+      "sha256": "a382e0d20cf21636dfd50cd7ab561149beba7b78eb2fbc5091915eb36382e7dd",
+      "bytes": 5088067
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -111,40 +132,40 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "425c01f32d508dcf4ec692aedb1e3cc217fe8d43964e6f603b18ccad6877e7a2",
+      "sha256": "f116037c8aa20ab9bf0d817877e169f7c1cc489c9caa9d49e2471c77374bd1de",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "52129ef327a949f3c4f21dc3567de8fc514b411e61b6e1c6d918a78d9aee94dd",
-      "bytes": 55538
+      "sha256": "3b764e7b5bba5e494e89a5926e31a7312e88080c1518af421af675ad03f7d1f6",
+      "bytes": 55556
     },
     "sectors.json": {
       "sha256": "e7844b2c8c1a9db43c83ffa85b26469e8b20dd06582aa30d4015526b54966ca2",
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "afa57a0295c596933b017c24ca5abb1886c1a879b67d7a5a7c04814617782daa",
-      "bytes": 36979
+      "sha256": "330a69dc970ab79e12dcecd18c842278bd1df39f9bc2a211dabd37533378a38a",
+      "bytes": 39100
     },
     "links.json": {
-      "sha256": "374686f7ef1b64ab73e651bd27067add5e05fc0389768a568915fc7b1544d9cd",
-      "bytes": 1506907
+      "sha256": "75d8c31ce10c47e5433fd2789221b8676bd3c24e365e5f9ac51db66841f8de7f",
+      "bytes": 1518189
     },
     "national.json": {
-      "sha256": "c9f293156c42c4c0ad48cc7bf73a3a85db16e9ca4413affcec4ef1e309a9627b",
-      "bytes": 772824
+      "sha256": "dbd2b3788c780c6ce2f011af146104a2ed50e98bcd959028fa9c5c097fff6c2e",
+      "bytes": 773026
     },
     "historical.json": {
-      "sha256": "8a62ab4a2c18a24a421192f03933f64be7c15d9cd00cdd75db559e192ed8efec",
-      "bytes": 117885
+      "sha256": "85750453e3dcc84cda96d16165128591759cc084c9f12b230e90b1b3bd058bd1",
+      "bytes": 173914
     },
     "industrial.json": {
-      "sha256": "a23b959d075bfdb8e3318b15d28882558bccc34f71b0892326b8a4e25b48672e",
+      "sha256": "0721a9a92427c0e7afab2c9c9fe41eaaa769e61cd8ad1cdb6fb9b79662db09a7",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "405b84ef26813d277d962feae4282a9da59b50a7330ebb887e14e93601393bcb",
-      "bytes": 116117
+      "sha256": "3a5ceee4efb439c607a400a3d8f7ca7a43bf36b0e7cebc202e5dc8623f9b87bd",
+      "bytes": 767634
     },
     "regional-boundaries.json": {
       "sha256": "c85272f20f3612a253970f71995f034df6d80de6d3ff7e51cb63d2412e7a90c6",
@@ -171,24 +192,28 @@
       "bytes": 584
     },
     "freshness.json": {
-      "sha256": "c771b5ecf4920d36883155f25105a3effef37f76538e592bb946fd809c81bf06",
-      "bytes": 134616
+      "sha256": "d48e729ed6bc3cf13746294c4786cdb95a571dec60f415fb1cf9cf92c507d1d4",
+      "bytes": 171689
     },
     "stat-revisions.json": {
-      "sha256": "c27e2f58c563b8ceb066550f46c3825d2c5445239a2b9e60b21ec0808206474d",
-      "bytes": 1471
+      "sha256": "31b75fb34c11b8474fb5f5f76373ba8569dd250db2d5aa99190c32ae5e8464af",
+      "bytes": 1700
     },
     "consistency.json": {
-      "sha256": "f5054946380f0b40363dc65c5f4a862f48c4595c24802cf4ffcfa3d73d849bbf",
-      "bytes": 258346
+      "sha256": "4612bd6868f06e7b162d8d62c8ea2c11505fff0da0f0090513dfd7183dbf1de4",
+      "bytes": 289597
     },
     "finance-workbooks.json": {
-      "sha256": "2150c55eacc8f101c5a02c11c3156cdd920e23d8cde34c1be4d76b16ccb53834",
-      "bytes": 287508
+      "sha256": "0b8b3a0a8aae868b0d1618ba4c83e08b30871eae049a6d9d5b83e1dd2d672321",
+      "bytes": 636977
     },
     "rosstat-workbooks.json": {
-      "sha256": "9dbff93e9d681764357da4d85123371c1493fac63d75454b9cdd48ba942cdd18",
-      "bytes": 1436
+      "sha256": "d82322524a41b8c6fa048b2be366688a41beb8bc26021ae335e8b596ac167f6d",
+      "bytes": 14866
+    },
+    "federal-budget.json": {
+      "sha256": "5d6f4a3ca75272c9cb76ece9ffb8674b381dec864502895aa770ba1dceda877f",
+      "bytes": 7354
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
@@ -269,6 +294,10 @@
     "regional-data/R_510509d40d0cb785_28f4b5b380.json": {
       "sha256": "15f411889b6c56366bdcced31c168bff48f49efbe12c774e3ebb3aaf42b01171",
       "bytes": 18479
+    },
+    "regional-data/R_564aea52db01a94a_366f6a2581.json": {
+      "sha256": "df1285098f800ea32146fa4b887ae31158947cad08002dc4ef177c0bf31384a7",
+      "bytes": 1713953
     },
     "regional-data/R_5f09b90031e93f90_031d7fe105.json": {
       "sha256": "7133b66188bc12782a77abf17b8afa031c8a9bc577ed089a0d31bea6bbec63ed",
@@ -409,6 +438,10 @@
     "electricity-balance.csv": {
       "sha256": "c9a6da0dff9c3f332cc5e1b1b66b2688d140c080d48e5731a7d0795ea41e4684",
       "bytes": 33139
+    },
+    "federal-budget.csv": {
+      "sha256": "4d39485abcb6bce4f849925efd80af11d66afcb0564e4d0b8b091529af6a50bd",
+      "bytes": 12637
     }
   }
 }
