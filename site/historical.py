@@ -176,6 +176,8 @@ def import_status(db,code,title,url,stamp,status,success,files=None):
     else:
         saved=old[0] if old else None
         kept=json.loads(old[1]) if old else []
+    db.execute("create table if not exists hist_attempts(code text primary key,url text not null,title text not null,attempted text not null)")
+    db.execute("insert or replace into hist_attempts values(?,?,?,?)",(code,url,title,stamp))
     db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,saved,status,json.dumps(kept,ensure_ascii=False)))
     return dict(code=code,title=title,url=url,checked=stamp,success=saved,status=status,files=kept)
 def parse_vrp(raw):
@@ -456,6 +458,7 @@ def parse_budget(raw,filename=""):
 
 def publish(db,stamp,out,refresh):
     db.execute("create table if not exists hist_sources(code text primary key,checked text,success text,status text,files text)")
+    db.execute("create table if not exists hist_attempts(code text primary key,url text not null,title text not null,attempted text not null)")
     db.execute("create table if not exists hist_values(indicator text,region text,year integer,unit text,value real,seen text,source text,payload text,primary key(indicator,region,year,unit,source,seen))")
     sources=[]
     for code,title,url in SOURCES:
@@ -573,6 +576,9 @@ def publish(db,stamp,out,refresh):
             title=files[0]["title"] if files else next((t for k,t,*_ in SPECS if code=="import_"+k),code)
             if not url and code=="import_minfin_budget":url="https://minfin.gov.ru/ru/statistics/fedbud/execute/";title="Годовые итоги федерального бюджета Минфина"
             if not url and code.startswith("import_"):url=DIRECT_FILES.get(code[7:])
+        attempt=db.execute("select url,title,attempted from hist_attempts where code=?",(code,)).fetchone()
+        if attempt and attempt[2]==checked:
+            url,title=attempt[:2]
         if url:sources.append(dict(code=code,title=title,url=url,checked=checked,success=success,status=status,files=files))
     # Keep every configured regional source visible even between scheduled attempts.
     present={s["code"] for s in sources}
