@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const svg=document.createElementNS(ns,'svg');svg.setAttribute('xmlns',ns);svg.setAttribute('viewBox','0 0 950 470');svg.setAttribute('width','950');svg.setAttribute('height','470');svg.setAttribute('role','img');svg.setAttribute('aria-label',title);
   const shape=(tag,attrs,text,p=svg)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;p.append(e);return e};
   const txt=(x,y,text,attrs={})=>shape('text',{x,y,fill:'#162e39','font-family':'Arial,sans-serif','font-size':13,...attrs},text);
-  shape('rect',{width:950,height:470,fill:'white'});txt(25,28,title,{'font-size':20,'font-weight':'bold'});txt(25,50,subtitle);callback(shape,txt);
+  shape('rect',{width:950,height:470,fill:'white'});txt(25,28,title,{'font-size':20,'font-weight':'bold'});chartFitLabel(txt(25,50,subtitle),900);callback(shape,txt);
   txt(25,449,'Версия данных: '+(version||'не определена'),{'font-size':11});txt(25,463,'Методика и исходные источники указаны в разделе; выгрузка CSV.',{'font-size':11});
   const wrap=node('div','');wrap.className='regional-figure-scroll';wrap.append(svg);parent.append(wrap);
   const tools=node('div','');tools.className='actions';const msg=node('span','');
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     const x=i=>105+805*i/Math.max(1,years.length-1),y=v=>365-280*(v-lo)/(hi-lo);
     for(let j=0;j<5;j++){const v=lo+(hi-lo)*j/4;shape('line',{x1:105,x2:910,y1:y(v),y2:y(v),stroke:'#d4dcdf'});txt(98,y(v)+4,v.toLocaleString('ru',{maximumSignificantDigits:5}),{'text-anchor':'end'})}
     result.years.forEach((d,i)=>{const z=d.stats;if(z){shape('line',{x1:x(i),x2:x(i),y1:y(z.p10),y2:y(z.p90),stroke:'#78bcb5','stroke-width':9,'stroke-linecap':'round'});const dot=shape('circle',{cx:x(i),cy:y(z.median),r:5,fill:'#006c69'});shape('title',{},d.year+' · n='+z.n+' · медиана '+f(z.median)+' · P10 '+f(z.p10)+' · P90 '+f(z.p90),dot)}
-     if(i===0||i===years.length-1||i%Math.ceil(years.length/7)===0)txt(x(i),388,d.year,{'text-anchor':'middle'})});
+     if(chartTickIndices(years.length,7).includes(i))txt(x(i),388,d.year,{'text-anchor':i===0?'start':i===years.length-1?'end':'middle'})});
     txt(105,413,'Точка — медиана; отрезок — 10-й–90-й процентили. Пропуски не заполнены.');
    },'dispersion-'+s.code+'-'+Y);
   }

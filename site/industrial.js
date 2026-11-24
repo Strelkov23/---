@@ -37,9 +37,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const x=i=>90+580*i/Math.max(1,periods.length-1),y=v=>175-150*(v-lo)/(hi-lo);
   for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4;shape('line',{x1:90,x2:670,y1:y(v),y2:y(v),stroke:'#b9c8c8'});shape('text',{x:85,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'currentColor'},fmt(v))}
   let path='';values.forEach((v,i)=>{if(v===null)return;path+=(i&&values[i-1]!==null?'L':'M')+x(i)+' '+y(v)+' ';const c=shape('circle',{cx:x(i),cy:y(v),r:2.8,fill:'#006c69'});const tip=document.createElementNS(ns,'title');tip.textContent=periods[i]+' · '+fmt(v);c.append(tip)});shape('path',{d:path,fill:'none',stroke:'#006c69','stroke-width':2});
-  periods.forEach((v,i)=>{if(i===0||i===periods.length-1||i%Math.ceil(periods.length/5)===0&&i<periods.length-2)shape('text',{x:x(i),y:200,'text-anchor':'middle','font-size':11,fill:'currentColor'},v)});
+  chartTickIndices(periods.length,5).forEach(i=>shape('text',{x:x(i),y:200,'text-anchor':i===0?'start':i===periods.length-1?'end':'middle','font-size':11,fill:'currentColor'},periods[i]));
   g.append(svg,node('p','Пропусков внутри периода: '+(periods.length-rows.length)));
-  chartTools(g,s.title,s.unit,periods,[{name:s.title,code:s.code||s.id,values}],{source:'Росстат',monthly});
+  chartTools(g,s.title,s.unit,periods,[{name:s.title,code:s.code||s.id,values}],{source:'Росстат',monthly,url:s.source});
   const table=node('table',''),head=table.createTHead().insertRow(),body=table.createTBody();
   for(const label of ['Период','Значение','Координаты ячейки','Примечание','Получено'])head.append(node('th',label));
   for(const period of [...periods].reverse()){const r=map.get(period),tr=body.insertRow();for(const v of [period,r?fmt(r.value):'Нет наблюдения',r?[s.sheet,r.row,r.column].join(' / '):'—',r?.note||'—',r?.seen||'—'])tr.insertCell().textContent=v}

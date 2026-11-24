@@ -53,7 +53,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   function shape(tag,attrs,text,parent=svg){const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;parent.append(e);return e}
   const txt=(xx,yy,t,size=15)=>shape('text',{x:xx,y:yy,'font-size':size,'font-family':'Arial, sans-serif',fill:'#162e39'},t);
   shape('rect',{width:w,height:h,fill:'#fff'});txt(30,33,'Региональная статистика · '+Y,23);
-  txt(30,58,(series.title+' · '+series.unit).slice(0,135),15);
+  chartFitLabel(txt(30,58,series.title+' · '+series.unit,15),1120);
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
   const select=f=>{const p=f.f.properties,r=f.r;details.replaceChildren(node('h3',r?.region||p.name),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
     if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}};
@@ -65,7 +65,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    shape('title',{},(f.r?.region||f.f.properties.name)+' · '+fmtValue(f.r?.value),p);p.addEventListener('click',()=>select(f));p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(f)}});
   }
   const bins=thresholds.length===1?[[thresholds[0],thresholds[0]]]:thresholds.slice(1).map((v,i)=>[thresholds[i],v]);
-  bins.forEach(([lo,hi],i)=>{const xx=30+i*220;shape('rect',{x:xx,y:590,width:24,height:16,fill:colors[i]});txt(xx+30,603,fmtValue(lo)+' – '+fmtValue(hi),12)});
+  bins.forEach(([lo,hi],i)=>{const xx=30+i*220;shape('rect',{x:xx,y:590,width:24,height:16,fill:colors[i]});chartFitLabel(txt(xx+30,603,fmtValue(lo)+' – '+fmtValue(hi),12),185)});
   shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
   txt(30,648,'Границы: Natural Earth (public domain), PiSpace Maps · источник статистики: '+series.code,12);
   txt(30,665,'Версия: '+(version||'не определена')+' · SHA-256 геометрии: '+String(meta.sha256||'—').slice(0,16)+'…',11);

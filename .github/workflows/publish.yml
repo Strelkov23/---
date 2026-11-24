@@ -37,6 +37,7 @@ jobs:
           node test-regional-disparities.js
           node test-regional-map.js
           node test-chain-stress.js
+          node test-chart-layout.js
           rm -rf public
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt
@@ -71,6 +72,14 @@ jobs:
           curl --fail --silent http://localhost:8765/industrial/ > /dev/null
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom 'http://localhost:8765/sector-passports.html?sp-sector=agriculture' > /tmp/sector-dom.html
           python3 -c "from pathlib import Path; import json; d=json.loads(Path('sector-passports.json').read_text()); assert len(d['profiles'])==14; s=Path('/tmp/sector-dom.html').read_text(); assert 'Показателей в выборке: 12' in s; p=next(x for x in d['profiles'] if x['id']=='agriculture'); assert not any(r['count'] for r in p['rows']) or ('Наблюдений:' in s and '<svg' in s and 'Скачать SVG' in s)"
+      - name: Audit responsive layout
+        working-directory: monitor/public
+        run: |
+          python3 -m pip install playwright==1.51.0
+          python3 -m http.server 8765 > /tmp/layout-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
+          CHROME_BIN=$(command -v google-chrome) python3 ../layout_audit.py http://localhost:8765/ /tmp/layout-audit
       - name: Retain validation reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,6 +89,7 @@ jobs:
             monitor/public/quality.json
             monitor/public/links.json
             /tmp/*-dom.html
+            /tmp/layout-audit/
           if-no-files-found: ignore
           retention-days: 14
       - name: Save updated history
