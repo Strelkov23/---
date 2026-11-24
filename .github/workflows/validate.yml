@@ -1,0 +1,56 @@
+name: Economic code checks
+on:
+  push:
+    branches: [main]
+    paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
+  workflow_dispatch:
+concurrency:
+  group: economic-code-checks
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline unit and calculation tests
+        run: |
+          unzip -q EconomicsPages.zip -d monitor
+          cp site/* monitor/
+          cd monitor
+          python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2
+          python3 -m unittest test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py
+          python3 -m compileall -q .
+          for script in *.js; do node --check "$script"; done
+          node test-regional-disparities.js
+          node test-regional-map.js
+          node test-news-map.js
+          node test-site-search.js
+          node test-interface.js
+          node test-facility-map.js
+          node test-sme-map.js
+          node test-district-map.js
+          node test-freshness.js
+          node test-stat-revisions.js
+          node test-chain-stress.js
+          node test-chart-layout.js
+          node test-macro-diagnostics.js
+          node test-reproduction-plan.js
+          node test-resource-plan.js
+          node test-dynamic-plan.js
+          node test-global-plan.js
+          node test-labor-calibration.js
+          node test-data-registry.js
+          node test-provenance.js
+          node test-index-builder.js
+          node test-composite-index.js
+          node test-report-builder.js
+          node test-cost-structure.js
+          node test-food-balance.js
+          node test-electricity-balance.js
+          node test-energy-output.js
