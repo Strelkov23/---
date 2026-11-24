@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const x=v=>L+(R-L)*(v-low)/(high-low||1),zero=x(0),h=108+subset.length*27;
    makeFigure(rankingHost,'Сравнение территорий · '+year,s.unit+' · первые '+subset.length+' из '+rows.length+' в выбранном порядке',s,W,h,(shape,text)=>{
     shape('line',{x1:zero,x2:zero,y1:64,y2:h-42,stroke:'#526b72','stroke-width':1});
-    subset.forEach((r,i)=>{const y=69+i*27,bar=shape('rect',{x:Math.min(zero,x(r.value)),y,width:Math.max(1,Math.abs(x(r.value)-zero)),height:19,fill:r.value<0?'#a24724':'#087e75'});
+    subset.forEach((r,i)=>{const y=69+i*27,bar=shape('rect',{x:Math.min(zero,x(r.value)),y,width:Math.abs(x(r.value)-zero),height:19,fill:r.value<0?'#a24724':'#087e75'});
      shape('title',{},r.region+' · '+fmt(r.value)+' '+s.unit,bar);
      text(20,y+14,r.region.length>43?r.region.slice(0,40)+'…':r.region,{'font-size':13});text(R+8,y+14,fmt(r.value),{'font-size':13})});
    });
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const values=new Map(s.values.filter(r=>names.includes(r.region)&&years.includes(r.year)&&Number.isFinite(r.value)).map(r=>[r.region+'\u0000'+r.year,r.value]));
    const nums=[...values.values()],min=Math.min(...nums),max=Math.max(...nums);
    const color=v=>{const p=max===min?.5:(v-min)/(max-min);return 'rgb('+[Math.round(235-215*p),Math.round(246-125*p),Math.round(243-129*p)].join(',')+')'};
-   const cell=42,HW=Math.max(1000,L+years.length*cell+35),HH=151+names.length*26;
+   const cell=42,HW=Math.max(1000,L+years.length*cell+35),HH=183+names.length*26;
    makeFigure(heatHost,'Тепловая карта динамики',s.unit+' · '+years[0]+'–'+year+' · единая шкала исходных значений',s,HW,HH,(shape,text)=>{
     years.forEach((yr,i)=>text(L+i*cell+cell/2,72,yr,{'font-size':11,'text-anchor':'middle'}));
     names.forEach((name,j)=>{const y=82+j*26;text(20,y+16,name.length>43?name.slice(0,40)+'…':name,{'font-size':13});
