@@ -124,6 +124,8 @@ def collect(out,stamp):
         add(ident,"География",title,r.get("documentation") or r.get("source"),r,year,archive=True,available=r["status"] in ("ok","cached"),policy="Фиксированный исторический набор; актуальность не предполагается",href=href)
     r=read("regional-boundaries.json")
     add("adm1","География","Границы субъектов Natural Earth",r.get("documentation"),dict(r,success=r.get("downloaded")),policy="Проверка при смене календарного месяца; не юридический реестр",href="economic-map.html")
+    projects=read("investment-projects.json")
+    add("regional-investment-projects","Предприятия","Бурятия · инвестиционные проекты",projects.get("source") or projects["source_page"],projects,projects.get("edition"),days=7,available=bool(projects["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; HTML при недоступности книги",href="investment-projects.html",failure_days=2)
     frp=read("frp-snapshot.json")
     add("frp-documentary","Предприятия","ФРП · документальный снимок итогов",frp["source"],dict(status="Ручной снимок; прямой запрос HTTP 403"),None,archive=True,available=bool(frp["rows"]),policy="Дата итогов не указана; повторная документальная проверка",href="frp-snapshot.html")
     cert=read("park-certificates.json")

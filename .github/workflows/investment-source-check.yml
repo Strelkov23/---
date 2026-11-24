@@ -28,9 +28,14 @@ jobs:
           raw=p.fetch(p.SOURCE)
           url=p.discover(raw,date.today())
           print("DISCOVERED",url,flush=True)
-          raw=p.fetch(url)
-          print("XLSX",len(raw),hashlib.sha256(raw).hexdigest(),flush=True)
-          rows=p.parse(raw,url)
+          rows=p.parse_html(raw,url)
+          print("HTML_PARSED",len(rows),hashlib.sha256(raw).hexdigest(),flush=True)
+          try:
+              raw=p.fetch(url)
+              print("XLSX",len(raw),hashlib.sha256(raw).hexdigest(),flush=True)
+              rows=p.parse(raw,url)
+          except Exception as e:
+              print("XLSX_UNAVAILABLE",type(e).__name__,str(e),flush=True)
           print("PARSED",len(rows),dict(Counter(r["status"] for r in rows)),flush=True)
           print("VALUES",sum(r["cost_mln_rub"] is not None for r in rows),sum(r["jobs"] is not None for r in rows))
           PY

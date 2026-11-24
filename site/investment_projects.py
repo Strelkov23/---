@@ -104,15 +104,46 @@ def parse(raw,url):
     if not 30<=len(rows)<=5000:raise ValueError("Неожиданный охват реестра")
     return rows
 
+
+HTML_HEADER="№;Наименование проекта;Сведения об Инициаторе проекта/инвестор;Краткое описание проекта;Место реализации проекта;Статус проекта;Срок реализации проекта, годы;Общая стоимость проекта, млн. руб.;Количество создаваемых рабочих мест"
+HTML_SHEET="HTML: таблица реестра"
+
+def parse_html(raw,url):
+    """Fallback for the independently counted and dated Q3 2026 edition only."""
+    if url!=BASELINE or not 0<len(raw)<=MAX:raise ValueError("HTML: неизвестная редакция или размер")
+    tree=Tree();tree.feed(raw.decode("utf-8-sig"));tree.close()
+    text=re.sub(r"\s*;\s*",";",tree.root.text())
+    if text.count(HTML_HEADER)!=1 or "30.09.2026" not in text:raise ValueError("HTML: неоднозначный заголовок или дата")
+    text=text.split(HTML_HEADER,1)[1].strip()
+    # End of table is an explicit heading in the published page.
+    if "Архив реестров" not in text:raise ValueError("HTML: нет границы таблицы")
+    text=text.split("Архив реестров",1)[0].strip()
+    digest=hashlib.sha256(raw).hexdigest();rows=[]
+    for n in range(1,64):
+        if not text.startswith(str(n)+";"):raise ValueError("HTML: пропущена запись "+str(n))
+        if n<63:
+            matches=[m for m in re.finditer(r"\s+(?="+str(n+1)+r";)",text) if len(text[:m.start()].split(";"))==9]
+            if len(matches)!=1:raise ValueError("HTML: неоднозначная граница "+str(n))
+            m=matches[0];part=text[:m.start()];text=text[m.end():]
+        else:part=text
+        values=part.split(";")
+        if len(values)!=9:raise ValueError("HTML: количество полей "+str(n))
+        no,name,investor,description,location,status,period,cost,jobs=map(clean,values)
+        if no!=str(n) or not name or location!=REGION or norm(status) not in STATUS or not re.fullmatch(r"\d{4}(?:\s*[-–—]\s*\d{4})?",period):raise ValueError("HTML: структура записи "+str(n))
+        rows.append(dict(record=n,region=REGION,name=name,investor=investor,location=location,status=norm(status),period=period,cost_mln_rub=number(cost),jobs=number(jobs,True),cost_raw=cost,jobs_raw=jobs,sheet=HTML_SHEET,row=n+1,edition=release(url).isoformat(),source=SOURCE,sha256=digest))
+    return rows
+
 def empty(stamp):
-    return dict(schema=1,built=stamp,source_page=SOURCE,note=NOTE,status="not_loaded",checked=None,success=None,edition=None,source=None,sha256=None,rows=[])
+    return dict(schema=1,built=stamp,source_page=SOURCE,note=NOTE,status="not_loaded",checked=None,success=None,edition=None,source=None,source_format=None,workbook_url=None,sha256=None,rows=[])
 
 def quality(d):
     if d["schema"]!=1 or d["source_page"]!=SOURCE or d["status"] not in ("ok","cached","unavailable","not_loaded"):raise ValueError("Метаданные реестра")
     rows=d["rows"]
     if not isinstance(rows,list):raise ValueError("Некорректные строки")
     if rows:
-        if not d["success"] or d["status"] not in ("ok","cached") or release(d["source"]).isoformat()!=d["edition"] or not re.fullmatch(r"[0-9a-f]{64}",d["sha256"] or ""):raise ValueError("Происхождение реестра")
+        if not d["success"] or d["status"] not in ("ok","cached") or release(d.get("workbook_url") or d["source"]).isoformat()!=d["edition"] or not re.fullmatch(r"[0-9a-f]{64}",d["sha256"] or ""):raise ValueError("Происхождение реестра")
+        fmt=d.get("source_format","xlsx")
+        if fmt not in ("html","xlsx") or fmt=="html" and (d["source"]!=SOURCE or d.get("workbook_url")!=BASELINE) or fmt=="xlsx" and d["source"]!=(d.get("workbook_url") or d["source"]):raise ValueError("Тип источника")
         if not 30<=len(rows)<=5000 or d["edition"]=="2026-09-30" and len(rows)!=63:raise ValueError("Охват")
     elif d["status"] in ("ok","cached") or any(d[k] is not None for k in ("success","edition","source","sha256")):raise ValueError("Пустой подтвержденный реестр")
     seen=set()
@@ -120,6 +151,7 @@ def quality(d):
         k=(r["sheet"],r["row"])
         if set(r)!=set(FIELDS) or r["record"]!=i or r["region"]!=REGION or not r["name"] or not r["location"] or r["status"] not in STATUS or not r["sheet"] or type(r["row"]) is not int or r["row"]<2 or k in seen or any(r[x]!=d[x] for x in ("edition","source","sha256")):raise ValueError("Строка реестра")
         seen.add(k)
+        if d.get("source_format")=="html" and (r["sheet"]!=HTML_SHEET or r["row"]!=i+1):raise ValueError("Координата HTML")
         if r["cost_mln_rub"]!=number(r["cost_raw"]) or r["jobs"]!=number(r["jobs_raw"],True):raise ValueError("Число не соответствует исходному полю")
     return dict(investment_project_records=len(rows),investment_project_regions=int(bool(rows)),investment_project_cost_records=sum(r["cost_mln_rub"] is not None for r in rows),investment_project_jobs_records=sum(r["jobs"] is not None for r in rows))
 
@@ -151,11 +183,19 @@ def sync(previous,stamp,refresh):
     due=not d["checked"] or today>=date.fromisoformat(d["checked"][:10])+timedelta(days=7 if d["checked"]==d["success"] else 2)
     if refresh and due:
         try:
-            url=discover(fetch(SOURCE),today)
+            page_raw=fetch(SOURCE)
+            url=discover(page_raw,today)
             if d["edition"] and release(url).isoformat()<d["edition"]:raise ValueError("Более старая редакция")
-            raw=fetch(url);rows=parse(raw,url)
+            fmt="xlsx";source=url;workbook_error=None
+            try:
+                raw=fetch(url);rows=parse(raw,url)
+            except Exception as e:
+                workbook_error=str(e)[:250]
+                if d["edition"]==release(url).isoformat() and d.get("source_format","xlsx")=="xlsx" and d["rows"]:raise
+                raw=page_raw;rows=parse_html(raw,url);fmt="html";source=SOURCE
             if d["rows"] and len(rows)<0.8*len(d["rows"]):raise ValueError("Резкое сокращение охвата — сохранена прежняя редакция")
-            candidate={**empty(stamp),"status":"ok","checked":stamp,"success":stamp,"edition":release(url).isoformat(),"source":url,"sha256":hashlib.sha256(raw).hexdigest(),"rows":rows}
+            candidate={**empty(stamp),"status":"ok","checked":stamp,"success":stamp,"edition":release(url).isoformat(),"source":source,"source_format":fmt,"workbook_url":url,"sha256":hashlib.sha256(raw).hexdigest(),"rows":rows}
+            if workbook_error:candidate["workbook_error"]=workbook_error
             quality(candidate);d=candidate
         except Exception as e:d.update(status="cached" if d["rows"] else "unavailable",checked=stamp,error=str(e)[:250])
     return d
@@ -167,7 +207,10 @@ def render(d):
     body+='<section><h2>Охват и актуальность</h2><p>'+e(state)+' · Регион: '+REGION+' · Редакция: '+e(d["edition"])+' · Проверка: '+e(d["checked"])+' · Последняя успешная загрузка: '+e(d["success"])+'</p>'
     if d.get("error"):body+='<p role="status">Ошибка обновления: '+e(d["error"])+'</p>'
     body+='<p>Записей: '+str(len(d["rows"]))+'. Покрытие: '+str(int(bool(d["rows"])))+' регион из пилотного источника. Это не общероссийский итог.</p>'
-    if d["source"]:body+='<p><a href="'+e(d["source"])+'">Оригинальная книга XLSX</a> · SHA-256: <code style="overflow-wrap:anywhere">'+e(d["sha256"])+'</code></p>'
+    if d["source"]:
+        label="Официальная HTML-таблица (резервный импорт)" if d.get("source_format")=="html" else "Оригинальная книга XLSX"
+        body+='<p><a href="'+e(d["source"])+'">'+label+'</a> · SHA-256: <code style="overflow-wrap:anywhere">'+e(d["sha256"])+'</code></p>'
+        if d.get("workbook_error"):body+='<p>Книга XLSX не проверена: '+e(d["workbook_error"])+' · <a href="'+e(d["workbook_url"])+'">Ссылка на книгу</a>. Номер строки HTML — порядковый номер записи с заголовком, а не ячейка XLSX.</p>'
     body+='<p><a href="investment-projects.csv">CSV всех записей</a> · <a href="investment-projects.json">JSON и метаданные</a></p></section>'
     body+='<section><h2>Поиск по реестру</h2><label>Название, инициатор, место<input id="project-query" type="search" placeholder="Введите часть названия"></label><label>Статус по реестру<select id="project-status"><option value="">Все статусы</option>'
     for status in sorted({r["status"] for r in d["rows"]}):body+='<option>'+e(status)+'</option>'
