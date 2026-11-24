@@ -24,7 +24,7 @@ class Page(HTMLParser):
 
 # Only known public publishers and official sources are contacted automatically.
 # All other external addresses are still inventoried.
-TRUSTED=("gov.ru","pravo.gov.ru","cbr.ru","rosstat.gov.ru","worldbank.org","imf.org","oecd.org","un.org","unido.org","rbc.ru","tass.ru","interfax.ru","kommersant.ru","vedomosti.ru","ria.ru","1prime.ru","rg.ru","economy.gov.ru","minfin.gov.ru","nalog.gov.ru","hse.ru","rcsi.science","1economic.ru","vopreco.ru","econorus.org","economyofregion.ru","questionset.ru","asnap.ru","crossref.org","e-library.ru","elibrary.ru","scopus.com","clarivate.com","cyberleninka.ru","issn.org","doaj.org","repec.org","github.com","github.io")
+TRUSTED=("gov.ru","pravo.gov.ru","cbr.ru","rosstat.gov.ru","worldbank.org","imf.org","oecd.org","un.org","unido.org","rbc.ru","tass.ru","interfax.ru","kommersant.ru","vedomosti.ru","ria.ru","1prime.ru","rg.ru","economy.gov.ru","minfin.gov.ru","nalog.gov.ru","hse.ru","rcsi.science","1economic.ru","vopreco.ru","econorus.org","economyofregion.ru","questionset.ru","asnap.ru","crossref.org","e-library.ru","elibrary.ru","scopus.com","clarivate.com","cyberleninka.ru","issn.org","doaj.org","repec.org","github.com","github.io","consultant.ru","rosspetsmash.ru","fedstat.ru","roskazna.gov.ru","customs.gov.ru")
 def trusted(url):
     try:
         p=urlsplit(url)
@@ -73,7 +73,8 @@ def scan(out):
     return sorted(set(issues)),external
 
 def publish(page,out,connect,stamp,refresh):
-    page("links.html","<h1>Проверка ссылок</h1>")
+    page("links.html",'<h1>Проверка ссылок</h1><a href="links.json">Отчёт</a>')
+    (out/"links.json").write_text("{}",encoding="utf-8")
     internal,external=scan(out)
     with connect() as db:
         db.execute("create table if not exists site_links(url text primary key,status text,detail text,checked text)")

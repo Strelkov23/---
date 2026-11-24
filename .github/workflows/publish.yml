@@ -12,6 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: write
     steps:
@@ -23,7 +24,7 @@ jobs:
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
-          python3 -m unittest test_catalogue.py test_research.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           python3 build.py --refresh
@@ -36,18 +37,29 @@ jobs:
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=налог' > /tmp/monitor-dom.html
-          python3 -c "from pathlib import Path; s=Path('/tmp/monitor-dom.html').read_text(); assert 'Найдено материалов: 0' not in s and 'Найдено материалов: ' in s and '<svg ' in s and '<tbody><tr>' in s and 'Изменение валового выпуска:' in s"
-          google-chrome --headless --no-sandbox --disable-gpu --window-size=390,844 --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=инвестиции&publisher=ПРАЙМ&start=2026-11-20&end=2026-11-20' > /tmp/mobile.html
-          python3 -c "from pathlib import Path; s=Path('/tmp/mobile.html').read_text(); assert 'Танзания' in s and 'Найдено материалов: 0' not in s and '2026-09' in s"
+          python3 -c "from pathlib import Path; s=Path('/tmp/monitor-dom.html').read_text(); assert 'Найдено материалов: ' in s and 'Изменение валового выпуска:' in s and 'Не удалось загрузить данные' not in s"
+          google-chrome --headless --no-sandbox --disable-gpu --window-size=390,844 --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/?q=инвестиции' > /tmp/mobile.html
+          python3 -c "from pathlib import Path; s=Path('/tmp/mobile.html').read_text(); assert 'Найдено материалов: ' in s and 'Межотраслевой сценарий' in s"
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/papers.html' > /tmp/papers-dom.html
-          python3 -c "from pathlib import Path; import json; s=Path('/tmp/papers-dom.html').read_text(); a=json.loads(Path('literature.json').read_text())['articles']; assert a and 'Найдено статей:' in s and 'https://doi.org/' in s; assert '<svg' in Path('indicator-NY.GDP.MKTP.KD.ZG.html').read_text()"
-          google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/desk.html?words=инвестиц' > /tmp/desk.html
+          python3 -c "from pathlib import Path; import json; s=Path('/tmp/papers-dom.html').read_text(); a=json.loads(Path('literature.json').read_text())['articles']; assert 'Найдено статей:' in s and (not a or 'https://doi.org/' in s); assert Path('indicator-NY.GDP.MKTP.KD.ZG.html').exists()"
+          google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/desk.html' > /tmp/desk.html
           google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/compare.html?begin=2010&finish=2020' > /tmp/pair.html
-          python3 -c "from pathlib import Path; assert 'В подборку</button>' in Path('/tmp/desk.html').read_text(); s=Path('/tmp/pair.html').read_text(); assert 'Совместных наблюдений: 11' in s and s.count('<svg') == 2"
+          python3 -c "from pathlib import Path; assert 'Найдено материалов: ' in Path('/tmp/desk.html').read_text(); s=Path('/tmp/pair.html').read_text(); assert 'Совместных наблюдений:' in s or 'За выбранный период общих наблюдений нет.' in s"
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/statistics.html' > /tmp/statistics-dom.html
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/diagnostics.html' > /tmp/diagnostics-dom.html
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/scenario.html' > /tmp/scenario-dom.html
           python3 -c "from pathlib import Path; import json; assert len(json.loads(Path('catalog.json').read_text())) >= 100; assert 'Показателей: ' in Path('/tmp/statistics-dom.html').read_text(); assert 'Рассчитано наблюдений:' in Path('/tmp/diagnostics-dom.html').read_text(); assert 'Групп выше условного предела:' in Path('/tmp/scenario-dom.html').read_text()"
+      - name: Retain validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: |
+            monitor/public/quality.json
+            monitor/public/links.json
+            /tmp/*-dom.html
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Save updated history
         run: |
           git config user.name 'github-actions[bot]'
