@@ -30,6 +30,9 @@ class ExtraIndustryTests(unittest.TestCase):
             p.write_text(p.read_text(encoding="utf-8-sig").replace("1000.0","999.0",1),encoding="utf-8-sig")
             with self.assertRaises(ValueError):x.verify_csv(p,d)
         with self.assertRaises(ValueError):x.quality(x.empty("2026-11-25"),d)
+    def test_legacy_labels(self):
+        self.assertIn("— всего",x.legacy_title("R_05c763647727a568",x.SOURCE,"Исходный заголовок"))
+        self.assertEqual(x.legacy_title("R_05c763647727a568","https://example.org","Другой источник"),"Другой источник")
     def test_invalid(self):
         for change in [lambda rows:rows.append(rows[0].copy()),lambda rows:rows[0].update(subsection="unknown"),lambda rows:rows[0].update(year=2023),lambda rows:rows[0].update(indicator_unit="tonnes"),lambda rows:rows[0].update(indicator_value="-1"),lambda rows:rows[0].update(indicator_value="0")]:
             with self.subTest(change=change),self.assertRaises(ValueError):x.parse(self.archive(change))
