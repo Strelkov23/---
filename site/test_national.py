@@ -31,4 +31,30 @@ class NationalTests(unittest.TestCase):
             self.assertTrue((out/"archive/index.html").exists())
             errors,_=link_audit.scan(out)
             self.assertFalse(errors,errors)
+    def test_money_history(self):
+        import io,openpyxl,money_history
+        from datetime import datetime
+        b=openpyxl.Workbook();w=b.active
+        w.append(["Денежные агрегаты, млрд руб."])
+        w.append(["Дата","М0","М1","М2","М2Х"])
+        for m in (1,2,3):w.append([datetime(2024,m,1),100+m,200+m,300+m,400+m])
+        f=io.BytesIO();b.save(f)
+        rows=money_history.parse(f.getvalue())
+        self.assertEqual(len(rows),12)
+        self.assertAlmostEqual(rows[("M2X","2024-03")],0.403)
+        w["A1"]="Денежные агрегаты, %"
+        f=io.BytesIO();b.save(f)
+        with self.assertRaises(ValueError):money_history.parse(f.getvalue())
+    def test_money_history_horizontal(self):
+        import io,openpyxl,money_history
+        b=openpyxl.Workbook();w=b.active
+        w.append(["Денежные агрегаты, трлн руб."])
+        w.append(["Показатель","01.01.2024","01.02.2024","01.03.2024"])
+        w.append(["М2",100,101,102])
+        w.append(["М2Х (широкая денежная масса)",110,111,112])
+        w.append(["М2Х (темп прироста)",9,8,7])
+        f=io.BytesIO();b.save(f)
+        rows=money_history.parse(f.getvalue())
+        self.assertEqual(len(rows),6)
+        self.assertEqual(rows[("M2X","2024-03")],112)
 if __name__=="__main__":unittest.main()
