@@ -1,0 +1,1 @@
+const assert=require('node:assert/strict'),D=require('./district-map.js'),r=[{properties:{shapeName:'Алёшинский район'}},{properties:{shapeName:'Другой район'}}];assert.equal(D.matches(r,'алешинский').length,1);assert.equal(D.matches(r,'район').length,2);assert.equal(D.matches(r,'').length,0);console.log('District search tests passed');

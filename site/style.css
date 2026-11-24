@@ -160,3 +160,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 .geo-profile{margin-top:1rem;padding:.75rem;border:1px solid #cfdcdb;border-radius:.4rem}.geo-profile summary{cursor:pointer;font-weight:650}.geo-profile table{min-width:700px}.geo-profile button{margin-top:.75rem}
 
 #sme-map path[role=button]{cursor:pointer}#sme-map path[role=button]:focus{stroke:#a24724;stroke-width:2}#sme-status,#sme-detail{overflow-wrap:anywhere}#sme-table table{min-width:650px}
+
+#district-map path{cursor:pointer}#district-map path[data-selected]{fill:#a3d6bc;stroke:#a24724;stroke-width:2}#district-list{display:flex;flex-wrap:wrap;gap:.5rem;align-items:start}#district-list>p{width:100%}#district-list button{overflow-wrap:anywhere}#district-status,#district-detail{overflow-wrap:anywhere}
