@@ -35,6 +35,25 @@ class HistoricalTests(unittest.TestCase):
         links=historical.discover('<a href="/storage/mediabank/test.xlsx">ВРП</a><a href="https://evil.example/data.xlsx">Bad</a>',"https://rosstat.gov.ru/statistics/accounts")
         self.assertEqual(len(links),1)
         self.assertEqual(links[0]["url"],"https://rosstat.gov.ru/storage/mediabank/test.xlsx")
+
+    def test_catalogue_card_titles(self):
+        base="https://rosstat.gov.ru/statistics/accounts"
+        html='<div><div class="card"><h3>Наличие основных фондов по полной учетной стоимости</h3><span><a href="/a.xlsx"> XLSX</a></span></div><div><h3>Инвестиции в основной капитал</h3><a href="/b.xlsx">XLSX</a></div></div><div>Несколько таблиц <a href="/c.xlsx">XLSX</a><a href="/d.xlsx">XLSX</a></div><a href="/e.xlsx" aria-label="Степень износа основных фондов">XLSX</a>'
+        rows={r["url"].rsplit("/",1)[-1]:r for r in historical.discover(html,base)}
+        self.assertEqual(rows["a.xlsx"]["title"],"Наличие основных фондов по полной учетной стоимости")
+        self.assertEqual(rows["a.xlsx"]["title_origin"],"container")
+        self.assertEqual(rows["b.xlsx"]["title"],"Инвестиции в основной капитал")
+        self.assertEqual(rows["c.xlsx"]["title"],"c.xlsx")
+        self.assertEqual(rows["d.xlsx"]["title"],"d.xlsx")
+        self.assertEqual(rows["e.xlsx"]["title_origin"],"anchor")
+        self.assertEqual(rows["e.xlsx"]["title"],"Степень износа основных фондов")
+    def test_catalogue_preserves_best_label(self):
+        base="https://rosstat.gov.ru/"
+        html='<div><a href="/a.xlsx">XLSX</a></div><a href="/a.xlsx">Валовой региональный продукт</a><a href="/a.xlsx">XLSX</a>'
+        rows=historical.discover(html,base)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["title"],"Валовой региональный продукт")
+        self.assertEqual(rows[0]["title_origin"],"anchor")
     def test_retry_policy(self):
         self.assertEqual(historical.due_date("2026-11-24","2026-11-24","2026-11-24",7,2),"2026-12-01")
         self.assertEqual(historical.due_date("2026-11-24","2026-11-23","2026-11-24",7,2),"2026-11-26")
