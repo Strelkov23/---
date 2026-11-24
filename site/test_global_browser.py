@@ -140,6 +140,29 @@ with sync_playwright() as p:
         assert page.locator("#capacity-table tbody tr").inner_text().find("42,3")>=0
         page.locator("#capacity-year").select_option("2023")
         assert page.locator("#capacity-table tbody tr").inner_text().find("58,2")>=0
+        page.goto("http://localhost:8765/data-registry.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено:')")
+        assert page.locator("#registry-list article").count()==20
+        page.locator("#registry-group").select_option("capital")
+        page.locator("#registry-q").fill("износ")
+        assert page.locator("#registry-list article").count()==20
+        page.locator("#registry-list article button").first.click()
+        page.locator("#registry-selected").check()
+        assert page.locator("#registry-list article").count()==1
+        page.reload(wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-save-status').textContent.includes('Сохранено рядов: 1')")
+        page.locator("#registry-selected").check()
+        assert page.locator("#registry-list article").count()==1
+        with page.expect_download() as d:
+            page.locator("#registry-export-selected").click()
+        assert d.value.suggested_filename=="data-registry-selection.csv"
+        with page.expect_download() as d:
+            page.locator("#registry-values").click()
+        assert d.value.suggested_filename=="data-registry-observations.csv"
+        content=d.value.path().read_text(encoding="utf-8-sig")
+        assert "wear_pct" in content and "2024" in content and "Наблюдение" in content
+        page.locator("#registry-clear").click()
+        assert page.locator("#registry-list article").count()==0
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

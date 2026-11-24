@@ -23,6 +23,7 @@ import labor_data
 import price_data
 import forecast
 import capital_data
+import data_registry
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -130,7 +131,7 @@ sector_passports.publish(out)
 regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html","sector-passports.html","prices.html","technology.html","forecast.html"]:
     page(name,Path(name).read_text())
-for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","industrial.js","sector-passports.js"]:
+for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","data-registry.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","industrial.js","sector-passports.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navigation.cards()))
 navigation.publish(page)
@@ -140,6 +141,7 @@ labor_data.publish(page,out,m.now())
 price_data.publish(out)
 forecast.publish(out,m.now())
 capital_data.publish(page,out)
+data_registry.publish(page,out,m.now())
 
 import atlas
 atlas.publish(page, out)
