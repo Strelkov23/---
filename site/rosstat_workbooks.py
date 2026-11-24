@@ -1,6 +1,7 @@
 """Official tables, conservative parsing, explicit scope and original cell provenance."""
 import csv,io,json,hashlib,re,math,zipfile
 from datetime import date,timedelta
+import calendar
 from html import escape
 from urllib.parse import urlsplit
 import historical as h
@@ -28,7 +29,103 @@ def allowed(url):
     return h.allowed(url) and (u.hostname=="rosstat.gov.ru" or u.hostname.endswith(".rosstat.gov.ru")) and u.path.lower().endswith((".xlsx",".xls"))
 def candidates(group,files):
     return [f for f in files if allowed(f["url"]) and re.search(HINTS[group],h.norm(f["title"]+" "+f["url"])) and not re.search(r"субъект|региональн|федеральн.*округ",h.norm(f["title"]))]
+COST_FIELDS={
+ "cost_materials":r"^материальные затраты$",
+ "cost_labor":r"^затраты на оплату труда$|^оплата труда$",
+ "cost_insurance":r"^страховые взносы$|^отчисления на социальные нужды$",
+ "cost_depreciation":r"^амортизация$",
+ "cost_other":r"^прочие затраты$"}
+DEBT_FIELDS={
+ "debt_total":r"^суммарная задолженность по обязательствам$|^суммарные обязательства$",
+ "debt_payable":r"^кредиторская задолженность$",
+ "debt_loans":r"^задолженность по кредитам и займам$|^кредиты и займы$",
+ "debt_overdue_total":r"^просроченная задолженность по обязательствам$|^просроченные обязательства$",
+ "debt_overdue_payable":r"^просроченная кредиторская задолженность$",
+ "debt_overdue_loans":r"^просроченная задолженность по кредитам и займам$|^просроченные кредиты и займы$",
+ "debt_receivable":r"^дебиторская задолженность$",
+ "debt_overdue_receivable":r"^просроченная дебиторская задолженность$"}
+for k,pat in COST_FIELDS.items():RULES[k]=(pat,r"процент|%","%","cost")
+for k,pat in DEBT_FIELDS.items():RULES[k]=(pat,r"миллиард[а-я]* рубл|млрд\.?\s*руб","млрд руб.","debt")
+def scope(header):
+    return bool(re.search(r"российск[а-я]+ федераци|в целом по россии",header) and not re.search(r"по субъектам|в разрезе субъектов|по федеральным округам",header))
+def complete_cost(values):
+    return set(values)==set(COST_FIELDS) and all(v is not None and 0<=v<=100 for v in values.values()) and abs(sum(values.values())-100)<=0.30000001
+def complete_debt(values):
+    if set(values)!=set(DEBT_FIELDS) or any(v is None or v<0 for v in values.values()):return False
+    v=values
+    return (abs(v["debt_total"]-v["debt_payable"]-v["debt_loans"])<=0.15000001 and
+            abs(v["debt_overdue_total"]-v["debt_overdue_payable"]-v["debt_overdue_loans"])<=0.15000001 and
+            all(v["debt_overdue_"+k]<=v["debt_"+k] for k in ("total","payable","loans","receivable")))
+def cost_sheet(rows,sheet,url,now_year):
+    found=[]
+    for hi,row in enumerate(rows[:35]):
+        header=" ".join(h.norm(v) for line in rows[:hi] for v in line if v is not None)
+        if not scope(header) or not re.search(r"структура затрат на производство и (?:продажу|реализацию)",header) or not re.search(r"процент|%",header) or not re.search(r"без субъектов малого предпринимательства|без малых предприятий",header):continue
+        if not re.search(r"видам экономической деятельности",header):continue
+        years=set(int(y) for y in re.findall(r"\b20[0-2]\d\b",header))
+        if len(years)!=1 or max(years)>now_year:continue
+        y=next(iter(years));cols={}
+        for k,pat in COST_FIELDS.items():
+            matches=[j for j,v in enumerate(row) if re.fullmatch(pat,h.norm(v))]
+            if len(matches)!=1:break
+            cols[k]=matches[0]
+        if len(cols)!=5:continue
+        names=[j for j,v in enumerate(row) if re.search(r"вид.*экономическ.*деятельност",h.norm(v))]
+        if len(names)!=1 or names[0] in cols.values():continue
+        n=names[0];result=[];seen=set()
+        for i,line in enumerate(rows[hi+1:],hi+2):
+            if len(line)<=max(n,*cols.values()):continue
+            title=str(line[n] or "").strip()
+            if not re.search(r"[а-яё]",title,re.I) or h.norm(title).startswith(("примечан","источник","сноск")):continue
+            values={k:h.numeric(line[j]) for k,j in cols.items()}
+            if all(v is None for v in values.values()):continue
+            if not complete_cost(values):raise ValueError("Не сходится структура затрат: "+title)
+            if h.norm(title) in seen:raise ValueError("Повтор вида деятельности")
+            seen.add(h.norm(title))
+            for k,j in cols.items():result.append(dict(metric=k,title=title,year=y,value=values[k],unit="%",source=url,sheet=sheet,row=i,column=j+1,definition=header))
+        if len(seen)>=10:found.append(result)
+    if len(found)>1:raise ValueError("Несколько таблиц структуры затрат")
+    return found[0] if found else []
+def month_end(v,now_year):
+    if isinstance(v,date):d=v
+    else:
+        m=re.fullmatch(r"(\d{1,2})[./](\d{1,2})[./](20[0-2]\d)",str(v).strip())
+        if not m:return None
+        try:d=date(int(m[3]),int(m[2]),int(m[1]))
+        except ValueError:return None
+    if d.year>now_year or d.day!=calendar.monthrange(d.year,d.month)[1]:return None
+    return d.strftime("%Y-%m")
+def debt_sheet(rows,sheet,url,now_year):
+    found=[]
+    for hi,row in enumerate(rows[:35]):
+        header=" ".join(h.norm(v) for line in rows[:hi] for v in line if v is not None)
+        if not scope(header) or not re.search(r"задолженность организаций",header) or not re.search(r"на конец месяца|на конец отчетного периода",header) or not re.search(r"миллиард[а-я]* рубл|млрд\.?\s*руб",header):continue
+        if not re.search(r"без субъектов малого предпринимательства|без малых предприятий",header):continue
+        periods=[(j,month_end(v,now_year)) for j,v in enumerate(row)]
+        periods=[(j,p) for j,p in periods if p]
+        if not periods or len({p for j,p in periods})!=len(periods):continue
+        first=periods[0][0];mapping={}
+        for i,line in enumerate(rows[hi+1:],hi+2):
+            names=[str(v).strip() for v in line[:first] if isinstance(v,str) and re.search(r"[а-яё]",v,re.I)]
+            if len(names)!=1:continue
+            keys=[k for k,pat in DEBT_FIELDS.items() if re.fullmatch(pat,h.norm(names[0]))]
+            if len(keys)!=1:continue
+            k=keys[0]
+            if k in mapping:raise ValueError("Повтор вида задолженности")
+            mapping[k]=(i,line)
+        if set(mapping)!=set(DEBT_FIELDS):continue
+        result=[]
+        for j,period in periods:
+            values={k:h.numeric(line[j]) if j<len(line) else None for k,(i,line) in mapping.items()}
+            if all(v is None for v in values.values()):continue
+            if not complete_debt(values):raise ValueError("Не сходится баланс задолженности: "+period)
+            for k,(i,line) in mapping.items():result.append(dict(metric=k,title="Россия, всего",year=int(period[:4]),period=period,value=values[k],unit="млрд руб.",source=url,sheet=sheet,row=i,column=j+1,definition=header))
+        if result:found.append(result)
+    if len(found)>1:raise ValueError("Несколько таблиц задолженности")
+    return found[0] if found else []
 def parse_sheet(rows,group,sheet,url,now_year):
+    if group=='cost':return cost_sheet(rows,sheet,url,now_year)
+    if group=='debt':return debt_sheet(rows,sheet,url,now_year)
     # Annual horizontal layouts only. Reject mixed/ambiguous metric or geographical dimensions.
     if not rows:return []
     found=[]
@@ -41,8 +138,6 @@ def parse_sheet(rows,group,sheet,url,now_year):
         header=" ".join(h.norm(v) for line in rows[max(0,hi-8):hi+1] for v in line if v is not None)
         # National scope explicitly stated; reject regional tables.
         if not re.search(r"российск[а-я]+ федераци|в целом по россии",header) or re.search(r"по субъектам|в разрезе субъектов|по федеральным округам",header):continue
-        # Multi-element tables (costs) and monthly debt are deliberately rejected until layout is mapped.
-        if group in ("cost","debt"):continue
         matches=[(k,v) for k,v in RULES.items() if v[3]==group and re.search(v[0],header) and re.search(v[1],header)]
         if len(matches)!=1:continue
         metric,(_,_,unit,_)=matches[0]
@@ -88,8 +183,8 @@ def parse(raw,group,url,now_year):
         finally:book.release_resources()
     else:raise ValueError("Не XLS/XLSX")
     result=[r for name,rows in sheets for r in parse_sheet(rows,group,name,url,now_year)]
-    if not result:raise ValueError("Нет однозначной годовой таблицы нужного показателя и охвата")
-    keys=[(r["metric"],h.norm(r["title"]),r["year"]) for r in result]
+    if not result:raise ValueError("Нет однозначной таблицы нужного показателя, периода и охвата")
+    keys=[(r["metric"],h.norm(r["title"]),r.get("period",str(r["year"]))) for r in result]
     if len(keys)!=len(set(keys)):raise ValueError("Неоднозначные повторные наблюдения между листами")
     return result
 def sync(db,stamp,refresh,out):
@@ -113,13 +208,18 @@ def sync(db,stamp,refresh,out):
     if refresh:
         options=[]
         for cat in catalogs:
-            # Discovery for costs/debt is useful, but unsupported table layouts are not fetched repeatedly.
-            if cat["group"] not in ("capital","capacity"):continue
             for file in cat["files"]:
                 u=file["url"];old=db.execute("select checked,success,sha,rows from rosstat_workbooks where url=?",(u,)).fetchone()
                 if not old or (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=(30 if old[0]==old[1] else 7):
                     options.append((old is not None,old[0] if old else "",u,cat["group"],old))
-        for _,__,url,group,old in sorted(options,key=lambda r:r[:3])[:3]:
+        # Rotate groups first to prevent a large catalogue starving the others.
+        groups=list(CATALOGS);offset=date.fromisoformat(stamp[:10]).toordinal()%len(groups);order=groups[offset:]+groups[:offset]
+        queue=[]
+        for group in order:
+            pool=sorted((x for x in options if x[3]==group),key=lambda r:r[:3])
+            if pool:queue.append(pool[0])
+        queue.extend(x for x in sorted(options,key=lambda r:r[:3]) if x not in queue)
+        for _,__,url,group,old in queue[:3]:
             try:
                 raw,_=h.get(url,12_000_000);rows=parse(raw,group,url,int(stamp[:4]))
                 db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,stamp,"Импортировано",hashlib.sha256(raw).hexdigest(),json.dumps(rows,ensure_ascii=False,allow_nan=False)))
@@ -135,17 +235,22 @@ def quality(d):
         urls.add(u);keys=set()
         if f["rows"] and (not f["success"] or not re.fullmatch(r"[a-f0-9]{64}",f["sha256"] or "")):raise ValueError("No provenance")
         for r in f["rows"]:
-            k=(r["metric"],h.norm(r["title"]),r["year"])
+            k=(r["metric"],h.norm(r["title"]),r.get("period",str(r["year"])))
             if k in keys or r["source"]!=u or r["metric"] not in RULES or RULES[r["metric"]][3]!=f["group"] or r["unit"]!=RULES[r["metric"]][2] or type(r["value"]) not in (int,float) or not math.isfinite(r["value"]) or r["value"]<0 or (r["unit"]=="%" and r["value"]>100):raise ValueError("Bad observation")
             keys.add(k);count+=1
+        groups={}
+        for r in f["rows"]:
+            if f["group"] in ("cost","debt"):groups.setdefault((r["title"],r.get("period",str(r["year"]))),{})[r["metric"]]=r["value"]
+        for v in groups.values():
+            if not (complete_cost(v) if f["group"]=="cost" else complete_debt(v)):raise ValueError("Balance not reproducible")
     return dict(rosstat_workbook_files=sum(bool(f["rows"]) for f in d["files"]),rosstat_workbook_observations=count)
 def publish(page,out,d):
     quality(d)
     (out/"rosstat-workbooks.json").write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"rosstat-workbooks.csv").open("w",encoding="utf-8-sig",newline="") as f:
-        w=csv.DictWriter(f,fieldnames=["metric","title","year","value","unit","source","sheet","row","column","definition"]);w.writeheader()
+        w=csv.DictWriter(f,fieldnames=["metric","title","year","period","value","unit","source","sheet","row","column","definition"]);w.writeheader()
         for batch in d["files"]:w.writerows(batch["rows"])
-    body="<h1>Оригинальные отраслевые таблицы Росстата</h1><p>Автоматический импорт годовых таблиц фондов и мощностей. Для затрат и задолженности пока только проверяется каталог; ручные наборы не замещаются.</p><p><a href='rosstat-workbooks.csv'>CSV</a> · <a href='rosstat-workbooks.json'>JSON</a> · <a href='capital.html'>Основные фонды</a> · <a href='cost-structure.html'>Затраты</a> · <a href='financial-state.html'>Финансовое состояние</a></p>"
+    body="<h1>Оригинальные отраслевые таблицы Росстата</h1><p>Автоматический импорт однозначных годовых таблиц фондов, мощностей, структуры затрат и месячных запасов задолженности. Неоднозначные форматы отклоняются; ручные наборы не замещаются.</p><p><a href='rosstat-workbooks.csv'>CSV</a> · <a href='rosstat-workbooks.json'>JSON</a> · <a href='capital.html'>Основные фонды</a> · <a href='cost-structure.html'>Затраты</a> · <a href='financial-state.html'>Финансовое состояние</a></p>"
     for group,url in CATALOGS.items():
         c=next((x for x in d["catalogs"] if x["group"]==group),None)
         body+="<section><h2>"+escape({"capital":"Основные фонды","capacity":"Мощности","cost":"Затраты","debt":"Задолженность"}[group])+"</h2><p><a href='"+escape(url,quote=True)+"'>Каталог Росстата</a> · "+escape(c["status"] if c else "Ожидается проверка")+"</p>"

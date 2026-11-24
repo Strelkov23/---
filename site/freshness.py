@@ -62,7 +62,7 @@ def collect(out,stamp):
     for b in read("finance-workbooks.json")["years"]:
         add("fns-profit-"+str(b["year"]),"Финансы организаций","Рентабельность ФНС "+str(b["year"]),b["url"],b,str(b["year"]) if b["rows"] else None,policy="30 суток после успеха, 7 после ошибки; до двух файлов за сборку",href="finance-workbooks.html")
     for b in read("rosstat-workbooks.json")["files"]:
-        add("rosstat-book-"+hashlib.sha256(b["url"].encode()).hexdigest()[:16],"Отраслевые таблицы Росстата",b["url"].rsplit("/",1)[-1],b["url"],b,latest(r["year"] for r in b["rows"]),policy="30 суток после успеха, 7 после сбоя; до трёх файлов за сборку",href="rosstat-workbooks.html")
+        add("rosstat-book-"+hashlib.sha256(b["url"].encode()).hexdigest()[:16],"Отраслевые таблицы Росстата",b["url"].rsplit("/",1)[-1],b["url"],b,latest(r.get("period",r["year"]) for r in b["rows"]),policy="30 суток после успеха, 7 после сбоя; до трёх файлов за сборку",href="rosstat-workbooks.html")
     cmp=read("compare.json")
     for k,r in read("catalog.json").items():
         add("wdi-"+k,"Всемирный банк",r["title"],r["source"],r,latest(cmp.get(k,{}).get("values",{})),policy="Ротация годовых рядов; точный день не назначен",href="statistics.html")

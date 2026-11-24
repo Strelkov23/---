@@ -63,12 +63,12 @@ def publish(out,previous,stamp,refresh):
             raw=(previous/path.name).read_bytes();meta.update(old);meta["status"]="cached"
         elif old["status"]=="unavailable":meta.update(old)
     except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
-    if raw is None and refresh and (meta.get("expected_units")!=EXPECTED or meta["status"]!="unavailable" or str(meta.get("checked",""))[:10]!=stamp[:10]):
+    if raw is None and refresh and (meta.get("release_pin")!=PINNED_SHA256 or meta["status"]!="unavailable" or str(meta.get("checked",""))[:10]!=stamp[:10]):
         try:
             with urlopen(Request(SOURCE,headers={"User-Agent":"EconomicMonitor/2.5"}),timeout=45) as response:payload=response.read(MAX+1)
             inv=verify_release(payload);raw=payload
             meta.update(status="ok",checked=stamp,downloaded=stamp,sha256=hashlib.sha256(raw).hexdigest(),inventory=inv,expected_units=EXPECTED);meta.pop("error",None)
-        except Exception as e:meta.update(status="unavailable",checked=stamp,error=str(e)[:200])
+        except Exception as e:meta.update(status="unavailable",checked=stamp,error=str(e)[:200],release_pin=PINNED_SHA256)
     if raw is not None:path.write_bytes(raw)
     elif path.exists():path.unlink()
     meta_path.write_text(json.dumps(meta,ensure_ascii=False,allow_nan=False),encoding="utf-8")
