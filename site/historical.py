@@ -54,7 +54,7 @@ def get(url,limit):
     cert=Path(__file__).with_name("rosstat-root.pem")
     if cert.exists():context.load_verify_locations(cafile=str(cert))
     p=urlsplit(url)
-    encoded=urlunsplit((p.scheme,p.netloc,quote(p.path,safe="/%:@!    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.3"}),timeout=18,context=context) as r:'()*+,;=-._~"),quote(p.query,safe="%=&+/:?"),""))
+    encoded=urlunsplit((p.scheme,p.netloc,quote(p.path,safe="/%:@!()*+,;=-._~"),quote(p.query,safe="%=&+/:?"),""))
     with urlopen(Request(encoded,headers={"User-Agent":"EconomicsMonitor/2.3"}),timeout=18,context=context) as r:
         if not allowed(r.geturl()):raise ValueError("Перенаправление вне источников")
         b=r.read(limit+1)
