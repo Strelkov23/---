@@ -18,8 +18,8 @@ def validate(raw):
     codes=set()
     for f in features:
         p=f.get("properties") or {};g=f.get("geometry") or {};code=p.get("iso_3166_2")
-        if not isinstance(p.get("name"),str) or not p["name"].strip():raise ValueError("Нет названия территории")
-        if isinstance(code,str) and code.startswith("RU-"):codes.add(code)
+        # An unnamed feature is retained but never matched by name. ISO codes remain mandatory for statistical joins.
+        if isinstance(code,str) and code.startswith("RU-") and isinstance(p.get("name"),str) and p["name"].strip():codes.add(code)
         if g.get("type") not in ("Polygon","MultiPolygon"):raise ValueError("Неподходящий тип геометрии")
         polygons=[g["coordinates"]] if g["type"]=="Polygon" else g["coordinates"]
         if not polygons:raise ValueError("Пустая геометрия")
