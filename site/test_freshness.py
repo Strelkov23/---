@@ -31,3 +31,14 @@ class FreshnessTests(unittest.TestCase):
         self.assertIsNone(f.historical_latest(dict(r,success=None),data))
         self.assertIsNone(f.historical_latest(dict(r,code="emiss_grp"),data))
         self.assertEqual(f.historical_latest(dict(code="mirror_grp",url=file),data),"2023")
+    def test_partial_import(self):
+        now=f.dt("2026-11-25T10:00:00Z")
+        self.assertEqual(f.state(now,now,"Ключей: 12; частичный импорт; исключён 2022",now,7),"partial")
+        self.assertEqual(f.state(now,now-timedelta(days=1),"Ошибка 404",now,7),"cached")
+        self.assertEqual(f.quality(dict(schema=1,built="2026-11-25",rows=[dict(id="a",state="partial",next_check=None)])),{"partial":1})
+    def test_workbook_retry_calculation(self):
+        now=f.dt("2026-11-25T10:00:00Z")
+        self.assertEqual(f.workbook_next({},now),now)
+        self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-25"),now),f.dt("2026-12-25"))
+        self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-24"),now),f.dt("2026-12-02"))
+        self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-25",attempt_url="old",catalogue_url="new"),now),now)
