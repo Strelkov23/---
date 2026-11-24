@@ -50,6 +50,7 @@ def parse(raw):
                 y=int(r["year"])
                 rows.append(dict(group=group,region=r["object_name"],level=r["object_level"],okato=r["object_okato"],oktmo=r["object_oktmo"],year=y,value=value(r["indicator_value"]),raw_value=r["indicator_value"],subsection=sub,edition=r["source"],version=r["version_date"],sheet=files[0].filename,row=reader.line_num,note=r["comment"],table=code))
     rows.sort(key=lambda r:(r["year"],r["level"],r["region"],r["okato"],r["group"]))
+    if not rows:raise ValueError("Нет строк двух таблиц")
     check_rows(rows)
     return rows
 def key(r):return (r["group"],r["region"],r["level"],r["okato"],r["oktmo"],r["year"])
