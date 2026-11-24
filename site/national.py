@@ -7,6 +7,7 @@ from html import unescape
 from urllib.parse import urlencode
 from urllib.request import Request,urlopen
 from collections import defaultdict
+import money_history
 INFL="https://www.cbr.ru/hd_base/infl/"
 RES="https://www.cbr.ru/hd_base/mrrf/mrrf_m/"
 MONEY="https://www.cbr.ru/statistics/macro_itm/dkfs/monetary_agg/"
@@ -102,27 +103,43 @@ def publish(db,stamp,out,refresh):
       (RES+"?"+urlencode({"UniDbQuery.From":"01.1993","UniDbQuery.To":today.strftime("%m.%Y"),"UniDbQuery.Posted":"True"}),parse_res,("RES_TOTAL","RES_FX","RES_CURRENCY","RES_SDR","RES_IMF","RES_GOLD")),
       (MONEY,parse_money,("M0","M1","M2","M2X"))
     ]
+    db.execute("create table if not exists national_extra_checks(code text primary key,checked text,success text,status text)")
+    workbook={}
     if refresh:
+        try:
+            workbook=money_history.fetch()
+            with db:db.execute("insert or replace into national_extra_checks values(?,?,?,?)",("money_xlsx",stamp,stamp,"Распознано наблюдений: "+str(len(workbook))))
+        except Exception as e:
+            with db:db.execute("insert into national_extra_checks values(?,?,null,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",("money_xlsx",stamp,"Ошибка: "+str(e)[:180]))
         for url,parser,codes in queries:
             try:
-                vals=parser(get(url))
-                if not vals:raise ValueError("Не распознана таблица")
+                html_error=None
+                try:vals=parser(get(url))
+                except Exception as e:vals={};html_error=e
+                # Use workbook precision for overlapping dates, with the exact source URI.
+                origin={k:url for k in vals}
+                if url==MONEY:
+                    vals.update(workbook);origin.update({k:money_history.URL for k in workbook})
+                if not vals:raise ValueError(str(html_error) if html_error else "Не распознана таблица")
                 for code in codes:
                     rows={p:v for (k,p),v in vals.items() if k==code and p<=today.strftime("%Y-%m")}
                     if not rows:
                         with db:db.execute("insert into national_checks values(?,?,null,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,"Ошибка: нет наблюдений"))
                         continue
-                    old={r[0]:r[1] for r in db.execute("select period,value from (select period,value,row_number() over(partition by period order by seen desc) rn from national_obs where code=?) where rn=1",(code,))}
+                    old={r[0]:(r[1],r[2]) for r in db.execute("select period,value,source from (select period,value,source,row_number() over(partition by period order by seen desc) rn from national_obs where code=?) where rn=1",(code,))}
                     with db:
-                        db.executemany("insert or ignore into national_obs values(?,?,?,?,?)",[(code,p,v,stamp,url) for p,v in rows.items() if old.get(p)!=v])
+                        db.executemany("insert or ignore into national_obs values(?,?,?,?,?)",[(code,p,v,stamp,origin[(code,p)]) for p,v in rows.items() if old.get(p)!=(v,origin[(code,p)]) and not (url==MONEY and origin[(code,p)]==MONEY and old.get(p,(None,None))[1]==money_history.URL)])
                         db.execute("insert or replace into national_checks values(?,?,?,?)",(code,stamp,stamp,"Получено: "+str(len(rows))))
             except Exception as err:
                 with db:
                     for code in codes:db.execute("insert into national_checks values(?,?,null,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,"Ошибка: "+str(err)[:150]))
+    extra=db.execute("select checked,success,status from national_extra_checks where code='money_xlsx'").fetchone()
     result={}
     for code,(title,unit,definition,source) in META.items():
         c=db.execute("select checked,success,status from national_checks where code=?",(code,)).fetchone()
         vals=[dict(period=r[0],value=r[1],seen=r[2],source=r[3]) for r in db.execute("select period,value,seen,source from (select *,row_number() over(partition by period order by seen desc) rn from national_obs where code=?) where rn=1 order by period",(code,))]
         result[code]=dict(title=title,unit=unit,definition=definition,source=source,checked=c[0] if c else None,success=c[1] if c else None,status=c[2] if c else "Ожидается загрузка",values=vals)
+    for code in ("M0","M1","M2","M2X"):
+        result[code]["history_source"]={"url":money_history.URL,"checked":extra[0] if extra else None,"success":extra[1] if extra else None,"status":extra[2] if extra else "Ожидается загрузка"}
     (out/"national.json").write_text(json.dumps(result,ensure_ascii=False,allow_nan=False),encoding="utf-8")
-    return [v["title"]+" · "+v["status"] for v in result.values() if v["status"].startswith("Ошибка")]
+    return [v["title"]+" · "+v["status"] for v in result.values() if v["status"].startswith("Ошибка")]+(["Денежные агрегаты XLSX · "+extra[2]] if extra and extra[2].startswith("Ошибка") else [])

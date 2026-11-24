@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const start=$('national-from').value,end=$('national-to').value;
    const rows=s.values.filter(r=>(!start||r.period>=start)&&(!end||r.period<=end));
    const box=$('national-passport');box.replaceChildren(node('h2',s.title),node('p',s.definition),node('p','Код: '+code+' · Единица: '+s.unit+' · Периодичность: месячная · Россия'),node('p','Последняя успешная загрузка: '+(s.success||'—')+' · '+s.status),a('Первоисточник',s.source));
+   if(s.history_source)box.append(node('p','Историческая таблица: '+s.history_source.status+' · '+(s.history_source.checked||'не проверено')),a('Официальный XLSX',s.history_source.url));
    const host=$('national-chart');host.replaceChildren();
    const tbl=$('national-table');tbl.replaceChildren();
    $('national-csv').disabled=!rows.length;
