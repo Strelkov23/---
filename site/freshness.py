@@ -24,8 +24,16 @@ def state(checked,success,status,now,days,archive=False,available=True):
     if archive:return "archive" if available else "unavailable"
     if not success:return "unavailable" if checked else "waiting"
     if checked and (checked>success or re.search(r"ошиб|отлож|недоступ|429|403|404|timeout|failed",status,re.I)):return "cached"
+    if "частичный импорт" in status.lower():return "partial"
     if days and now-success>timedelta(days=days):return "overdue"
     return "ok"
+
+def workbook_next(record,now,success_days=30,failure_days=7):
+    checked=dt(record.get("checked"));success=dt(record.get("success"))
+    if not checked:return now
+    changed=record.get("attempt_url") and record.get("catalogue_url") and record["attempt_url"]!=record["catalogue_url"]
+    if changed:return now
+    return checked+timedelta(days=success_days if checked==success else failure_days)
 
 def historical_latest(record,series):
     # Discovery success only means that a catalogue was read, not that its data
@@ -70,10 +78,22 @@ def collect(out,stamp):
         add("cbr-"+k,"Банк России",r["title"],r["source"],r,latest(x.get("date") for x in r["values"]),1,"Проверка при ежедневной сборке; торговые/рабочие дни",href="national.html")
     for k,r in read("national.json").items():
         add("nat-"+k,"Банк России",r["title"],r["source"],r,latest(x.get("period") for x in r["values"]),1,"Проверка при сборке; период публикации зависит от показателя",href="national.html")
-    for b in read("finance-workbooks.json")["years"]:
-        add("fns-profit-"+str(b["year"]),"Финансы организаций","Рентабельность ФНС "+str(b["year"]),b["url"],b,str(b["year"]) if b["rows"] else None,policy="30 суток после успеха, 7 после ошибки; до двух файлов за сборку",href="finance-workbooks.html")
-    for b in read("rosstat-workbooks.json")["files"]:
-        add("rosstat-book-"+hashlib.sha256(b["url"].encode()).hexdigest()[:16],"Отраслевые таблицы Росстата",b["url"].rsplit("/",1)[-1],b["url"],b,latest(r.get("period",r["year"]) for r in b["rows"]),policy="30 суток после успеха, 7 после сбоя; до трёх файлов за сборку",href="rosstat-workbooks.html")
+    fns=read("finance-workbooks.json")
+    fns_batches={str(b["year"]):b for b in fns["years"]}
+    try:fns_catalog=read("finance-data.json").get("file_check",{})
+    except (OSError,ValueError):fns_catalog={}
+    for y,url in fns_catalog.get("files",{}).items():
+        if y not in fns_batches:fns_batches[y]=dict(year=int(y),url=url,rows=[],status="Ожидается загрузка")
+    for y,b in sorted(fns_batches.items()):
+        record=dict(b,catalogue_url=fns_catalog.get("files",{}).get(y))
+        add("fns-profit-"+y,"Финансы организаций","Рентабельность ФНС "+y,b["url"],b,y if b["rows"] else None,policy="30 суток после успеха, 7 после ошибки; до двух файлов за сборку",not_before=workbook_next(record,now),href="finance-workbooks.html")
+    rosstat=read("rosstat-workbooks.json")
+    books={b["url"]:b for b in rosstat["files"]}
+    for cat in rosstat["catalogs"]:
+        for f in cat.get("files",[]):
+            books.setdefault(f["url"],dict(url=f["url"],title=f.get("title"),group=cat["group"],rows=[],status="Ожидается загрузка"))
+    for url,b in sorted(books.items()):
+        add("rosstat-book-"+hashlib.sha256(url.encode()).hexdigest()[:16],"Отраслевые таблицы Росстата",b.get("title") or url.rsplit("/",1)[-1],url,b,latest(r.get("period",r["year"]) for r in b["rows"]),policy="30 суток после успеха, 7 после сбоя; до трёх файлов за сборку",not_before=workbook_next(b,now),href="rosstat-workbooks.html")
     cmp=read("compare.json")
     for k,r in read("catalog.json").items():
         add("wdi-"+k,"Всемирный банк",r["title"],r["source"],r,latest(cmp.get(k,{}).get("values",{})),policy="Ротация годовых рядов; точный день не назначен",href="statistics.html")
@@ -109,7 +129,7 @@ def quality(data):
         if not r.get("id") or r["id"] in ids:raise ValueError("duplicate source id")
         ids.add(r["id"])
         k=r["state"]
-        if k not in ("ok","cached","overdue","waiting","unavailable","archive"):raise ValueError("invalid freshness status")
+        if k not in ("ok","cached","partial","overdue","waiting","unavailable","archive"):raise ValueError("invalid freshness status")
         for field in ("checked","success","next_check"):
             if r.get(field) is not None and not dt(r[field]):raise ValueError("invalid timestamp")
         if r.get("next_check") and dt(r["next_check"])<=dt(data["built"]):raise ValueError("next check is not future")
@@ -120,4 +140,4 @@ def quality(data):
 def publish(page,out,stamp):
     data=collect(out,stamp);quality(data)
     (out/"freshness.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")
-    page("freshness.html",'<section class="mast"><p class="kicker">Источники · автоматизация</p><h1>Контроль обновлений</h1><p>Даты наблюдения, успешной загрузки и внутренней проверки разделены. Исторический архив не считается свежим только потому, что сайт собран сегодня. Расчётный календарь проверок — не обещание даты выпуска ведомства.</p><p><a href="sources.html">Подробные источники</a> · <a href="updates.html">Журнал изменений</a> · <a href="methodology.html#freshness-method">Методика</a> · <a href="freshness.json">JSON</a></p></section><section><h2>Состояние наборов</h2><form id="fresh-form"><label>Группа<select id="fresh-group"><option value="">Все</option></select></label><label>Состояние<select id="fresh-state"><option value="">Все</option><option value="ok">Успешная загрузка</option><option value="cached">Сохранённые данные / сбой</option><option value="overdue">Просрочена проверка</option><option value="waiting">Ожидается загрузка</option><option value="unavailable">Недоступно</option><option value="archive">Исторический архив</option></select></label><label>Поиск<input id="fresh-query" type="search"></label></form><p id="fresh-status" role="status">Загрузка…</p><div id="fresh-summary" class="metrics"></div><button id="fresh-export" disabled>Выгрузить выбранные строки CSV</button><div id="fresh-table"></div><button id="fresh-more" hidden>Показать ещё</button></section><script defer src="provenance.js"></script><script defer src="freshness.js"></script>')
+    page("freshness.html",'<section class="mast"><p class="kicker">Источники · автоматизация</p><h1>Контроль обновлений</h1><p>Даты наблюдения, успешной загрузки и внутренней проверки разделены. Исторический архив не считается свежим только потому, что сайт собран сегодня. Расчётный календарь проверок — не обещание даты выпуска ведомства.</p><p><a href="sources.html">Подробные источники</a> · <a href="updates.html">Журнал изменений</a> · <a href="methodology.html#freshness-method">Методика</a> · <a href="freshness.json">JSON</a></p></section><section><h2>Состояние наборов</h2><form id="fresh-form"><label>Группа<select id="fresh-group"><option value="">Все</option></select></label><label>Состояние<select id="fresh-state"><option value="">Все</option><option value="ok">Успешная загрузка</option><option value="cached">Сохранённые данные / сбой</option><option value="partial">Частичный импорт</option><option value="overdue">Просрочена проверка</option><option value="waiting">Ожидается загрузка</option><option value="unavailable">Недоступно</option><option value="archive">Исторический архив</option></select></label><label>Поиск<input id="fresh-query" type="search"></label></form><p id="fresh-status" role="status">Загрузка…</p><div id="fresh-summary" class="metrics"></div><button id="fresh-export" disabled>Выгрузить выбранные строки CSV</button><div id="fresh-table"></div><button id="fresh-more" hidden>Показать ещё</button></section><script defer src="provenance.js"></script><script defer src="freshness.js"></script>')
