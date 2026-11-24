@@ -125,6 +125,15 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#forecast-board-export").click()
         assert d.value.suggested_filename=="forecast-overview.csv"
+        page.goto("http://localhost:8765/capital.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#capital-status').textContent.includes('Разделов деятельности: 19')")
+        assert page.locator("#capital-table tbody tr").count()==20
+        assert page.locator("#capacity-table tbody tr").count()==72
+        page.locator("#capacity-query").fill("тракторы")
+        assert page.locator("#capacity-table tbody tr").count()==1
+        assert page.locator("#capacity-table tbody tr").inner_text().find("42,3")>=0
+        page.locator("#capacity-year").select_option("2023")
+        assert page.locator("#capacity-table tbody tr").inner_text().find("58,2")>=0
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

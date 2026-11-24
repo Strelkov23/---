@@ -114,3 +114,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 
 /* Constrain native select intrinsic width, including long Russian option text. */
 #forecast-series,#forecast-horizon,#forecast-board-period,#forecast-board-target{display:block;width:100%;min-width:0;max-width:100%}.forecast-control{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:100%;min-width:0;margin:.6rem 0}#forecast-board table{min-width:850px}#forecast-chart{min-width:0;max-width:100%}#forecast-chart svg{display:block;width:100%;min-width:0}#forecast-board-status{overflow-wrap:anywhere}
+
+.capital-control{display:grid;grid-template-columns:minmax(0,1fr);max-width:100%;margin:.6rem 0}.capital-control select,.capital-control input{width:100%;min-width:0}#capital-table table,#capacity-table table{min-width:780px}
