@@ -1,12 +1,14 @@
 {
-  "built": "2026-11-24T12:35:11+00:00",
+  "built": "2026-11-24T12:39:30+00:00",
   "errors": [],
   "warnings": [
     "Часть месячных данных унаследована из архива и не подтверждена повторно",
-    "Месячная промышленность · Месячный выпуск не подтверждён при текущем обновлении; Недоступных страниц: 6; HTTP Error 404: Not Found"
+    "Российская статистика: нет наблюдений M2X",
+    "Месячная промышленность · Месячный выпуск не подтверждён при текущем обновлении; Недоступных страниц: 9; HTTP Error 404: Not Found",
+    "Широкая денежная масса М2Х · Ошибка: нет наблюдений"
   ],
   "counts": {
-    "archive": 7275,
+    "archive": 7282,
     "papers": 8166,
     "indicators": 105,
     "indicators_with_data": 105,
@@ -14,16 +16,18 @@
     "monthly_industry_verified": 0,
     "cbr_KEY": 762,
     "cbr_USD": 741,
+    "national_series": 13,
+    "national_observations": 2700,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "5bade59bf310d24f9e2f029e4046560f617a284c17c501e1c6a3484c1440c7d1",
-      "bytes": 3500202
+      "sha256": "24a8fe0b7a1755596b88fc0fdb67102ce7fafe789c5c76939885ffc23805330c",
+      "bytes": 3502508
     },
     "literature.json": {
-      "sha256": "a5829fc6a0684cfb4d3929529b33ccaafb7e5ce29170d77d83758bbe9576b29c",
-      "bytes": 3317648
+      "sha256": "5ca372f0d565c457f9dfaf3b4e7f2751e04632330b26c095a8b72298d56766ce",
+      "bytes": 3331558
     },
     "compare.json": {
       "sha256": "0c3d8766cceb77f4c1f8bf031a5e544b961edf5c596e702d0bca422e5b9f9e55",
@@ -38,11 +42,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "04cf75b6046276a6503285491847b43f6fc2a6684ce93e59e03d34168586fd44",
-      "bytes": 793
+      "sha256": "6ba092fb5bb2c12d6542a7ecc7798ae451d1a9e2e31e61e4c530004cfffcb919",
+      "bytes": 1048
     },
     "cbr.json": {
-      "sha256": "c825bb62819ef42f0d381f2fa03bd7c4f02f8689f78f195c487fb1ef3fc41ec5",
+      "sha256": "84e58fdca4b2785446cc389c5005d78fb35d0b5d2dc2d931711dce510a430241",
       "bytes": 55538
     },
     "sectors.json": {
@@ -50,12 +54,16 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "d3b940bfea31c6b0112260fdc429a8a9d7571d152c580c473fe65bda89c7c4a2",
-      "bytes": 31540
+      "sha256": "14a7fd31af98c4884634ff8eb07ef22ab0bdf9820fef256e096ae7fe89fee542",
+      "bytes": 31636
     },
     "links.json": {
-      "sha256": "bb6cfda5dc1a4b80725d5c0e01c625fbd6b487b001508169d1cd863427140568",
-      "bytes": 1274360
+      "sha256": "12b900b0f1594117354c68c76da27a72742787985d1de691ac070728cad0bf4e",
+      "bytes": 1276880
+    },
+    "national.json": {
+      "sha256": "d6fca4b7bc8e9681b2c6c0853246d27e33c9ebff9155fce5c58126eb20be56b9",
+      "bytes": 541877
     }
   }
 }
