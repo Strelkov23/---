@@ -17,7 +17,7 @@ jobs:
           python-version: '3.12'
       - name: Verify fixed archive and exact rows
         run: |
-          PYTHONPATH=site python3 - <<'PY'
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=site python3 - <<'PY'
           import regional_manufacturing as m
           from urllib.request import Request,urlopen
           from pathlib import Path
