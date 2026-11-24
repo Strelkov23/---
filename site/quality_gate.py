@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -217,6 +217,18 @@ def check(out,previous,stamp):
         if not data["regional-mining-energy.json"]["rows"]:warnings.append("Добыча и энергетика: нет импортированных данных")
         if data["regional-mining-energy.json"]["status"].startswith("Ошибка"):warnings.append("Добыча и энергетика: "+data["regional-mining-energy.json"]["status"])
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Добыча и энергетика: "+str(e))
+    try:
+        import industrial_parks as ip
+        parks=data["industrial-parks.json"]
+        counts.update(ip.quality(parks))
+        ip.verify_csv(out/"industrial-parks.csv",parks)
+        if not parks["rows"]:warnings.append("Каталог АИП: нет импортированных карточек")
+        if parks.get("error"):warnings.append("Каталог АИП: "+parks["error"])
+        old_file=previous/"industrial-parks.json"
+        if old_file.is_file():
+            old=json.loads(old_file.read_text(encoding="utf-8"))
+            if old.get("rows") and len(parks["rows"])<0.8*len(old["rows"]):raise ValueError("Потеря охвата каталога АИП")
+    except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Каталог АИП: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
