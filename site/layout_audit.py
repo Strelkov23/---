@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 ROOT=sys.argv[1] if len(sys.argv)>1 else "http://localhost:8765/"
 OUT=Path(sys.argv[2] if len(sys.argv)>2 else "/tmp/layout-audit")
 OUT.mkdir(parents=True,exist_ok=True)
-PAGES=["index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","freshness.html","stat-revisions.html","statistics.html","national.html","historical.html","economic-map.html","news-map.html","facility-map.html","district-map.html","search.html","glossary.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html","index-builder.html","report-builder.html","finance.html","financial-state.html","cost-structure.html","food-balance.html"]
+PAGES=["index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","freshness.html","stat-revisions.html","statistics.html","national.html","historical.html","economic-map.html","regional-manufacturing.html","news-map.html","facility-map.html","district-map.html","search.html","glossary.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html","index-builder.html","report-builder.html","finance.html","financial-state.html","cost-structure.html","food-balance.html"]
 AUDIT="""() => {
  const root=document.documentElement;
  const isVisible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden'};
@@ -46,7 +46,7 @@ def run():
                     page.evaluate("document.fonts.ready")
                     page.wait_for_timeout(150)
                     record.update(page.evaluate(AUDIT))
-                    if path in ("index.html","historical.html","scenario.html","sector-passports.html","papers.html","analysis-centre.html") or record.get("outside") or errors or record.get("svgIssues"):
+                    if path in ("index.html","historical.html","scenario.html","sector-passports.html","regional-manufacturing.html","papers.html","analysis-centre.html") or record.get("outside") or errors or record.get("svgIssues"):
                         page.screenshot(path=str(OUT/f"{width}-{path.replace('.html','')}.png"),full_page=False,timeout=12000)
                 except Exception as err:record["audit_error"]=str(err)
                 finally:page.close()
