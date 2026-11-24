@@ -26,3 +26,21 @@ class ElectricityTests(unittest.TestCase):
         rows=e.parse(sample(),2026)
         self.assertEqual(rows[0]["values"]["coal_production_twh"],50)
         with self.assertRaises(ValueError):e.parse(sample().replace(b",50,60,70",b",50,60,"),2026)
+
+    def test_published_quality(self):
+        import tempfile
+        from pathlib import Path
+        with sqlite3.connect(":memory:") as db,tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)
+            with patch("electricity_balance.fetch",return_value=(e.parse(sample(),2026),"a"*64)):
+                data=e.sync(db,"2026-11-24T00:00:00+00:00",True)
+            e.publish(out,data)
+            c,w=e.quality(data,out/"electricity-balance.csv",2026)
+            self.assertEqual(c["energy_observations"],30)
+            self.assertEqual(c["fuel_complete_years"],5)
+            self.assertEqual(c["electricity_discrepancies"],0)
+            self.assertFalse(w)
+            altered=dict(data,rows=data["rows"][1:])
+            e.publish(out,altered)
+            with self.assertRaisesRegex(ValueError,"disappeared"):
+                e.quality(altered,out/"electricity-balance.csv",2026,data)

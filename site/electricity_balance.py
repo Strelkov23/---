@@ -73,3 +73,45 @@ def publish(out,data):
         w=csv.writer(f);w.writerow(["year","indicator","value","unit","source","source_sha256"])
         for r in data["rows"]:
             for k,v in r["values"].items():w.writerow([r["year"],k,v,data["unit"],data["source"],data["source_sha256"]])
+
+def quality(data,path,max_year,previous=None):
+    """Published dataset integrity; unavailable coverage is a warning, not a fabricated fact."""
+    if data["source"]!=SOURCE or data["unit"]!="TWh" or data["metrics"]!=METRICS or data["fuels"]!=FUELS:
+        raise ValueError("Energy metadata mismatch")
+    rows=data["rows"];sha=data["source_sha256"];success=data["success"]
+    if rows and (not success or not isinstance(sha,str) or len(sha)!=64 or any(c not in "0123456789abcdef" for c in sha)):
+        raise ValueError("Missing energy source provenance")
+    if not rows and (success or sha):raise ValueError("Empty successful snapshot")
+    expected={};years=set();complete=0;fuel_complete=0;discrepancies=0
+    for r in rows:
+        y=r["year"];v=r["values"]
+        if type(y) is not int or not 1992<=y<=max_year or y in years or not v:
+            raise ValueError("Invalid or duplicate energy year")
+        years.add(y)
+        for k,x in v.items():
+            if k not in ALL_METRICS or type(x) not in (int,float) or not math.isfinite(x) or (k!=N and x<0):
+                raise ValueError("Invalid energy observation")
+            expected[(str(y),k)]=(str(x),"TWh",SOURCE,sha)
+        if all(k in v for k in METRICS):
+            complete+=1
+            discrepancies+=abs(v[G]+v[N]-v[D])>max(0.1,0.001*v[D])
+        fuel_complete+=all(k in v for k in FUELS)
+    if previous and keys(previous["rows"])-keys(rows):
+        raise ValueError("Previously published energy observations disappeared")
+    actual={}
+    with path.open(encoding="utf-8-sig",newline="") as fh:
+        reader=csv.DictReader(fh)
+        if reader.fieldnames!=["year","indicator","value","unit","source","source_sha256"]:raise ValueError("Energy CSV header mismatch")
+        for r in reader:
+            key=(r["year"],r["indicator"])
+            if key in actual:raise ValueError("Duplicate energy CSV observation")
+            actual[key]=tuple(r[k] for k in ("value","unit","source","source_sha256"))
+    if actual!=expected:raise ValueError("Energy JSON/CSV mismatch")
+    counts=dict(energy_years=len(years),energy_observations=len(expected),electricity_complete_years=complete,electricity_discrepancies=discrepancies,fuel_complete_years=fuel_complete)
+    warnings=[]
+    if not rows:warnings.append("OWID: нет загруженных энергетических наблюдений")
+    elif complete<5:warnings.append("OWID: недостаточное покрытие баланса электроэнергии")
+    if fuel_complete<5:warnings.append("OWID: недостаточное совместное покрытие добычи трёх топлив")
+    if discrepancies:warnings.append("OWID: превышен экран расхождения электрического баланса: "+str(discrepancies))
+    if data["checked"]!=success:warnings.append("OWID: последняя попытка загрузки неуспешна")
+    return counts,warnings

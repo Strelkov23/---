@@ -36,8 +36,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const val of [y,...keys.map(k=>fmt(v[k])),fmt(m.gap),fmt(m.netShare)])tr.insertCell().textContent=val
   }
   $('electricity-table').replaceChildren(t);
-  chartTools($('electricity-charts'),'Электроэнергетика России — выработка и спрос','ТВт·ч',years,keys.filter(k=>k!=='electricity_net_imports_twh').map(k=>({name:d.metrics[k],code:k,values:years.map(y=>byYear.get(y)?.[k]??null)})),{source:'OWID Energy, Ember и другие источники',url:d.metadata});
-  chartTools($('electricity-charts'),'Электроэнергетика России — чистый импорт','ТВт·ч',years,[{name:d.metrics.electricity_net_imports_twh,code:'electricity_net_imports_twh',values:years.map(y=>byYear.get(y)?.electricity_net_imports_twh??null)}],{source:'OWID Energy, Ember',url:d.metadata});
+  chartTools($('electricity-charts'),'Электроэнергетика России — выработка и спрос','ТВт·ч',years,keys.filter(k=>k!=='electricity_net_imports_twh').map(k=>({name:d.metrics[k],code:k,values:years.map(y=>byYear.get(y)?.[k]??null)})),{source:'OWID Energy, Ember и другие источники',url:d.metadata,display:true});
+  chartTools($('electricity-charts'),'Электроэнергетика России — чистый импорт','ТВт·ч',years,[{name:d.metrics.electricity_net_imports_twh,code:'electricity_net_imports_twh',values:years.map(y=>byYear.get(y)?.electricity_net_imports_twh??null)}],{source:'OWID Energy, Ember',url:d.metadata,display:true});
   function clear(){
    exportButton.disabled=true;
    const v=byYear.get(Number(year.value))||{};
@@ -64,7 +64,7 @@ function renderFuels(d,manifest,verified,$,fmt){
  for(const label of ['Год',...Object.values(labels),'Сумма трёх топлив, ТВт·ч','Изменение суммы, ТВт·ч','Прирост суммы, %',...Object.values(labels).map(x=>x+' — доля, %')]){const th=document.createElement('th');th.scope='col';th.textContent=label;head.append(th)}
  for(const r of rows.slice().reverse()){const tr=body.insertRow();for(const v of [r.y,...keys.map(k=>fmt(r.v[k])),fmt(r.total),fmt(r.change),fmt(r.growth),...keys.map(k=>fmt(r.shares[k]))])tr.insertCell().textContent=v}
  host.replaceChildren(table);status.textContent='Полных лет: '+rows.filter(r=>r.total!==null).length+' из '+rows.length+' · '+d.status;
- chartTools($('fuel-charts'),'Добыча ископаемого топлива России — энергосодержание','ТВт·ч',years,keys.map(k=>({name:labels[k],code:k,values:rows.map(r=>r.v[k]??null)})),{source:'OWID Energy, Energy Institute и другие источники',url:d.metadata});
+ chartTools($('fuel-charts'),'Добыча ископаемого топлива России — энергосодержание','ТВт·ч',years,keys.map(k=>({name:labels[k],code:k,values:rows.map(r=>r.v[k]??null)})),{source:'OWID Energy, Energy Institute и другие источники',url:d.metadata,display:true});
  exp.disabled=false;exp.onclick=()=>csv('fossil-production.csv',[
  ['Год',...keys.map(k=>k+' (ТВт·ч)'),'Сумма трёх топлив (ТВт·ч)','Изменение суммы (ТВт·ч)','Прирост суммы (%)',...keys.map(k=>k+' доля (%)'),'Источник','SHA-256 CSV','SHA-256 JSON','Отпечаток набора'],
  ...rows.map(r=>[r.y,...keys.map(k=>r.v[k]??null),r.total,r.change,r.growth,...keys.map(k=>r.shares[k]),d.source,d.source_sha256,verified.sha256,manifest.data_fingerprint])]);

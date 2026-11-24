@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -116,6 +116,17 @@ def check(out,previous,stamp):
         hashes["food-balance.csv"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("Продовольственные балансы: "+str(e))
+    try:
+        import electricity_balance
+        energy_csv=out/"electricity-balance.csv"
+        previous_energy=previous/"electricity-balance.json"
+        old_energy=json.loads(previous_energy.read_text(encoding="utf-8")) if previous_energy.is_file() else None
+        ec,ew=electricity_balance.quality(data["electricity-balance.json"],energy_csv,int(stamp[:4]),old_energy)
+        counts.update(ec);warnings.extend(ew)
+        raw=energy_csv.read_bytes()
+        hashes["electricity-balance.csv"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("Энергетика: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

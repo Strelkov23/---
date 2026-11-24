@@ -301,8 +301,24 @@ with sync_playwright() as p:
             with page.expect_download() as energy:
                 page.locator("#energy-export").click()
             assert energy.value.suggested_filename.startswith("energy-output-")
+        page.wait_for_function("document.querySelector('#electricity-status').textContent!=='Загрузка…'")
+        energy_data=json.loads(Path("electricity-balance.json").read_text())
+        assert "Набор не подтверждён" not in page.locator("#electricity-status").inner_text()
+        if energy_data["rows"]:
+            assert page.locator("#electricity-table tbody tr").count()>0
+            assert page.locator("#electricity-charts svg").count()>0
+        if any(any(k in r["values"] for k in energy_data["fuels"]) for r in energy_data["rows"]):
+            assert page.locator("#fuel-table tbody tr").count()>0
+            assert page.locator("#fuel-charts svg").count()==1
+        page.wait_for_function("document.querySelector('#metal-status').textContent!=='Загрузка…'")
+        assert "Набор не подтверждён" not in page.locator("#metal-status").inner_text()
+        if page.locator("#metal-period option").count():
+            assert page.locator("#metal-table tbody tr").count()>0
+            with page.expect_download() as metal:
+                page.locator("#metal-export").click()
+            assert metal.value.suggested_filename.startswith("metal-output-")
         page.goto("http://localhost:8765/food-balance.html",wait_until="load")
-        page.wait_for_function("!document.querySelector(\'#fbs-run\').disabled")
+        page.wait_for_function("!document.querySelector('#fbs-run').disabled")
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

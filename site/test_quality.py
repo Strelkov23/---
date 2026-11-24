@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 import quality_gate as q
 import food_balance as f
+import electricity_balance as e
 import sqlite3
 
 class QualityTests(unittest.TestCase):
@@ -33,6 +34,7 @@ class QualityTests(unittest.TestCase):
         for name,value in self.data.items():self.put(name,value)
         with sqlite3.connect(":memory:") as db:
             f.publish(lambda *args:None,self.out,f.sync(db,"2026-11-24T00:00:00+00:00",False))
+            e.publish(self.out,e.sync(db,"2026-11-24T00:00:00+00:00",False))
     def put(self,name,value):
         (self.out/name).write_text(json.dumps(value),encoding="utf-8")
     def report(self):return q.check(self.out,self.prev,"2026-11-24")
@@ -55,6 +57,10 @@ class QualityTests(unittest.TestCase):
         p=self.out/"food-balance.csv"
         p.write_text(p.read_text(encoding="utf-8-sig").replace("117759","117760"),encoding="utf-8-sig")
         self.assertTrue(any("JSON/CSV mismatch" in e for e in self.report()["errors"]))
+    def test_energy_csv_mismatch(self):
+        p=self.out/"electricity-balance.csv"
+        with p.open("a",encoding="utf-8") as fh:fh.write("2024,"+e.G+",1,TWh,"+e.SOURCE+",abc\n")
+        self.assertTrue(any("Energy JSON/CSV mismatch" in x for x in self.report()["errors"]))
     def test_missing(self):
         (self.out/"cbr.json").unlink()
         self.assertTrue(self.report()["errors"])

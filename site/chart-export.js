@@ -92,7 +92,7 @@ function chartTools(host,title,unit,years,series,options={}){
       lines.forEach(v=>{label(margin+54,cy,v,19);cy+=25});cy+=12;
     });
     cy=footerTop;for(const v of footer){label(margin,cy,v,15);cy+=22}
-    return {blob:new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'}),width,height};
+    return {svg,blob:new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'}),width,height};
   }
   async function png(){
     const fig=vector(),img=new Image(),src=URL.createObjectURL(fig.blob);
@@ -113,6 +113,7 @@ function chartTools(host,title,unit,years,series,options={}){
     const rows=[[period,...series.map(s=>s.name+' ('+unit+')')],...years.map((yr,i)=>[yr,...series.map(s=>Number.isFinite(s.values[i])?String(s.values[i]).replace('.',','):'')]),['Источник',source,...series.map(s=>s.code)],['URL',url],['Версия данных',snapshot()]];
     await navigator.clipboard.writeText(rows.map(r=>r.map(v=>String(v??'').replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n'));status.textContent='Таблица скопирована для вставки в Excel или Word.';
   });
+  if(options.display){const figure=vector().svg;figure.style.display='block';figure.style.width='100%';figure.style.height='auto';host.append(figure)}
   toolbar.append(status);host.append(toolbar);
 }
 if(typeof module!=='undefined')module.exports={chartTickIndices,chartWrap,chartAdjacent};
