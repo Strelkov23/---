@@ -158,16 +158,182 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   return profileCache.get(file)
  }
  const profileCodes=[
-  ['Экономика','GRP_95b8dd2585'],['Экономика','GRP_PC_95b8dd2585'],['Экономика','GRP_VOLUME_95b8dd2585'],
-  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','MFG_total_099b62c9d9'],
-  ['Инвестиции','R_88230ed30f2f2738_bf6a5a3983'],['Инвестиции','R_66b96177c45a01ad_bf6a5a3983'],
-  ['Труд','R_65254a01945743d3_1db3db8e79'],['Труд','R_a4138d558584b81a_1db3db8e79'],
-  ['Бюджет','R_77976ed27f49b4fd_28f4b5b380'],['Бюджет','R_8728bc736516e87c_28f4b5b380'],
-  ['Население','R_f39e59bbabc208f3_4c391d1044'],['Население','HH_CONS_PC_95b8dd2585']
- ];
+ [
+  "Экономика",
+  "GRP_95b8dd2585"
+ ],
+ [
+  "Экономика",
+  "GRP_PC_95b8dd2585"
+ ],
+ [
+  "Экономика",
+  "GRP_VOLUME_95b8dd2585"
+ ],
+ [
+  "Экономика",
+  "GRP_PC_VOLUME_95b8dd2585"
+ ],
+ [
+  "Экономика",
+  "GRP_SHARE_95b8dd2585"
+ ],
+ [
+  "Экономика",
+  "R_505af17284b98773_fd1adecbd1"
+ ],
+ [
+  "Промышленность",
+  "R_347ab451705a6d33_031d7fe105"
+ ],
+ [
+  "Промышленность",
+  "R_425e9fbbe745e4e6_031d7fe105"
+ ],
+ [
+  "Промышленность",
+  "R_5f09b90031e93f90_031d7fe105"
+ ],
+ [
+  "Промышленность",
+  "R_975b9c501d870374_099b62c9d9"
+ ],
+ [
+  "Промышленность",
+  "MFG_total_099b62c9d9"
+ ],
+ [
+  "Промышленность",
+  "SHIP_mining_total_099b62c9d9"
+ ],
+ [
+  "Промышленность",
+  "SHIP_energy_total_099b62c9d9"
+ ],
+ [
+  "Инвестиции и фонды",
+  "R_88230ed30f2f2738_bf6a5a3983"
+ ],
+ [
+  "Инвестиции и фонды",
+  "R_66b96177c45a01ad_bf6a5a3983"
+ ],
+ [
+  "Инвестиции и фонды",
+  "R_90575f546cc99ce3_bf6a5a3983"
+ ],
+ [
+  "Инвестиции и фонды",
+  "R_564aea52db01a94a_366f6a2581"
+ ],
+ [
+  "Труд",
+  "R_65254a01945743d3_1db3db8e79"
+ ],
+ [
+  "Труд",
+  "R_a4138d558584b81a_1db3db8e79"
+ ],
+ [
+  "Труд",
+  "R_b8ff4db9a1b3092e_1db3db8e79"
+ ],
+ [
+  "Труд",
+  "R_e8fd80380742955e_1db3db8e79"
+ ],
+ [
+  "Бюджет",
+  "R_77976ed27f49b4fd_28f4b5b380"
+ ],
+ [
+  "Бюджет",
+  "R_8728bc736516e87c_28f4b5b380"
+ ],
+ [
+  "Население и уровень жизни",
+  "R_f39e59bbabc208f3_4c391d1044"
+ ],
+ [
+  "Население и уровень жизни",
+  "HH_CONS_PC_95b8dd2585"
+ ],
+ [
+  "Население и уровень жизни",
+  "R_78abb4e04b10f5df_bd2b25cb51"
+ ],
+ [
+  "Население и уровень жизни",
+  "R_11c9b1e4fe44cfc1_bd2b25cb51"
+ ],
+ [
+  "Население и уровень жизни",
+  "R_88f3fb354016c809_4c391d1044"
+ ],
+ [
+  "Население и уровень жизни",
+  "R_2308ddd83ecf600c_4c391d1044"
+ ],
+ [
+  "Сельское хозяйство",
+  "R_9b96293c7c45f30c_f2cb408b61"
+ ],
+ [
+  "Сельское хозяйство",
+  "R_d7e928d7b9e2a713_f2cb408b61"
+ ],
+ [
+  "Строительство",
+  "R_71188b5f455e6cd2_1cd8b8a232"
+ ],
+ [
+  "Строительство",
+  "R_fca0666f3b1929ac_1cd8b8a232"
+ ],
+ [
+  "Торговля и услуги",
+  "R_1f8efa58e94578b7_fca0b9a0b9"
+ ],
+ [
+  "Торговля и услуги",
+  "R_d20ed9bce6fc8595_fca0b9a0b9"
+ ],
+ [
+  "Торговля и услуги",
+  "R_4ea7f66d299541fc_fca0b9a0b9"
+ ],
+ [
+  "Транспорт",
+  "R_305945e51ba007cf_3ff9a059d6"
+ ],
+ [
+  "Транспорт",
+  "R_84a6f15f95d32308_3ff9a059d6"
+ ],
+ [
+  "Транспорт",
+  "R_a9a6e02e2fd5305c_3ff9a059d6"
+ ],
+ [
+  "Транспорт",
+  "R_fcf23e371a2160e4_3ff9a059d6"
+ ],
+ [
+  "Инновации",
+  "R_74c11af622ab2ebd_d4010eb82b"
+ ],
+ [
+  "Цены",
+  "R_9a4b6e147c8d1ce5_d3c672e059"
+ ],
+ [
+  "Цены",
+  "R_f92915777d319fd8_d3c672e059"
+ ]
+];
  function addProfile(f,Y){
   if(!profileEnabled)return;
-  const section=node('details','');section.className='geo-profile';section.append(node('summary','Экономическое досье региона · 15 показателей'));
+  const section=node('details','');section.className='geo-profile';section.append(node('summary','Экономическое досье региона · '+profileCodes.length+' показателя'));
   const info=node('p','Показаны наблюдения за выбранный год или последнее доступное значение не позднее этого года. Разные годы не сопоставляются автоматически.');
   const body=node('div',''),status=node('p','Раскройте досье для загрузки.');status.setAttribute('role','status');section.append(info,status,body);details.append(section);
   let loaded=false,busy=false;
@@ -176,22 +342,31 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    if(!f.key){status.textContent='Нет однозначного статистического соответствия для этого контура.';return}
    busy=true;status.textContent='Загрузка проверенных рядов…';
    try{
-    const jobs=profileCodes.map(async([group,code])=>{
+    const work=async([group,code])=>{
      const m=catalog.find(s=>s.code===code);if(!m)return {group,code,error:'Ряд отсутствует'};
      try{const data=await profileFile(m.file),r=RegionalMap.profileObservation(data.values,f.key,Y,RegionalStats.sample);
-      return {group,code,title:m.title,unit:m.unit,source:data.source,kind:m.kind,r}
+      return {group,code,title:m.title,unit:m.unit,source:data.source,kind:m.kind,file:m.file,r}
      }catch(e){return {group,code,title:m.title,unit:m.unit,error:'Не удалось проверить ряд'}}
-    });
-    const results=await Promise.all(jobs);if(!section.isConnected)return;
+    };
+    // Limit simultaneous downloads of long regional series. Reuse verified cache.
+    const results=[];
+    for(let i=0;i<profileCodes.length;i+=6){results.push(...await Promise.all(profileCodes.slice(i,i+6).map(work)));if(!section.isConnected)return}
+    if(!section.isConnected)return;
+    const manifest=await profileManifest;
+    const filter=node('select','');filter.setAttribute('aria-label','Раздел досье');
+    filter.append(new Option('Все разделы',''),...[...new Set(results.map(r=>r.group))].map(g=>new Option(g,g)));
+    const label=node('label','Раздел досье');label.append(filter);
+    const available=node('input','');available.type='checkbox';const availableLabel=node('label',' Только с наблюдениями');availableLabel.prepend(available);
     const table=node('table',''),thead=table.createTHead().insertRow(),tbody=table.createTBody();
     for(const v of ['Раздел','Показатель','Значение','Год','Источник'])thead.append(node('th',v));
-    for(const v of results){const tr=tbody.insertRow();tr.insertCell().textContent=v.group;tr.insertCell().textContent=v.title||v.code;tr.insertCell().textContent=v.error||(!v.r?'Нет наблюдения':fmtValue(v.r.value)+' '+v.unit);tr.insertCell().textContent=v.r?String(v.r.year)+(v.r.year!==Y?' (ранее)':''):'—';const cell=tr.insertCell();if(v.source&&/^https?:\/\//i.test(v.source))cell.append(link('Источник',v.source));else cell.textContent='—'}
+    const filtered=()=>results.filter(v=>(!filter.value||filter.value===v.group)&&(!available.checked||v.r));
+    function render(){tbody.replaceChildren();for(const v of filtered()){const tr=tbody.insertRow();tr.insertCell().textContent=v.group;tr.insertCell().textContent=v.title||v.code;tr.insertCell().textContent=v.error||(!v.r?'Нет наблюдения':fmtValue(v.r.value)+' '+v.unit);tr.insertCell().textContent=v.r?String(v.r.year)+(v.r.year!==Y?' (ранее)':''):'—';const cell=tr.insertCell();if(v.source&&/^https?:\/\//i.test(v.source))cell.append(link('Источник',v.source));else cell.textContent='—'};status.textContent='Доступно: '+results.filter(v=>v.r).length+' из '+results.length+' · в таблице: '+filtered().length+' · за выбранный год: '+results.filter(v=>v.r?.year===Y).length+(results.some(v=>v.error)?' · недоступных рядов: '+results.filter(v=>v.error).length:'');}
+    filter.onchange=render;available.onchange=render;
     const exportButton=node('button','Скачать досье CSV');exportButton.type='button';
-    exportButton.onclick=()=>csv('regional-profile-'+chosenRegion+'-'+Y+'.csv',[['Регион','Выбранный год','Раздел','Код','Показатель','Год наблюдения','Значение','Единица','Источник','Метод получения','Статус'],...results.map(v=>[f.r?.region||RegionalMap.displayName(f.f.properties.iso_3166_2,f.f.properties.name),Y,v.group,v.code,v.title,v.r?.year,v.r?.value??'',v.unit,v.source,v.kind,v.error||(!v.r?'Нет наблюдения':v.r.year===Y?'Выбранный год':'Более ранний год')])]);
-    const found=results.filter(v=>v.r).length,failed=results.filter(v=>v.error).length;
-    status.textContent='Доступно: '+found+' из '+results.length+' · за выбранный год: '+results.filter(v=>v.r?.year===Y).length+(failed?' · ошибок загрузки: '+failed:'');
-    body.replaceChildren(table,exportButton);loaded=failed===0;
-   }finally{busy=false}
+    exportButton.onclick=()=>csv('regional-profile-'+f.f.properties.iso_3166_2+'-'+Y+'.csv',[['Регион карты','Регион источника','Выбранный год','Раздел','Код','Показатель','Год наблюдения','Значение','Единица','Источник','Метод получения','Статус','Лист','Строка','Столбец','Примечание','Файл архива','SHA-256 JSON','Отпечаток манифеста'],...filtered().map(v=>[RegionalMap.displayName(f.f.properties.iso_3166_2,f.f.properties.name),v.r?.region,Y,v.group,v.code,v.title,v.r?.year,v.r?.value??'',v.unit,v.source,v.kind,v.error||(!v.r?'Нет наблюдения':v.r.year===Y?'Выбранный год':'Более ранний год'),v.r?.sheet,v.r?.row,v.r?.column,v.r?.note,v.file,manifest.files[v.file]?.sha256,manifest.data_fingerprint])]);
+    const wrap=node('div','');wrap.className='table-scroll';wrap.append(table);
+    body.replaceChildren(label,availableLabel,wrap,exportButton);render();loaded=!results.some(v=>v.error&&v.error!=='Ряд отсутствует');
+   }catch(e){if(section.isConnected)status.textContent='Не удалось проверить досье: '+String(e.message||e)}finally{busy=false}
   }
  }
  function addBrief(f){
