@@ -23,7 +23,18 @@ const RegionalMap=(()=>{
   return [...new Set([0,.2,.4,.6,.8,1].map(q))];
  }
  function bin(v,thresholds){if(!Number.isFinite(v)||!thresholds.length)return -1;if(thresholds.length===1)return 0;const i=thresholds.slice(1).findIndex(t=>v<=t);return i<0?thresholds.length-2:i}
- return {key,project,rings,classes,bin};
+ function theme(code){
+ if(/^(GRP_|NW_GRP_|R_024d9416ea6f54dc_|R_7e8fd799d1d06897_|R_f54f02504bfb051e_)/.test(code))return 'economy';
+ if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code))return 'industry';
+ if(/^R_(66b96177c45a01ad|6887143295c72599|88230ed30f2f2738|90575f546cc99ce3)_/.test(code))return 'investment';
+ if(/^R_(65254a01945743d3|a4138d558584b81a|b8ff4db9a1b3092e|e8fd80380742955e)_/.test(code))return 'labor';
+ if(/^R_(510509d40d0cb785|77976ed27f49b4fd|8728bc736516e87c|b7f9afa8b1ac06d9)_/.test(code))return 'budget';
+ if(/^(HH_CONS_|R_(2308ddd83ecf600c|88f3fb354016c809|b772cc7700d0fcd7|f39e59bbabc208f3)_)/.test(code))return 'people';
+ return 'all';
+}
+ function isGrowth(code){return /^(GRP_(PC_)?VOLUME_|R_(024d9416ea6f54dc|347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|66b96177c45a01ad)_)/.test(code)}
+ function growthBin(v){return !Number.isFinite(v)?-1:v<95?0:v<100?1:v===100?2:v<=105?3:4}
+ return {key,project,rings,classes,bin,theme,isGrowth,growthBin};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -34,6 +45,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const link=(t,u)=>{const a=node('a',t);a.href=u;a.target='_blank';a.rel='noopener noreferrer';return a};
  let catalog=[],geo=null,meta=null,series=null,seq=0,first=true;
  const colors=['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953'];
+ const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers');
+ const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers'].filter(id=>$(id))];
  function draw(){
   if(!geo||!series)return;
   host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
@@ -44,6 +57,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const features=geo.features.map(feature=>{const f={...feature,properties:feature.properties||{}};const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
   const matched=features.filter(x=>x.r),unmapped=[...sample.out].filter(([key])=>counts.get(key)!==1);
   const thresholds=RegionalMap.classes(matched.map(x=>x.r.value));
+  const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code)),palette=growth?['#a53e35','#e8a39b','#f0f0ed','#a3d6bc','#207a57']:colors;
+  if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code);if(!RegionalMap.isGrowth(series.code))growthPick.value='quantile'}
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
   source.replaceChildren(node('p',series.title+' · '+series.unit+' · '+series.kind),link('Статистический первоисточник',series.source),document.createTextNode(' · '),link('Описание границ и лицензия',meta.documentation),node('p','Границы: '+meta.license+' · получены '+String(meta.downloaded||'—').slice(0,10)+' · '+(meta.status==='cached'?'сохранённая копия':'загруженный файл')));
   const polygons=features.map(x=>({...x,rings:RegionalMap.rings(x.f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
@@ -62,13 +77,27 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   for(const f of polygons){
    const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
    if(!d)continue;
-   const bin=RegionalMap.bin(f.r?.value,thresholds),fill=bin<0?'#deded9':colors[Math.min(bin,colors.length-1)];
+   const bin=growth?RegionalMap.growthBin(f.r?.value):RegionalMap.bin(f.r?.value,thresholds),fill=bin<0?'#deded9':palette[Math.min(bin,palette.length-1)];
    const p=shape('path',{d,fill,stroke:'#fff','stroke-width':.65,'fill-rule':'evenodd',tabindex:0,role:'button','aria-label':(f.r?.region||regionName(f.f.properties))+': '+fmtValue(f.r?.value)});
    shape('title',{},(f.r?.region||regionName(f.f.properties))+' · '+fmtValue(f.r?.value),p);p.addEventListener('click',()=>select(f));p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(f)}});
   }
+  if(markerPick?.value==='top'){
+   const top=polygons.filter(f=>f.r).sort((a,b)=>b.r.value-a.r.value).slice(0,8);
+   for(const f of top){
+    const ring=f.rings.slice().sort((a,b)=>b.length-a.length)[0];if(!ring?.length)continue;
+    const mean=ring.reduce((s,p)=>[s[0]+p[0]/ring.length,s[1]+p[1]/ring.length],[0,0]);
+    const [u,v]=ring.reduce((a,p)=>Math.hypot(p[0]-mean[0],p[1]-mean[1])<Math.hypot(a[0]-mean[0],a[1]-mean[1])?p:a,ring[0]);
+    const g=shape('g',{transform:'translate('+x(u)+' '+y(v)+')',role:'button',tabindex:0,'aria-label':'Региональный показатель: '+f.r.region+' '+fmtValue(f.r.value)});
+    shape('circle',{r:10,fill:'#173e52',stroke:'#fff','stroke-width':1.5},undefined,g);
+    shape('path',{d:'M-6 5 V-1 L-2 1 V-4 L2 -1 V-6 H5 V5 Z',fill:'#fff'},undefined,g);
+    shape('title',{},'Региональная статистика, не предприятие: '+f.r.region+' · '+fmtValue(f.r.value),g);
+    g.addEventListener('click',()=>select(f));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(f)}});
+   }
+  }
   const bins=thresholds.length===1?[[thresholds[0],thresholds[0]]]:thresholds.slice(1).map((v,i)=>[thresholds[i],v]);
-  bins.forEach(([lo,hi],i)=>{const xx=30+i*220;shape('rect',{x:xx,y:590,width:24,height:16,fill:colors[i]});chartFitLabel(txt(xx+30,603,fmtValue(lo)+' – '+fmtValue(hi),12),185)});
-  shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
+  const labels=growth?['< 95%','95–<100%','100%','>100–105%','>105%']:bins.map(([lo,hi])=>fmtValue(lo)+' – '+fmtValue(hi));
+  labels.forEach((label,i)=>{const xx=30+i*220;shape('rect',{x:xx,y:590,width:24,height:16,fill:palette[i]});chartFitLabel(txt(xx+30,603,label,12),185)});
+  shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,growth?'Серый: нет данных; 100% = уровень предыдущего года.':'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
   txt(30,648,'Границы: Natural Earth (public domain), PiSpace Maps · источник статистики: '+series.code,12);
   txt(30,665,'Версия: '+(version||'не определена')+' · SHA-256 геометрии: '+String(meta.sha256||'—').slice(0,16)+'…',11);
   const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap);
@@ -82,7 +111,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const table=node('table',''),hrow=table.createTHead().insertRow(),body=table.createTBody();for(const v of ['Код','Название геометрии','Территория статистики','Значение'])hrow.append(node('th',v));
   for(const f of features){const tr=body.insertRow();for(const v of [f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,fmtValue(f.r?.value)])tr.insertCell().textContent=v||'—'}
   audit.append(table,node('p','Наблюдения без контура: '+(unmapped.map(([,r])=>r.region).join('; ')||'нет')));host.append(audit);
-  csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Геометрия','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(fields)
+  csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Геометрия','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(activeFields)
  }
  async function choose(){
   const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
@@ -94,8 +123,15 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   meta=await load('regional-boundaries.json');
   if(!['ok','cached'].includes(meta.status)){status.textContent='Файл границ пока недоступен; используйте тепловые карты и территориальные таблицы.';source.append(link('Документация источника',meta.documentation),node('p',meta.error||''));return}
   [geo,catalog]=await Promise.all([load('regional-boundaries.geojson'),load('historical.json').then(x=>x.series.filter(s=>s.regions>=3))]);
-  for(const s of catalog)pick.add(new Option(s.title+' · '+s.unit+' · '+s.kind,s.code));
-  const def=catalog.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code;
-  restore(['geo-series']);pick.onchange=choose;year.onchange=draw;form.onsubmit=e=>e.preventDefault();choose()
+  function populate(preferred){
+   const subset=catalog.filter(s=>!themePick||themePick.value==='all'||RegionalMap.theme(s.code)===themePick.value);
+   pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.kind,s.code)));
+   if(subset.some(s=>s.code===preferred))pick.value=preferred;
+   else {const def=subset.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code}
+   if(!subset.length){status.textContent='В этом слое нет загруженных рядов.';host.replaceChildren();details.replaceChildren();csvButton.disabled=true;return false}
+   return true
+  }
+  if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code);restore(['geo-theme','geo-scale','geo-markers']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
+  populate(saved.get('geo-series'));restore(['geo-series']);pick.onchange=choose;year.onchange=draw;if(growthPick)growthPick.onchange=draw;if(markerPick)markerPick.onchange=draw;form.onsubmit=e=>e.preventDefault();choose()
  }catch(e){console.error(e);status.textContent='Географические данные недоступны для этой версии. Откройте текущую сборку или используйте таблицы.'}
 });

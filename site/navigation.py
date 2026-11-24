@@ -19,6 +19,7 @@ GROUPS=(
   ("labor.html","Труд и производительность","Отраслевые агрегаты, регионы и подготовка коэффициентов."),
   ("national.html","Российские данные","Официальные денежные и макроэкономические ряды."),
   ("indicators.html","Годовые показатели","Динамика с 1991 года по доступным наблюдениям."),
+  ("economic-map.html","Экономическая карта России","Интерактивные слои: ВРП, промышленность, инвестиции, труд, бюджеты и население."),
   ("historical.html","Регионы и история","Региональные ряды, бюджеты и территориальные сравнения."),
   ("industrial.html","Промышленная статистика","Физические объёмы и индексы производства."),
  )),
@@ -35,7 +36,7 @@ GROUPS=(
   ("historical.html#hist-rank","Территориальные сравнения","Сопоставление значений по территориям за один год."),
   ("historical.html#regional-comparison","Сопоставление региональных показателей","Два ряда по общей территории и базовому году."),
   ("historical.html#regional-disparities","Межрегиональные диспропорции","Разброс, Джини территорий и корреляции."),
-  ("historical.html#regional-map","Географическая карта","Сопоставление статистики и справочных границ."),
+  ("economic-map.html","Экономическая карта России","Сопоставление региональной статистики и справочных границ."),
   ("industrial.html#energy-output","Энергетические ресурсы","Натуральный выпуск, динамика по продуктам и источники."),
   ("industrial.html#electricity-balance","Баланс электроэнергии","Годовая выработка, чистый импорт, спрос и условный сценарий."),
   ("industrial.html#fossil-production","Добыча ископаемого топлива","Уголь, нефть, газ: энергосодержание и структура добычи."),
@@ -83,12 +84,16 @@ def current_group(page):
     return next((g for g in GROUPS if any(href==page for href,_,_ in g[3])),None)
 def primary(page):
     group=current_group(page)
-    return a("index.html","Главная",page=="index.html")+''.join(a(g[0]+".html",g[1],g==group) for g in GROUPS)
+    return a("index.html","Главная",page=="index.html")+a("economic-map.html","Карта России",page=="economic-map.html")+''.join(a(g[0]+".html",g[1],g==group and page!="economic-map.html") for g in GROUPS)
 def secondary(page):
     g=current_group(page)
     if not g:return ""
     key,label,_,items=g
-    return '<nav class="section-nav" aria-label="Раздел '+escape(label,quote=True)+'"><span>Раздел: '+a(key+".html",label,page==key+".html")+'</span><div>'+''.join(a(href,title,href==page) for href,title,_ in items)+'</div></nav>'
+    quick=[item for i,item in enumerate(items) if i<3 or item[0]==page]
+    rest=[item for item in items if item not in quick]
+    links=lambda seq:''.join(a(href,title,href==page) for href,title,_ in seq)
+    more='<details class="section-more"><summary>Все инструменты раздела ('+str(len(items))+')</summary><div>'+links(rest)+'</div></details>' if rest else ''
+    return '<nav class="section-nav" aria-label="Раздел '+escape(label,quote=True)+'"><span>Раздел: '+a(key+".html",label,page==key+".html")+'</span><div>'+links(quick)+'</div>'+more+'</nav>'
 def cards():
     return '<section class="section-directory" aria-label="Разделы портала"><h2>Выберите направление работы</h2><div class="portal-grid">'+''.join('<article><h3>'+a(g[0]+".html",g[1])+'</h3><p>'+escape(g[2])+'</p><p class="portal-quick">'+ ' · '.join(a(h,t) for h,t,_ in g[3][:2])+'</p></article>' for g in GROUPS)+'</div></section>'
 def publish(page):

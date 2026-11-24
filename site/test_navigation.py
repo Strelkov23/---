@@ -11,6 +11,9 @@ class NavTests(unittest.TestCase):
             self.assertIn(h,destinations)
         self.assertIn('aria-current="page">Статистика',n.primary("historical.html"))
         self.assertIn('aria-current="page">Регионы и история',n.secondary("historical.html"))
+        self.assertIn('aria-current="page">Карта России',n.primary("economic-map.html"))
+        self.assertIn("section-more",n.secondary("scenario.html"))
+        self.assertIn('aria-current="page">Многовариантные сценарии',n.secondary("scenario.html"))
         self.assertIn("Отрасли",n.secondary("sector-1.html"))
         self.assertIn("Статистика",n.secondary("indicator-TEST.html"))
     def test_hubs(self):

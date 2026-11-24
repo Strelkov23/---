@@ -144,3 +144,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #cost-table table,#cost-detail table{min-width:760px}#cost-chart svg{display:block;width:100%;height:auto;max-width:900px}#cost-status,#cost-result{overflow-wrap:anywhere}#cost-trend table{table-layout:fixed}#cost-trend td,#cost-trend th{min-width:0;overflow-wrap:anywhere}
 
 #fbs-table table{min-width:620px}#fbs-status,#fbs-check,#fbs-result{overflow-wrap:anywhere}
+
+.section-more{margin-top:.55rem}.section-more summary{cursor:pointer;padding:.5rem 0;color:#365d59;font-size:.9rem}.section-more>div{display:flex;flex-wrap:wrap;gap:.35rem}.section-more a{padding:.4rem .65rem;min-height:40px;display:inline-flex;align-items:center;background:#f2f6f5;border-radius:.35rem;text-decoration:none;font-size:.9rem}.map-note{font-size:.95rem;color:#405b61;overflow-wrap:anywhere}#geo-map g[role=button]{cursor:pointer}#geo-map g[role=button]:focus circle{stroke:#e3a14d;stroke-width:3px}

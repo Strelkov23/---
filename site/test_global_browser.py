@@ -184,6 +184,16 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
+        page.goto("http://localhost:8765/economic-map.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#geo-status').textContent.startsWith('Загрузка')")
+        if page.locator("#geo-series option").count():
+            page.locator("#geo-theme").select_option("industry")
+            page.wait_for_function("document.querySelector('#geo-status').textContent.startsWith('Год:')")
+            assert page.locator("#geo-map svg").count()==1
+            page.locator("#geo-scale").select_option("growth")
+            page.locator("#geo-markers").select_option("top")
+            assert page.locator("#geo-map g[role=button]").count()>0
+            assert page.locator("#geo-map g[role=button]").count()<=8
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
         methods=json.loads(Path("method-passports.json").read_text())
         assert len(methods)>=33
