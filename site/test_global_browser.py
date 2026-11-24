@@ -243,6 +243,16 @@ with sync_playwright() as p:
         assert "<svg" in html and "<script" not in html and "SHA-256" in html
         page.locator("#report-end").fill("2023")
         assert page.locator("#report-json").is_disabled()
+        page.goto("http://localhost:8765/finance.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#finance-status').textContent.includes('Видов деятельности')")
+        assert page.locator("#finance-table tbody tr").count()==61
+        assert page.locator("#finance-chart svg").count()==1
+        assert "Проверка списка файлов ФНС" in page.locator("#finance-source-check").inner_text()
+        page.locator("#finance-query").fill("Добыча угля")
+        assert page.locator("#finance-table tbody tr").count()==1
+        assert "Отр" in page.locator("#finance-table tbody tr").inner_text()
+        page.locator("#finance-year").select_option("2024")
+        assert "4,8" in page.locator("#finance-table tbody tr").inner_text()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

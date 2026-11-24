@@ -134,3 +134,7 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #report-selection>div{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.6rem 0}#report-preview{overflow-wrap:anywhere}#report-preview p{white-space:pre-wrap}#report-preview svg{width:100%;max-width:900px;height:auto}#report-preview table{min-width:340px}#report-note{width:100%;max-width:100%;min-width:0}@media print{body:has(#report-preview) .site-header,body:has(#report-preview) .section-nav,body:has(#report-preview) .mast,body:has(#report-preview) .report-controls,body:has(#report-preview) #snapshot-notice{display:none!important}#report-preview{display:block}#report-preview .table-scroll{overflow:visible}#report-preview tr{break-inside:avoid}#report-preview h2,#report-preview h3{break-after:avoid}}
 
 #report-coverage table,#report-preview .report-series table{min-width:620px}
+
+#finance-table table{min-width:760px}#finance-chart{min-width:0;overflow-wrap:anywhere}#finance-chart table{table-layout:fixed}#finance-chart td,#finance-chart th{min-width:0;overflow-wrap:anywhere}
+
+#finance-chart svg{display:block;width:100%;height:auto;max-width:800px}#finance-source-check,#finance-source-files{overflow-wrap:anywhere}

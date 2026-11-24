@@ -55,6 +55,12 @@ def make(out):
             for field,label,unit in metrics:
                 vals=[x for x in items if x.get(field) is not None];first,last=bounds(x["year"] for x in vals)
                 add(group,code+"."+field,items[0]["title"]+" — "+label,unit,"годовая","Россия",len(vals),first,last,capital["source"],None,None,"Ручная текстовая транскрипция "+capital["transcribed"]+"; визуальная сверка не подтверждена","manual","capital.html","fixed-assets.csv" if group=="capital" else "capacity-utilization.csv",items[0].get("coverage",""),"ОКВЭД2" if group=="capital" else "Продукты, наименования источника")
+    fin=load(out,"finance-data.json")
+    grouped=defaultdict(list)
+    for r in fin["rows"]:grouped[(r["code"],r["metric"])].append(r)
+    for (code,metric),items in grouped.items():
+        vals=[r for r in items if r["value"] is not None];first,last=bounds(r["year"] for r in vals)
+        add("finance",code+"."+metric,items[0]["title"]+" — "+fin["metrics"][metric]["title"],"%","годовая","Россия",len(vals),first,last,fin["source"],None,None,fin["status"],"manual","finance.html","finance-data.json","Отрицательные значения без величины исключены из числового ряда, сохранены в исходном наборе; "+items[0]["level"],"ОКВЭД2; локальный идентификатор")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])
