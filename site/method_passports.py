@@ -61,6 +61,11 @@ def describe(r):
         if g=="capital":definition,formula,caution=CAPITAL[c.rsplit(".",1)[1]]
         else:definition="Использование среднегодовой производственной мощности, без субъектов малого предпринимательства.";formula="100 × фактический выпуск / среднегодовая мощность; готовый показатель таблицы 16.5.";caution="Незагруженная доля 100−U не равна резерву к выпуску (100/U−1)×100. Резерв условный; не коэффициент баланса 2021."
         level="explained";anchor="methodology.html#capital-data-method"
+    elif g=="finance":
+        from finance_data import METRICS
+        definition,formula,caution=METRICS[c.rsplit(".",1)[1]]
+        caution+=" Ориентиры ФНС, охват уточнить; группы пересекаются, отрицательная величина без числа не заменяется нулём."
+        level="explained";anchor="methodology.html#finance-method"
     elif g=="forecast":
         kind="Расчётная экстраполяция, не факт";level="calculated"
         definition="Прогноз от последнего наблюдения; отдельный выбор метода для каждого горизонта."

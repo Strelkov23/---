@@ -14,6 +14,7 @@ const DataRegistry=(()=>{
   else if(r.group==='regional')result=d.values.map(v=>row(v.year,v.value,r.source,v.region,v.seen,[v.note,v.sheet?'Лист '+v.sheet:'',v.row?'Строка '+v.row:'',v.column?'Столбец '+v.column:''].filter(Boolean).join('; ')));
   else if(r.group==='industry'){const s=d.series.find(x=>x.id===r.code);if(!s)throw Error('Промышленный ряд не найден');result=s.values.map(v=>row(v.period,v.value,s.source,r.territory,v.seen,[v.note,s.sheet?'Лист '+s.sheet:'',v.row?'Строка '+v.row:'',v.column?'Столбец '+v.column:''].filter(Boolean).join('; ')))}
   else if(['capital','capacity'].includes(r.group)){const field=r.code.slice(r.code.lastIndexOf('.')+1),code=r.code.slice(0,r.code.lastIndexOf('.'));result=d[r.group==='capital'?'assets':'capacity'].filter(v=>v.code===code).map(v=>row(v.year,v[field],v.source,r.territory,null,[v.tables||v.table,v.pages||v.page,v.coverage,v.note].filter(Boolean).join('; ')))}
+  else if(r.group==='finance'){const pos=r.code.lastIndexOf('.'),code=r.code.slice(0,pos),metric=r.code.slice(pos+1);result=d.rows.filter(v=>v.code===code&&v.metric===metric).map(v=>row(v.year,v.value,v.replica,r.territory,null,'ФНС; '+v.sign+'; '+v.level))}
   else if(r.group==='forecast'){const s=d.series.find(x=>x.code===r.code);if(!s)throw Error('Прогнозный ряд не найден');result=s.results.map(v=>row(v.target,v.point,s.source,r.territory,null,'Последний факт: '+s.last+'; горизонт: '+v.horizon+'; метод: '+v.selected+'; границы описательные',v.low,v.high))}
   else throw Error('Неизвестный тип ряда');
   result=result.filter(v=>typeof v.value==='number'&&Number.isFinite(v.value));
@@ -25,7 +26,7 @@ const DataRegistry=(()=>{
 if(typeof module!=='undefined')module.exports=DataRegistry;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);if(!$('registry-form'))return;
- const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',forecast:'Прогнозные расчёты'};
+ const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',finance:'Финансы организаций',forecast:'Прогнозные расчёты'};
  const modes={auto:'Автоматический сборщик',manual:'Ручной снимок',derived:'Расчётный ряд'};
  const key='economic-registry-selection-v1';let saved=new Set(),storage=true;
  try{const v=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(v))saved=new Set(v.filter(x=>typeof x==='string'))}catch(e){storage=false}

@@ -1,0 +1,14 @@
+document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id);if(!$('finance-year'))return;
+ const fmt=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:2}):'—';
+ const show=r=>r?.sign==='negative_unspecified'?'Отр (величина не указана)':fmt(r?.value);
+ const table=(host,headers,rows)=>{const t=document.createElement('table'),h=t.createTHead().insertRow(),b=t.createTBody();for(const v of headers){const th=document.createElement('th');th.scope='col';th.textContent=v;h.append(th)}for(const row of rows){const tr=b.insertRow();for(const v of row)tr.insertCell().textContent=String(v)}host.replaceChildren(t)};
+ try{
+  const d=await load('finance-data.json'),rows=d.rows,lookup=new Map(rows.map(x=>[x.code+'|'+x.year+'|'+x.metric,x])),groups=rows.filter(x=>x.year===2025&&x.metric==='sales'),at=(code,y,metric)=>lookup.get(code+'|'+y+'|'+metric);
+  for(const r of groups)$('finance-trend').add(new Option(r.title,r.code));
+  const change=(a,b)=>Number.isFinite(a?.value)&&Number.isFinite(b?.value)?fmt(a.value-b.value):'—';
+  function draw(){const y=Number($('finance-year').value),level=$('finance-level').value,q=$('finance-query').value.toLowerCase().trim(),shown=groups.filter(r=>(!level||r.level===level)&&(r.title.toLowerCase()+' '+r.code).includes(q));$('finance-status').textContent='Видов деятельности и итогов: '+shown.length+' · '+y+' · ручной снимок.';table($('finance-table'),['Вид деятельности','Уровень','Продажи к затратам, %','Активы, %','Изменение продаж к прошлому году, п.п.','Изменение активов, п.п.'],shown.map(r=>[r.title,{total:'Итого',section:'Раздел',detail:'Детализация'}[r.level],show(at(r.code,y,'sales')),show(at(r.code,y,'assets')),change(at(r.code,y,'sales'),at(r.code,y-1,'sales')),change(at(r.code,y,'assets'),at(r.code,y-1,'assets'))]))}
+  function trend(){const code=$('finance-trend').value,r=groups.find(x=>x.code===code),years=[2023,2024,2025],host=$('finance-chart');table(host,['Год','Рентабельность продаж к затратам, %','Рентабельность активов, %'],years.map(y=>[y,show(at(code,y,'sales')),show(at(code,y,'assets'))]));const series=['sales','assets'].map(k=>({name:d.metrics[k].title,code:k,values:years.map(y=>at(code,y,k)?.value??null)}));if(series.some(s=>s.values.some(Number.isFinite)))chartTools(host,r.title+' — рентабельность','%',years,series,{source:'ФНС, приложение 4; текстовая транскрипция, отр — величина неизвестна',url:d.source});const p=document.createElement('p');p.textContent='Документальные копии по годам: ';for(const y of years){const a=document.createElement('a');a.href=d.replicas[y];a.textContent=String(y);p.append(a,' · ')}host.append(p)}
+  for(const id of ['finance-year','finance-level','finance-query'])$(id).addEventListener('input',draw);$('finance-trend').addEventListener('change',trend);draw();trend();
+ }catch(e){console.error(e);$('finance-status').textContent='Набор недоступен.'}
+});
