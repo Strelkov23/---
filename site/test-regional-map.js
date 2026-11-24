@@ -127,3 +127,15 @@ const reg=[{code:'MFG_total_099b62c9d9'},{code:'MFG_chemical_099b62c9d9'},{code:
 assert.deepEqual(P.relatedRegional('chemical',reg).map(r=>r.code),['MFG_chemical_099b62c9d9']);
 assert.deepEqual(P.relatedRegional('pharma',reg).map(r=>r.code),['MFG_chemical_099b62c9d9']);
 assert.deepEqual(P.relatedRegional('food',reg).map(r=>r.code),['MFG_food_099b62c9d9']);
+
+const cap={assets:[{code:'C',year:2024},{code:'D',year:2024},{code:'A',year:2023}],capacity:[{code:'acid',year:2024},{code:'refining',year:2024},{code:'tires',year:2024},{code:'cotton',year:2024},{code:'coal',year:2024},{code:'acid',year:2023}]};
+assert.deepEqual(P.capitalRows('chemical',cap,2024).products.map(r=>r.code),['acid']);
+assert.deepEqual(P.capitalRows('chemical',cap,2024).assets,[]);
+assert.deepEqual(P.capitalRows('manufacturing',cap,2024).assets.map(r=>r.code),['C']);
+assert.deepEqual(P.capitalRows('manufacturing',cap,2024).products.map(r=>r.code),['acid','refining','tires','cotton']);
+assert.deepEqual(P.capitalRows('mining',cap,2024).products.map(r=>r.code),['coal']);
+assert.deepEqual(P.capitalRows('materials',cap,2024).products.map(r=>r.code),['tires']);
+assert.deepEqual(P.capitalRows('light',cap,2024).products.map(r=>r.code),['cotton']);
+assert.deepEqual(P.capitalRows('pharma',cap,2024),{assets:[],products:[]});
+assert.deepEqual(P.capitalRows('energy',cap,2024).assets.map(r=>r.code),['D']);
+assert.deepEqual(P.capitalRows('chemical',cap,2023).products.map(r=>r.year),[2023]);
