@@ -208,6 +208,15 @@ def check(out,previous,stamp):
         if not data["regional-manufacturing.json"]["rows"]:warnings.append("Специализация обрабатывающей промышленности: нет импортированных данных")
         if data["regional-manufacturing.json"]["status"].startswith("Ошибка"):warnings.append("Специализация обрабатывающей промышленности: "+data["regional-manufacturing.json"]["status"])
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Специализация обрабатывающей промышленности: "+str(e))
+    try:
+        import regional_industry_extra as rx
+        old_file=previous/"regional-mining-energy.json"
+        old=json.loads(old_file.read_text(encoding="utf-8")) if old_file.is_file() else None
+        counts.update(rx.quality(data["regional-mining-energy.json"],old))
+        rx.verify_csv(out/"regional-mining-energy.csv",data["regional-mining-energy.json"])
+        if not data["regional-mining-energy.json"]["rows"]:warnings.append("Добыча и энергетика: нет импортированных данных")
+        if data["regional-mining-energy.json"]["status"].startswith("Ошибка"):warnings.append("Добыча и энергетика: "+data["regional-mining-energy.json"]["status"])
+    except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Добыча и энергетика: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
