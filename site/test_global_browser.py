@@ -156,6 +156,11 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#registry-export-selected").click()
         assert d.value.suggested_filename=="data-registry-selection.csv"
+        with page.expect_download() as d:
+            page.locator("#registry-values").click()
+        assert d.value.suggested_filename=="data-registry-observations.csv"
+        content=d.value.path().read_text(encoding="utf-8-sig")
+        assert "wear_pct" in content and "2024" in content and "Наблюдение" in content
         page.locator("#registry-clear").click()
         assert page.locator("#registry-list article").count()==0
         assert not errors,errors
