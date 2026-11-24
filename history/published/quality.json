@@ -1,8 +1,10 @@
 {
-  "built": "2026-11-24T20:07:32+00:00",
+  "built": "2026-11-24T20:24:21+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
+    "Площадки WRI: архив 2021 года, текущий статус работы не подтверждён",
+    "Площадки WRI: нет наблюдаемой годовой выработки в импортированных полях",
     "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
@@ -16,6 +18,8 @@
     "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
+    "Правовой портал 2026-11-24",
+    "Правовой портал 2026-11-23",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -31,7 +35,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7802,
+    "archive": 7805,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -45,6 +49,8 @@
     "historical_observations": 55214,
     "official_files": 565,
     "geographic_features": 86,
+    "geographic_unique_codes": 83,
+    "geographic_unmatched_contours": 3,
     "industrial_series": 2209,
     "industrial_observations": 33806,
     "sector_passports": 14,
@@ -59,16 +65,19 @@
     "electricity_complete_years": 26,
     "electricity_discrepancies": 0,
     "fuel_complete_years": 34,
+    "facility_records": 545,
+    "facility_capacity_records": 545,
+    "facility_reported_generation_records": 0,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "2df8fb11c236486ea7d90cef3194520e48f5242857d484d4c8c1a3858a6a77d9",
-      "bytes": 3771319
+      "sha256": "fe43ff1f48d63ed9e17c056d9107dc79ce1712269f851e6f05f0ad53b7ab0007",
+      "bytes": 3772407
     },
     "literature.json": {
-      "sha256": "fc123829bb279ef967b858a73432adac883f12450cc301dc9df6e4efe5f2ce66",
-      "bytes": 4927374
+      "sha256": "6840abe1fa6c47fa923472e09717ce03f7f968be61eb07b3c3053da7b010b762",
+      "bytes": 4941050
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -83,11 +92,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "e324b3c6b5a23f784ceab0afa381b6d393029b9015f83e4f651ac8624905854f",
+      "sha256": "5fee381b4e9358499e4ec87feb5e949218f9a60d8481a379e17a890456ec23bd",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "7a971cddaa6bef44095b5cd3b93cc7f05bf2d9d464bb8c53c7fce20989f71bb2",
+      "sha256": "f6b76d641dfa782bfde432766462f14cef2267e329dcd6eed84c81206e2fff46",
       "bytes": 55538
     },
     "sectors.json": {
@@ -95,27 +104,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "545b663ac6b6f6e8de320407c051fb7b91dc9e8e632c7ab9ce173cf52c9bdf5a",
-      "bytes": 36366
+      "sha256": "dcbf01521782d7e325f0e16c04842d47ae2e1d53decdcf9f94b87b2c9bb76ed2",
+      "bytes": 36470
     },
     "links.json": {
-      "sha256": "7456beffbc1158b14743454e7a24f95548c4b8ee3fd93ddd424313870b8c2728",
-      "bytes": 1485526
+      "sha256": "7117f3cfc9b001dee503f311508ebafbdaec6c4920d49d1d1904edcbd1c43395",
+      "bytes": 1486954
     },
     "national.json": {
-      "sha256": "0d9034dd84a0be7cddc13048fe04974232454babd5607a3bb47f5b0bc6b6b8ce",
+      "sha256": "1c8d254436104d1d1410eabb8bad4fa866644df4dbc0a16c60422dee91e4f12b",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "c25e95a4499347be20873fa7e6d7a9dfe4c0b783aebf94224d94e6fdb484e39a",
+      "sha256": "478318793cb404f61516177ec4335077c071d5ee26bf270961907b36f0477485",
       "bytes": 95441
     },
     "industrial.json": {
-      "sha256": "5667d6415851e1efec48eaeb2b8598ec61392d379654c1c767bcc56effff54c9",
+      "sha256": "f1cc50d06337e66a643c683cd181126cbd77c1ac77e9a57ae7dcc9416f512b6f",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "1e61e574a742bcfb2349b89bc481b78a12659a080b28105ea50c0019eb30b44a",
+      "sha256": "0534a027415890eff7bea9aa0230e77fc679df7c913e22fd0b20f91324cdff55",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -129,6 +138,10 @@
     "electricity-balance.json": {
       "sha256": "fb3b453436428213f4ca713b7db9d021c6fe6068dd4b40596490f211583695a7",
       "bytes": 8491
+    },
+    "facility-energy.json": {
+      "sha256": "6532f212a1a4c071e8272c8081a7abca03b883624bc84c95a9d618639996bea5",
+      "bytes": 169833
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
