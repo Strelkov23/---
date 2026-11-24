@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'), C=require('./park-certificates.js');
+const r={name:'Парк Ёлка',number:'56',region:'Московская область',start:'2022-04-01',end:'2027-03-31'};
+assert.equal(C.calendar(r,'2022-03-31'),'future');
+assert.equal(C.calendar(r,'2022-04-01'),'within');
+assert.equal(C.calendar(r,'2027-03-31'),'within');
+assert.equal(C.calendar(r,'2027-04-01'),'expired');
+assert.equal(C.filter([r],'2026-11-25','','within','елка').length,1);
+assert.equal(C.filter([r],'2026-11-25','','within','56').length,1);
+assert.equal(C.filter([r],'2026-11-25','Москва','','').length,0);
+assert.equal(C.filter([r],'2026-11-25','','expired','').length,0);
+console.log('Certificate dates and filters OK');
