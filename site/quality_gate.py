@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -78,6 +78,17 @@ def check(out,previous,stamp):
             hashes[s["file"]]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
         except (OSError,ValueError,KeyError) as e:issues.append("Исторический ряд "+s["code"]+": "+str(e))
     if not hist["series"]:warnings.append("Региональные ряды пока не загружены")
+    geo=data["regional-boundaries.json"]
+    if geo.get("status") in ("ok","cached"):
+        try:
+            import regional_geo
+            raw=(out/"regional-boundaries.geojson").read_bytes()
+            count=regional_geo.validate(raw)
+            if count!=geo.get("features") or hashlib.sha256(raw).hexdigest()!=geo.get("sha256"):raise ValueError("Контрольная сумма или число границ не совпадает")
+            counts["geographic_features"]=count
+            hashes["regional-boundaries.geojson"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
+        except (OSError,ValueError,KeyError,TypeError) as e:issues.append("География: "+str(e))
+    else:warnings.append("Географические границы недоступны: "+str(geo.get("error","нет файла")))
     ind=data["industrial.json"]
     counts["industrial_series"]=len(ind["series"])
     counts["industrial_observations"]=sum(len(s["values"]) for s in ind["series"])
