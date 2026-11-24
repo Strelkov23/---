@@ -1,21 +1,18 @@
 {
-  "built": "2026-11-24T14:51:37+00:00",
+  "built": "2026-11-24T15:29:11+00:00",
   "errors": [],
   "warnings": [
-    "Географические границы недоступны: Нет названия территории",
-    "Вопросы экономики · HTTP Error 400: Bad Request",
-    "Журнал Новой экономической ассоциации · HTTP Error 400: Bad Request",
-    "Экономический журнал ВШЭ · HTTP Error 400: Bad Request",
-    "Экономика региона · HTTP Error 400: Bad Request",
-    "Вопросы инновационной экономики · HTTP Error 400: Bad Request",
-    "Вопросы теоретической экономики · HTTP Error 400: Bad Request",
-    "Информатизация в цифровой экономике · HTTP Error 400: Bad Request",
-    "Экономика сельскохозяйственных и перерабатывающих предприятий · HTTP Error 400: Bad Request",
-    "Экономика высокотехнологичных производств · HTTP Error 400: Bad Request",
-    "Экономическая политика · HTTP Error 400: Bad Request",
-    "Проблемы прогнозирования · HTTP Error 400: Bad Request",
-    "Пространственная экономика · HTTP Error 400: Bad Request",
-    "Пространственная и региональная экономика · HTTP Error 400: Bad Request",
+    "https://www.kommersant.ru/rss/section-economics.xml",
+    "Вопросы экономики · HTTP Error 429: Too Many Requests",
+    "Экономический журнал ВШЭ · HTTP Error 429: Too Many Requests",
+    "Экономика региона · HTTP Error 429: Too Many Requests",
+    "Вопросы теоретической экономики · HTTP Error 429: Too Many Requests",
+    "Экономика сельскохозяйственных и перерабатывающих предприятий · HTTP Error 429: Too Many Requests",
+    "Экономика высокотехнологичных производств · HTTP Error 429: Too Many Requests",
+    "Экономическая политика · HTTP Error 429: Too Many Requests",
+    "Проблемы прогнозирования · HTTP Error 429: Too Many Requests",
+    "Пространственная экономика · HTTP Error 429: Too Many Requests",
+    "Пространственная и региональная экономика · HTTP Error 429: Too Many Requests",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -31,7 +28,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7567,
+    "archive": 7590,
     "papers": 8166,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -44,6 +41,7 @@
     "historical_series": 32,
     "historical_observations": 55214,
     "official_files": 445,
+    "geographic_features": 86,
     "industrial_series": 2209,
     "industrial_observations": 33806,
     "sector_passports": 14,
@@ -52,12 +50,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "6c2ec364c6b093c1b62ea3caea28d65a16f265c2f874326ab3d3e1c75808e6bf",
-      "bytes": 3673849
+      "sha256": "fa31dec1746113b2a9d0c03c161f46bc427f34572fae372b45a20b56b28de81b",
+      "bytes": 3681646
     },
     "literature.json": {
-      "sha256": "d059b9e69fd9b67f5ca4420d3e7041bb6f93a0bf36ef7b729516369b497b01a9",
-      "bytes": 3482881
+      "sha256": "159351d142362de9719c3b4399c90f6fa7d30891b3c8644fb2e93da4d9e9d044",
+      "bytes": 3558459
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -72,11 +70,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "f8a2ef9c03b45f6d732ff8e208ec23dc0190611085a6287b5b407ee15f4dc968",
+      "sha256": "b8984485b6d851fea15c7f29a435d8798187ee24dd0b77b1a44359d0a6fa2e9e",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "feee54c7422b271a18924091ab1e0362b14e3a6e5078b65b0b2938196b196b0f",
+      "sha256": "6a22447306255a3d5608b81b690772b458dd2dcdbaf53f085733273adf93ab26",
       "bytes": 55538
     },
     "sectors.json": {
@@ -84,32 +82,32 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "a13052b90c7355ed0c94186e0c9798623b74c6685d9f556eddef4ff70e4ccd1f",
-      "bytes": 35846
+      "sha256": "39658d29b2f06509bb754c1e21a83f827271d48b3479b0be4b73fc0c8755089a",
+      "bytes": 35717
     },
     "links.json": {
-      "sha256": "d029aaedd29fdaf2aeb6a85947e932825fc6f57259559d131c58e303e6014818",
-      "bytes": 1402435
+      "sha256": "cf81fb665cbf29c8cef3c3a0db62d7ba8be2de821ec0fff5a3cfe16f6aee30fb",
+      "bytes": 1407383
     },
     "national.json": {
-      "sha256": "61eeef04bb7f370165ea12da4864a61722f5fcccd58a72a030ba3699cdfa6ada",
+      "sha256": "3a7e0e078f26442a667c9fa231f45cb4f23f9d9f357a8d7c28d94ed11e0e950c",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "5372ddf10ac6df7414b5762c7bc4c3f97b6a54f6c2665cb5a14697fb3f2dc029",
+      "sha256": "9023c404871e98d60f8cb7b8b52806f0c89281ea5e67d16c3a53a92cd0296380",
       "bytes": 79758
     },
     "industrial.json": {
-      "sha256": "282514d625670c99f5ee09824698bd94adbf3cedfe82c6f527a2be721c7d3a54",
+      "sha256": "cc42f6e307b0fd18bda0cd085b0814bcd7eb30dac010fd0e893c18464a582b55",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "cc9685f020d0c248887b75c367fafa930e787a7fd0559ff29ba6b86d94cc0edc",
+      "sha256": "4cb7075f6196d9f0a3dce3dc2709b14987821770764cc476a0b29f8b59f49512",
       "bytes": 116117
     },
     "regional-boundaries.json": {
-      "sha256": "e1df94af96f2822bc45954f7d452b9621bd09b235cbeebdc6c1c2fadc2683638",
-      "bytes": 357
+      "sha256": "dd99d21f8c53eff5545d2b43235e62374f0be26f2aa0a7f8a2d28c545c63a5c3",
+      "bytes": 432
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
@@ -238,6 +236,10 @@
     "regional-data/R_f54f02504bfb051e_84c74d6e51.json": {
       "sha256": "cf7463f9cb493c368343dc10f3a5bd8360fa4b67727416cc6529567f1205b0fb",
       "bytes": 1459610
+    },
+    "regional-boundaries.geojson": {
+      "sha256": "b1c32477d1aa7973e449e9fead6f73565b870acfaa4b856b6764be8ced33436f",
+      "bytes": 3001035
     }
   }
 }
