@@ -117,3 +117,13 @@ assert.equal(M.deriveProfile(profile.map((x,i)=>i===1?{...x,r:{...x.r,region:'М
 assert.equal(M.deriveProfile(profile.map((x,i)=>i===2?{...x,r:{...x.r,value:0}}:x))[1].value,null);
 assert.equal(M.deriveProfile(profile.map((x,i)=>i===3?{...x,unit:'млрд руб.'}:x))[2].value,null);
 assert.equal(M.deriveProfile(profile.map((x,i)=>i===5?{...x,r:{...x.r,value:0}}:x))[3].value,-10);
+
+const P=require('./sector-passports.js');
+const product='Химия, фармацевтика, резиновые и пластмассовые изделия';
+assert.deepEqual(P.relatedBalance('chemical',{names:['Химия',product]}),[{name:product,i:1}]);
+assert.deepEqual(P.relatedBalance('pharma',{names:[product,product]}),[]);
+assert.deepEqual(P.relatedBalance('light',{names:['Пищевая промышленность']}),[]);
+const reg=[{code:'MFG_total_099b62c9d9'},{code:'MFG_chemical_099b62c9d9'},{code:'MFG_food_099b62c9d9'},{code:'legacy',title:'химическая промышленность'}];
+assert.deepEqual(P.relatedRegional('chemical',reg).map(r=>r.code),['MFG_chemical_099b62c9d9']);
+assert.deepEqual(P.relatedRegional('pharma',reg).map(r=>r.code),['MFG_chemical_099b62c9d9']);
+assert.deepEqual(P.relatedRegional('food',reg).map(r=>r.code),['MFG_food_099b62c9d9']);
