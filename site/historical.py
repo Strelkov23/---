@@ -440,7 +440,7 @@ def mirror_rows(raw,section,selected=False):
                     if selected and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
-                    note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
+                    note=val("note")+" · Подраздел источника: "+str(r.get("subsection",""))+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
                     result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
                     if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV: "+"; ".join(headers)[:350])
@@ -652,6 +652,19 @@ def publish(db,stamp,out,refresh):
                 accepted.append((*key,r["value"],stamp,url,json.dumps(r,ensure_ascii=False)))
         with db:db.executemany("insert or ignore into hist_values values(?,?,?,?,?,?,?,?)",accepted)
         return sum(1 for rr in grouped.values() if len(set(r["value"] for r in rr))==1)
+    # Separate canonical manufacturing groups from the exact source table. Original
+    # legacy IDs remain accessible; their ambiguous labels are corrected below.
+    import regional_manufacturing as rm
+    path=out/"regional-manufacturing.json"
+    if path.is_file():
+        detail=json.loads(path.read_text(encoding="utf-8"))
+        rm.quality(detail)
+        rows=[]
+        for r in detail["rows"]:
+            if r["value"] is None:continue
+            group=rm.LABELS[r["group"]]
+            rows.append(dict(indicator="MFG_"+r["group"],title="Отгрузка: "+group["title"]+" (ОКВЭД2 "+group["okved"]+")",region=r["region"],year=r["year"],value=r["value"],unit=rm.UNIT,sheet=r["sheet"],row=r["row"],column=None,note="Подраздел источника: "+r["subsection"]+" · Издание: "+r["edition"]+" · Версия: "+r["version"]+" · Уровень территории: "+r["level"]+" · ОКТМО: "+r["oktmo"]+" · ОКАТО: "+r["okato"]+" · Код показателя: "+rm.CODE+" · "+r["note"]))
+        if rows:store(rows,rm.SOURCE,"Отгрузка по отраслям","Росстат · обработка «Если быть точным», CC BY 4.0 · точные подразделы")
     # Stable published bulletin, kept as its own dated edition (also available offline).
     seed=list(regional_seed.rows())
     n=store(seed,regional_seed.SOURCE,regional_seed.TITLE,"Росстат · опубликованный бюллетень, текстовая транскрипция")
@@ -791,7 +804,8 @@ def publish(db,stamp,out,refresh):
         r=json.loads(row[0])
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         if (r["indicator"],r["source"]) in mixed_units:key+="_u"+hashlib.sha256(r["unit"].encode()).hexdigest()[:8]
-        group=series.setdefault(key,dict(title=r["title"],unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))
+        title=rm.legacy_title(r["indicator"],r["source"],r["title"])
+        group=series.setdefault(key,dict(title=title,unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))
         if group["unit"]!=r["unit"] or group["source"]!=r["source"]:raise ValueError("Несовместимые исторические ряды")
         group["values"].append({k:r[k] for k in ("region","year","value","sheet","row","column","note","seen")})
     # Split into independent data files to avoid giant initial download.
