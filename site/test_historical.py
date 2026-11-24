@@ -57,6 +57,16 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(len({(r["indicator"],r["region"],r["year"]) for r in rows}),52)
         self.assertEqual({r["unit"] for r in rows},{"млрд руб.","тыс. руб."})
         self.assertEqual({r["year"] for r in rows},{2023,2024})
+    def test_offline_publish(self):
+        import tempfile,sqlite3,json
+        with tempfile.TemporaryDirectory() as folder, sqlite3.connect(":memory:") as db:
+            out=Path(folder)
+            historical.publish(db,"2026-11-24T00:00:00+00:00",out,False)
+            catalog=json.loads((out/"historical.json").read_text())
+            self.assertEqual(sum(s["count"] for s in catalog["series"]),52)
+            self.assertEqual(len(catalog["series"]),2)
+            historical.publish(db,"2026-11-25T00:00:00+00:00",out,False)
+            self.assertEqual(db.execute("select count(*) from hist_values").fetchone()[0],52)
     def test_industry_bulletin(self):
         import industry
         body="Индекс промышленного производства составил: – в январе-июле 2026 г. по сравнению с январем-июлем 2025 г. – 100,1%; – в июле 2026 г. по сравнению с июлем 2025 г. – 100,4%, по сравнению с июнем 2026 г. – 101,4%. Индексы промышленного производства"
