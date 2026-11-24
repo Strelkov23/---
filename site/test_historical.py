@@ -157,6 +157,45 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(len(rows),3)
         self.assertEqual(rows[0]["year"],2024)
         self.assertEqual(rows[-1]["value"],-10)
+    def test_budget_strict_dates_units_and_duplicates(self):
+        def blob(header,duplicates=()):
+            b=openpyxl.Workbook();s=b.active
+            s.append([header]);s.append(["Наименование","Исполнено"])
+            s.append(["Доходы бюджета - всего",100])
+            for x in duplicates:s.append(["Доходы бюджета - всего",x])
+            s.append(["Расходы бюджета - всего",110])
+            s.append(["Результат исполнения бюджета",-10])
+            f=io.BytesIO();b.save(f);return f.getvalue()
+        base="Отчет об исполнении федерального бюджета 0503117 на "
+        self.assertEqual(len(historical.parse_budget(blob(base+"2025-01-01, рубли"),"0503117.xlsx")),3)
+        self.assertEqual(historical.parse_budget(blob(base+"01.02.2025, рубли"),"0503117_01.01.2025.xlsx"),[])
+        self.assertEqual(historical.parse_budget(blob(base+"01.01.2025, млн рублей"),"0503117.xlsx"),[])
+        self.assertEqual(historical.parse_budget(blob(base+"01.01.2025, миллионах рублей"),"0503117.xlsx"),[])
+        self.assertEqual(historical.parse_budget(blob(base+"01.01.2025, рубли",(120,100)),"0503117.xlsx"),[])
+        self.assertEqual(historical.parse_budget(blob(base+"01.01.2025 и 01.02.2025, рубли"),"0503117.xlsx"),[])
+    def test_emiss_catalogue_html_and_validation(self):
+        import emiss_archive
+        valid="https://storage.yandexcloud.net/example/61483.parquet"
+        def get(url,limit):
+            if "/api/" in url:raise ValueError("API unavailable")
+            return ('<a href="'+valid+'">Data</a><a href="https://evil.example/61483.parquet">Bad</a><a href="https://storage.yandexcloud.net/example/12345.parquet">Wrong code</a><a href="https://user@storage.yandexcloud.net/example/61483.parquet">Credentials</a>').encode(),"utf-8"
+        errors=[]
+        urls=emiss_archive.resource_candidates("61483",get,errors)
+        self.assertEqual(urls[0],valid)
+        self.assertEqual(len(errors),1)
+        self.assertTrue(all(emiss_archive.valid_resource("61483",u) for u in urls))
+        self.assertIn("https://storage.yandexcloud.net/datalakeiepru-s3-storage-public/fedstatru/parquet/61483.parquet",urls)
+    def test_emiss_reject_ambiguous_observations(self):
+        import emiss_archive,gzip
+        def parse(body):
+            return emiss_archive.parse(gzip.compress(body.encode()),"61483",historical.numeric,historical.year)
+        header="region;year;value;unit\n"
+        row="Москва;2020;100;рубль\n"
+        self.assertEqual(len(parse(header+row+row)),1)
+        with self.assertRaises(ValueError):parse(header+row+"Москва;2020;101;рубль\n")
+        with self.assertRaises(ValueError):parse("region;territory;year;value;unit\nМосква;Томск;2020;100;рубль\n")
+        with self.assertRaises(ValueError):parse("region; year;year;value;unit\nМосква;2020;2020;100;рубль\n")
+        with self.assertRaises(ValueError):parse(header+row+"Москва;2021;100;рубль;unexpected\n")
     def test_m2x(self):
         import national
         h='<table><tr><th>Дата</th><th>01.11.2026 трлн руб.</th><th>Темп прироста</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th></tr><tr><td>Денежный агрегат М2Х (широкая денежная масса)</td><td>151,4</td><td>16</td><td>14,2</td><td>-0,1</td><td>0,1</td><td>7,8</td><td>7,9</td></tr></table>'
