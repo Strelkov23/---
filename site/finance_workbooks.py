@@ -71,25 +71,50 @@ def fetch(url):
         raw=f.read(MAX+1)
     if len(raw)>MAX:raise ValueError("Превышен лимит")
     return raw
+def observation_keys(rows):
+    # Normalise only the explicitly verified punctuation variant; retain exact
+    # original hashes and labels in the published data.
+    alias={alias:codes[0] for codes in CROSSWALK.values() for alias in codes}
+    return {(alias.get(r["code"],r["code"]),r["metric"]) for r in rows if r["sign"]!="missing"}
+
 def sync(db,stamp,refresh,files):
     db.execute("create table if not exists finance_workbooks(year integer primary key,url text,checked text,success text,status text,sha text,rows text)")
+    db.execute("create table if not exists finance_workbook_attempts(year integer primary key,url text not null,checked text not null)")
+    db.execute("create table if not exists finance_workbook_editions(year integer,sha text,url text,seen text,rows text,primary key(year,sha))")
     old={r[0]:r for r in db.execute("select year,url,checked,success,status,sha,rows from finance_workbooks")}
+    attempts={y:(u,c) for y,u,c in db.execute("select year,url,checked from finance_workbook_attempts")}
+    # Preserve already imported editions before replacing their current record.
+    for y,r in old.items():
+        if r[3] and r[5] and json.loads(r[6]):
+            db.execute("insert or ignore into finance_workbook_editions values(?,?,?,?,?)",(y,r[5],r[1],r[3],r[6]))
     if refresh:
         now=datetime.fromisoformat(stamp)
         candidates=[]
         for y,u in files.items():
-            y=int(y);r=old.get(y)
-            if not r or (now-datetime.fromisoformat(r[2]))>=timedelta(days=30 if r[2]==r[3] else 7):candidates.append((y,u))
-        for y,u in sorted(candidates,key=lambda x:(x[0] in old,-x[0]))[:2]:
+            y=int(y);r=old.get(y);previous_attempt=attempts.get(y,(r[1],r[2]) if r else (None,None))
+            changed=u!=previous_attempt[0]
+            if not r or changed or (now-datetime.fromisoformat(r[2]))>=timedelta(days=30 if r[2]==r[3] else 7):
+                candidates.append((not changed and r is not None,r is not None,r[2] if r else "",-y,y,u))
+        for _,__,___,____,y,u in sorted(candidates)[:2]:
             r=old.get(y)
+            db.execute("insert or replace into finance_workbook_attempts values(?,?,?)",(y,u,stamp))
             try:
                 raw=fetch(u);rows=parse(raw,y,u)
-                with db:db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,u,stamp,stamp,"Импортировано",hashlib.sha256(raw).hexdigest(),json.dumps(rows,ensure_ascii=False,allow_nan=False)))
+                if r and r[3]:
+                    missing=observation_keys(json.loads(r[6]))-observation_keys(rows)
+                    if missing:raise ValueError("Новая редакция потеряла ранее доступные позиции: "+str(len(missing)))
+                sha=hashlib.sha256(raw).hexdigest()
+                payload=json.dumps(rows,ensure_ascii=False,allow_nan=False)
+                with db:
+                    db.execute("insert or ignore into finance_workbook_editions values(?,?,?,?,?)",(y,sha,u,stamp,payload))
+                    db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,u,stamp,stamp,"Импортировано",sha,payload))
             except Exception as e:
-                with db:db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,r[1] if r and r[3] else u,stamp,r[3] if r else None,"Ошибка: "+str(e)[:180],r[5] if r else None,r[6] if r else "[]"))
+                with db:db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,r[1] if r and r[3] else u,stamp,r[3] if r else None,"Ошибка: "+str(e)[:240],r[5] if r else None,r[6] if r else "[]"))
     result=[]
     for y,u,c,s,status,sha,rows in db.execute("select year,url,checked,success,status,sha,rows from finance_workbooks order by year desc"):
-        result.append(dict(year=y,url=u,checked=c,success=s,status=status,sha256=sha,rows=json.loads(rows)))
+        attempt=db.execute("select url,checked from finance_workbook_attempts where year=?",(y,)).fetchone()
+        editions=db.execute("select count(*) from finance_workbook_editions where year=?",(y,)).fetchone()[0]
+        result.append(dict(year=y,url=u,checked=c,success=s,status=status,sha256=sha,rows=json.loads(rows),attempt_url=attempt[0] if attempt else u,editions=editions))
     return dict(schema=1,built=stamp,years=result)
 # Explicit crosswalk of the abbreviated 2023–2025 documentary labels to
 # hashes of full official labels observed in the imported workbooks.
@@ -236,7 +261,10 @@ def publish(page,out,d):
     if not d["years"]:body+="<p>Пока нет попыток импорта.</p>"
     for b in d["years"]:
         body+="<section><h2>"+str(b["year"])+"</h2><p>"+escape(b["status"])+" · наблюдений: "+str(len(b["rows"]))+" · последний успех: "+escape(str(b["success"] or "—"))+"</p>"
+        if b.get("attempt_url") and b["attempt_url"]!=b["url"]:
+            body+="<p>Последняя попытка: "+escape(b["attempt_url"])+" · отображается предыдущая успешная редакция.</p>"
         if b["rows"]:
+            body+="<p>Сохранённых редакций: "+str(b.get("editions",1))+"</p>"
             body+="<p>SHA-256: "+escape(b["sha256"])+"</p><details><summary>Открыть исходные значения</summary><table><tr><th>Вид деятельности</th><th>Показатель</th><th>Значение, %</th><th>Ячейка</th></tr>"
             for r in b["rows"]:
                 body+="<tr>"+"".join("<td>"+escape(str(v))+"</td>" for v in (r["title"],"Продажи к затратам" if r["metric"]=="sales" else "Активы",r["raw"],r["sheet"]+" / "+str(r["row"])+":"+str(r["column"])))+"</tr>"
