@@ -23,3 +23,5 @@
 .sp-chart{background:white;padding:1rem;border:1px solid #cfdcdb;margin:1rem 0}.sp-chart svg{width:100%;height:auto;display:block}.sp-chart h3{overflow-wrap:anywhere}#sp-highlights strong{font-size:1.7rem}#sp-highlights article{min-width:0;overflow-wrap:anywhere}#sp-chart-series{max-width:100%;width:100%}
 
 #rc-form label{flex:1 1 220px;min-width:0}#rc-form select{max-width:100%;width:100%}#rc-chart .legend{align-items:flex-start}#rc-chart .legend span{overflow-wrap:anywhere}#rc-sources p{overflow-wrap:anywhere}
+
+#rd-form label{flex:1 1 220px;min-width:0}#rd-form select{width:100%;max-width:100%}#rd-results,#rd-cross{overflow-wrap:anywhere}#rd-results table,#rd-cross table{font-variant-numeric:tabular-nums}#rd-results .metrics{margin:1rem 0}#rd-cross{margin-top:2rem}
