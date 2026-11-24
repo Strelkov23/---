@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
  const a=(t,u)=>{const e=node('a',t);e.href=u;e.target='_blank';e.rel='noopener noreferrer';return e};
  const metrics=$('hist-metrics'),status=$('hist-status'),picker=$('hist-series'),region=$('hist-region');
  const peer=$('hist-peer'),mode=$('hist-mode'),rankYear=$('hist-rank-year');
- const fields=['hist-search','hist-series','hist-region','hist-peer','hist-mode','hist-from','hist-to','hist-rank-year','hist-rank-search','hist-rank-sort'];let selected=null,generation=0;
+ const fields=['hist-search','hist-series','hist-region','hist-peer','hist-mode','hist-from','hist-to','hist-rank-year','hist-rank-search','hist-rank-sort','hist-visual-limit','hist-visual-years'];let selected=null,generation=0;
  function metric(t,n){const x=node('div','');x.className='metric';x.append(node('b',fmt(n)),node('span',t));metrics.append(x)}
  try{
   if(!version){const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const saved=new URLSearchParams(location.search);$('hist-search').value=saved.get('hist-search')||'';options();restore(fields.filter(f=>!['hist-region','hist-peer','hist-rank-year'].includes(f)));
   async function select(){
    const prior=[region.value,peer.value,rankYear.value];const id=++generation,meta=catalog.find(x=>x.code===picker.value);selected=null;
-   $('hist-passport').replaceChildren();$('hist-graph').replaceChildren();$('hist-table').replaceChildren();$('hist-export').disabled=true;region.replaceChildren();peer.replaceChildren(new Option('Без сравнения',''));rankYear.replaceChildren();$('hist-rank').replaceChildren();$('hist-rank-export').disabled=true;
+   $('hist-passport').replaceChildren();$('hist-graph').replaceChildren();$('hist-table').replaceChildren();$('hist-export').disabled=true;region.replaceChildren();peer.replaceChildren(new Option('Без сравнения',''));rankYear.replaceChildren();$('hist-rank').replaceChildren();$('hist-rank-visual').replaceChildren();$('hist-heat-visual').replaceChildren();$('hist-rank-export').disabled=true;
    if(!meta){status.textContent='Нет загруженных рядов по выборке. Проверьте реестр официальных файлов ниже.';return}
    status.textContent='Загрузка ряда…';
    try{
@@ -71,17 +71,71 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(const r of rows){const tr=body.insertRow();for(const v of [r.region,r.year,fmt(r.value),r.note||'—',[r.sheet,r.row,r.column].filter(x=>x!=null).join(' / '),r.seen])tr.insertCell().textContent=v}host.append(detail);
    $('hist-export').disabled=false;$('hist-export').onclick=()=>csv('regional-'+s.code+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Обработка','Лист','Строка','Столбец','Примечание','Получено','Индекс (если выбран режим)','Базовый год'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,s.kind,r.sheet,r.row,r.column,r.note,r.seen,indexed?r.value/maps[names.indexOf(r.region)].get(base).value*100:'',indexed?base:''])])
   }
+
+  function makeFigure(host,title,subtitle,source,w,h,draw){
+   host.replaceChildren();
+   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+   svg.setAttribute('xmlns',ns);svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('width',w);svg.setAttribute('height',h);svg.setAttribute('role','img');svg.setAttribute('aria-label',title);
+   const shape=(tag,attrs,t,parent=svg)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(t!==undefined)e.textContent=t;parent.append(e);return e};
+   const text=(x,y,t,extra={})=>shape('text',{x,y,fill:'#162e39','font-family':'Arial,sans-serif','font-size':14,...extra},t);
+   shape('rect',{x:0,y:0,width:w,height:h,fill:'#fff'});
+   text(20,27,title,{'font-size':19,'font-weight':'bold'});text(20,50,subtitle,{'font-size':13});
+   draw(shape,text);
+   const foot=source.kind+' · '+source.code+' · версия '+(version||'не закреплена');
+   text(20,h-27,foot,{'font-size':11});text(20,h-12,'Источник и методология — в паспорте показателя и CSV.',{'font-size':11});
+   const frame=node('div','');frame.className='regional-figure-scroll';frame.append(svg);host.append(frame);
+   const tools=node('div','');tools.className='actions';const result=node('span','');result.setAttribute('role','status');
+   const blob=()=>new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
+   const download=(data,ext)=>{const u=URL.createObjectURL(data),a=node('a','');a.href=u;a.download=source.code+'-'+title.split(' ')[0]+'-'+rankYear.value+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(u),30000)};
+   const png=async()=>{const u=URL.createObjectURL(blob());try{const image=new Image();image.src=u;await image.decode();const c=document.createElement('canvas');c.width=w*2;c.height=h*2;c.getContext('2d').drawImage(image,0,0,c.width,c.height);return await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('PNG')),'image/png'))}finally{URL.revokeObjectURL(u)}};
+   const button=(label,action)=>{const b=node('button',label);b.type='button';b.onclick=async()=>{try{await action();result.textContent='Готово'}catch{result.textContent='Экспорт недоступен; попробуйте SVG.'}};tools.append(b)};
+   button('Скачать SVG',()=>download(blob(),'svg'));button('Скачать PNG',async()=>download(await png(),'png'));
+   if(navigator.clipboard?.write&&typeof ClipboardItem!=='undefined')button('Копировать график',async()=>navigator.clipboard.write([new ClipboardItem({'image/png':await png()})]));
+   tools.append(result);host.append(tools)
+  }
+  function regionalVisuals(s,rows,year){
+   const rankingHost=$('hist-rank-visual'),heatHost=$('hist-heat-visual');
+   rankingHost.replaceChildren();heatHost.replaceChildren();
+   const limit=Number($('hist-visual-limit').value)||20,nYears=Number($('hist-visual-years').value)||10;
+   const subset=rows.filter(r=>Number.isFinite(r.value)).slice(0,limit);
+   if(!subset.length){rankingHost.append(node('p','Нет данных для визуализации.'));return}
+   const W=1000,L=340,R=855,high=Math.max(0,...subset.map(r=>r.value)),low=Math.min(0,...subset.map(r=>r.value));
+   const x=v=>L+(R-L)*(v-low)/(high-low||1),zero=x(0),h=108+subset.length*27;
+   makeFigure(rankingHost,'Сравнение территорий · '+year,s.unit+' · первые '+subset.length+' из '+rows.length+' в выбранном порядке',s,W,h,(shape,text)=>{
+    shape('line',{x1:zero,x2:zero,y1:64,y2:h-42,stroke:'#526b72','stroke-width':1});
+    subset.forEach((r,i)=>{const y=69+i*27,bar=shape('rect',{x:Math.min(zero,x(r.value)),y,width:Math.max(1,Math.abs(x(r.value)-zero)),height:19,fill:r.value<0?'#a24724':'#087e75'});
+     shape('title',{},r.region+' · '+fmt(r.value)+' '+s.unit,bar);
+     text(20,y+14,r.region.length>43?r.region.slice(0,40)+'…':r.region,{'font-size':13});text(R+8,y+14,fmt(r.value),{'font-size':13})});
+   });
+   rankingHost.append(node('p','Территориальные агрегаты могут пересекаться. Это сравнение значений, а не рейтинг эффективности. Полный срез доступен ниже.'));
+   const names=subset.map(r=>r.region),years=Array.from({length:nYears},(_,i)=>year-nYears+1+i);
+   const values=new Map(s.values.filter(r=>names.includes(r.region)&&years.includes(r.year)&&Number.isFinite(r.value)).map(r=>[r.region+'\u0000'+r.year,r.value]));
+   const nums=[...values.values()],min=Math.min(...nums),max=Math.max(...nums);
+   const color=v=>{const p=max===min?.5:(v-min)/(max-min);return 'rgb('+[Math.round(235-215*p),Math.round(246-125*p),Math.round(243-129*p)].join(',')+')'};
+   const cell=42,HW=Math.max(1000,L+years.length*cell+35),HH=151+names.length*26;
+   makeFigure(heatHost,'Тепловая карта динамики',s.unit+' · '+years[0]+'–'+year+' · единая шкала исходных значений',s,HW,HH,(shape,text)=>{
+    years.forEach((yr,i)=>text(L+i*cell+cell/2,72,yr,{'font-size':11,'text-anchor':'middle'}));
+    names.forEach((name,j)=>{const y=82+j*26;text(20,y+16,name.length>43?name.slice(0,40)+'…':name,{'font-size':13});
+     years.forEach((yr,i)=>{const v=values.get(name+'\u0000'+yr),rect=shape('rect',{x:L+i*cell,y,width:cell-2,height:24,fill:Number.isFinite(v)?color(v):'#e1e4e5',stroke:'#fff'});
+      shape('title',{},name+' · '+yr+' · '+(Number.isFinite(v)?fmt(v)+' '+s.unit:'нет данных'),rect)})});
+    const y=89+names.length*26;[0,.25,.5,.75,1].forEach((p,i)=>shape('rect',{x:L+i*38,y,width:38,height:15,fill:color(min+(max-min)*p)}));
+    text(L,y+31,fmt(min),{'font-size':11});text(L+190,y+31,fmt(max),{'font-size':11,'text-anchor':'end'});
+    shape('rect',{x:L+210,y,width:20,height:15,fill:'#e1e4e5'});text(L+235,y+12,'Нет данных',{'font-size':12});
+   });
+   heatHost.append(node('p','Строки — те же территории, что на графике среза. Цвет сравнивает абсолютные значения, не темпы роста. Серый цвет — пропуск, не ноль. Наведите на ячейку для точного значения.'));
+  }
   function ranking(){
    if(!selected)return;
    const s=selected,year=Number(rankYear.value),q=$('hist-rank-search').value.trim().toLowerCase(),sort=$('hist-rank-sort').value;
    const rows=s.values.filter(r=>r.year===year&&r.region.toLowerCase().includes(q));
    rows.sort((a,b)=>sort==='name'?a.region.localeCompare(b.region,'ru'):sort==='asc'?a.value-b.value:b.value-a.value);
+   regionalVisuals(s,rows,year);
    const t=node('table',''),head=t.createTHead().insertRow(),body=t.createTBody();
    for(const l of ['Территория',s.unit,'Примечание'])head.append(node('th',l));
    for(const r of rows){const tr=body.insertRow();tr.insertCell().textContent=r.region;tr.insertCell().textContent=fmt(r.value);const cell=tr.insertCell(),d=node('details','');d.append(node('summary','Источник / сноски'),node('p',r.note||'—'));cell.append(d)}
    $('hist-rank').replaceChildren(node('p','Территорий в срезе: '+rows.length+' · '+year),t);
    $('hist-rank-export').disabled=!rows.length;$('hist-rank-export').onclick=()=>csv('regional-cross-section-'+s.code+'-'+year+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Лист','Строка','Столбец','Примечание'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,r.sheet,r.row,r.column,r.note])]);save(fields)
   }
-  $('hist-search').oninput=()=>{options();select()};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
+  $('hist-search').oninput=()=>{options();select()};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-visual-limit').onchange=ranking;$('hist-visual-years').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
  }catch(e){console.error(e);status.textContent='Исторический каталог не доступен в этой версии. Откройте текущую сборку.'}
 });
