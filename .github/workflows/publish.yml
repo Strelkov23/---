@@ -38,6 +38,7 @@ jobs:
           node test-regional-map.js
           node test-chain-stress.js
           node test-chart-layout.js
+          node test-macro-diagnostics.js
           rm -rf public
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt

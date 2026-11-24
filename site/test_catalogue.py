@@ -23,6 +23,22 @@ class CatalogueTests(unittest.TestCase):
         for tag in ("ВАК К1","ВАК К2","ВАК К3","РИНЦ","Scopus","RSCI","Web of Science"):
             self.assertIn(tag,tags)
         self.assertTrue(all(m["sources"] and m["verified"] for m in registry.values()))
+    def test_crossref_projection_fallback(self):
+        from urllib.parse import urlsplit,parse_qs
+        from io import BytesIO
+        requests=[]
+        payload={"message":{"items":[{"DOI":"10.1234/new","title":["Test"],"published":{"date-parts":[[2025]]},"volume":"2","page":"10-20"}]}}
+        def request(req,timeout):
+            query=parse_qs(urlsplit(req.full_url).query)
+            requests.append(query)
+            if "select" in query:raise HTTPError(req.full_url,400,"Bad request",{},None)
+            return BytesIO(json.dumps(payload).encode())
+        with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=request):
+            literature.sync(self.db,"2026-11-24T00:00:00+00:00",True)
+        self.assertNotIn("language",requests[0]["select"][0].split(","))
+        self.assertNotIn("select",requests[1])
+        self.assertEqual(self.db.execute("select status from journal_checks").fetchone()[0],"Проверено")
+        self.assertEqual(self.db.execute("select title from literature where doi='10.1234/new'").fetchone()[0],"Test")
     def test_metadata(self):
         item={"volume":"2","issue":"3","page":"10-20","is-referenced-by-count":0}
         self.assertEqual(literature.metadata(item)["pages"],"10-20")
