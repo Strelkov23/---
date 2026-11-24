@@ -88,6 +88,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           mkdir -p history/published
           cp monitor/public/*.json history/published/
+          if [ -f monitor/public/regional-boundaries.geojson ]; then cp monitor/public/regional-boundaries.geojson history/published/; fi
           mkdir -p history/published/regional-data
           cp -a monitor/public/regional-data/. history/published/regional-data/
           # SQLite is restored losslessly at the next build. Do not commit a raw database over GitHub's 100 MiB limit.
