@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -78,6 +78,14 @@ def check(out,previous,stamp):
             hashes[s["file"]]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
         except (OSError,ValueError,KeyError) as e:issues.append("Исторический ряд "+s["code"]+": "+str(e))
     if not hist["series"]:warnings.append("Региональные ряды пока не загружены")
+    ind=data["industrial.json"]
+    counts["industrial_series"]=len(ind["series"])
+    counts["industrial_observations"]=sum(len(s["values"]) for s in ind["series"])
+    if len({s["id"] for s in ind["series"]})!=counts["industrial_series"]:
+        issues.append("industrial: повторяющиеся идентификаторы")
+    for s in ind["series"]:
+        if not s["unit"] or not http_url(s["source"]) or len({r["period"] for r in s["values"]})!=len(s["values"]) or any(not finite(r["value"]) for r in s["values"]):
+            issues.append("industrial: некорректный ряд "+s["id"])
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

@@ -6,7 +6,7 @@ ROUTES={
  "archive":"index.html#archive","stats":"statistics.html","compare":"compare.html",
  "overview":"week.html","model":"index.html#model","sources":"sources.html",
  "desk":"desk.html","laws":"laws.html","papers":"papers.html","atlas":"atlas.html",
- "statistics":"statistics.html","national":"national.html","historical":"historical.html","regions":"historical.html","budget":"historical.html#hist-sources","history":"historical.html","diagnostics":"diagnostics.html",
+ "statistics":"statistics.html","national":"national.html","industrial":"industrial.html","historical":"historical.html","regions":"historical.html","budget":"historical.html#hist-sources","history":"historical.html","diagnostics":"diagnostics.html",
  "scenario":"scenario.html","methodology":"methodology.html","directory":"directory.html",
  "links":"links.html","updates":"updates.html","indicators":"indicators.html",
  "brief":"desk.html#brief","watch":"index.html#archive"

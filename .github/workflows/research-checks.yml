@@ -25,7 +25,7 @@ jobs:
           cd monitor
           python3 -m compileall -q .
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py
           for script in *.js; do node --check "$script"; done
           rm -rf public
           python3 build.py
@@ -152,6 +152,54 @@ jobs:
         continue-on-error: true
         run: |
           for route in version.txt historical.html historical.json quality.json regions/; do
+            echo "PUBLIC $route"
+            curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
+            if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
+          done
+
+
+      - name: Verify real industrial series and rendered explorer
+        if: github.head_ref == 'stage-03-industry-atlas' || github.event_name == 'workflow_dispatch'
+        working-directory: monitor
+        run: |
+          python3 - <<'PY'
+          import industrial_data as d,sqlite3,json
+          from pathlib import Path
+          from unittest.mock import patch
+          from datetime import datetime,timezone
+          cache={}
+          for filename in d.FILES:
+              url=d.BASE+filename
+              raw,enc=d.h.get(url,35000000)
+              cache[url]=(raw,enc)
+              rows=d.parse(raw,filename)
+              print("VERIFIED INDUSTRY",filename,len(rows),"series",sum(len(s["values"]) for s in rows),"observations",flush=True)
+          with sqlite3.connect("industrial-test.db") as db,patch("industrial_data.h.get",side_effect=lambda url,limit:cache[url]):
+              warnings=d.publish(db,datetime.now(timezone.utc).isoformat(),Path("public"),True)
+              assert not warnings,warnings
+              first=db.execute("select count(*) from industrial_obs").fetchone()[0]
+              d.publish(db,datetime.now(timezone.utc).isoformat(),Path("public"),True)
+              assert first==db.execute("select count(*) from industrial_obs").fetchone()[0]
+          data=json.loads(Path("public/industrial.json").read_text())
+          total=sum(len(s["values"]) for s in data["series"])
+          print("INDUSTRIAL TOTAL",len(data["series"]),total,flush=True)
+          assert total>15000 and len(data["series"])>300
+          s=next(s for s in data["series"] if s["kind"]=="Индекс производства г/г" and s["code"]=="C")
+          Path("/tmp/industrial-query").write_text(s["id"])
+          PY
+          cd public
+          python3 -m http.server 8765 > /tmp/industrial-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/industrial.html > /dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom "http://localhost:8765/industrial.html?ind-series=$(cat /tmp/industrial-query)" > /tmp/industrial-dom.html
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("/tmp/industrial-dom.html").read_text()
+          assert "Наблюдений:" in s and "Копировать график" in s and "ОКВЭД2" in s
+          assert "Координаты ячейки" in s
+          print("INDUSTRIAL BROWSER PASSED")
+          PY
+          for route in version.txt historical.html historical.json industrial.html; do
             echo "PUBLIC $route"
             curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
             if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
