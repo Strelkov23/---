@@ -458,7 +458,6 @@ with sync_playwright() as p:
                 with page.expect_download() as delta:
                     page.locator("#rm-change-export").click()
                 assert delta.value.suggested_filename=="regional-industry-change-RU-MOS-C-2022-2024.csv"
-                import csv
                 with open(delta.value.path(),encoding="utf-8-sig",newline="") as f:
                     rows=list(csv.reader(f,delimiter=";"))
                 assert len(rows)==15
