@@ -27,7 +27,12 @@ def inventory(folder):
             result[(group,code)]=series(r["title"],r["unit"],r.get("source") or catalog.get(code,{}).get("source"),values,r.get("definition",""))
     for r in read(folder,"historical.json")["series"]:
         data=read(folder,r["file"])
-        result[("Регионы",r["code"])]=series(data["title"],data["unit"],data["source"],points(data["values"],lambda x:(x["region"],str(x["year"]))),data.get("kind",""))
+        values=data["values"]
+        # Reserved missing markers were mistakenly stored in some earlier snapshots.
+        # Exclude them on both sides: correcting a parser is not a statistical revision.
+        if "tochno-st-catalog/Rosstat/" in data["source"]:
+            values=[x for x in values if x["value"] not in (-77777777,-99999999)]
+        result[("Регионы",r["code"])]=series(data["title"],data["unit"],data["source"],points(values,lambda x:(x["region"],str(x["year"]))),data.get("kind",""))
     for r in read(folder,"industrial.json")["series"]:
         result[("Промышленность",r["id"])]=series(r["title"],r["unit"],r["source"],points(r["values"],lambda x:("",str(x["period"])))," | ".join(str(r.get(k,"")) for k in ("classification","kind","frequency","definition")))
     for filename,group,unit in [("food-balance.json","Продовольственные балансы","тыс. т"),("electricity-balance.json","Энергетические балансы","ТВт·ч")]:
