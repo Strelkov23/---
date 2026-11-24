@@ -49,7 +49,7 @@ def page(name, body):
     match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
     title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
     shell=Path("shell.html").read_text()
-    (out / name).write_text(shell.replace("<!--TITLE-->",escape(title)).replace("<!--NAV-->",navigation.primary(name)).replace("<!--SECTION-NAV-->",navigation.secondary(name)).replace("<!--BODY-->",body),encoding="utf-8")
+    (out / name).write_text(shell.replace("<!--TITLE-->",escape(title)).replace("<!--NAV-->",navigation.primary(name)).replace("<!--SECTION-NAV-->",navigation.secondary(name)).replace("<!--PAGE-GUIDE-->",navigation.guide(name)).replace("<!--BODY-->",body),encoding="utf-8")
 
 with m.connect() as db:
     articles = [dict(r) for r in db.execute("""select a.title,a.url,a.published,a.seen,a.source,
@@ -139,9 +139,9 @@ with m.connect() as db:
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 sector_passports.publish(out)
 regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
-for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","economic-map.html","news-map.html","search.html","industrial.html","sector-passports.html","prices.html","technology.html","forecast.html","index-builder.html","report-builder.html"]:
+for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","economic-map.html","news-map.html","search.html","glossary.html","industrial.html","sector-passports.html","prices.html","technology.html","forecast.html","index-builder.html","report-builder.html"]:
     page(name,Path(name).read_text())
-for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","finance-data.js","financial-state.js","cost-structure.js","food-balance.js","data-registry.js","index-builder.js","composite-index.js","report-builder.js","provenance.js","reproducibility.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","news-map.js","site-search.js","industrial.js","energy-output.js","electricity-balance.js","sector-passports.js"]:
+for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","interface.js","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","finance-data.js","financial-state.js","cost-structure.js","food-balance.js","data-registry.js","index-builder.js","composite-index.js","report-builder.js","provenance.js","reproducibility.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","news-map.js","site-search.js","industrial.js","energy-output.js","electricity-balance.js","sector-passports.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navigation.cards()))
 navigation.publish(page)

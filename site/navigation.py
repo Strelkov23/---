@@ -69,6 +69,7 @@ GROUPS=(
  ("quality-centre","Источники и качество","Методика, проверка данных и прозрачность обновлений",(
   ("reproducibility.html","Воспроизводимость","Отпечаток набора, контрольные суммы и архивные версии."),
   ("method-passports.html","Паспорта методик","Формулы расчётов, ограничения и ссылки на инструменты."),
+  ("glossary.html","Экономический словарь","Определения, примеры и ограничения экономических показателей."),
   ("methodology.html","Методология","Правила интерпретации и формулы расчётов."),
   ("sources.html","Состояние источников","Проверки загрузок, охват и сбои."),
   ("links.html","Проверка ссылок","Отчёт по внутренним и внешним адресам."),
@@ -109,3 +110,111 @@ def search_entries():
         for href,title,note in items:
             if href not in entries:entries[href]={"href":href,"title":title,"description":note,"section":label}
     return list(entries.values())
+
+GUIDES={
+  "economic-map.html": [
+    "Выберите тему, показатель и год. Цвет показывает величину, а не качество экономики. Серый означает отсутствие сопоставимых данных.",
+    "quantile",
+    "geography-method"
+  ],
+  "news-map.html": [
+    "Нажмите на регион или значок. Это карта упоминаний в заголовках, а не точных координат событий.",
+    "news",
+    "news-map-method"
+  ],
+  "historical.html": [
+    "Выберите один показатель и регион. Сначала проверьте единицу, период и границы территории.",
+    "gdp",
+    "regional-dispersion"
+  ],
+  "industrial.html": [
+    "Индекс 100% означает неизменный выпуск относительно указанного периода. Натуральные объёмы нельзя складывать в разных единицах.",
+    "volume",
+    "energy-output-method"
+  ],
+  "scenario.html": [
+    "Задайте изменение спроса и ограничения. Результат условный: это не прогноз и не гарантированный план.",
+    "scenario",
+    "global-plan-method"
+  ],
+  "forecast.html": [
+    "Смотрите ошибку на известных периодах и сравнивайте единицы. Прогноз не заменяет факт.",
+    "forecast",
+    "forecast-method"
+  ],
+  "data-registry.html": [
+    "Введите название или код показателя. Проверьте единицы, охват и паспорт; затем скачайте наблюдения.",
+    "source",
+    "registry-method"
+  ],
+  "index-builder.html": [
+    "Выберите ряд и преобразование. Не сравнивайте индексы с разной базой.",
+    "pp",
+    "indicator-builder-method"
+  ],
+  "papers.html": [
+    "Ищите тему, автора или DOI. Статус журнала проверяется отдельно от статуса статьи.",
+    "indexing",
+    "crossref-cooldown-method"
+  ],
+  "report-builder.html": [
+    "Выберите ряды, период и территорию. Выгружайте исходные данные и паспорта вместе с графиками.",
+    "source",
+    "report-builder-method"
+  ],
+  "capital.html": [
+    "Износ и загрузка мощностей характеризуют разные явления. Смотрите определения и годы.",
+    "capacity",
+    "capital-data-method"
+  ],
+  "labor.html": [
+    "Не смешивайте производительность на занятого и на человеко-час.",
+    "productivity",
+    "labor-data-method"
+  ],
+  "food-balance.html": [
+    "Сопоставляйте ресурсы и использование в одной единице. Пропуск не равен нулю.",
+    "balance",
+    "food-balance-method"
+  ],
+  "finance.html": [
+    "Выберите одинаковый вид рентабельности и год.",
+    "profit",
+    "finance-method"
+  ],
+  "financial-state.html": [
+    "Не смешивайте запасы обязательств на дату и денежные потоки за период.",
+    "debt",
+    "financial-state-method"
+  ],
+  "programmes.html": [
+    "План, факт и кассовое исполнение — разные показатели. Сверяйте базу сравнения.",
+    "budget",
+    "programme-budget-method"
+  ],
+  "technology.html": [
+    "Изменяйте коэффициенты и ограничения при одной базе; результаты условны.",
+    "scenario",
+    "technology-method"
+  ],
+  "prices.html": [
+    "Межотраслевой ценовой сценарий не предсказывает рыночные цены.",
+    "leontief",
+    "price-model-method"
+  ],
+  "reproducibility.html": [
+    "Проверка хеша подтверждает совпадение файлов, но не достоверность исходных наблюдений.",
+    "hash",
+    "provenance-method"
+  ],
+  "compare.html": [
+    "Сначала проверьте единицы, период и определения обоих рядов.",
+    "nominal",
+    "method-passport-rules"
+  ]
+}
+def guide(page):
+    row=GUIDES.get(page)
+    if not row:return ""
+    message,term,method=row
+    return '<aside class="page-guide" aria-label="Подсказка"><strong>Как пользоваться</strong><p>'+escape(message)+'</p><p>'+a("glossary.html#"+term,"Объяснение термина")+' · '+a("methodology.html#"+method,"Методика расчёта")+'</p></aside>'

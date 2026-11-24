@@ -184,6 +184,18 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
+        page.goto("http://localhost:8765/glossary.html",wait_until="load")
+        assert page.locator("#glossary-list article").count()>=20
+        page.locator("#glossary-query").fill("ВРП")
+        assert page.locator("#glossary-list article:visible").count()>=1
+        assert page.locator("#glossary-list article:visible").count()<20
+        page.locator("#view-mode").select_option("professional")
+        page.goto("http://localhost:8765/scenario.html",wait_until="load")
+        assert page.locator("#view-mode").input_value()=="professional"
+        assert page.locator(".section-more").evaluate("(e)=>e.open")
+        assert page.locator(".page-guide a[href='methodology.html#global-plan-method']").count()==1
+        page.locator("#view-mode").select_option("simple")
+        assert not page.locator(".section-more").evaluate("(e)=>e.open")
         page.goto("http://localhost:8765/search.html?q=инвестиции",wait_until="load")
         page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
         assert page.locator("#site-search-results section").count()==4

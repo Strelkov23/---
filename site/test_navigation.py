@@ -22,6 +22,10 @@ class NavTests(unittest.TestCase):
         self.assertIn("economic-map.html",{r["href"] for r in rows})
         self.assertIn("news-map.html",{r["href"] for r in rows})
         self.assertIn('aria-current="page">Поиск',n.primary("search.html"))
+    def test_guides(self):
+        self.assertIn("glossary.html#scenario",n.guide("scenario.html"))
+        self.assertIn("methodology.html#global-plan-method",n.guide("scenario.html"))
+        self.assertEqual(n.guide("unknown.html"),"")
     def test_hubs(self):
         pages={}
         n.publish(lambda name,body:pages.update({name:body}))
