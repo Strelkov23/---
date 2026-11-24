@@ -1,0 +1,119 @@
+"""Versioned interpretation notes, not a certification of external statistical methodology."""
+from html import escape
+from urllib.parse import quote
+import json,csv,re
+
+VERSION="1.0"
+# Only explicitly characterized definitions; no formula inferred solely from the unit.
+WDI={
+"NY.GDP.MKTP.KD.ZG":("Годовой темп изменения реального ВВП.","100 × (реальный ВВП_t / реальный ВВП_t−1 − 1); концептуальная формула, значение импортируется.","Реальный ВВП, постоянные цены; не номинальный рост."),
+"NY.GDP.MKTP.KD":("ВВП в постоянных долларах США 2015 года.","Импорт готового ряда; не пересчёт текущего валютного курса.","Не складывать с текущими долларами; проверить базис и национальные пересмотры."),
+"NY.GDP.MKTP.CN":("Номинальный ВВП в текущей национальной валюте.","Импорт готового ряда.","Рост включает ценовые изменения; не реальный ВВП."),
+"FP.CPI.TOTL.ZG":("Годовая инфляция потребительских цен WDI.","Годовое изменение индекса потребительских цен по методике поставщика; сайт не пересчитывает.","Не считать эквивалентом декабрь к декабрю или месячного показателя г/г."),
+"SL.UEM.TOTL.ZS":("Модельная оценка МОТ доли безработных в рабочей силе.","100 × безработные / рабочая сила; исходная модельная оценка импортируется.","Не зарегистрированная безработица и не доля всего населения."),
+"SI.POV.GINI":("Индекс неравенства распределения доходов или потребления, шкала 0–100.","Импорт оценки WDI; не расчёт по территориальным средним.","Различия доходов и потребления, обследований и шкалы 0–1; не специальный показатель национальных целей."),
+"NE.GDI.FTOT.ZS":("Валовое накопление основного капитала относительно ВВП.","100 × валовое накопление основного капитала / ВВП.","Не тождественно инвестициям в основной капитал из обследований предприятий."),
+"NE.EXP.GNFS.ZS":("Экспорт товаров и услуг относительно ВВП.","100 × экспорт товаров и услуг / ВВП.","Не только товарный экспорт и не доля отечественной добавленной стоимости."),
+"NE.IMP.GNFS.ZS":("Импорт товаров и услуг относительно ВВП.","100 × импорт товаров и услуг / ВВП.","Не только товарный импорт; не доля импорта в промежуточных затратах."),
+"NV.IND.TOTL.ZS":("Добавленная стоимость промышленности, включая строительство, относительно ВВП.","100 × ВДС сектора / ВВП.","Включает строительство; не индекс промпроизводства и не валовой выпуск."),
+"NV.IND.MANF.ZS":("Добавленная стоимость обрабатывающих производств относительно ВВП.","100 × ВДС обработки / ВВП.","Обработка входит в промышленность; не складывать с её итогом."),
+"SP.DYN.TFRT.IN":("Условное число детей на женщину при сохранении возрастных коэффициентов рождаемости периода.","Суммирование возрастных коэффициентов с учётом ширины возрастных интервалов; импорт оценки.","Не фактическое среднее число детей у завершивших репродуктивный период женщин."),
+"SP.DYN.LE00.IN":("Ожидаемая продолжительность жизни при рождении при сохранении возрастных уровней смертности.","Расчёт по таблице смертности источника; сайт импортирует результат.","Не средний возраст смерти и не индивидуальный прогноз."),
+}
+CAPITAL={
+"stock_mrub":("Полная учётная стоимость основных фондов на конец года.","Готовое значение таблицы 14.4; смешанные учётные цены.","Не остаточная стоимость; номинальное изменение не равно физическому приросту."),
+"wear_pct":("Степень износа основных фондов на конец года.","100 × накопленный учётный износ / полная учётная стоимость.","Не доля физически непригодных или незагруженных мощностей."),
+"renewal_pct":("Коэффициент обновления основных фондов.","100 × ввод новых фондов / наличие фондов на конец года (сопоставимые цены).","Не чистый прирост; иной знаменатель, чем при выбытии. Расхождение итогов 2023 в таблицах 14.3 и 14.7."),
+"disposal_pct":("Коэффициент выбытия основных фондов.","100 × ликвидированные фонды / наличие на начало года (сопоставимые цены).","Не бухгалтерский износ; не вычитать напрямую из обновления."),
+"volume_index":("Индекс физического объёма основных фондов.","Готовый индекс в сопоставимых ценах, 2024 к 2023.","Не отношение номинальных учётных стоимостей."),
+}
+def describe(r):
+    g,c=r["group"],r["code"]
+    level="source";kind="Опубликованный показатель";formula="Импорт готовых значений; сайт не пересчитывает показатель."
+    definition=r.get("note") or r["title"]
+    caution="Сопоставимость не подтверждается одним названием или совпадением единиц. Проверьте охват, период, классификацию, цены и редакцию источника."
+    method_url=r["source"];anchor="methodology.html#registry-method"
+    if g=="wdi":
+        method_url="https://data.worldbank.org/indicator/"+quote(c,safe=".")
+        definition,formula,caution=WDI.get(c,(r["title"]+". Точное определение и первичная методика — в метаданных WDI.",formula,caution))
+        level="explained" if c in WDI else "source"
+        kind="Опубликованный ряд WDI (может содержать оценки)"
+    elif g=="national":
+        if c=="CPI_TARGET":kind="Цель, не фактическое наблюдение";caution="Не объединять с фактической инфляцией как однородный ряд."
+        elif c=="CPI_YOY":caution="Месяц к тому же месяцу предыдущего года; не среднегодовая инфляция и не м/м."
+        elif c=="KEY_END":caution="Ставка на конец месяца; не средняя за месяц."
+        elif c.startswith("RES_"):caution="Запас на начало месяца в долларах; изменение оценки не равно потоку."
+        elif c in ("M0","M1","M2","M2X"):caution="Запас на начало месяца; агрегаты вложены друг в друга и не суммируются. Уточнить валютный и инструментальный охват."
+        level="explained" if r.get("note") else "source"
+    elif g=="cbr":
+        if c=="KEY":definition="Ключевая ставка Банка России на дату наблюдения.";caution="Не средняя ставка и не стоимость кредита конкретному заёмщику."
+        else:definition="Официальный курс на дату наблюдения.";formula="Опубликованная стоимость номинала / номинал валюты (XML Банка России).";caution="Не курс сделки и не средний курс за период."
+        level="explained"
+    elif g=="industrial" or g=="industry":
+        definition=r.get("note") or r["title"]
+        level="explained" if r.get("note") else "source"
+        caution="Не смешивать ОКВЭД и ОКПД, классификации разных редакций, натуральный выпуск и отгрузку в текущих ценах; м/м, г/г и с начала года имеют разные базы."
+    elif g=="regional":
+        definition=r["title"]+". "+r.get("note","")
+        caution="Состав территорий и границы могут меняться; пересекающиеся территории нельзя суммировать. Единицы и период не доказывают одинаковую методику."
+        anchor="methodology.html#regional-dispersion"
+    elif g in ("capital","capacity"):
+        if g=="capital":definition,formula,caution=CAPITAL[c.rsplit(".",1)[1]]
+        else:definition="Использование среднегодовой производственной мощности, без субъектов малого предпринимательства.";formula="100 × фактический выпуск / среднегодовая мощность; готовый показатель таблицы 16.5.";caution="Незагруженная доля 100−U не равна резерву к выпуску (100/U−1)×100. Резерв условный; не коэффициент баланса 2021."
+        level="explained";anchor="methodology.html#capital-data-method"
+    elif g=="forecast":
+        kind="Расчётная экстраполяция, не факт";level="calculated"
+        definition="Прогноз от последнего наблюдения; отдельный выбор метода для каждого горизонта."
+        formula="Минимальная ранняя MAE; пять поздних проверок; диапазон ± 80-й процентиль абсолютных контрольных ошибок."
+        caution="Последние редакции данных, не real-time проверка; диапазон не вероятностный. Не официальный прогноз."
+        anchor="methodology.html#forecast-method"
+    return dict(method_version=VERSION,method_level=level,measurement_kind=kind,method_definition=definition,method_formula=formula,method_caution=caution,method_url=method_url,method_anchor=anchor)
+
+# Existing documented methods, linked at the point of use; no unverified new estimates.
+MODELS=[
+("historical.html","regional-dispersion","Региональный разброс","Медиана, квантили, CV, Джини, корреляция","Равные веса территорий, не населения."),
+("historical.html","geography-method","Карта","Квантили и географическая привязка","Классы могут различаться между годами."),
+("diagnostics.html","macro-diagnostics-method","Диагностика экономики","Пороговые сигналы и расчётные показатели","Не причинная оценка."),
+("scenario.html","chain-stress-method","Стресс-тест цепочек","Межотраслевые эффекты спроса","Фиксированная структура баланса."),
+("scenario.html","reproduction-method","Капитал и труд","Сценарные коэффициенты","Не измеренный отраслевой баланс."),
+("scenario.html","resource-plan-method","Распределение ресурсов","Линейная оптимизация","Оптимальность только для заданной цели."),
+("scenario.html","dynamic-plan-method","Многолетние мощности","Инвестиции, лаг и выбытие","Условные коэффициенты."),
+("scenario.html","dynamic-strategies-method","Инвестиционные стратегии","Локальная оптимизация и чувствительность","Не глобальный оптимум."),
+("scenario.html","global-plan-method","Оптимизация горизонта","Прямая и двойственная задачи","Фиксированная технология и заданные ограничения."),
+("scenario.html","dynamic-labor-method","Трудовое ограничение","Человеко-лет на единицу выпуска","Пользовательские допущения."),
+("programmes.html","programme-method","Госпрограммы","Классификация публикаций","Не подтверждение исполнения."),
+("programmes.html","goal-method","Национальные цели","Сравнение с порогом","Не годовой план."),
+("programmes.html","annual-goal-method","Годовой план и факт","Отклонение за один год","Версия плана имеет значение."),
+("programmes.html","programme-budget-method","Бюджеты госпрограмм","Касса к назначениям","Различать закон и роспись."),
+("programmes.html","health-project-method","Федеральные проекты","Сверка составных расходов","Округления и резерв."),
+("budget-diagnostics.html","budget-diagnostics-method","Бюджетные отклонения","Разложение изменений и остатков","Не оценка эффективности."),
+("programme-evidence.html","programme-evidence-method","Расходы и результаты","Сопоставление периода","Не причинный эффект."),
+("labor.html","labor-data-method","Производительность труда","ВДС/занятые, ВРП/занятые","Не валовой выпуск на часы."),
+("prices.html","price-model-method","Цены и трудовые часы","Обратная транспонированная матрица","Не рыночная цена."),
+("prices.html","price-hours-import-method","Ввод трудовых часов","Часы / выпуск","Подлинность источника проверяет исследователь."),
+("technology.html","technology-method","Технологии и ресурсы","Матрица затрат и двойственные оценки","Нет стоимости внедрения."),
+("technology.html","technology-frontier-method","Кривая компромисса","Оптимизация по уровням лимита","Не полная граница Парето."),
+("forecast.html","forecast-method","Статистический прогноз","Выбор по MAE и контроль","Не структурный прогноз."),
+("forecast.html","forecast-range-method","Диапазоны и сводка","Контроль попаданий","Не вероятность покрытия."),
+("capital.html","capital-data-method","Фонды и мощности","Учётные и физические показатели","Не автоматическая калибровка."),
+("data-registry.html","registry-export-method","Подборка данных","Длинный формат","Нет автоматического согласования единиц."),
+]
+def links(body,name):
+    items=[x for x in MODELS if x[0]==name]
+    if not items:return body
+    note='<aside class="method-panel" aria-label="Методика расчётов"><strong>Как получены результаты</strong><p>Откройте формулы и ограничения до интерпретации.</p><ul>'+''.join('<li><a href="methodology.html#'+escape(a)+'">'+escape(title)+'</a> — '+escape(limit)+'</li>' for _,a,title,_,limit in items)+'</ul></aside>'
+    # Place immediately after the first heading, including pages generated at build.
+    return re.sub(r'(</h1>)',lambda m:m.group(0)+note,body,count=1,flags=re.I) if re.search(r'</h1>',body,re.I) else note+body
+
+def publish(page,out):
+    html=(out/"methodology.html").read_text(encoding="utf-8")
+    rows=[]
+    for name,anchor,title,method,limit in MODELS:
+        if not re.search(r'\bid=["\']'+re.escape(anchor)+r'["\']',html):raise ValueError("Missing method anchor "+anchor)
+        if not (out/name).is_file():raise ValueError("Missing method page "+name)
+        rows.append(dict(version=VERSION,title=title,method=method,limitation=limit,page=name,method_url="methodology.html#"+anchor))
+    (out/"method-passports.json").write_text(json.dumps(rows,ensure_ascii=False),encoding="utf-8")
+    with (out/"method-passports.csv").open("w",encoding="utf-8-sig",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+    body='<section class="mast"><h1>Паспорта методик и расчётов</h1><p>Версия структуры паспорта '+VERSION+'. Описания не являются независимой научной сертификацией. Для исходных показателей — <a href="data-registry.html">паспорта рядов</a>; для расчётов сайта — формулы и ограничения по ссылкам ниже.</p><p><a href="method-passports.csv">CSV</a> · <a href="method-passports.json">JSON</a> · <a href="methodology.html">Полная методология</a></p></section><section><h2>Расчётные инструменты</h2><div class="portal-grid">'+''.join('<article><h3>'+escape(r["title"])+'</h3><p>'+escape(r["method"])+'</p><p><strong>Ограничение:</strong> '+escape(r["limitation"])+'</p><p><a href="'+escape(r["method_url"])+'">Формулы и методика</a> · <a href="'+escape(r["page"])+'">Открыть инструмент</a></p></article>' for r in rows)+'</div></section>'
+    page("method-passports.html",body)

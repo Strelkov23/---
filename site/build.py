@@ -24,6 +24,8 @@ import price_data
 import forecast
 import capital_data
 import data_registry
+import method_passports
+import wdi_metadata
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -37,6 +39,7 @@ def write(name, data):
 def page(name, body):
     import re
     from html import unescape
+    body=method_passports.links(body,name)
     match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
     title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
     shell=Path("shell.html").read_text()
@@ -87,6 +90,7 @@ with m.connect() as db:
         c=checks_by_url.get(url,{})
         catalog[code]={"theme":meta[0],"title":meta[1],"unit":meta[2],"agency":meta[3],"source":url,"checked":c.get("checked"),"success":c.get("success"),"status":c.get("status","Ожидается загрузка"),"withdrawn":withdrawn.get(code,[])}
     write("catalog.json",catalog)
+    wdi_metadata.sync(db,set(catalog),m.now(),"--refresh" in sys.argv,out)
     write("stats.json",{"series":m.SERIES,"values":[r for r in latest if r["code"] in m.SERIES and r["value"] is not None]})
     literature.sync(db,m.now(),"--refresh" in sys.argv)
     literature.reclassify(db)
@@ -151,6 +155,7 @@ import bulletin
 bulletin.publish(page,out)
 shutil.copy('chart-export.js',out)
 
+method_passports.publish(page,out)
 routes.publish(out)
 
 import link_audit
