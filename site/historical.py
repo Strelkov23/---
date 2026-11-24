@@ -668,6 +668,17 @@ def publish(db,stamp,out,refresh):
             group=rm.LABELS[r["group"]]
             rows.append(dict(indicator="MFG_"+r["group"],title="Отгрузка: "+group["title"]+" (ОКВЭД2 "+group["okved"]+")",region=r["region"],year=r["year"],value=r["value"],unit=rm.UNIT,sheet=r["sheet"],row=r["row"],column=None,note="Подраздел источника: "+r["subsection"]+" · Издание: "+r["edition"]+" · Версия: "+r["version"]+" · Уровень территории: "+r["level"]+" · ОКТМО: "+r["oktmo"]+" · ОКАТО: "+r["okato"]+" · Код показателя: "+rm.CODE+" · "+r["note"]))
         if rows:store(rows,rm.SOURCE,"Отгрузка по отраслям","Росстат · обработка «Если быть точным», CC BY 4.0 · точные подразделы")
+    # Mining and energy are separate OKVED2 sections, each with its own totals.
+    import regional_industry_extra as rx
+    path=out/"regional-mining-energy.json"
+    if path.is_file():
+        detail=json.loads(path.read_text(encoding="utf-8"));rx.quality(detail)
+        rows=[]
+        for r in detail["rows"]:
+            if r["value"] is None:continue
+            g=rx.GROUPS[r["group"]]
+            rows.append(dict(indicator="SHIP_"+r["group"],title="Отгрузка: "+g["title"]+" (ОКВЭД2 "+g["okved"]+")",region=r["region"],year=r["year"],value=r["value"],unit=rx.UNIT,sheet=r["sheet"],row=r["row"],column=None,note="Подраздел источника: "+r["subsection"]+" · Издание: "+r["edition"]+" · Версия: "+r["version"]+" · Уровень территории: "+r["level"]+" · ОКТМО: "+r["oktmo"]+" · ОКАТО: "+r["okato"]+" · Код показателя: "+r["table"]+" · "+r["note"]))
+        if rows:store(rows,rx.SOURCE,"Отгрузка: добыча и энергетика","Росстат · обработка «Если быть точным», CC BY 4.0 · точные подразделы")
     # Stable published bulletin, kept as its own dated edition (also available offline).
     seed=list(regional_seed.rows())
     n=store(seed,regional_seed.SOURCE,regional_seed.TITLE,"Росстат · опубликованный бюллетень, текстовая транскрипция")
