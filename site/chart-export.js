@@ -21,6 +21,20 @@ function chartWrap(text,width,measure){
   }
   if(line)lines.push(line);return lines.length?lines:[''];
 }
+// For fixed-space plot labels only: retain the full label in an SVG tooltip.
+function chartFitLabel(element,width){
+  const value=element.textContent;
+  const size=Number(element.getAttribute('font-size'))||13;
+  const ctx=document.createElement('canvas').getContext('2d');
+  const weight=element.getAttribute('font-weight')||'normal';
+  if(ctx)ctx.font=weight+' '+size+'px Arial';
+  const measure=s=>ctx?ctx.measureText(s).width:[...s].length*size*.65;
+  if(measure(value)<=width)return element;
+  const chars=[...value];while(chars.length&&measure(chars.join('')+'…')>width)chars.pop();
+  element.textContent=chars.join('')+'…';
+  const tip=document.createElementNS('http://www.w3.org/2000/svg','title');tip.textContent=value;element.append(tip);
+  return element;
+}
 function chartAdjacent(a,b,monthly=false){
   if(monthly){
     const month=v=>{const m=String(v).match(/^(\d{4})-(0[1-9]|1[0-2])$/);return m?Number(m[1])*12+Number(m[2]):NaN};
