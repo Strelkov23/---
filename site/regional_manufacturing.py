@@ -12,6 +12,7 @@ CATALOG="https://tochno.st/datasets/regions_collection"
 PRIMARY="https://rosstat.gov.ru/folder/210/document/13204"
 LICENSE="CC BY 4.0"
 RELEASE="v20260313"
+EDITIONS={2022:"Промышленное производство в России 2023",2024:"Промышленное производство в России 2025"}
 CODE="Y477090010"
 TITLE="Объем отгруженных товаров собственного производства, выполненных работ и услуг собственными силами по видам экономической деятельности раздела обрабатывающие производства"
 UNIT="Миллионов рублей"
@@ -73,8 +74,8 @@ def parse(raw):
                 sub=r["subsection"];group=LOOKUP.get(sub)
                 if not group:raise ValueError("Неизвестный подраздел: "+sub)
                 y=int(r["year"]);region=r["object_name"];level=r["object_level"]
-                if not 2017<=y<=date.today().year or not region or level not in ("Регион","Страна","Федеральный округ"):raise ValueError("Некорректная территория или год")
-                if not r["source"] or r["version_date"]!=RELEASE:raise ValueError("Неизвестная редакция")
+                if y not in EDITIONS or not region or level not in ("Регион","Страна","Федеральный округ"):raise ValueError("Некорректная территория или год")
+                if r["source"]!=EDITIONS[y] or r["version_date"]!=RELEASE:raise ValueError("Неизвестная редакция")
                 # A territory name can carry distinct official codes; never merge them.
                 key=(group,region,level,r["object_okato"],r["object_oktmo"],y)
                 if key in seen:raise ValueError("Дублирующийся ключ: "+str(key))
@@ -82,7 +83,7 @@ def parse(raw):
                 rows.append(dict(group=group,region=region,level=level,okato=r["object_okato"],oktmo=r["object_oktmo"],year=y,value=number(r["indicator_value"]),raw_value=r["indicator_value"],subsection=sub,edition=r["source"],version=r["version_date"],sheet=files[0].filename,row=reader.line_num,note=r["comment"]))
     if {r["group"] for r in rows}!=set(LABELS):raise ValueError("Неполное покрытие групп")
     years=sorted({r["year"] for r in rows})
-    if len(years)<2 or len({r["region"] for r in rows if r["level"]=="Регион"})<70:raise ValueError("Неполное покрытие регионов/лет")
+    if set(years)!=set(EDITIONS) or len({r["region"] for r in rows if r["level"]=="Регион"})<70:raise ValueError("Неполное покрытие регионов/лет")
     for y in years:
         national=[r for r in rows if r["year"]==y and r["level"]=="Страна"]
         if {r["group"] for r in national}!=set(LABELS) or len(national)!=len(LABELS) or any(r["region"]!="Российская Федерация" or r["value"] is None for r in national):raise ValueError("Неоднозначный итог РФ "+str(y))
@@ -92,21 +93,23 @@ def empty(stamp):
     return dict(schema=1,built=stamp,source=SOURCE,catalog=CATALOG,primary=PRIMARY,license=LICENSE,release=RELEASE,unit=UNIT,indicator=CODE,method=METHOD,groups=list(LABELS.values()),checked=None,success=None,status="Ожидается загрузка",sha256=None,rows=[])
 def quality(d,previous=None):
     if d["schema"]!=1 or d["source"]!=SOURCE or d["release"]!=RELEASE or d["groups"]!=list(LABELS.values()) or d["indicator"]!=CODE or d["unit"]!=UNIT:raise ValueError("Метаданные отраслевой таблицы")
-    rows=d["rows"];keys=set()
+    rows=d["rows"];keys=set();line_numbers=set()
     if rows and (not d["success"] or not re.fullmatch("[0-9a-f]{64}",d["sha256"] or "")):raise ValueError("Нет хеша исходного файла")
     for r in rows:
         key=(r["group"],r["region"],r["level"],r["okato"],r["oktmo"],r["year"])
         if key in keys or LOOKUP.get(r["subsection"])!=r["group"] or r["version"]!=RELEASE or r["value"]!=number(r["raw_value"]) or not isinstance(r["row"],int) or r["row"]<2:raise ValueError("Неверная строка отраслевого архива")
-        keys.add(key)
+        if r["row"] in line_numbers or r["level"] not in ("Регион","Страна","Федеральный округ") or not r["region"] or EDITIONS.get(r["year"])!=r["edition"]:raise ValueError("Некорректная территория, издание или номер строки")
+        keys.add(key);line_numbers.add(r["row"])
     if previous and previous.get("rows"):
         old={(r["group"],r["region"],r["level"],r["okato"],r["oktmo"],r["year"]) for r in previous["rows"]}
         if old-keys:raise ValueError("Потеря ранее опубликованных наблюдений")
     if rows:
-        for y in {r["year"] for r in rows}:
+        if {r["year"] for r in rows}!=set(EDITIONS) or {r["group"] for r in rows}!=set(LABELS):raise ValueError("Неполный отраслевой архив")
+        for y in sorted(EDITIONS):
             national=[r for r in rows if r["year"]==y and r["level"]=="Страна"]
             if len(national)!=len(LABELS) or {r["group"] for r in national}!=set(LABELS) or any(r["region"]!="Российская Федерация" or r["value"] is None for r in national):raise ValueError("Итог РФ не воспроизводится")
             if next(r for r in national if r["group"]=="total")["value"]<=0:raise ValueError("Нулевой итог РФ")
-    return dict(regional_manufacturing_groups=len(LABELS)-1,regional_manufacturing_rows=len(rows),regional_manufacturing_numeric=sum(r["value"] is not None for r in rows),regional_manufacturing_suppressed=sum(str(r["raw_value"]).strip() in ("-77777777","-77777777.0") for r in rows),regional_manufacturing_years=len({r["year"] for r in rows}))
+    return dict(regional_manufacturing_groups=sum(any(r["group"]==ident and r["value"] is not None for r in rows) for ident in LABELS if ident!="total"),regional_manufacturing_rows=len(rows),regional_manufacturing_numeric=sum(r["value"] is not None for r in rows),regional_manufacturing_suppressed=sum(str(r["raw_value"]).strip() in ("-77777777","-77777777.0") for r in rows),regional_manufacturing_years=len({r["year"] for r in rows}))
 def publish(out,previous,stamp,refresh):
     import historical
     d=empty(stamp);old=None
