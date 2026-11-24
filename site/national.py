@@ -78,12 +78,13 @@ def parse_money(raw):
         p=month(m[1],"%d.%m.%Y")
         for r in rows:
             if len(r)!=8:continue
-            label=r[0].upper().replace("М","M").replace("Х","X").replace("ШИРОКАЯ ДЕНЕЖНАЯ МАССА (M2X)","ДЕНЕЖНЫЙ АГРЕГАТ M2X").replace("ШИРОКАЯ ДЕНЕЖНАЯ МАССА (M2Х)","ДЕНЕЖНЫЙ АГРЕГАТ M2X")
-            match=re.fullmatch(r"(?:ДЕНЕЖНЫЙ АГРЕГАТ )?(M0|M1|M2|M2X)(?: \(ШИРОКАЯ ДЕНЕЖНАЯ МАССА\))?",label)
+            label=" ".join(r[0].upper().split())
+            # Normalise the code only; replacing every Cyrillic М breaks the word МАССА.
+            match=re.fullmatch(r"(?:ДЕНЕЖНЫЙ АГРЕГАТ )?([МM][012][ХX]?)(?: \(ШИРОКАЯ ДЕНЕЖНАЯ МАССА\))?",label)
             if not match:continue
             try:
                 v=num(r[1])
-                if v>0:result[(match[1],p)]=v
+                if v>0:result[(match[1].replace("М","M").replace("Х","X"),p)]=v
             except ValueError:continue
         if result:break
     return result
