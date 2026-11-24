@@ -3,7 +3,7 @@ const node=(tag,text)=>Object.assign(document.createElement(tag),{textContent:te
 const fmt=v=>v.toLocaleString('ru',{maximumFractionDigits:2});
 const params=new URLSearchParams(location.search);
 const requestedSnapshot=params.get('snapshot')||'';
-const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html','historical.html','industrial.html','sector-passports.html']);
+const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html','historical.html','industrial.html','sector-passports.html','monitoring.html','data-centre.html','sectors.html','analysis-centre.html','research-centre.html','quality-centre.html']);
 const currentPage=location.pathname.split('/').at(-1)||'';
 const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnapshot)?requestedSnapshot:'';
 const root=/^[0-9a-f]{40}$/i.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
@@ -142,7 +142,23 @@ async function start(){
  el('health').textContent='Сборка '+new Date(status.built).toLocaleString('ru',{timeZone:'Europe/Moscow'})+' МСК · ежедневно в 06:17 МСК. '+(status.failures.length?'Частичное обновление: '+status.failures.length+' источников; подробности в методологии.':'Зарегистрированных ошибок нет.')+(total?' Доля «'+sources[0][0]+'» в новостях: '+fmt(100*sources[0][1]/total)+'%.':'');
  const cite=node('button','Закрепить версию данных в ссылке');cite.onclick=()=>{const url=new URL(location.href);url.searchParams.set('snapshot',version);history.replaceState(null,'',url);cite.textContent='Скопируйте адрес страницы — версия закреплена'};el('health').after(cite);
  if(el('monthly')){
-   load('industry.json').then(rows=>{for(const row of rows){const tr=el('monthly').insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);const link=node('a','Выпуск Росстата');link.href=row.url;const cell=tr.insertCell();cell.append(link,node('small',row.verified?' · Проверено '+row.verified.slice(0,10):' · Архивное, повторно не подтверждено'));if(row.alternative_url){const alt=node('a',' · Альтернативный бюллетень');alt.href=row.alternative_url;cell.append(alt)}const directory=node('a',' · Раздел промышленности Росстата');directory.href='https://www.rosstat.gov.ru/enterprise_industrial';cell.append(directory)}}).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
+   load('industry.json').then(rows=>{
+     const data=rows.filter(r=>r&&typeof r.period==='string'&&Number.isFinite(r.value)).sort((a,b)=>b.period.localeCompare(a.period)),body=el('monthly'),more=el('monthly-more'),summary=el('monthly-summary');
+     let full=false;
+     function render(){
+       body.replaceChildren();
+       for(const row of (full?data:data.slice(0,12))){
+         const tr=body.insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);
+         const link=node('a','Выпуск Росстата');link.href=row.url;const cell=tr.insertCell();cell.append(link,node('small',row.verified?' · Проверено '+row.verified.slice(0,10):' · Архивное, повторно не подтверждено'));
+         if(row.alternative_url){const alt=node('a',' · Альтернативный бюллетень');alt.href=row.alternative_url;cell.append(alt)}
+         const directory=node('a',' · Раздел промышленности Росстата');directory.href='https://www.rosstat.gov.ru/enterprise_industrial';cell.append(directory)
+       }
+       if(!data.length)body.insertRow().insertCell().textContent='Нет доступных наблюдений';
+       if(summary)summary.textContent='Показано '+(full?data.length:Math.min(data.length,12))+' из '+data.length+' месячных наблюдений, сначала последние.';
+       if(more){more.hidden=data.length<=12;more.textContent=full?'Свернуть до 12 последних месяцев':'Показать весь ряд';more.setAttribute('aria-expanded',String(full));more.onclick=()=>{full=!full;render()}}
+     }
+     render()
+   }).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
  }
  for(const [fn,id] of [[archive,'count'],[model,'effect'],[stats,'chart']])fn().catch(()=>el(id).textContent='Не удалось загрузить данные. Обновите страницу.')
 }
@@ -151,5 +167,5 @@ start().catch(()=>{if(el('health'))el('health').textContent='Снимок нед
 document.addEventListener('DOMContentLoaded',()=>{
  const n=el('snapshot-notice');if(!n)return;
  if(requestedSnapshot&&!pinned){n.hidden=false;n.textContent='Эта статическая страница отображает текущую сборку, а не закреплённую версию. Для исторических данных используйте статистический центр или сравнение.';const a=node('a',' Открыть закреплённый статистический центр');a.href='statistics.html?snapshot='+encodeURIComponent(requestedSnapshot);n.append(a)}
- else if(pinned){n.hidden=false;n.textContent='Закреплённая версия динамических данных: '+pinned+'. Статические страницы и методические тексты относятся к текущей сборке.';for(const a of document.querySelectorAll('header nav a')){const u=new URL(a.href);if(u.origin===location.origin&&dynamicPages.has(u.pathname.split('/').at(-1))){u.searchParams.set('snapshot',pinned);a.href=u.href}}}
+ else if(pinned){n.hidden=false;n.textContent='Закреплённая версия динамических данных: '+pinned+'. Статические страницы и методические тексты относятся к текущей сборке.';for(const a of document.querySelectorAll('header nav a,.section-nav a,.portal-grid a')){const u=new URL(a.href);if(u.origin===location.origin&&dynamicPages.has(u.pathname.split('/').at(-1))){u.searchParams.set('snapshot',pinned);a.href=u.href}}}
 });

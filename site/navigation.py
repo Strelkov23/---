@@ -1,0 +1,66 @@
+"""One authoritative navigation catalogue; legacy pages remain independently addressable."""
+from html import escape
+
+GROUPS=(
+ ("monitoring","Мониторинг","Новости, официальные решения и законодательство",(
+  ("week.html","Обзор за неделю","Главные публикации по отраслям за последние семь дней."),
+  ("index.html#archive","Архив материалов","Поиск по новостям, ведомствам, тематике и датам."),
+  ("laws.html","Законодательство","Правовые акты, даты публикации и контроль полноты."),
+  ("directory.html","Ведомства и кодексы","Справочник государственных органов и правовых источников."),
+ )),
+ ("data-centre","Статистика","Экономические показатели России, история и регионы",(
+  ("statistics.html","Каталог показателей","Единицы, периодичность, охват, пропуски и источники."),
+  ("national.html","Российские данные","Официальные денежные и макроэкономические ряды."),
+  ("indicators.html","Годовые показатели","Динамика с 1991 года по доступным наблюдениям."),
+  ("historical.html","Регионы и история","Региональные ряды, бюджеты и территориальные сравнения."),
+  ("industrial.html","Промышленная статистика","Физические объёмы и индексы производства."),
+ )),
+ ("sectors","Отрасли","Структура экономики и производственные цепочки",(
+  ("sector-passports.html","Паспорта отраслей","Показатели, динамика и источники по тематическим досье."),
+  ("atlas.html","Межотраслевой атлас","113 продуктовых позиций и связи 19 групп баланса."),
+  ("machinery.html","Сельскохозяйственная техника","Отдельный разбор машиностроения."),
+  ("industrial.html","Натуральное производство","Детализация промышленного выпуска."),
+ )),
+ ("analysis-centre","Аналитика","Сравнения, диспропорции и сценарные расчёты",(
+  ("compare.html","Сравнение показателей","Графики, сопоставимые годы и исходные наблюдения."),
+  ("diagnostics.html","Диагностика экономики","Расчёт разрывов и сигналов для исследования."),
+  ("historical.html#hist-rank","Территориальные сравнения","Сопоставление значений по территориям за один год."),
+  ("historical.html#regional-comparison","Сопоставление региональных показателей","Два ряда по общей территории и базовому году."),
+  ("historical.html#regional-disparities","Межрегиональные диспропорции","Разброс, Джини территорий и корреляции."),
+  ("scenario.html","Многовариантные сценарии","Расчёты изменения конечного спроса."),
+  ("index.html#model","Межотраслевая модель","Воспроизводимые расчёты по таблицам затрат и выпуска."),
+ )),
+ ("research-centre","Исследования","Научные публикации и рабочее пространство",(
+  ("papers.html","Научные статьи","Поиск литературы по темам, журналам, индексам и DOI."),
+  ("desk.html","Рабочий стол","Поиск, отбор и сохранение материалов исследования."),
+  ("desk.html#brief","Аналитическая справка","Заметки, выбранные источники и сценарии для отчёта."),
+ )),
+ ("quality-centre","Источники и качество","Методика, проверка данных и прозрачность обновлений",(
+  ("methodology.html","Методология","Правила интерпретации и формулы расчётов."),
+  ("sources.html","Состояние источников","Проверки загрузок, охват и сбои."),
+  ("links.html","Проверка ссылок","Отчёт по внутренним и внешним адресам."),
+  ("updates.html","Журнал обновлений","Изменения данных между сохранёнными версиями."),
+ ))
+)
+def a(href,label,active=False):
+    return '<a href="'+escape(href,quote=True)+'"'+(' aria-current="page"' if active else '')+'>'+escape(label)+'</a>'
+def current_group(page):
+    for group in GROUPS:
+        if page==group[0]+".html":return group
+    if page.startswith("indicator-"):return GROUPS[1]
+    if page.startswith("sector-") and page!="sector-passports.html":return GROUPS[2]
+    return next((g for g in GROUPS if any(href==page for href,_,_ in g[3])),None)
+def primary(page):
+    group=current_group(page)
+    return a("index.html","Главная",page=="index.html")+''.join(a(g[0]+".html",g[1],g==group) for g in GROUPS)
+def secondary(page):
+    g=current_group(page)
+    if not g:return ""
+    key,label,_,items=g
+    return '<nav class="section-nav" aria-label="Раздел '+escape(label,quote=True)+'"><span>Раздел: '+a(key+".html",label,page==key+".html")+'</span><div>'+''.join(a(href,title,href==page) for href,title,_ in items)+'</div></nav>'
+def cards():
+    return '<section class="section-directory" aria-label="Разделы портала"><h2>Выберите направление работы</h2><div class="portal-grid">'+''.join('<article><h3>'+a(g[0]+".html",g[1])+'</h3><p>'+escape(g[2])+'</p><p class="portal-quick">'+ ' · '.join(a(h,t) for h,t,_ in g[3][:2])+'</p></article>' for g in GROUPS)+'</div></section>'
+def publish(page):
+    for key,label,desc,items in GROUPS:
+        body='<section class="mast"><p class="kicker">Экономический обзор · раздел</p><h1>'+escape(label)+'</h1><p>'+escape(desc)+'</p></section><section class="portal-grid">'+''.join('<article><h2>'+a(href,title)+'</h2><p>'+escape(note)+'</p></article>' for href,title,note in items)+'</section>'
+        page(key+".html",body)
