@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(let j=0;j<5;j++){const v=lo+(hi-lo)*j/4;shape('line',{x1:110,x2:730,y1:y(v),y2:y(v),stroke:'#cbd7d5'});shape('text',{x:104,y:y(v)+4,'text-anchor':'end'},v.toLocaleString('ru',{maximumSignificantDigits:5}))}
    let path='';values.forEach((v,i)=>{if(!Number.isFinite(v))return;path+=(i&&Number.isFinite(values[i-1])?'L':'M')+x(i)+' '+y(v)+' ';const c=shape('circle',{cx:x(i),cy:y(v),r:2.8,fill:'#006c69'});const tip=document.createElementNS(ns,'title');tip.textContent=periods[i]+' · '+fmt(v)+' '+r.unit;c.append(tip)});
    shape('path',{d:path,stroke:'#006c69','stroke-width':2,fill:'none'});
-   periods.forEach((p,i)=>{if(i===0||i===periods.length-1||i%Math.ceil(periods.length/5)===0&&i<periods.length-2)shape('text',{x:x(i),y:215,'text-anchor':i===0?'start':i===periods.length-1?'end':'middle'},p)});
+   chartTickIndices(periods.length,5).forEach(i=>shape('text',{x:x(i),y:215,'font-size':11,'text-anchor':i===0?'start':i===periods.length-1?'end':'middle'},periods[i]));
    host.append(svg);chartTools(host,r.title,r.unit,periods,[{name:r.title,code:r.id,values}],{source:r.provider,monthly,url:r.source});
    download.disabled=false;download.onclick=()=>csv('sector-series-'+r.id+'.csv',[['Код','Показатель','Период','Значение','Единица','Источник','Дата получения','Примечание'],...periods.map(p=>{const v=by.get(p);return[r.id,r.title,p,v?.value??'',r.unit,v?.source||r.source,v?.seen||'',v?.note||(!v?'Нет наблюдения':'')]})]);save(ids)
   }
