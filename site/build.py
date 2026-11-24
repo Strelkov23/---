@@ -87,7 +87,12 @@ with m.connect() as db:
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
     failures.extend(r["journal"]+" · "+r["status"] for r in journal_checks if r["status"]!="Проверено")
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
-    industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv else ""
+    failures.extend(industrial_data.publish(db,m.now(),out,"--refresh" in sys.argv))
+    industrial=json.loads((out/"industrial.json").read_text())
+    aggregate=[s for s in industrial["series"] if s["kind"]=="Индекс производства г/г" and s["code"]=="BCDE" and s["source"]==industrial_data.BASE+"ind_baza_2023.xlsx"]
+    # Use the official systematic workbook ahead of obsolete bulletin URLs.
+    primary=aggregate[0] if len(aggregate)==1 else None
+    industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv and not primary else ""
     if industry_error:
         failures.append("Месячная промышленность · " + industry_error)
     db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
@@ -96,6 +101,12 @@ with m.connect() as db:
         from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) m
         left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
         where m.rn=1 order by m.period""")]
+    if primary:
+        by_period={r["period"]:r for r in months}
+        check=next((x for x in industrial["sources"] if x["url"]==primary["source"]),{})
+        for r in primary["values"]:
+            by_period[r["period"]]=dict(period=r["period"],value=r["value"],url=primary["source"],verified=check.get("success") or r["seen"],sheet=primary["sheet"],row=r["row"],column=r["column"])
+        months=sorted(by_period.values(),key=lambda r:r["period"])
     for row in months:
         alternative=industry.ALTERNATIVES.get(row["period"])
         if alternative and abs(alternative[0]-row["value"])<1e-8:
@@ -107,7 +118,6 @@ with m.connect() as db:
             failures.append(c["title"]+" · "+c["status"])
     failures.extend(national.publish(db,m.now(),out,"--refresh" in sys.argv))
     failures.extend(historical.publish(db,m.now(),out,"--refresh" in sys.argv))
-    failures.extend(industrial_data.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html"]:
     page(name,Path(name).read_text())
