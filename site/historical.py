@@ -17,6 +17,7 @@ SOURCES=[
  ("population","Росстат · Демография","https://rosstat.gov.ru/folder/12781"),
  ("prices","Росстат · Цены","https://rosstat.gov.ru/statistics/price"),
  ("shortterm","Росстат · Краткосрочные показатели","https://www.rosstat.gov.ru/compendium/document/50802"),
+ ("emiss_open","ЕМИСС · Открытые данные","https://fedstat.ru/opendata/"),
  ("emiss","ЕМИСС · Паспорт среднегодового населения","https://fedstat.ru/indicator/31556"),
  ("emiss_grp","ЕМИСС · Валовой региональный продукт","https://fedstat.ru/indicator/61497"),
  ("budget","Казначейство · Федеральный бюджет","https://roskazna.gov.ru/ispolnenie-byudzhetov/federalnyj-byudzhet"),
@@ -142,6 +143,50 @@ def mirror_rows(raw,section):
                     if len(result)>200000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Не распознана документированная структура CSV")
     return result
+
+def parse_budget(raw,filename=""):
+    """Annual actual federal budget totals from 0503117 only.
+    Require year-end date, rubles, single actual-execution column, balance identity.
+    Other report forms and monthly cumulative totals are not relabelled annual.
+    """
+    import openpyxl
+    result=[]
+    def workbook(blob,member):
+        book=openpyxl.load_workbook(io.BytesIO(blob),read_only=True,data_only=True)
+        try:
+            for sheet in book:
+                rows=list(sheet.iter_rows(values_only=True,max_row=min(sheet.max_row or 3000,3000),max_col=min(sheet.max_column or 35,35)))
+                header=" ".join(norm(x) for row in rows[:20] for x in row if x is not None)
+                if "0503117" not in header+" "+member or not re.search(r"рубл|оке[ий]\s*383",header):continue
+                if "федеральн" not in header or "бюджет" not in header:continue
+                dates=re.findall(r"\b01[./]01[./](20[0-2]\d)\b",header+" "+member)
+                if len(set(dates))!=1:continue
+                yr=int(dates[0])-1
+                cols=set(j for row in rows[:25] for j,v in enumerate(row) if norm(v) in ("исполнено","исполнено всего","исполнение"))
+                if len(cols)!=1:continue
+                col=next(iter(cols));vals={}
+                labels={"доходы бюджета - всего":"BUD_REV","доходы бюджета всего":"BUD_REV","доходы - всего":"BUD_REV","расходы бюджета - всего":"BUD_EXP","расходы бюджета всего":"BUD_EXP","расходы - всего":"BUD_EXP","результат исполнения бюджета":"BUD_BAL"}
+                for i,row in enumerate(rows):
+                    for x in row[:col]:
+                        label=norm(x).replace("–","-").replace("—","-")
+                        if label not in labels:continue
+                        key=labels[label];v=numeric(row[col]) if col<len(row) else None
+                        if v is None:continue
+                        if key in vals and vals[key][0]!=v:vals[key]=(None,i+1)
+                        else:vals[key]=(v,i+1)
+                if any(k not in vals or vals[k][0] is None for k in ("BUD_REV","BUD_EXP","BUD_BAL")):continue
+                rev,exp,bal=[vals[k][0] for k in ("BUD_REV","BUD_EXP","BUD_BAL")]
+                if rev<0 or exp<0 or abs(rev-exp-bal)>max(1,abs(rev)*1e-9):continue
+                for k,title in (("BUD_REV","Федеральный бюджет: исполненные доходы"),("BUD_EXP","Федеральный бюджет: исполненные расходы"),("BUD_BAL","Федеральный бюджет: сальдо исполнения")):
+                    result.append(dict(indicator=k,title=title,region="Российская Федерация",year=yr,value=vals[k][0],unit="руб.",sheet=member+" / "+sheet.title,row=vals[k][1],column=col+1,note="Форма 0503117; годовой итог на 1 января следующего года. Контроль: доходы минус расходы равны сальдо."))
+        finally:book.close()
+    if filename.lower().endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            for item in z.infolist():
+                if item.filename.lower().endswith(".xlsx") and "0503117" in item.filename and item.file_size<25_000_000:workbook(z.read(item),item.filename)
+    else:workbook(raw,filename)
+    return result
+
 def publish(db,stamp,out,refresh):
     db.execute("create table if not exists hist_sources(code text primary key,checked text,success text,status text,files text)")
     db.execute("create table if not exists hist_values(indicator text,region text,year integer,unit text,value real,seen text,source text,payload text,primary key(indicator,region,year,unit,source,seen))")
@@ -152,7 +197,7 @@ def publish(db,stamp,out,refresh):
         if refresh and (not old or (old[0] or "")[:10]!=stamp[:10]):
             try:
                 raw,enc=get(url,5_000_000);found=discover(raw.decode(enc,errors="replace"),url)
-                if not found and code not in ("emiss","emiss_grp"):raise ValueError("Ссылки на файлы не распознаны")
+                if not found and code not in ("emiss","emiss_grp","emiss_open"):raise ValueError("Ссылки на файлы не распознаны")
                 files=found
                 db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,"Найдено файлов: "+str(len(files)),json.dumps(files,ensure_ascii=False)))
             except Exception as e:
@@ -184,6 +229,15 @@ def publish(db,stamp,out,refresh):
                     n=store(rows,f["url"],title,"Росстат · прямой импорт")
                     sources.append(dict(code="import_"+code,title=title,url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
                 except Exception as e:sources.append(dict(code="import_"+code,title=title,url=f["url"],checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
+        # Year-end federal reports only. Keep the other Treasury files in the source registry.
+        budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
+        for f in budget_files[:3]:
+            try:
+                raw,_=get(f["url"],35_000_000);rows=parse_budget(raw,unquote(urlsplit(f["url"]).path.rsplit("/",1)[-1]))
+                if not rows:raise ValueError("Годовая форма 0503117 не распознана")
+                n=store(rows,f["url"],"Федеральный бюджет","Казначейство · прямой импорт")
+                sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
+            except Exception as e:sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
         # One bounded independent processed archive per update; rotate sections.
         section=list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]
         url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
