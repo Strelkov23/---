@@ -9,6 +9,8 @@ import industry
 import indicators
 import literature
 import cbr_data
+import national
+import routes
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -92,15 +94,20 @@ with m.connect() as db:
         from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) m
         left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
         where m.rn=1 order by m.period""")]
+    for row in months:
+        alternative=industry.ALTERNATIVES.get(row["period"])
+        if alternative and abs(alternative[0]-row["value"])<1e-8:
+            row["alternative_url"]=alternative[1]
     write("industry.json", months)
     cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
     for c in json.loads((out/"cbr.json").read_text()).values():
         if c["status"].startswith("Ошибка"):
             failures.append(c["title"]+" · "+c["status"])
+    failures.extend(national.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html"]:
+for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html"]:
     page(name,Path(name).read_text())
-for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js"]:
+for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())
 
@@ -111,6 +118,8 @@ page('machinery.html',Path('machinery.html').read_text())
 import bulletin
 bulletin.publish(page,out)
 shutil.copy('chart-export.js',out)
+
+routes.publish(out)
 
 import link_audit
 (out/"quality.json").write_text("{}",encoding="utf-8")

@@ -16,6 +16,12 @@ RELEASES = [
     "https://rosstat.gov.ru/storage/mediabank/75_27-05-2026.html",
     "https://rosstat.gov.ru/storage/mediabank/110_22-07-2026.html",
 ]
+ALTERNATIVES = {
+    "2026-07": (100.4,"https://www.rosstat.gov.ru/storage/mediabank/127_26-08-2026.html"),
+    "2026-08": (99.4,"https://www.rosstat.gov.ru/storage/mediabank/146_23-09-2026.html"),
+    "2026-09": (101.8,"https://www.rosstat.gov.ru/storage/mediabank/164_28-10-2026.html"),
+}
+RELEASES += [url for value,url in ALTERNATIVES.values()]
 MONTHS = "январе феврале марте апреле мае июне июле августе сентябре октябре ноябре декабре".split()
 PRIOR_MONTHS = "январем февралем мартом апрелем маем июнем июлем августом сентябрем октябрем ноябрем декабрем".split()
 
@@ -60,7 +66,7 @@ def collect(db, stamp):
                 if re.search(r'/document/\d+/?$|/storage/mediabank/[^/]+\.html?$',p.path,re.I):urls.add(url)
         except Exception as err:errors.append(str(err)[:90])
     candidates=defaultdict(dict)
-    ordered=RELEASES+sorted(urls-set(RELEASES),reverse=True)[:28]
+    ordered=RELEASES+sorted(urls-set(RELEASES),reverse=True)[:25]
     for url in ordered:
         try:
             body=" ".join(unescape(re.sub("<[^>]+>"," ",read(url))).split())[:15000]

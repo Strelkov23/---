@@ -3,10 +3,10 @@ const node=(tag,text)=>Object.assign(document.createElement(tag),{textContent:te
 const fmt=v=>v.toLocaleString('ru',{maximumFractionDigits:2});
 const params=new URLSearchParams(location.search);
 const requestedSnapshot=params.get('snapshot')||'';
-const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html']);
+const dynamicPages=new Set(['','index.html','compare.html','papers.html','desk.html','statistics.html','diagnostics.html','scenario.html','methodology.html','national.html']);
 const currentPage=location.pathname.split('/').at(-1)||'';
 const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnapshot)?requestedSnapshot:'';
-const root=/^[0-9a-f]{40}$/.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
+const root=/^[0-9a-f]{40}$/i.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
 async function load(file){const r=await fetch(root+file);if(!r.ok)throw Error();return r.json()}
 function restore(ids){
  for(const id of ids){const value=params.get(id);if(value!==null){const field=el(id);if(!field)continue;if(field.tagName!=='SELECT'||Array.from(field.options).some(o=>o.value===value))field.value=value}}
@@ -142,7 +142,7 @@ async function start(){
  el('health').textContent='Сборка '+new Date(status.built).toLocaleString('ru',{timeZone:'Europe/Moscow'})+' МСК · ежедневно в 06:17 МСК. '+(status.failures.length?'Частичное обновление: '+status.failures.length+' источников; подробности в методологии.':'Зарегистрированных ошибок нет.')+(total?' Доля «'+sources[0][0]+'» в новостях: '+fmt(100*sources[0][1]/total)+'%.':'');
  const cite=node('button','Закрепить версию данных в ссылке');cite.onclick=()=>{const url=new URL(location.href);url.searchParams.set('snapshot',version);history.replaceState(null,'',url);cite.textContent='Скопируйте адрес страницы — версия закреплена'};el('health').after(cite);
  if(el('monthly')){
-   load('industry.json').then(rows=>{for(const row of rows){const tr=el('monthly').insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);const link=node('a','Выпуск Росстата');link.href=row.url;tr.insertCell().append(link,node('small',row.verified?' · Проверено '+row.verified.slice(0,10):' · Архивное, повторно не подтверждено'))}}).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
+   load('industry.json').then(rows=>{for(const row of rows){const tr=el('monthly').insertRow();tr.insertCell().textContent=row.period;tr.insertCell().textContent=fmt(row.value);const link=node('a','Выпуск Росстата');link.href=row.url;const cell=tr.insertCell();cell.append(link,node('small',row.verified?' · Проверено '+row.verified.slice(0,10):' · Архивное, повторно не подтверждено'));if(row.alternative_url){const alt=node('a',' · Альтернативный бюллетень');alt.href=row.alternative_url;cell.append(alt)}}}).catch(()=>{el('monthly').insertRow().insertCell().textContent='Для этой версии ряд недоступен'})
  }
  for(const [fn,id] of [[archive,'count'],[model,'effect'],[stats,'chart']])fn().catch(()=>el(id).textContent='Не удалось загрузить данные. Обновите страницу.')
 }

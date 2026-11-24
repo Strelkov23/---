@@ -20,14 +20,15 @@ jobs:
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m compileall -q .
-          python3 -m unittest test_catalogue.py test_research.py test_quality.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py
           for script in *.js; do node --check "$script"; done
+          rm -rf public
           python3 build.py
           python3 - <<'PY'
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js'):
+          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
