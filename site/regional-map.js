@@ -41,7 +41,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const regionName=p=>typeof p?.name==='string'&&p.name.trim()?p.name:'Контур без названия';
   const regionKey=p=>typeof p?.name==='string'&&p.name.trim()?RegionalMap.key(p.iso_3166_2):null;
   for(const f of geo.features){const k=regionKey(f.properties);if(k)counts.set(k,(counts.get(k)||0)+1)}
-  const features=geo.features.map(f=>{const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
+  const features=geo.features.map(feature=>{const f={...feature,properties:feature.properties||{}};const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
   const matched=features.filter(x=>x.r),unmapped=[...sample.out].filter(([key])=>counts.get(key)!==1);
   const thresholds=RegionalMap.classes(matched.map(x=>x.r.value));
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
