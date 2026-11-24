@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),M=require('./regional-map.js');
+assert.equal(M.key('RU-MOW'),'москва');
+assert.equal(M.key('RU-ARK'),null);
+assert.equal(M.key('UA-43'),null);
+assert.ok(M.project(100,65).every(v=>Math.abs(v)<1e-10));
+const a=M.project(180,65),b=M.project(-180,65);
+assert.ok(a.every((v,i)=>Math.abs(v-b[i])<1e-10));
+assert.deepEqual(M.classes([3,3,3]),[3]);
+assert.equal(M.bin(3,[3]),0);
+assert.equal(M.bin(null,[1,2]),-1);
+assert.equal(M.bin(3,[1,2,4]),1);
+console.log('Regional map tests passed');
