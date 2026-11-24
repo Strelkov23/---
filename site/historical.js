@@ -139,3 +139,75 @@ document.addEventListener('DOMContentLoaded',async()=>{
   $('hist-search').oninput=()=>{options();select()};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-visual-limit').onchange=ranking;$('hist-visual-years').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
  }catch(e){console.error(e);status.textContent='Исторический каталог не доступен в этой версии. Откройте текущую сборку.'}
 });
+
+document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),form=$('rc-form');if(!form)return;
+ const a=$('rc-a'),b=$('rc-b'),region=$('rc-region'),base=$('rc-base'),status=$('rc-status'),host=$('rc-chart'),table=$('rc-table'),sources=$('rc-sources'),download=$('rc-csv');
+ const fields=['rc-a','rc-b','rc-region','rc-from','rc-to','rc-base'],saved=new URLSearchParams(location.search);
+ let pair=null,seq=0,first=true;
+ const cache=new Map();
+ const urlLink=(t,u)=>{const l=node('a',t);l.href=u;l.target='_blank';l.rel='noopener noreferrer';return l};
+ const valid=r=>Number.isInteger(r.year)&&Number.isFinite(r.value)&&typeof r.region==='string'&&r.region.length>0;
+ function clear(){host.replaceChildren();table.replaceChildren();download.disabled=true}
+ function format(x){return Number.isFinite(x)?fmt(x):'—'}
+ try{
+  const catalog=(await load('historical.json')).series;
+  for(const s of catalog)for(const p of [a,b])p.add(new Option(s.title+' · '+s.unit+' · '+s.kind,s.code));
+  if(b.options.length>1)b.selectedIndex=1;
+  restore(['rc-a','rc-b','rc-from','rc-to']);
+  async function get(s){if(!cache.has(s.code)){const req=load(s.file).catch(e=>{cache.delete(s.code);throw e});cache.set(s.code,req);if(cache.size>8)cache.delete(cache.keys().next().value)}return {...await cache.get(s.code),code:s.code}}
+  async function select(){
+   const token=++seq,old=first?saved.get('rc-region'):region.value;pair=null;clear();sources.replaceChildren();region.replaceChildren();base.replaceChildren(new Option('Первый общий положительный год',''));status.textContent='Загрузка рядов…';
+   const ma=catalog.find(s=>s.code===a.value),mb=catalog.find(s=>s.code===b.value);
+   if(!ma||!mb){status.textContent='Нет доступных рядов в каталоге.';return}
+   if(ma.code===mb.code){status.textContent='Выберите два разных показателя.';return}
+   try{
+    const rows=await Promise.all([get(ma),get(mb)]);if(token!==seq)return;
+    pair=rows;
+    const names=rows.map(s=>new Set(s.values.filter(valid).map(r=>r.region)));
+    for(const r of [...names[0]].filter(r=>names[1].has(r)).sort((x,y)=>x.localeCompare(y,'ru')))region.add(new Option(r,r));
+    if([...region.options].some(o=>o.value===old))region.value=old;
+    for(const [i,s] of rows.entries()){const p=node('p',(i===0?'A: ':'B: ')+s.title+' · '+s.unit+' · '+s.kind+' · ');p.append(urlLink('Первоисточник',s.source));sources.append(p)}
+    const initial=first?saved.get('rc-base'):'';first=false;draw(initial);
+   }catch(e){if(token===seq){console.error(e);status.textContent='Один из рядов недоступен для выбранной версии.'}}
+  }
+  function draw(preferred){
+   if(!pair)return;
+   clear();
+   const start=Number($('rc-from').value),end=Number($('rc-to').value),old=typeof preferred==='string'?preferred:base.value;
+   base.replaceChildren(new Option('Первый общий положительный год',''));
+   if(!region.value){status.textContent='Нет территорий с совпадающими названиями в двух рядах.';save(fields);return}
+   if(!Number.isInteger(start)||!Number.isInteger(end)||start<1990||end>2029||start>end){status.textContent='Укажите корректный период 1990–2029.';return}
+   const maps=pair.map(s=>new Map(s.values.filter(r=>valid(r)&&r.region===region.value&&r.year>=start&&r.year<=end).map(r=>[r.year,r])));
+   const all=[...maps[0].keys(),...maps[1].keys()];
+   if(!all.length){status.textContent='Нет наблюдений в выбранном периоде.';save(fields);return}
+   const lo=Math.min(...all),hi=Math.max(...all),years=Array.from({length:hi-lo+1},(_,i)=>lo+i);
+   const common=years.filter(y=>maps.every(m=>m.has(y))),possible=common.filter(y=>maps.every(m=>m.get(y).value>0));
+   for(const y of possible)base.add(new Option(String(y),String(y)));
+   if(possible.includes(Number(old)))base.value=old;
+   const ref=base.value?Number(base.value):possible[0];
+   const idx=(i,y)=>ref!==undefined&&maps[i].has(y)?maps[i].get(y).value/maps[i].get(ref).value*100:null;
+   status.textContent='Общих лет: '+common.length+' · наблюдений A: '+maps[0].size+' · B: '+maps[1].size+(ref===undefined?' · нет общей положительной базы':' · база '+ref+' = 100');
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+   for(const label of ['Год','A · '+pair[0].unit,'B · '+pair[1].unit,'A · индекс','B · индекс'])h.append(node('th',label));
+   for(const y of [...years].reverse()){const tr=body.insertRow();for(const v of [y,format(maps[0].get(y)?.value),format(maps[1].get(y)?.value),format(idx(0,y)),format(idx(1,y))])tr.insertCell().textContent=v}
+   table.append(t);
+   if(ref!==undefined){
+    const series=pair.map((s,i)=>({name:(i===0?'A: ':'B: ')+s.title,code:s.code,values:years.map(y=>idx(i,y))}));
+    const vals=series.flatMap(s=>s.values.filter(Number.isFinite));let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min-=1;max+=1}
+    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 760 240');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label','Сравнение индексов двух показателей');
+    const shape=(tag,attrs,t)=>{const e=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(t!==undefined)e.textContent=t;svg.append(e);return e};
+    const x=i=>85+640*i/Math.max(1,years.length-1),y=v=>190-155*(v-min)/(max-min);
+    for(let i=0;i<5;i++){const v=min+(max-min)*i/4;shape('line',{x1:85,x2:725,y1:y(v),y2:y(v),stroke:'#cbd7d5'});shape('text',{x:78,y:y(v)+4,'text-anchor':'end'},format(v))}
+    series.forEach((s,j)=>{const color=j?'#a24724':'#006c69';let d='';s.values.forEach((v,i)=>{if(!Number.isFinite(v))return;d+=(i&&Number.isFinite(s.values[i-1])?'L':'M')+x(i)+' '+y(v)+' ';const c=shape('circle',{cx:x(i),cy:y(v),r:3,fill:color});const tip=document.createElementNS(ns,'title');tip.textContent=(j?'B':'A')+' · '+years[i]+' · '+format(v);c.append(tip)});shape('path',{d,fill:'none',stroke:color,'stroke-width':2.5,'stroke-dasharray':j?'7 4':'none'})});
+    years.forEach((yr,i)=>{if(i===0||i===years.length-1||i%Math.ceil(years.length/6)===0&&i<years.length-2)shape('text',{x:x(i),y:215,'text-anchor':'middle'},yr)});
+    const legend=node('div','');legend.className='legend';for(const [j,s] of series.entries()){const l=node('span',s.name);l.style.color=j?'#a24724':'#006c69';legend.append(l)}
+    host.append(node('h3',region.value+' · '+ref+' = 100'),legend,svg,node('p','Индекс = значение года / значение базового года × 100. Пропущенные данные остаются пропусками. Индексация номинальных величин не устраняет инфляцию.'));
+    chartTools(host,'Сопоставление региональных показателей', 'индекс, '+ref+' = 100',years,series.map((s,i)=>({...s,name:i===0?'A: '+pair[0].code:'B: '+pair[1].code})),{territory:region.value,source:pair.map(s=>s.kind).join(' / ')});
+   }else host.append(node('p','График индексов недоступен: нет общего года с положительными значениями обоих показателей. Исходные значения доступны ниже.'));
+   download.disabled=false;download.onclick=()=>csv('regional-comparison.csv',[['Территория','Год','Код','Показатель','Единица','Значение','Индекс','Базовый год','Источник','Метод обработки','Лист','Строка','Столбец','Примечание','Получено'],...years.flatMap(y=>pair.map((s,i)=>{const r=maps[i].get(y);return[region.value,y,s.code,s.title,s.unit,r?.value??'',idx(i,y)??'',ref??'',s.source,s.kind,r?.sheet,r?.row,r?.column,r?.note,r?.seen]}))]);
+   save(fields)
+  }
+  a.onchange=b.onchange=select;region.onchange=()=>draw('');base.onchange=()=>draw();$('rc-from').oninput=$('rc-to').oninput=()=>draw();form.onsubmit=e=>e.preventDefault();select()
+ }catch(e){console.error(e);status.textContent='Каталог сопоставления недоступен.'}
+});
