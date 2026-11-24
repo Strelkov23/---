@@ -49,3 +49,5 @@
 #monthly-summary{font-size:.9rem;color:#43625e}#monthly td:first-child{white-space:nowrap}#monthly-more{margin-right:.4rem}
 
 #papers article button[aria-pressed=true]{background:#dbece7;font-weight:bold}#paper-selection{font-weight:600}#paper-filters label{flex:1 1 175px}
+
+#geo-form label{flex:1 1 200px;min-width:0}#geo-form select{width:100%;max-width:100%}#geo-map .geo-figure svg path:focus{outline:none;stroke:#a24724;stroke-width:2}#geo-map .geo-figure svg path:hover{stroke:#a24724;stroke-width:2}#geo-map details{overflow-x:auto}#geo-detail{overflow-wrap:anywhere}
