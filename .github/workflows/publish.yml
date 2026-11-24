@@ -40,6 +40,7 @@ jobs:
           node test-chart-layout.js
           node test-macro-diagnostics.js
           node test-reproduction-plan.js
+          node test-resource-plan.js
           rm -rf public
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt
@@ -62,7 +63,7 @@ jobs:
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/statistics.html' > /tmp/statistics-dom.html
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/diagnostics.html' > /tmp/diagnostics-dom.html
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/scenario.html' > /tmp/scenario-dom.html
-          python3 -c "from pathlib import Path; import json; assert len(json.loads(Path('catalog.json').read_text())) >= 100; assert 'Показателей: ' in Path('/tmp/statistics-dom.html').read_text(); assert 'Рассчитано наблюдений:' in Path('/tmp/diagnostics-dom.html').read_text(); assert 'Групп выше условного предела:' in Path('/tmp/scenario-dom.html').read_text() and 'максимальная доля единого сценария:' in Path('/tmp/scenario-dom.html').read_text() and 'Условный сценарий:' in Path('/tmp/scenario-dom.html').read_text(); assert Path('supplier-dependencies.csv').exists()"
+          python3 -c "from pathlib import Path; import json; assert len(json.loads(Path('catalog.json').read_text())) >= 100; assert 'Показателей: ' in Path('/tmp/statistics-dom.html').read_text(); assert 'Рассчитано наблюдений:' in Path('/tmp/diagnostics-dom.html').read_text(); assert 'Групп выше условного предела:' in Path('/tmp/scenario-dom.html').read_text() and 'максимальная доля единого сценария:' in Path('/tmp/scenario-dom.html').read_text() and 'Условный сценарий:' in Path('/tmp/scenario-dom.html').read_text() and 'Рассчитано альтернатив: 3' in Path('/tmp/scenario-dom.html').read_text(); assert Path('supplier-dependencies.csv').exists()"
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/national.html' > /tmp/national-dom.html
           python3 -c "from pathlib import Path; import json; p=Path('.'); assert len(json.loads((p/'national.json').read_text())) == 13; assert 'Наблюдений:' in Path('/tmp/national-dom.html').read_text()"
           for route in monitoring.html data-centre.html sectors.html analysis-centre.html research-centre.html quality-centre.html index.html papers.html statistics.html national.html methodology.html links.html diagnostics.html scenario.html atlas.html directory.html laws.html compare.html desk.html week.html 404.html archive/ stats/ model/ papers/; do curl --fail --silent "http://localhost:8765/$route" > /dev/null; done
