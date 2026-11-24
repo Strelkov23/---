@@ -30,7 +30,11 @@ const ResourcePlan=(()=>{
   basis.forEach((j,i)=>{if(j<n)x[j]=Math.max(0,t[i][size])});
   const slack=b.map((v,i)=>v-dot(A[i],x));
   if(x.some(v=>!Number.isFinite(v))||slack.some((v,i)=>v< -1e-6*Math.max(1,b[i])))throw Error('LP feasibility check failed');
-  return {x,objective:dot(c,x),slack,iterations};
+  const dual=t[m].slice(n,n+m),objective=dot(c,x),dualObjective=dot(dual,b);
+  const dualSlack=c.map((v,j)=>sum(A.map((row,i)=>dual[i]*row[j]))-v);
+  const gap=Math.abs(dualObjective-objective);
+  if(dual.some(v=>!Number.isFinite(v)||v< -1e-7)||dualSlack.some((v,j)=>v< -1e-7*Math.max(1,Math.abs(c[j])))||gap>1e-6*Math.max(1,Math.abs(objective)))throw Error('LP optimality check failed');
+  return {x,objective,slack,iterations,dual,dualObjective,gap};
  }
  function model(m,p){
   const n=m.names.length;
@@ -70,15 +74,24 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    table(detail,['Группа','Прирост спроса, млрд ₽','Прирост спроса, % базы','Прирост выпуска, млрд ₽','Прирост выпуска, % базы','Импорт от спроса группы, млрд ₽','Остаток условного лимита выпуска, млрд ₽'],m.names.map((name,i)=>[name,fmtValue(r.x[i]),fmtValue(r.x[i]*100000/m.demand[i]),fmtValue(r.output[i]),fmtValue(r.output[i]*100000/m.output[i]),fmtValue(r.x[i]*latest.imp[i]),fmtValue(Math.max(0,r.capacitySlack[i]))]));
   }
   function draw(){
-   results.replaceChildren();detail.replaceChildren();download.disabled=true;latest=null;
+   results.replaceChildren();detail.replaceChildren();$('opt-chart').replaceChildren();download.disabled=true;latest=null;
    const all=[...priority,...cap,...maximum,...fields.map($)];
    if(all.some(x=>!x.value||!x.validity.valid||!Number.isFinite(x.valueAsNumber))){status.textContent='Проверьте допустимые пределы и веса.';return}
    const p={budget:$('opt-budget').valueAsNumber,importLimit:$('opt-import').valueAsNumber,penalty:$('opt-penalty').valueAsNumber,priority:priority.map(x=>x.valueAsNumber),maxDemand:maximum.map(x=>x.valueAsNumber),cap:cap.map(x=>x.valueAsNumber)};
    try{latest=ResourcePlan.model(m,p);params=p}catch(e){console.error(e);status.textContent='Не удалось получить допустимое решение. Проверьте данные и ограничения.';return}
    const r=latest.results;status.textContent='Рассчитано альтернатив: '+r.length+' · все решения проверены на соблюдение заданных ограничений.';
    table(results,['Критерий','Конечный спрос, млрд ₽','Взвешенный спрос, усл. ед.','Валовой выпуск, млрд ₽','Импортные затраты, млрд ₽','Неиспользованный лимит спроса, млрд ₽'],r.map(a=>[a.name,fmtValue(a.direct),fmtValue(a.priority),fmtValue(a.gross),fmtValue(a.imports),fmtValue(Math.max(0,a.usedBudget))]));
+   const chart=$('opt-chart'),heading=node('h3','Сравнение рассчитанных альтернатив');chart.append(heading);
+   for(const [label,key] of [['Дополнительный конечный спрос','direct'],['Дополнительный валовой выпуск','gross'],['Импортные промежуточные затраты','imports']]){
+    const block=node('section','');block.className='opt-bars';block.append(node('h4',label+' · млрд ₽'));
+    const max=Math.max(1,...r.map(a=>a[key]));
+    for(const a of r){const row=node('div','');row.className='opt-bar-row';const text=node('p',a.name+' — '+fmtValue(a[key]));const meter=node('div','');meter.className='opt-bar-track';meter.setAttribute('aria-hidden','true');const fill=node('div','');fill.className='opt-bar-fill';fill.style.width=(100*a[key]/max)+'%';meter.append(fill);row.append(text,meter);block.append(row)}
+    chart.append(block);
+   }
+   chart.append(node('p','Шкала едина внутри каждого показателя; между показателями длины полос не сопоставляются.'));
+   chart.append(node('p','Численная проверка оптимальности: максимальное расхождение прямой и двойственной целей — '+Math.max(...r.map(a=>a.gap)).toExponential(2)+' усл. ед.'));
    showDetail();
-   download.disabled=false;download.onclick=()=>csv('resource-allocation-2021.csv',[['Источник','https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'],['Версия',version||''],['Лимит спроса, млрд ₽',params.budget],['Лимит импорта, млрд ₽',params.importLimit],['Штраф импорта',params.penalty],['Альтернатива','Группа','Вес','Макс. прирост спроса, %','Макс. прирост выпуска, %','Дополнительный спрос, млрд ₽','Дополнительный выпуск, млрд ₽','Импорт от дополнительного спроса, млрд ₽','Коэффициент цели','Суммарное значение цели'],...r.flatMap(a=>m.names.map((name,i)=>[a.name,name,params.priority[i],params.maxDemand[i],params.cap[i],a.x[i],a.output[i],a.x[i]*latest.imp[i],a.objectiveCoefficients[i],a.objective]))]);
+   download.disabled=false;download.onclick=()=>csv('resource-allocation-2021.csv',[['Источник','https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'],['Версия',version||''],['Лимит спроса, млрд ₽',params.budget],['Лимит импорта, млрд ₽',params.importLimit],['Штраф импорта',params.penalty],['Альтернатива','Группа','Вес','Макс. прирост спроса, %','Макс. прирост выпуска, %','Дополнительный спрос, млрд ₽','Дополнительный выпуск, млрд ₽','Импорт от дополнительного спроса, млрд ₽','Коэффициент цели','Суммарное значение цели','Двойственная цель','Невязка оптимальности'],...r.flatMap(a=>m.names.map((name,i)=>[a.name,name,params.priority[i],params.maxDemand[i],params.cap[i],a.x[i],a.output[i],a.x[i]*latest.imp[i],a.objectiveCoefficients[i],a.objective,a.dualObjective,a.gap]))]);
    save(fields);const u=new URL(location.href);u.searchParams.set('opt-priority',p.priority.join(','));u.searchParams.set('opt-caps',p.cap.join(','));u.searchParams.set('opt-maxima',p.maxDemand.join(','));history.replaceState(null,'',u);
   }
   select.onchange=showDetail;
