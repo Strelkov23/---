@@ -263,7 +263,7 @@ def publish(db,stamp,out,refresh):
         except Exception as e:sources.append(dict(code="mirror_"+section,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
-    for row in db.execute("""select payload from (select payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year"""):
+    for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
         r=json.loads(row[0])
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         group=series.setdefault(key,dict(title=r["title"],unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))
