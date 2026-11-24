@@ -426,6 +426,8 @@ def mirror_rows(raw,section,selected=False):
                     def val(k):return str(r.get(keys[k],"") or "").strip()
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
                     if not y or v is None or not title or not unit or not region:continue
+                    # Confirmed confidentiality marker in the licensed archive, not an economic value.
+                    if v==-77777777:continue
                     # The publisher explicitly uses mixed units for nationwide budget totals.
                     original_unit=unit
                     if "для значений в целом по россии" in norm(unit):
@@ -796,12 +798,15 @@ def publish(db,stamp,out,refresh):
                 s["next_due"]=stamp[:10]
             s["retry_policy"]+=" До двух показателей ЕМИСС за сборку."
     # Publish bounded sets grouped by indicator and source, never merge across providers.
-    series={}
+    series={};suppressed=0
     # Legacy series IDs remain stable unless a source actually publishes more than
     # one unit for the same indicator. Such editions must never share one label.
     mixed_units=set(db.execute("select indicator,source from hist_values group by indicator,source having count(distinct unit)>1"))
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
         r=json.loads(row[0])
+        # Preserve original database records; exclude reserved marker from public numeric series.
+        if r["source"].startswith(MIRROR) and r["value"]==-77777777:
+            suppressed+=1;continue
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         if (r["indicator"],r["source"]) in mixed_units:key+="_u"+hashlib.sha256(r["unit"].encode()).hexdigest()[:8]
         title=rm.legacy_title(r["indicator"],r["source"],r["title"])
@@ -814,5 +819,5 @@ def publish(db,stamp,out,refresh):
     for key,s in series.items():
         file=key+".json";(folder/file).write_text(json.dumps(s,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         catalog.append(dict(code=key,title=s["title"],unit=s["unit"],kind=s["kind"],source=s["source"],file="regional-data/"+file,count=len(s["values"]),regions=len(set(r["region"] for r in s["values"])),first=min(r["year"] for r in s["values"]),last=max(r["year"] for r in s["values"])))
-    (out/"historical.json").write_text(json.dumps(dict(built=stamp,sources=sources,series=catalog,mirror=MIRROR_PAGE,primary=PRIMARY),ensure_ascii=False,allow_nan=False),encoding="utf-8")
+    (out/"historical.json").write_text(json.dumps(dict(built=stamp,sources=sources,series=catalog,mirror=MIRROR_PAGE,primary=PRIMARY,suppressed_legacy_markers=suppressed),ensure_ascii=False,allow_nan=False),encoding="utf-8")
     return ["История · "+s["title"]+" · "+s["status"] for s in sources if s["status"].startswith("Ошибка") or "частичный импорт" in s["status"]]
