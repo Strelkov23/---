@@ -54,6 +54,11 @@ const RegionalMap=(()=>{
   transport:['#edf0fa','#c7d2ed','#92a9d7','#577ab7','#294a82'],
   innovation:['#f6e9f6','#e1c5e2','#c39ac6','#9a619f','#64386c'],
   enterprises:['#e7f0f3','#b5d3dc','#81b2c0','#4c8495','#255563'],
+  living:['#fdf1e7','#f3d0b3','#dca67e','#aa704a','#714024'],
+  capital:['#e6edf5','#becfe2','#86a6c5','#4c789e','#21466b'],
+  ict:['#e5f6fa','#b2e3ed','#72c7d9','#3295b2','#145974'],
+  prices:['#fce9ed','#efbfc9','#d98598','#ac4d68','#772941'],
+  foreign_trade:['#e8f4dc','#c4e0ac','#95c37e','#61954d','#315b2d'],
   contrast:['#fff4cb','#f5c36b','#cf873e','#895b8b','#34235d'],
   all:['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953']};
  function palette(theme,choice='auto',growth=false){
@@ -63,8 +68,8 @@ const RegionalMap=(()=>{
  function theme(code,source='',title=''){
  const sub=industryTheme(title,source);if(sub)return sub;
  if(/\/data_farming_102_v20260313\.zip$/.test(String(source)))return 'agriculture';
- const section=String(source).match(/\/data_(11|13|14|15|16|18)_socio_economic_102_v20260313\.zip$/)?.[1];
- if(section)return {'11':'enterprises','13':'agriculture','14':'construction','15':'trade','16':'transport','18':'innovation'}[section];
+ const section=String(source).match(/\/data_(03|09|11|13|14|15|16|17|18|20|21)_socio_economic_102_v20260313\.zip$/)?.[1];
+ if(section)return {'03':'living','09':'capital','11':'enterprises','13':'agriculture','14':'construction','15':'trade','16':'transport','17':'ict','18':'innovation','20':'prices','21':'foreign_trade'}[section];
  if(/^(GRP_|NW_GRP_|R_024d9416ea6f54dc_|R_7e8fd799d1d06897_|R_f54f02504bfb051e_)/.test(code))return 'economy';
  if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code)||/\/data_(?:12_socio_economic|industry)_102_v20260313\.zip$/.test(source))return 'industry';
  if(/^R_(66b96177c45a01ad|6887143295c72599|88230ed30f2f2738|90575f546cc99ce3)_/.test(code))return 'investment';
