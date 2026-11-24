@@ -152,6 +152,8 @@ page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navig
 navigation.publish(page)
 write('site-search.json',navigation.search_entries())
 budget_diagnostics.publish(page,out)
+import federal_budget
+federal_budget.publish(page,out,m.now())
 programme_evidence.publish(page,out,m.now())
 labor_data.publish(page,out,m.now())
 price_data.publish(out)
