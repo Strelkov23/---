@@ -176,15 +176,57 @@ def metadata(item):
     count=item.get("is-referenced-by-count")
     return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None)
 
-SELECT_FIELDS="DOI,title,author,published,volume,issue,page,article-number,is-referenced-by-count"
-def fetch_batch(issn,filters,cursor,select=True):
-    params=dict(filter=",".join(filters),rows=300,cursor=cursor)
+SELECT_FIELDS="DOI,title,author,published,volume,issue,page,is-referenced-by-count"
+def fetch_batch(issn,filters,offset=0,select=False):
+    # A bounded, ordinary /works query avoids cursor restrictions introduced in 2026.
+    params=dict(filter=",".join(["issn:"+issn,*filters]),rows=1000,offset=offset)
     if select:params["select"]=SELECT_FIELDS
-    url=f"https://api.crossref.org/journals/{issn}/works?{urlencode(params)}"
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)"}),timeout=40) as resp:
-        data=json.load(resp)["message"]
+    url=f"https://api.crossref.org/works?{urlencode(params)}"
+    try:
+        with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)"}),timeout=40) as resp:
+            data=json.load(resp)["message"]
+    except HTTPError as err:
+        if err.code==400:
+            try:detail=err.read(700).decode("utf-8","replace")
+            except Exception:detail=""
+            raise ValueError("Crossref HTTP 400: "+detail[:350]) from err
+        raise
     if not isinstance(data.get("items"),list):raise ValueError("Invalid Crossref response")
     return data
+
+def windows(start,end,days):
+    while start<=end:
+        finish=min(start+timedelta(days=days-1),end)
+        yield start,finish
+        start=finish+timedelta(days=1)
+
+def period_items(issn,filters,date_key,start,end):
+    # Split dense intervals before using offsets; no silent truncation at 1000 records.
+    interval=filters+["from-"+date_key+":"+str(start),"until-"+date_key+":"+str(end)]
+    batch=fetch_batch(issn,interval)
+    total=batch.get("total-results")
+    if type(total) is not int or total<0:raise ValueError("Crossref total-results missing")
+    items=batch["items"]
+    if total>1000 and start<end:
+        mid=start+(end-start)//2
+        yield from period_items(issn,filters,date_key,start,mid)
+        yield from period_items(issn,filters,date_key,mid+timedelta(days=1),end)
+        return
+    if total>10000:raise ValueError("Crossref: more than 10000 works in a single day")
+    seen=set();offset=0
+    while True:
+        if batch.get("total-results")!=total:raise ValueError("Crossref: result count changed during pagination")
+        for item in items:
+            doi=str(item.get("DOI") or "").lower()
+            if not doi or doi in seen:raise ValueError("Crossref: duplicate or missing DOI during pagination")
+            seen.add(doi)
+        yield items
+        offset+=len(items)
+        if offset>=total:break
+        if not items:raise ValueError("Crossref: incomplete page")
+        batch=fetch_batch(issn,interval,offset)
+        items=batch["items"]
+    if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
 def sync(db, stamp, refresh):
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
@@ -196,24 +238,20 @@ def sync(db, stamp, refresh):
     for issn,journal in JOURNALS.items():
         if not refresh: continue
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
-        start='1991-01-01'
-        filters=['type:journal-article','from-pub-date:'+start]
         full=not(last and last[0]) or issn==backfill
-        if not full:
-            filters.append('from-index-date:'+str(date.fromisoformat(last[0][:10])-timedelta(days=2)))
-        cursor='*'
-        selected=True
+        today=date.fromisoformat(stamp[:10])
+        # Include forthcoming records within the current calendar year in a full backfill.
+        filters=['type:journal-article']
+        key="pub-date" if full else "index-date"
+        start=date(1991,1,1) if full else date.fromisoformat(last[0][:10])-timedelta(days=2)
+        finish=date(today.year,12,31) if full else today
+        if not full:filters.append("from-pub-date:1991-01-01")
         try:
-            while True:
-                try:batch=fetch_batch(issn,filters,cursor,selected)
-                except HTTPError as err:
-                    if err.code!=400 or not selected:raise
-                    # A rejected field projection must not stop the entire journal archive.
-                    selected=False
-                    batch=fetch_batch(issn,filters,cursor,False)
+            for lo,hi in windows(start,finish,366*5 if full else 7):
+              for items in period_items(issn,filters,key,lo,hi):
                 entries=[]
                 details=[]
-                for item in batch['items']:
+                for item in items:
                     titles=item.get('title') or []
                     if not titles:continue
                     title=tidy(titles[0])
@@ -229,9 +267,6 @@ def sync(db, stamp, refresh):
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
-                if len(batch['items'])<300:break
-                cursor=batch.get('next-cursor')
-                if not cursor:raise ValueError("Crossref cursor missing")
             with db:
                 db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
                 if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))

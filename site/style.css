@@ -87,3 +87,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 @media(max-width:700px){.cards,.duo{grid-template-columns:minmax(0,1fr)}main{padding:0 .9rem 3rem}.mast{padding:.6rem 0 1.2rem}.metrics{gap:.65rem}.metric{flex-basis:135px;padding-right:.6rem}.actions{gap:.5rem}form{gap:.65rem;padding:.85rem}article{padding:.9rem}.sp-chart{padding:.65rem}}
 @media(max-width:400px){.primary-nav a{font-size:.84rem}.section-nav>div a{font-size:.83rem}.metric{flex-basis:120px}.metric b{font-size:1.25rem}}
 @media print{.table-scroll,.atlas-table,.regional-figure-scroll{overflow:visible}.table-scroll table,.atlas-table table{min-width:0;max-width:100%}header,.skip-link,.section-nav,.actions{display:none}.regional-figure-scroll svg{min-width:0;max-width:100%}main{padding:0}}
+
+#repro-form label{flex:1 1 210px}#repro-table table{min-width:1100px}#repro-source{overflow-wrap:anywhere}#repro-chart .legend{align-items:flex-start}
