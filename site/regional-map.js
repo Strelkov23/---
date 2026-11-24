@@ -7,7 +7,7 @@ const RegionalMap=(()=>{
  ALT:'алтайский край',ZAB:'забайкальский край',KAM:'камчатский край',KDA:'краснодарский край',KYA:'красноярский край',PER:'пермский край',PRI:'приморский край',STA:'ставропольский край',KHA:'хабаровский край',
  AD:'адыгея',AL:'алтай',BA:'башкортостан',BU:'бурятия',DA:'дагестан',IN:'ингушетия',KL:'калмыкия',KR:'карелия',KO:'коми',ME:'марий эл',MO:'мордовия',SA:'саха (якутия)',SE:'северная осетия - алания',TA:'татарстан',TY:'тыва',UD:'удмуртия',KK:'хакасия',CE:'чечня',CU:'чувашия',KC:'карачаево-черкесия',KB:'кабардино-балкария',
  KHM:'ханты-мансийский автономный округ',YAN:'ямало-ненецкий автономный округ',NEN:'ненецкий автономный округ',CHU:'чукотский автономный округ',YEV:'еврейская автономная область',MOW:'москва',SPE:'санкт-петербург'};
- function key(code){return typeof code==='string'&&code.startsWith('RU-')?pairs[code.slice(3)]||null:null}
+ function key(code){return typeof code==='string'&&code.startsWith('RU-')&&Object.prototype.hasOwnProperty.call(pairs,code.slice(3))?pairs[code.slice(3)]:null}
  // Lambert azimuthal equal-area, central longitude 100 E, latitude 65 N.
  function project(lon,lat){
   const rad=Math.PI/180,l=(lon-100)*rad,p=lat*rad,p0=65*rad;
