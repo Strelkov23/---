@@ -178,7 +178,7 @@ def reconcile(manual,workbooks):
                 state="missing" if number is not None and number<0 else "different"
         rows.append(dict(year=x["year"],code=x["code"],metric=x["metric"],manual_title=x["title"],official_title=y["title"] if y else None,manual_value=x["value"],official_value=y["value"] if y else None,manual_sign=x["sign"],official_sign=y["sign"] if y else None,state=state,manual_source=x.get("replica") or x.get("source"),official_source=y["source"] if y else None,official_sheet=y["sheet"] if y else None,official_row=y["row"] if y else None,official_column=y["column"] if y else None))
     return dict(method="Точное соответствие по проверенному словарю полных наименований, год и показатель. Числовые значения сравниваются без допуска; отр сравнивается отдельно. Не независимый аудит.",rows=rows,counts=dict(Counter(r["state"] for r in rows)))
-def quality(d):
+def quality(d,out=None):
     if d.get("schema")!=1:raise ValueError("schema")
     years=set();count=0
     for batch in d["years"]:
@@ -198,6 +198,14 @@ def quality(d):
         expected=reconcile(finance_data.records(),d["years"])
         if d["reconciliation"]!=expected:raise ValueError("Сверка рентабельности не воспроизводится")
         counts.update({"finance_reconciliation_"+k:v for k,v in expected["counts"].items()})
+        if out is not None:
+            fields=["year","code","metric","manual_title","official_title","manual_value","official_value","manual_sign","official_sign","state","manual_source","official_source","official_sheet","official_row","official_column"]
+            with (out/"finance-reconciliation.csv").open(encoding="utf-8-sig",newline="") as f:
+                reader=csv.DictReader(f)
+                if reader.fieldnames!=fields:raise ValueError("Заголовок CSV сверки не совпадает")
+                actual=list(reader)
+            wanted=[{k:"" if r[k] is None else str(r[k]) for k in fields} for r in expected["rows"]]
+            if actual!=wanted:raise ValueError("CSV сверки не воспроизводится")
     return counts
 def publish(page,out,d):
     import finance_data
