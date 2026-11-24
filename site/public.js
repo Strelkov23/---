@@ -59,7 +59,7 @@ function lineChart(years,values){
  const max=Math.max(5,Math.ceil(Math.max(...values.flat().filter(Number.isFinite))/5)*5);
  const x=i=>left+i*(width-left-right)/Math.max(1,years.length-1),y=v=>195-v/max*170;
  for(let i=0;i<=4;i++){const v=i*max/4;add('line',{x1:left,x2:width-right,y1:y(v),y2:y(v),stroke:'#dce4df'});add('text',{x:left-6,y:y(v)+4,'text-anchor':'end'},fmt(v))}
- years.forEach((year,i)=>{if(i===0||i===years.length-1||i%Math.ceil(years.length/4)===0 && years.length-1-i>=2)add('text',{x:x(i),y:220,'text-anchor':'middle'},year)});
+ chartTickIndices(years.length,5).forEach(i=>add('text',{x:x(i),y:220,'font-size':11,'text-anchor':i===0?'start':i===years.length-1?'end':'middle'},years[i]));
  values.forEach((row,j)=>{const color=['#006c69','#a24724'][j];let path='',continuous=false;row.forEach((v,i)=>{if(!Number.isFinite(v)){continuous=false;return}path+=(continuous?'L':'M')+x(i)+' '+y(v)+' ';continuous=true;const dot=add('circle',{cx:x(i),cy:y(v),r:2.8,fill:color});const title=document.createElementNS(ns,'title');title.textContent=years[i]+' · '+fmt(v)+'%';dot.append(title)});add('path',{d:path,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':j?'6 3':'none'})});return host
 }
 async function stats(){
