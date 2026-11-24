@@ -737,4 +737,4 @@ def publish(db,stamp,out,refresh):
         file=key+".json";(folder/file).write_text(json.dumps(s,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         catalog.append(dict(code=key,title=s["title"],unit=s["unit"],kind=s["kind"],source=s["source"],file="regional-data/"+file,count=len(s["values"]),regions=len(set(r["region"] for r in s["values"])),first=min(r["year"] for r in s["values"]),last=max(r["year"] for r in s["values"])))
     (out/"historical.json").write_text(json.dumps(dict(built=stamp,sources=sources,series=catalog,mirror=MIRROR_PAGE,primary=PRIMARY),ensure_ascii=False,allow_nan=False),encoding="utf-8")
-    return ["История · "+s["title"]+" · "+s["status"] for s in sources if s["status"].startswith("Ошибка")]
+    return ["История · "+s["title"]+" · "+s["status"] for s in sources if s["status"].startswith("Ошибка") or "частичный импорт" in s["status"]]
