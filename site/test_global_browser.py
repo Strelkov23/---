@@ -423,6 +423,25 @@ with sync_playwright() as p:
             with page.expect_download() as metal:
                 page.locator("#metal-export").click()
             assert metal.value.suggested_filename.startswith("metal-output-")
+        page.goto("http://localhost:8765/sector-passports.html?sp-sector=chemical",wait_until="load")
+        page.wait_for_function("document.querySelector('#sp-status').textContent.startsWith('Показателей в выборке:')",timeout=30000)
+        assert page.locator("#sp-sector").input_value()=="chemical"
+        assert page.locator("#sp-sector option").count()==20
+        assert "Химическая промышленность" in page.locator("#sp-scope").inner_text()
+        passports=json.loads(Path("sector-passports.json").read_text())["profiles"]
+        chemical=next(p for p in passports if p["id"]=="chemical")
+        if chemical["finance"]:
+            assert page.locator("#sp-finance-year option").count()>0
+            year=int(page.locator("#sp-finance-year").input_value())
+            assert page.locator("#sp-finance-table tbody tr").count()==sum(x["year"]==year for x in chemical["finance"])
+            assert all(x["local_code"]=="20" for x in chemical["finance"])
+            with page.expect_download() as download:
+                page.locator("#sp-finance-export").click()
+            assert download.value.suggested_filename=="sector-finance-chemical-"+str(year)+".csv"
+        else:
+            assert page.locator("#sp-finance-export").is_disabled()
+        page.locator("#sp-sector").select_option("light")
+        assert "Лёгкая промышленность" in page.locator("#sp-scope").inner_text()
         page.goto("http://localhost:8765/stat-revisions.html",wait_until="load")
         page.wait_for_function("document.querySelector('#rev-status').textContent.startsWith('Снимок')",timeout=30000)
         assert page.locator("#rev-build option").count()>0
