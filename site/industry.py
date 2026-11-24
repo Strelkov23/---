@@ -27,7 +27,8 @@ PRIOR_MONTHS = "январем февралем мартом апрелем ма
 
 def read(url):
     context = ssl.create_default_context()
-    context.load_verify_locations(cafile=str(Path(__file__).with_name("rosstat-root.pem")))
+    cert=Path(__file__).with_name("rosstat-root.pem")
+    if cert.exists():context.load_verify_locations(cafile=str(cert))
     with urlopen(Request(url, headers={"User-Agent":"EconomicsMonitor/2.1"}),timeout=15,context=context) as response:
         data=response.read(3_000_001)
         if len(data)>3_000_000:raise ValueError("Превышен лимит размера")
@@ -50,13 +51,22 @@ def parse_months(body):
     for month,year,pm,prev,val in re.findall(patterns[1],body):
         if MONTHS.index(month)==PRIOR_MONTHS.index(pm) and int(year)==int(prev)+1 and 0<float(val.replace(",","."))<300:
             values[f"{year}-{MONTHS.index(month)+1:02d}"].add(float(val.replace(",",".")))
+    # Official bulletin format: an aggregate heading followed by a list.
+    # The list must begin with the explicit national index heading; limit to its first paragraph/list.
+    heading=re.search(r"индекс промышленного производства\s*(?:\*|\d+)?\s*(?:составил|составил:|:)",body)
+    if heading:
+        block=body[heading.end():heading.end()+650]
+        block=re.split(r"индексы промышленного производства|добыча полезных ископаемых|обрабатывающие производства|производство основных",block,maxsplit=1)[0]
+        for month,yr,pm,prev,val in re.findall(rf"в ({names}) (\d{{4}})\s*(?:года|г\.?)\s*по сравнению с ({prior}) (\d{{4}})\s*(?:года|г\.?)\s*[-–—]\s*(\d+(?:[,.]\d+)?)\s*%",block):
+            if MONTHS.index(month)==PRIOR_MONTHS.index(pm) and int(yr)==int(prev)+1 and 0<float(val.replace(",","."))<300:
+                values[f"{yr}-{MONTHS.index(month)+1:02d}"].add(float(val.replace(",",".")))
     return {p:next(iter(v)) for p,v in values.items() if len(v)==1}
 
 def collect(db, stamp):
     db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
     db.execute("create table if not exists industry_verified(period text,value real,url text,checked text,primary key(period,value,url))")
     errors=[]; urls=set(RELEASES)
-    for listing_url in (INDEX,"https://rosstat.gov.ru/central-news","https://rosstat.gov.ru/enterprise_industrial"):
+    for listing_url in (INDEX,"https://rosstat.gov.ru/enterprise_industrial","https://www.rosstat.gov.ru/enterprise_industrial","https://rosstat.gov.ru/folder/23458","https://rosstat.gov.ru/compendium/document/50798"):
         try:
             listing=read(listing_url)
             for href,title in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',listing,re.I|re.S):
@@ -66,7 +76,7 @@ def collect(db, stamp):
                 if re.search(r'/document/\d+/?$|/storage/mediabank/[^/]+\.html?$',p.path,re.I):urls.add(url)
         except Exception as err:errors.append(str(err)[:90])
     candidates=defaultdict(dict)
-    ordered=RELEASES+sorted(urls-set(RELEASES),reverse=True)[:25]
+    ordered=list(dict.fromkeys([url for _,url in ALTERNATIVES.values()]+RELEASES+sorted(urls-set(RELEASES),reverse=True)[:15]))
     for url in ordered:
         try:
             body=" ".join(unescape(re.sub("<[^>]+>"," ",read(url))).split())[:15000]
