@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),S=require('./chain-stress.js'),m=require('./sectors.json');
+const n=S.validate(m),zero=Array(n).fill(0),cap=Array(n).fill(10);
+let a=S.calculate(m,zero,cap);assert.equal(a.alpha,1);assert.equal(a.total,0);
+const p=zero.slice();p[8]=10;a=S.calculate(m,p,cap);
+assert.ok(Math.abs(a.total-1477.854)<0.005);assert.ok(Math.abs(a.imports-m.imports[8]/10000)<1e-8);
+assert.ok(Math.abs(a.total-a.rows.reduce((s,x)=>s+x.dx,0))<1e-8);
+let c=cap.slice();c[8]=0;a=S.calculate(m,p,c);assert.equal(a.alpha,0);assert.ok(a.binding.includes(8));
+p[0]=-10;a=S.calculate(m,p,cap);assert.ok(a.grossImportIncrease>=0&&a.grossImportDecrease<=0);assert.ok(Math.abs(a.imports-a.grossImportIncrease-a.grossImportDecrease)<1e-8);
+const equal=S.concentration([1,1,1,1]);assert.equal(equal.hhi,.25);assert.equal(equal.top3,.75);assert.equal(S.concentration([1,-1]),null);
+console.log('Chain stress tests passed');
