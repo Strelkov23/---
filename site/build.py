@@ -59,8 +59,8 @@ with m.connect() as db:
     literature.sync(db,m.now(),"--refresh" in sys.argv)
     papers=[dict(r) for r in db.execute("select * from literature order by published desc,title,doi")]
     journal_counts=Counter(r["journal"] for r in papers)
-    journal_checks=[dict(r,journal=literature.JOURNALS[r["issn"]],count=journal_counts[literature.JOURNALS[r["issn"]]]) for r in db.execute("select * from journal_checks")]
-    write("literature.json",dict(articles=papers,checks=journal_checks))
+    journal_checks=[dict(r,journal=literature.JOURNALS.get(r["issn"],r["issn"]),count=journal_counts[literature.JOURNALS[r["issn"]]]) for r in db.execute("select * from journal_checks")]
+    write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))
     page("papers.html",Path("papers.html").read_text())
     active = {feed[2] for feed in m.FEEDS}
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
