@@ -43,6 +43,8 @@ class QualityTests(unittest.TestCase):
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
+        import industrial_parks
+        industrial_parks.publish(self.out,self.prev,"2026-11-24",False)
         import regional_manufacturing
         regional_manufacturing.publish(self.out,self.prev,"2026-11-24",False)
         import regional_industry_extra
