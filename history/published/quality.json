@@ -1,0 +1,61 @@
+{
+  "built": "2026-11-24T12:35:11+00:00",
+  "errors": [],
+  "warnings": [
+    "Часть месячных данных унаследована из архива и не подтверждена повторно",
+    "Месячная промышленность · Месячный выпуск не подтверждён при текущем обновлении; Недоступных страниц: 6; HTTP Error 404: Not Found"
+  ],
+  "counts": {
+    "archive": 7275,
+    "papers": 8166,
+    "indicators": 105,
+    "indicators_with_data": 105,
+    "monthly_industry": 7,
+    "monthly_industry_verified": 0,
+    "cbr_KEY": 762,
+    "cbr_USD": 741,
+    "internal_link_errors": 0
+  },
+  "files": {
+    "archive.json": {
+      "sha256": "5bade59bf310d24f9e2f029e4046560f617a284c17c501e1c6a3484c1440c7d1",
+      "bytes": 3500202
+    },
+    "literature.json": {
+      "sha256": "a5829fc6a0684cfb4d3929529b33ccaafb7e5ce29170d77d83758bbe9576b29c",
+      "bytes": 3317648
+    },
+    "compare.json": {
+      "sha256": "0c3d8766cceb77f4c1f8bf031a5e544b961edf5c596e702d0bca422e5b9f9e55",
+      "bytes": 84469
+    },
+    "catalog.json": {
+      "sha256": "ad3ee75dc6a2b3551d11e8fdb7badedfc134e2591b6c07ff86e4c6cb85652675",
+      "bytes": 45853
+    },
+    "stats.json": {
+      "sha256": "a71505439fbcbde6b8a1f7d623e24f3fe73f95ec81ca447e9a7f036de61d5c62",
+      "bytes": 13787
+    },
+    "industry.json": {
+      "sha256": "04cf75b6046276a6503285491847b43f6fc2a6684ce93e59e03d34168586fd44",
+      "bytes": 793
+    },
+    "cbr.json": {
+      "sha256": "c825bb62819ef42f0d381f2fa03bd7c4f02f8689f78f195c487fb1ef3fc41ec5",
+      "bytes": 55538
+    },
+    "sectors.json": {
+      "sha256": "e7844b2c8c1a9db43c83ffa85b26469e8b20dd06582aa30d4015526b54966ca2",
+      "bytes": 10783
+    },
+    "status.json": {
+      "sha256": "d3b940bfea31c6b0112260fdc429a8a9d7571d152c580c473fe65bda89c7c4a2",
+      "bytes": 31540
+    },
+    "links.json": {
+      "sha256": "bb6cfda5dc1a4b80725d5c0e01c625fbd6b487b001508169d1cd863427140568",
+      "bytes": 1274360
+    }
+  }
+}
