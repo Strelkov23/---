@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -196,6 +196,14 @@ def check(out,previous,stamp):
         raw=(out/"federal-budget.csv").read_bytes()
         hashes["federal-budget.csv"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Документальный федеральный бюджет: "+str(e))
+    try:
+        import regional_manufacturing as rm
+        old_file=previous/"regional-manufacturing.json"
+        old=json.loads(old_file.read_text(encoding="utf-8")) if old_file.is_file() else None
+        counts.update(rm.quality(data["regional-manufacturing.json"],old))
+        if not data["regional-manufacturing.json"]["rows"]:warnings.append("Специализация обрабатывающей промышленности: нет импортированных данных")
+        if data["regional-manufacturing.json"]["status"].startswith("Ошибка"):warnings.append("Специализация обрабатывающей промышленности: "+data["regional-manufacturing.json"]["status"])
+    except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Специализация обрабатывающей промышленности: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
