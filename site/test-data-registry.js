@@ -25,3 +25,10 @@ assert.equal(debtRows[0].period,'2025-12');
 
 const energy={...w,group:'energy',code:'gas_production_twh',count:1};
 assert.equal(R.observations(energy,{rows:[{year:2021,values:{gas_production_twh:70}},{year:2022,values:{}}],source:w.source,source_sha256:'a'}).at(0).value,70);
+const law={...w,group:'budget_law',code:'balance',count:1};
+const lawObs=R.observations(law,{rows:[{year:2025,source:'https://example.org/law',law_number:'340-ФЗ',law_date:'2026-10-19',article:1,original:{balance:'-5626540177.4'},values:{balance:-5626.5401774}}]});
+assert.equal(lawObs[0].value,-5626.5401774);assert.equal(lawObs[0].source,'https://example.org/law');assert.ok(lawObs[0].note.includes('340-ФЗ'));
+const original={...w,group:'finance_original',code:'A.sales',count:1};
+const sourceRow={code:'A',metric:'sales',year:2025,value:0,sign:'numeric',source:'https://data.nalog.ru/a.xlsx',sheet:'Лист',row:4,column:2};
+const originalRows=R.observations(original,{years:[{success:'2026-11-25',sha256:'a'.repeat(64),status:'Импортировано',rows:[sourceRow,{...sourceRow,year:2024,value:null,sign:'negative_unspecified'},{...sourceRow,metric:'assets',value:11}]}]});
+assert.equal(originalRows.length,1);assert.equal(originalRows[0].value,0);assert.ok(originalRows[0].note.includes('4:2'));assert.equal(originalRows[0].source,sourceRow.source);
