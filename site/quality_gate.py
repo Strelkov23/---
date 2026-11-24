@@ -167,7 +167,7 @@ def check(out,previous,stamp):
     try:
         import consistency
         d=data["consistency.json"]
-        if d!=consistency.create(nat,cbr,data["sme-regions.json"],d["built"]):raise ValueError("Результаты не воспроизводятся")
+        if d!=consistency.create(nat,cbr,data["sme-regions.json"],d["built"],consistency.budget_observations(out)):raise ValueError("Результаты не воспроизводятся")
         for k,v in d["counts"].items():counts["consistency_"+k]=v
         if d["counts"].get("расхождение"):warnings.append("Сверки: "+str(d["counts"]["расхождение"])+" расхождений; см. consistency.html")
     except (ValueError,KeyError,TypeError) as e:issues.append("Сверки: "+str(e))
