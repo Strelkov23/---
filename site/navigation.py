@@ -85,7 +85,7 @@ def current_group(page):
     return next((g for g in GROUPS if any(href==page for href,_,_ in g[3])),None)
 def primary(page):
     group=current_group(page)
-    return a("index.html","Главная",page=="index.html")+a("economic-map.html","Карта России",page=="economic-map.html")+''.join(a(g[0]+".html",g[1],g==group and page!="economic-map.html") for g in GROUPS)
+    return a("index.html","Главная",page=="index.html")+a("economic-map.html","Карта России",page=="economic-map.html")+a("search.html","Поиск",page=="search.html")+''.join(a(g[0]+".html",g[1],g==group and page!="economic-map.html") for g in GROUPS)
 def secondary(page):
     g=current_group(page)
     if not g:return ""
@@ -101,3 +101,11 @@ def publish(page):
     for key,label,desc,items in GROUPS:
         body='<section class="mast"><p class="kicker">Экономический обзор · раздел</p><h1>'+escape(label)+'</h1><p>'+escape(desc)+'</p></section><section class="portal-grid">'+''.join('<article><h2>'+a(href,title)+'</h2><p>'+escape(note)+'</p></article>' for href,title,note in items)+'</section>'
         page(key+".html",body)
+
+def search_entries():
+    entries={}
+    for key,label,desc,items in GROUPS:
+        entries[key+".html"]={"href":key+".html","title":label,"description":desc,"section":label}
+        for href,title,note in items:
+            if href not in entries:entries[href]={"href":href,"title":title,"description":note,"section":label}
+    return list(entries.values())

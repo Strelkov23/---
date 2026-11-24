@@ -184,6 +184,12 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
+        page.goto("http://localhost:8765/search.html?q=инвестиции",wait_until="load")
+        page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
+        assert page.locator("#site-search-results section").count()==4
+        page.locator("#site-search-scope").select_option("tools")
+        page.wait_for_function("document.querySelectorAll('#site-search-results section').length===1")
+        assert page.locator("#site-search-results article a").count()>0
         page.goto("http://localhost:8765/economic-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#geo-status').textContent.startsWith('Загрузка')")
         if page.locator("#geo-series option").count():

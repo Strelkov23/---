@@ -16,6 +16,12 @@ class NavTests(unittest.TestCase):
         self.assertIn('aria-current="page">Многовариантные сценарии',n.secondary("scenario.html"))
         self.assertIn("Отрасли",n.secondary("sector-1.html"))
         self.assertIn("Статистика",n.secondary("indicator-TEST.html"))
+    def test_search_entries(self):
+        rows=n.search_entries()
+        self.assertEqual(len(rows),len({r["href"] for r in rows}))
+        self.assertIn("economic-map.html",{r["href"] for r in rows})
+        self.assertIn("news-map.html",{r["href"] for r in rows})
+        self.assertIn('aria-current="page">Поиск',n.primary("search.html"))
     def test_hubs(self):
         pages={}
         n.publish(lambda name,body:pages.update({name:body}))
