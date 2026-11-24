@@ -1,5 +1,5 @@
 // The same labelled vector figure is used for the clipboard, PNG and SVG.
-function chartTools(host, title, unit, years, series) {
+function chartTools(host, title, unit, years, series, options={}) {
   const toolbar=document.createElement('div'), status=document.createElement('span');
   toolbar.className='actions'; status.setAttribute('role','status');
   function vector() {
@@ -28,13 +28,13 @@ function chartTools(host, title, unit, years, series) {
     series.forEach((s,j)=>{
       const color=j?'#a24724':'#006c69';let path='';
       s.values.forEach((v,i)=>{if(!Number.isFinite(v))return;
-        path+=(i && Number.isFinite(s.values[i-1]) && years[i]-years[i-1]===1?'L':'M')+x(i)+' '+y(v)+' ';
+        path+=(i && Number.isFinite(s.values[i-1]) && (options.monthly||years[i]-years[i-1]===1)?'L':'M')+x(i)+' '+y(v)+' ';
         shape('circle',{cx:x(i),cy:y(v),r:3.4,fill:color})});
       shape('path',{d:path,fill:'none',stroke:color,'stroke-width':3,'stroke-dasharray':j?'9 5':'none'});
       shape('line',{x1:35,x2:75,y1:529+30*j,y2:529+30*j,stroke:color,'stroke-width':4,'stroke-dasharray':j?'9 5':'none'});
       label(86,536+30*j,s.name,20);
     });
-    label(35,610,'Источник: Всемирный банк, World Development Indicators · '+series.map(s=>s.code).join(' / '),18);
+    label(35,610,'Источник: '+(options.source||'Всемирный банк, World Development Indicators')+' · '+series.map(s=>s.code).join(' / '),18);
     label(35,640,'Версия: '+(typeof version!=='undefined'&&version?version:'не определена')+' · '+new Date().toISOString().slice(0,10),14);
     return new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
   }
@@ -51,7 +51,7 @@ function chartTools(host, title, unit, years, series) {
     b.onclick=async()=>{try{await fn()}catch{status.textContent='Буфер или экспорт недоступен. Скачайте SVG или используйте CSV.'}};toolbar.append(b)}
   button('Копировать график',async()=>{await navigator.clipboard.write([new ClipboardItem({'image/png':png()})]);status.textContent='График скопирован. Вставьте его в документ.'});
   button('Скачать PNG',async()=>download(await png(),'png'));button('Скачать SVG',()=>download(vector(),'svg'));
-  button('Копировать таблицу',async()=>{const rows=[['Год',...series.map(s=>s.name+' ('+unit+')')],...years.map((yr,i)=>[yr,...series.map(s=>s.values[i]==null?'':String(s.values[i]).replace('.',','))]),['Источник','Всемирный банк, WDI',...series.map(s=>s.code)]];
+  button('Копировать таблицу',async()=>{const rows=[['Год',...series.map(s=>s.name+' ('+unit+')')],...years.map((yr,i)=>[yr,...series.map(s=>s.values[i]==null?'':String(s.values[i]).replace('.',','))]),['Источник',options.source||'Всемирный банк, WDI',...series.map(s=>s.code)]];
     await navigator.clipboard.writeText(rows.map(r=>r.join('\t')).join('\n'));status.textContent='Таблица скопирована для вставки в Excel или Word.'});
   toolbar.append(status);host.append(toolbar);
 }
