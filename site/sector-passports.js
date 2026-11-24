@@ -1,4 +1,13 @@
-document.addEventListener('DOMContentLoaded',async()=>{
+const SectorPassports=(()=>{
+ function financeDelta(r,rows){
+  const candidates=rows.filter(x=>x.year===r.year-1&&x.local_code===r.local_code&&x.metric===r.metric);
+  const prev=candidates.length===1?candidates[0]:null;
+  return prev?.sign==='numeric'&&r.sign==='numeric'&&Number.isFinite(prev.value)&&Number.isFinite(r.value)?Number((r.value-prev.value).toFixed(8)):null
+ }
+ return {financeDelta}
+})();
+if(typeof module!=='undefined')module.exports=SectorPassports;
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);if(!$('sp-form'))return;
  const ids=['sp-sector','sp-q','sp-provider','sp-coverage','sp-chart-series','sp-chart-span'],picker=$('sp-sector'),provider=$('sp-provider'),status=$('sp-status');
  const link=(label,url)=>{const a=node('a',label);a.href=url;return a};
@@ -13,7 +22,12 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }
   for(const p of profiles)picker.add(new Option(p.title,p.id));
   for(const p of [...new Set(all.map(r=>r.provider))].sort())provider.add(new Option(p,p));
+  const requestedSector=new URLSearchParams(location.search).get('sp-sector');
   restore(ids.filter(id=>id!=='sp-chart-series'));
+  if(requestedSector&&!profiles.some(p=>p.id===requestedSector)){
+   const warning=node('p','Запрошенного паспорта нет в этой версии архива. Показан первый доступный паспорт.');
+   $('sp-form').before(warning)
+  }
   const initialChart=new URLSearchParams(location.search).get('sp-chart-series');let activeRows=[],firstChart=true;
   const datasets=await Promise.allSettled(['compare.json','industrial.json','national.json'].map(load));
   const [wdi,industry,national]=datasets.map(d=>d.status==='fulfilled'?d.value:null);
@@ -82,11 +96,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(const label of ['Вид деятельности','Коэффициент','Значение, %','Изменение к предыдущему году, п. п.','Последний успех','Источник / ячейка'])h.append(node('th',label));
    const metric=r=>r.metric==='sales'?'Продажи к затратам':'Активы';
    const value=r=>r.sign==='negative_unspecified'?'Отр (величина не указана)':r.sign==='numeric'&&Number.isFinite(r.value)?fmt(r.value):'Нет данных';
-   const delta=r=>{
-    const candidates=rows.filter(x=>x.year===r.year-1&&x.local_code===r.local_code&&x.metric===r.metric);
-    const prev=candidates.length===1?candidates[0]:null;
-    return prev?.sign==='numeric'&&r.sign==='numeric'&&Number.isFinite(prev.value)&&Number.isFinite(r.value)?Number((r.value-prev.value).toFixed(8)):null
-   };
+   const delta=r=>SectorPassports.financeDelta(r,rows);
    for(const r of selected){
     const tr=body.insertRow(),diff=delta(r);
     for(const v of [r.title,metric(r),value(r),diff===null?'—':(diff>0?'+':'')+fmt(diff),r.success?.slice(0,10)||'—'])tr.insertCell().textContent=v;
