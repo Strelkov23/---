@@ -21,3 +21,13 @@ class FreshnessTests(unittest.TestCase):
         self.assertEqual(f.quality(data),{"archive":1})
         with self.assertRaises(ValueError):f.quality(dict(data,rows=data["rows"]*2))
         with self.assertRaises(ValueError):f.quality(dict(data,rows=[dict(id="a",state="archive",next_check="2026-11-25")]))
+
+    def test_historical_observations_follow_import_not_catalogue(self):
+        primary="https://fedstat.ru/indicator/61483"
+        file="https://storage.yandexcloud.net/archive/61483.parquet"
+        data=[dict(source=file,last=2023)]
+        r=dict(code="emiss_61483",url=primary,success="2026-11-24",files=[dict(url=file,format="parquet")])
+        self.assertEqual(f.historical_latest(r,data),"2023")
+        self.assertIsNone(f.historical_latest(dict(r,success=None),data))
+        self.assertIsNone(f.historical_latest(dict(r,code="emiss_grp"),data))
+        self.assertEqual(f.historical_latest(dict(code="mirror_grp",url=file),data),"2023")
