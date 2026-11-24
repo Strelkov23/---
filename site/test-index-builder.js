@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),B=require('./index-builder.js');
+const rows=[['2020',100],['2021',120],['2023',0],['2024',60]].map(([period,value])=>({period,value,territory:'R',kind:'Наблюдение'}));
+const p={territory:'R',method:'delta',base:'2020',window:2};
+assert.deepEqual(B.compute(rows,p).rows.map(r=>r.value),[null,20,null,null,60]);
+const growth=B.compute(rows,{...p,method:'growth'}).rows.map(r=>r.value);assert.ok(Math.abs(growth[1]-20)<1e-9);assert.deepEqual(growth.filter((_,i)=>i!==1),[null,null,null,null]);
+assert.deepEqual(B.compute(rows,{...p,method:'base'}).rows.map(r=>r.value),[100,120,null,0,60]);
+assert.deepEqual(B.compute(rows,{...p,method:'mean'}).rows.map(r=>r.value),[null,110,null,null,30]);
+assert.throws(()=>B.compute(rows,{...p,method:'base',base:'2023'}));
+assert.throws(()=>B.compute([...rows,rows[0]],p));
+assert.throws(()=>B.compute(rows.map(r=>({...r,kind:'Цель'})),p));
+const month=[['2024-01',100],['2025-01',130]].map(([period,value])=>({period,value,territory:'R',kind:'Наблюдение'}));
+const y=B.compute(month,{...p,method:'yoy'});assert.equal(y.rows.length,13);assert.ok(Math.abs(y.rows.at(-1).value-30)<1e-9);
+assert.throws(()=>B.compute(rows,{...p,method:'yoy'}));
+console.log('Indicator builder: gaps, zero denominators, exact calendar lags, duplicates and target rejection passed');
