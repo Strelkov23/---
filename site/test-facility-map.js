@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict'),M=require('./facility-map.js');
+const rows=[{name:'Example A',fuel:'Gas',latitude:55.1,longitude:80.2,generation:{2017:20}},{name:'Example B',fuel:'Coal',latitude:55.3,longitude:80.5,generation:{}},{name:'Example C',fuel:'Gas',latitude:56.1,longitude:80.2,generation:{}}];
+assert.equal(M.group(rows).length,2);assert.equal(M.group(rows)[0].rows.length,2);assert.equal(M.filter(rows,'Gas','',false).length,2);assert.equal(M.filter(rows,'','example b',false).length,1);assert.equal(M.filter(rows,'','',true).length,1);
+console.log('Facility map tests passed');

@@ -184,6 +184,13 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
+        page.goto("http://localhost:8765/facility-map.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#facility-status').textContent.startsWith('Загрузка')",timeout=30000)
+        if page.locator("#facility-status").inner_text().startswith("Архивных записей:"):
+            assert page.locator("#facility-map svg").count()==1
+            assert page.locator("#facility-list article").count()>0
+            page.locator("#facility-query").fill("zzzz_no_such_facility")
+            assert page.locator("#facility-list article").count()==0
         page.goto("http://localhost:8765/glossary.html",wait_until="load")
         assert page.locator("#glossary-list article").count()>=20
         page.locator("#glossary-query").fill("ВРП")
