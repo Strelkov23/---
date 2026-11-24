@@ -464,7 +464,19 @@ with sync_playwright() as p:
             assert download.value.suggested_filename=="sector-finance-chemical-"+str(year)+".csv"
         else:
             assert page.locator("#sp-finance-export").is_disabled()
+        page.wait_for_function("document.querySelector('#sp-capital-status').textContent.includes('продуктов:')",timeout=30000)
+        assert page.locator("#sp-capacity-table tbody tr").count()==6
+        assert page.locator("#sp-capital-assets tbody tr").count()==0
+        with page.expect_download() as cexp:
+            page.locator("#sp-capital-export").click()
+        assert cexp.value.suggested_filename.startswith("sector-capital-chemical-")
+        page.locator("#sp-sector").select_option("pharma")
+        assert page.locator("#sp-capital-export").is_disabled()
         page.locator("#sp-sector").select_option("light")
+        assert page.locator("#sp-capacity-table tbody tr").count()==6
+        page.locator("#sp-capital-year").select_option("2022")
+        assert page.locator("#sp-capital-status").inner_text().startswith("2022")
+
         assert "Лёгкая промышленность" in page.locator("#sp-scope").inner_text()
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
