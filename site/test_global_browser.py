@@ -246,6 +246,8 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/finance.html",wait_until="load")
         page.wait_for_function("document.querySelector('#finance-status').textContent.includes('Видов деятельности')")
         assert page.locator("#finance-table tbody tr").count()==61
+        assert page.locator("#finance-chart svg").count()==1
+        assert "Проверка списка файлов ФНС" in page.locator("#finance-source-check").inner_text()
         page.locator("#finance-query").fill("Добыча угля")
         assert page.locator("#finance-table tbody tr").count()==1
         assert "Отр" in page.locator("#finance-table tbody tr").inner_text()

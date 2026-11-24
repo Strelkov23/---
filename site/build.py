@@ -147,7 +147,8 @@ labor_data.publish(page,out,m.now())
 price_data.publish(out)
 forecast.publish(out,m.now())
 capital_data.publish(page,out)
-finance_data.publish(page,out)
+with m.connect() as finance_db:
+    finance_data.publish(page,out,finance_data.check_files(finance_db,m.now(),"--refresh" in sys.argv))
 data_registry.publish(page,out,m.now())
 
 import atlas

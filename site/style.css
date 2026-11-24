@@ -136,3 +136,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #report-coverage table,#report-preview .report-series table{min-width:620px}
 
 #finance-table table{min-width:760px}#finance-chart{min-width:0;overflow-wrap:anywhere}#finance-chart table{table-layout:fixed}#finance-chart td,#finance-chart th{min-width:0;overflow-wrap:anywhere}
+
+#finance-chart svg{display:block;width:100%;height:auto;max-width:800px}#finance-source-check,#finance-source-files{overflow-wrap:anywhere}

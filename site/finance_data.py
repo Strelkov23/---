@@ -1,5 +1,9 @@
 """FNS annual profitability benchmarks, documentary snapshot. 'отр' is a sign, not a number."""
-import csv,json
+import csv,json,re
+from datetime import datetime,timedelta,timezone
+from html.parser import HTMLParser
+from urllib.parse import urljoin,urlsplit
+from urllib.request import Request,urlopen
 from decimal import Decimal
 SOURCE="https://www.nalog.gov.ru/rn77/taxation/reference_work/conception_vnp/"
 REPLICAS={2023:"https://www.consultant.ru/document/cons_doc_LAW_55729/295da02404d085de3420ba1b64cace60fbeed002/",2024:"https://www.consultant.ru/document/cons_doc_LAW_55729/0e9f3c6aeb49362ca20996710a02f80c375b0ef4/",2025:"https://www.consultant.ru/document/cons_doc_LAW_55729/46b5b065d9811c15e161f73df1f433342686dda3/"}
@@ -77,10 +81,51 @@ def records():
                 out.append(dict(code=code,title=title,level=level,year=year,metric=metric,value=value,sign="negative_unspecified" if raw=="отр" else "numeric",raw=raw,source=SOURCE,replica=REPLICAS[year]))
     if len({(r["code"],r["year"],r["metric"]) for r in out})!=len(out):raise ValueError("Duplicate financial observation")
     return out
-def publish(page,out):
+class Links(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True);self.current=None;self.links=[]
+    def handle_starttag(self,tag,attrs):
+        if tag=="a":self.current=[dict(attrs).get("href",""),[]]
+    def handle_data(self,text):
+        if self.current is not None:self.current[1].append(text)
+    def handle_endtag(self,tag):
+        if tag=="a" and self.current is not None:self.links.append((self.current[0]," ".join(self.current[1])));self.current=None
+def discover(html):
+    p=Links();p.feed(html);found={}
+    for url,title in p.links:
+        title=" ".join(title.split()).lower()
+        if "рентабельност" not in title and "среднеотраслевые показатели" not in title:continue
+        m=re.search(r"за\s+(20\d{2})\s+год",title)
+        if not m:continue
+        url=urljoin(SOURCE,url);u=urlsplit(url)
+        if u.scheme!="https" or u.hostname!="data.nalog.ru" or not u.path.lower().endswith((".xls",".xlsx")):continue
+        year=int(m[1])
+        if year in found and found[year]!=url:raise ValueError("Несколько файлов для "+str(year))
+        found[year]=url
+    if not found:raise ValueError("Годовые файлы не обнаружены")
+    return found
+def stamp_date(s):
+    t=datetime.fromisoformat(s)
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+def check_files(db,stamp,refresh):
+    db.execute("create table if not exists finance_files(id integer primary key check(id=1),checked text,success text,status text,files text)")
+    prev=db.execute("select checked,success,status,files from finance_files where id=1").fetchone()
+    if refresh and (not prev or stamp_date(stamp)-stamp_date(prev[0])>=timedelta(days=7)):
+        try:
+            with urlopen(Request(SOURCE,headers={"User-Agent":"EconomicsMonitor/2.0"}),timeout=20) as f:
+                raw=f.read(3000001)
+                encoding=f.headers.get_content_charset() or "utf-8"
+            if len(raw)>3000000:raise ValueError("Ответ слишком велик")
+            found=discover(raw.decode(encoding))
+            with db:db.execute("insert or replace into finance_files values(1,?,?,?,?)",(stamp,stamp,"Обнаружено годовых ссылок: "+str(len(found)),json.dumps(found)))
+        except Exception as e:
+            with db:db.execute("insert into finance_files values(1,?,null,?,?) on conflict(id) do update set checked=excluded.checked,status=excluded.status",(stamp,"Ошибка проверки: "+str(e)[:160],"{}"))
+    row=db.execute("select checked,success,status,files from finance_files where id=1").fetchone()
+    return dict(checked=row[0] if row else None,success=row[1] if row else None,status=row[2] if row else "Ожидается первая проверка",files=json.loads(row[3]) if row else {})
+def publish(page,out,file_check=None):
     rows=records()
-    data=dict(source=SOURCE,replicas=REPLICAS,rows=rows,metrics={k:dict(title=v[0],formula=v[1],caution=v[2]) for k,v in METRICS.items()},transcribed="2026-11-24",status="Ручная сверка опубликованных таблиц приложения 4 в КонсультантПлюс; оригинальный XLSX не прочитан. Охват организаций уточняется по первоисточнику.")
+    data=dict(file_check=file_check or {},source=SOURCE,replicas=REPLICAS,rows=rows,metrics={k:dict(title=v[0],formula=v[1],caution=v[2]) for k,v in METRICS.items()},transcribed="2026-11-24",status="Ручная сверка опубликованных таблиц приложения 4 в КонсультантПлюс; оригинальный XLSX не прочитан. Охват организаций уточняется по первоисточнику.")
     (out/"finance-data.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"finance-profitability.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
-    page("finance.html",'<section class="mast"><h1>Финансы организаций: рентабельность</h1><p>Среднеотраслевые ориентиры ФНС, приложение 4, 2023–2025. Ручной документальный снимок, не текущая оперативная статистика. Названия сокращены, идентификаторы локальные; разделы и детализация пересекаются. Не суммировать коэффициенты. <a href="'+SOURCE+'">Первоисточник ФНС</a> · <a href="finance-profitability.csv">CSV</a> · <a href="finance-data.json">JSON</a> · <a href="methodology.html#finance-method">Методика</a>.</p><p>Оригинальный XLSX не прочитан; использованы опубликованные таблицы приложения 4 в КонсультантПлюс. «Отр» означает отрицательный результат без числовой величины; не ноль и не отсутствие отрицательного результата.</p></section><section><h2>Сопоставление по видам деятельности</h2><label class="builder-control">Год<select id="finance-year"><option>2025</option><option>2024</option><option>2023</option></select></label><label class="builder-control">Уровень<select id="finance-level"><option value="">Все</option><option value="section">Разделы</option><option value="detail">Детализация</option></select></label><label class="builder-control">Поиск<input id="finance-query" type="search"></label><p id="finance-status" role="status">Загрузка…</p><div id="finance-table" class="table-scroll" tabindex="0" role="region" aria-label="Рентабельность"></div><h2>Динамика выбранного вида деятельности</h2><label class="builder-control">Вид деятельности<select id="finance-trend"></select></label><div id="finance-chart"></div><p>Финансовые ориентиры не измеряют физические мощности, технологическую эффективность, задолженность или фактическую себестоимость. Не использовать для автоматического назначения цен.</p></section><script defer src="finance-data.js"></script>')
+    page("finance.html",'<section class="mast"><h1>Финансы организаций: рентабельность</h1><p>Среднеотраслевые ориентиры ФНС, приложение 4, 2023–2025. Ручной документальный снимок, не текущая оперативная статистика. Названия сокращены, идентификаторы локальные; разделы и детализация пересекаются. Не суммировать коэффициенты. <a href="'+SOURCE+'">Первоисточник ФНС</a> · <a href="finance-profitability.csv">CSV</a> · <a href="finance-data.json">JSON</a> · <a href="methodology.html#finance-method">Методика</a>.</p><p id="finance-source-check" role="status"></p><div id="finance-source-files"></div><p>Автоматически проверяется наличие ссылок на годовые файлы (не чаще раза в семь дней), но числовые данные пока требуют отдельной сверки и обновления.</p><p>Оригинальный XLSX не прочитан; использованы опубликованные таблицы приложения 4 в КонсультантПлюс. «Отр» означает отрицательный результат без числовой величины; не ноль и не отсутствие отрицательного результата.</p></section><section><h2>Сопоставление по видам деятельности</h2><label class="builder-control">Год<select id="finance-year"><option>2025</option><option>2024</option><option>2023</option></select></label><label class="builder-control">Уровень<select id="finance-level"><option value="">Все</option><option value="section">Разделы</option><option value="detail">Детализация</option></select></label><label class="builder-control">Поиск<input id="finance-query" type="search"></label><p id="finance-status" role="status">Загрузка…</p><div id="finance-table" class="table-scroll" tabindex="0" role="region" aria-label="Рентабельность"></div><h2>Динамика выбранного вида деятельности</h2><label class="builder-control">Вид деятельности<select id="finance-trend"></select></label><div id="finance-chart"></div><p>Финансовые ориентиры не измеряют физические мощности, технологическую эффективность, задолженность или фактическую себестоимость. Не использовать для автоматического назначения цен.</p></section><script defer src="finance-data.js"></script>')
