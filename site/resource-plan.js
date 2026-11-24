@@ -3,18 +3,19 @@
 const ResourcePlan=(()=>{
  const EPS=1e-9,sum=a=>a.reduce((s,v)=>s+v,0);
  const dot=(a,b)=>sum(a.map((v,i)=>v*b[i]));
- function solve(A,b,c){
+ function solve(A,b,c,options={}){
   const n=c.length,m=b.length;
-  if(!n||!m||A.length!==m||A.some(r=>r.length!==n||r.some(v=>!Number.isFinite(v)||v<0))||b.some(v=>!Number.isFinite(v)||v<0)||c.some(v=>!Number.isFinite(v)))throw Error('Invalid LP');
+  if(!n||!m||A.length!==m||A.some(r=>r.length!==n||r.some(v=>!Number.isFinite(v)||(!options.signed&&v<0)))||b.some(v=>!Number.isFinite(v)||v<0)||c.some(v=>!Number.isFinite(v)))throw Error('Invalid LP');
   // Nonnegative RHS: origin is feasible, slack variables provide the initial basis.
   const size=n+m,t=A.map((r,i)=>[...r,...Array.from({length:m},(_,j)=>i===j?1:0),b[i]]);
   t.push([...c.map(v=>-v),...Array(m).fill(0),0]);
   const basis=Array.from({length:m},(_,i)=>n+i);
-  let iterations=0;
+  let iterations=0,stalled=0,bland=!options.fast;
   // Bland's rule avoids cycling on degenerate constraints.
   for(;;){
    if(++iterations>10000)throw Error('LP iteration limit');
-   const enter=t[m].slice(0,size).findIndex(v=>v< -EPS);
+   let enter=t[m].slice(0,size).findIndex(v=>v< -EPS);
+   if(!bland&&enter>=0)for(let j=enter+1;j<size;j++)if(t[m][j]<t[m][enter]-EPS)enter=j;
    if(enter<0)break;
    let leave=-1,best=Infinity;
    for(let i=0;i<m;i++)if(t[i][enter]>EPS){
@@ -22,9 +23,11 @@ const ResourcePlan=(()=>{
     if(q<best-EPS||(Math.abs(q-best)<=EPS&&(leave<0||basis[i]<basis[leave]))){best=q;leave=i}
    }
    if(leave<0)throw Error('Unbounded objective');
+   const before=t[m][size];
    const pivot=t[leave][enter];t[leave]=t[leave].map(v=>v/pivot);
    for(let i=0;i<=m;i++)if(i!==leave){const k=t[i][enter];if(k!==0)t[i]=t[i].map((v,j)=>v-k*t[leave][j])}
    basis[leave]=enter;
+   if(!bland){stalled=t[m][size]-before<=EPS?stalled+1:0;if(stalled>=20)bland=true;}
   }
   const x=Array(n).fill(0);
   basis.forEach((j,i)=>{if(j<n)x[j]=Math.max(0,t[i][size])});
