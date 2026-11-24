@@ -457,7 +457,26 @@ with sync_playwright() as p:
             with page.expect_download() as rm:
                 page.locator("#rm-export").click()
             assert rm.value.suggested_filename=="regional-manufacturing-chemical-2024.csv"
-        else:
+        extra=json.loads(Path("regional-mining-energy.json").read_text())
+        if extra["rows"]:
+            page.goto("http://localhost:8765/regional-manufacturing.html?rm-group=coal&rm-year=2024&rm-region=RU-MOS",wait_until="load")
+            page.wait_for_function("document.querySelector('#rm-status').textContent.startsWith('Отрасль:')",timeout=30000)
+            assert page.locator("#rm-section").input_value()=="B"
+            assert page.locator("#rm-group").input_value()=="coal"
+            assert page.locator("#rm-group option").count()==6
+            assert "раздел B" in page.locator("#rm-status").inner_text()
+            assert "Итог раздела B" in page.locator("#rm-table").inner_text()
+            assert page.locator("#rm-detail tbody tr").count()==6
+            with page.expect_download() as rm:
+                page.locator("#rm-export").click()
+            assert rm.value.suggested_filename=="regional-manufacturing-coal-2024.csv"
+            page.locator("#rm-section").select_option("D")
+            assert page.locator("#rm-group option").count()==4
+            page.locator("#rm-group").select_option("heat")
+            assert "раздел D" in page.locator("#rm-status").inner_text()
+            assert "Итог раздела D" in page.locator("#rm-table").inner_text()
+            assert page.locator("#rm-detail tbody tr").count()==4
+        elif not manufacturing["rows"]:
             page.wait_for_function("document.querySelector('#rm-status').textContent.startsWith('Нет загруженных наблюдений')",timeout=30000)
             assert page.locator("#rm-export").is_disabled()
         page.goto("http://localhost:8765/stat-revisions.html",wait_until="load")
