@@ -17,6 +17,7 @@ SOURCES=[
  ("accounts","Росстат · Национальные счета","https://rosstat.gov.ru/statistics/accounts"),
  ("investment","Росстат · Инвестиции","https://rosstat.gov.ru/investment_nonfinancial"),
  ("population","Росстат · Демография","https://rosstat.gov.ru/folder/12781"),
+ ("finance","Росстат · Финансы организаций и задолженность","https://rosstat.gov.ru/statistics/finance"),
  ("prices","Росстат · Цены","https://rosstat.gov.ru/statistics/price"),
  ("industry","Росстат · Индексы промышленности и натуральный выпуск","https://www.rosstat.gov.ru/enterprise_industrial"),
  ("shortterm","Росстат · Краткосрочные показатели","https://www.rosstat.gov.ru/compendium/document/50802"),

@@ -253,6 +253,14 @@ with sync_playwright() as p:
         assert "Отр" in page.locator("#finance-table tbody tr").inner_text()
         page.locator("#finance-year").select_option("2024")
         assert "4,8" in page.locator("#finance-table tbody tr").inner_text()
+        page.goto("http://localhost:8765/financial-state.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#state-status').textContent.includes('Выборочных строк')")
+        assert page.locator("#debt-table tbody tr").count()==8
+        assert page.locator("#debt-ratios tbody tr").count()==4
+        assert page.locator("#results-table tbody tr").count()==14
+        page.locator("#results-query").fill("Добыча угля")
+        assert page.locator("#results-table tbody tr").count()==1
+        assert "178,6" in page.locator("#results-table tbody tr").inner_text()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
