@@ -24,6 +24,28 @@ class HistoricalTests(unittest.TestCase):
         rows=historical.mirror_rows(f.getvalue(),"grp")
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]["value"],10.5)
+    def test_observed_vrp_layout(self):
+        b=openpyxl.Workbook()
+        for i,header in enumerate(("Валовой региональный продукт по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(в текущих  ценах; миллионов рублей)","Валовой региональный продукт на душу населения по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(рублей)","Индексы физического объема валового регионального продукта в 2017-2024 гг.\n(в постоянных ценах; в процентах к предыдущему году)")):
+            s=b.active if i==0 else b.create_sheet()
+            s.append(["К содержанию"]);s.append([header]);s.append([None,"20223)","20233)","20244)"])
+            for n in range(11):s.append(["Область "+str(n),100+n,110+n,120+n])
+        f=io.BytesIO();b.save(f)
+        rows=historical.parse_vrp(f.getvalue())
+        self.assertEqual(len(rows),99)
+        self.assertEqual({x["indicator"] for x in rows},{"GRP","GRP_PC","GRP_VOLUME"})
+        self.assertEqual({x["year"] for x in rows},{2022,2023,2024})
+        self.assertTrue(any("20244)" in x["note"] for x in rows))
+        self.assertEqual({r["unit"] for r in rows if r["indicator"]=="GRP_PC"},{"руб."})
+    def test_observed_csv_layout(self):
+        f=io.BytesIO()
+        with zipfile.ZipFile(f,"w") as z:z.writestr("data.csv","section;indicator_code;indicator_name;subsection;object_name;object_level;object_oktmo;object_okato;year;indicator_value;indicator_unit;comment;source;version_date\nФинансы;Y1;Доходы консолидированных бюджетов субъектов РФ;CD;Москва;Регион;45000000;45000000;2020;10.5;млн руб.;По данным ведомства;Регионы России 2024;v20260313\n")
+        rows=historical.mirror_rows(f.getvalue(),"finance",selected=True)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["value"],10.5)
+        self.assertEqual(rows[0]["region"],"Москва")
+        self.assertIn("45000000",rows[0]["note"])
+        self.assertIn("Регионы России 2024",rows[0]["note"])
     def test_budget(self):
         b=openpyxl.Workbook();s=b.active
         s.append(["Отчет об исполнении федерального бюджета 0503117 на 01.01.2025, рубли"])
