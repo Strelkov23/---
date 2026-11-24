@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const detail=node('details',''),raw=node('table',''),head=raw.createTHead().insertRow(),body=raw.createTBody();detail.append(node('summary','Исходные наблюдения и координаты источника'),raw);
    for(const label of ['Территория','Год','Значение','Примечание','Лист / строка / столбец','Получено'])head.append(node('th',label));
    for(const r of rows){const tr=body.insertRow();for(const v of [r.region,r.year,fmt(r.value),r.note||'—',[r.sheet,r.row,r.column].filter(x=>x!=null).join(' / '),r.seen])tr.insertCell().textContent=v}host.append(detail);
-   $('hist-export').disabled=false;$('hist-export').onclick=()=>csv('regional-'+s.code+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Обработка','Лист','Строка','Столбец','Примечание','Получено','Индекс (если выбран режим)','Базовый год','Версия'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,s.kind,r.sheet,r.row,r.column,r.note,r.seen,indexed?r.value/maps[names.indexOf(r.region)].get(base).value*100:'',indexed?base:'',version])])
+   $('hist-export').disabled=false;$('hist-export').onclick=()=>csv('regional-'+s.code+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Обработка','Лист','Строка','Столбец','Примечание','Получено','Индекс (если выбран режим)','Базовый год'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,s.kind,r.sheet,r.row,r.column,r.note,r.seen,indexed?r.value/maps[names.indexOf(r.region)].get(base).value*100:'',indexed?base:''])])
   }
   function ranking(){
    if(!selected)return;
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(const l of ['Территория',s.unit,'Примечание'])head.append(node('th',l));
    for(const r of rows){const tr=body.insertRow();tr.insertCell().textContent=r.region;tr.insertCell().textContent=fmt(r.value);const cell=tr.insertCell(),d=node('details','');d.append(node('summary','Источник / сноски'),node('p',r.note||'—'));cell.append(d)}
    $('hist-rank').replaceChildren(node('p','Территорий в срезе: '+rows.length+' · '+year),t);
-   $('hist-rank-export').disabled=!rows.length;$('hist-rank-export').onclick=()=>csv('regional-cross-section-'+s.code+'-'+year+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Лист','Строка','Столбец','Примечание','Версия'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,r.sheet,r.row,r.column,r.note,version])]);save(fields)
+   $('hist-rank-export').disabled=!rows.length;$('hist-rank-export').onclick=()=>csv('regional-cross-section-'+s.code+'-'+year+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Лист','Строка','Столбец','Примечание'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,r.sheet,r.row,r.column,r.note])]);save(fields)
   }
   $('hist-search').oninput=()=>{options();select()};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
  }catch(e){console.error(e);status.textContent='Исторический каталог не доступен в этой версии. Откройте текущую сборку.'}
