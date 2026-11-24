@@ -97,3 +97,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 .budget-bars{display:grid;gap:.7rem}.budget-bars p{margin:0 0 .2rem;overflow-wrap:anywhere}.budget-bar-track{height:12px;background:#e3ecee;border-radius:3px;overflow:hidden}.budget-bar-fill{height:100%;background:#006c69;border-radius:3px}
 
 #dyn-controls table,#dyn-results table,#dyn-detail table{min-width:650px}.dyn-bars{margin:.7rem 0}.dyn-bars p{margin:0 0 .2rem}.dyn-goal{height:100%;background:#a6bbc5;border-radius:3px}.dyn-goal .budget-bar-fill{height:100%}
+
+#dyn-alternatives table,#dyn-sensitivity table{min-width:680px}#dyn-compare-chart{margin:1rem 0}#dynamic-strategies{margin-top:1.5rem}
