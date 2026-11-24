@@ -51,7 +51,7 @@ def collect(out,stamp):
     if not now:raise ValueError("invalid build timestamp")
     result=[]
     def read(name):return json.loads((out/name).read_text(encoding="utf-8"))
-    def add(key,group,title,url,record,latest_period=None,days=None,policy="Ротация источников; срок не гарантирован",archive=False,available=True,not_before=None,href="sources.html"):
+    def add(key,group,title,url,record,latest_period=None,days=None,policy="Ротация источников; срок не гарантирован",archive=False,available=True,not_before=None,href="sources.html",failure_days=1):
         checked=dt(record.get("checked"));success=dt(record.get("success"))
         if archive:
             success=dt(record.get("downloaded")) if available else None
@@ -60,7 +60,7 @@ def collect(out,stamp):
         current=state(checked,success,status,now,days,archive,available)
         due=None
         if days and not archive:
-            delay=timedelta(days=1 if current in ("cached","unavailable") else days)
+            delay=timedelta(days=failure_days if current in ("cached","unavailable") else days)
             due=next_run(now,max(checked+delay if checked else now,not_before or now))
         elif not_before and not archive:due=next_run(now,not_before)
         result.append(dict(id=key,group=group,title=title,url=url,href=href,checked=iso(checked),success=iso(success),observation=latest_period,state=current,status=status,policy=policy,next_check=iso(due),interval_days=days))
@@ -125,9 +125,9 @@ def collect(out,stamp):
     r=read("regional-boundaries.json")
     add("adm1","География","Границы субъектов Natural Earth",r.get("documentation"),dict(r,success=r.get("downloaded")),policy="Проверка при смене календарного месяца; не юридический реестр",href="economic-map.html")
     cert=read("park-certificates.json")
-    add("park-certificates","Предприятия","Документы добровольной сертификации АИП",cert["source"],cert,cert.get("success","")[:10] if cert.get("success") else None,days=7,available=bool(cert["rows"]),policy="Проверка каждые 7 суток; после ошибки через 2 суток; календарный срок не подтверждает отсутствие отзыва",href="industrial-parks.html#park-certificates")
+    add("park-certificates","Предприятия","Документы добровольной сертификации АИП",cert["source"],cert,cert.get("success","")[:10] if cert.get("success") else None,days=7,available=bool(cert["rows"]),policy="Проверка каждые 7 суток; после ошибки через 2 суток; календарный срок не подтверждает отсутствие отзыва",href="industrial-parks.html#park-certificates",failure_days=2)
     p=read("industrial-parks.json")
-    add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,p.get("success"),days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html")
+    add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,(p.get("success") or "")[:10] or None,days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html",failure_days=2)
     r=read("sme-regions.json")
     add("sme","Предприятия","Агрегаты реестра МСП ФНС",r.get("documentation"),dict(r,success=r.get("downloaded")),r.get("period"),policy="Ожидаемый месячный срез на 10-е; проверка при сборке",href="facility-map.html#sme-map-section")
     return dict(schema=1,built=stamp,rows=result,policy="Даты следующей проверки — расчётные сроки внутреннего процесса, не календарь публикаций ведомств. При задержке сборки могут сдвигаться.")
