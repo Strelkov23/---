@@ -1,18 +1,18 @@
 {
-  "built": "2026-11-24T16:34:31+00:00",
+  "built": "2026-11-24T16:41:15+00:00",
   "errors": [],
   "warnings": [
-    "Экономическая политика · HTTP Error 429: Too Many Requests",
-    "Проблемы прогнозирования · HTTP Error 429: Too Many Requests",
-    "Пространственная экономика · HTTP Error 429: Too Many Requests",
-    "Пространственная и региональная экономика · HTTP Error 429: Too Many Requests",
-    "Информатизация в цифровой экономике · HTTP Error 429: Too Many Requests",
-    "Вопросы теоретической экономики · HTTP Error 429: Too Many Requests",
-    "Экономика высокотехнологичных производств · HTTP Error 429: Too Many Requests",
-    "Экономический журнал ВШЭ · HTTP Error 429: Too Many Requests",
-    "Вопросы инновационной экономики · HTTP Error 429: Too Many Requests",
-    "Экономика сельскохозяйственных и перерабатывающих предприятий · HTTP Error 429: Too Many Requests",
-    "Правовой портал 2026-11-24",
+    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Информатизация в цифровой экономике · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Вопросы теоретической экономики · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Экономический журнал ВШЭ · Crossref HTTP 429; повтор не ранее 2026-11-24T17:38:46+00:00",
+    "Вопросы инновационной экономики · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Экономика сельскохозяйственных и перерабатывающих предприятий · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
+    "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-24T17:38:46+00:00",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -28,7 +28,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7680,
+    "archive": 7694,
     "papers": 8166,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -50,12 +50,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "4df67eb503558eed915875bf6dc65bddd535b79352f1f2fe13a0931718c57d26",
-      "bytes": 3727050
+      "sha256": "26c461ede2a0f71e58a636a9a2a5a96724ef17bbeb7575b0efd4b89e7f84761b",
+      "bytes": 3733159
     },
     "literature.json": {
-      "sha256": "bd35fb9bf69e35cedde1ef3ccdaa7b746e4a0e22b518949e46b82612b8fab6f6",
-      "bytes": 4037511
+      "sha256": "33bd1113051095e0421c207c450931246caeca06425b1f24f2071014d2ab4108",
+      "bytes": 4051966
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -70,11 +70,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "7d677e11b24167bcddbe9b6c1cb70e92eb72121a3d9ea6dadbe8161b890f8ac1",
+      "sha256": "5a329c5f069a2260e95cae5fd4e0f5956cf0dab26494b6ab0e49922af137e2e5",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "774149f78dae636c34d2978b1ad270bed64e64580b5a5e7792ca11701de4b1ec",
+      "sha256": "deecce53a943996a03a28e36c7a1bb1788d14b61db12b6a19c129b90294cf35e",
       "bytes": 55538
     },
     "sectors.json": {
@@ -82,27 +82,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "f633e0466bbfecafb976f5df5df88a1851253979dd50a07f60b309dd4f0fbfec",
-      "bytes": 35754
+      "sha256": "484e0b9cda22c00f84f80188fd1d1a5e789f1f89dce361951a327309c491c6c1",
+      "bytes": 36120
     },
     "links.json": {
-      "sha256": "6c1eb54be2ccec50cecda35a12ec45768ae06d6043de121e34005f87058a4caa",
-      "bytes": 1428847
+      "sha256": "a44ee989ebcd21f9c0d3a2f6d393432e5e68549b85ffb9841763e134625d566a",
+      "bytes": 1431830
     },
     "national.json": {
-      "sha256": "b59f1e1bd614c3fd5fa5434b24a8a022397cd3f5633533c8933d8f01d36fa915",
+      "sha256": "d543caf93b83315ece12d23843db85ab464c908492d8164f66b620a56d3c1fcb",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "524557d9adbd638d36e2d947bf6b77e34025a457f2f6edab47125fb1bfd77cca",
+      "sha256": "0c04d2512e67104fecefd23ecb48c0b1a829e2244680323576117985a325ff96",
       "bytes": 79758
     },
     "industrial.json": {
-      "sha256": "aff6f3b2f6cee0327dd1cec551eee0d63dd4d90f38aaa48e70ef4caa1febb641",
+      "sha256": "c4a646c8badd79e028450840d6c49162c01ec436dd64f773f0f003ac56f9e8ba",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "88e325a4edd7f029cd43fcb049fd34a6a6814260017dcfcd1cd55478843e3d70",
+      "sha256": "caa06176a4dd0f280cde9e2472a8665ba68f6d9f6f5a41f2f3d8f5a4a9c467ab",
       "bytes": 116117
     },
     "regional-boundaries.json": {
