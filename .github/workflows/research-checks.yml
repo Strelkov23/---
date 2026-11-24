@@ -205,19 +205,25 @@ jobs:
             if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
           done
 
+
       - name: Inspect assets capacity and finance tables
         if: github.head_ref == 'stage-03-assets-capacity'
         working-directory: monitor
         run: |
           python3 - <<'PY'
-          import historical as h,openpyxl,io,re
+          import historical as h,openpyxl,io
           from concurrent.futures import ThreadPoolExecutor
-          pages=['https://www.rosstat.gov.ru/folder/14304','https://www.rosstat.gov.ru/enterprise_industrial','https://www.rosstat.gov.ru/statistics/finance']
-          def discover(url):
+          names=['Nal_of_pus_ved-2024.xlsx','St_izn_of_ved-2024.xlsx','Vvod_of_ved-2024.xlsx','Urov_motsh_2017-2024.xlsx','fin_sost org_2025.xlsx','Koef_of-2024.xlsx']
+          def probe(name):
               try:
-                  raw,enc=h.get(url,12000000)
-                  files=h.discover(raw.decode(enc,errors='replace'),url)
-                  print('CATALOG',url,[(f['title'],f['url']) for f in files if f['format']=='xlsx'],flush=True)
-              except Exception as e:print('ERROR',url,str(e),flush=True)
-          with ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(discover,pages))
+                  raw,_=h.get('https://www.rosstat.gov.ru/storage/mediabank/'+name,35000000)
+                  w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                  lines=[f'FILE {name} {len(raw)}']
+                  for s in list(w)[:5]:
+                      lines.append(f'SHEET {s.title!r} {s.max_row} {s.max_column}')
+                      for i,r in enumerate(s.iter_rows(values_only=True,max_row=13,max_col=18),1):lines.append(f'ROW {i} {r!r}'[:1400])
+                  w.close()
+                  print('\n'.join(lines),flush=True)
+              except Exception as e:print(name,type(e).__name__,str(e),flush=True)
+          with ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(probe,names))
           PY
