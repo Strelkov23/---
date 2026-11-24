@@ -42,6 +42,25 @@ class HistoricalTests(unittest.TestCase):
                 db.execute("insert into hist_sources values(?,?,null,?,?)",(code,"2026-11-24","Ошибка","[]"))
             second=historical.choose_sections(db,"2026-11-24")
             self.assertFalse(set(first)&set(second))
+    def test_budget_queue_fairness(self):
+        import sqlite3
+        with sqlite3.connect(":memory:") as db:
+            db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
+            files=[dict(url=f"https://roskazna.gov.ru/report-{i}.xlsx",title=str(i),format="xlsx") for i in range(6)]
+            stamp="2026-11-24"
+            first=historical.choose_budget_files(db,files+[files[0]],stamp)
+            self.assertEqual(len(first),3)
+            self.assertEqual(len({f["url"] for f in first}),3)
+            for f in first:
+                historical.import_status(db,historical.budget_import_code(f["url"]),f["title"],f["url"],stamp,"Ошибка",False)
+            second=historical.choose_budget_files(db,files,stamp)
+            self.assertEqual(len(second),3)
+            self.assertFalse({f["url"] for f in first}&{f["url"] for f in second})
+            for f in second:
+                historical.import_status(db,historical.budget_import_code(f["url"]),f["title"],f["url"],stamp,"OK",True,[f])
+            self.assertEqual(historical.choose_budget_files(db,files,"2026-11-25"),[])
+            self.assertEqual(historical.choose_budget_files(db,files,"2026-11-26"),first)
+            self.assertEqual(historical.choose_budget_files(db,files,"2026-11-26",limit=1),first[:1])
     def test_import_fallback(self):
         from unittest.mock import patch
         spec=historical.SPECS[1]
