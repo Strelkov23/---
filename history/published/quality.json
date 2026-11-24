@@ -1,11 +1,12 @@
 {
-  "built": "2026-11-24T20:40:47+00:00",
+  "built": "2026-11-24T20:50:14+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
     "Площадки WRI: архив 2021 года, текущий статус работы не подтверждён",
     "Площадки WRI: нет наблюдаемой годовой выработки в импортированных полях",
     "ADM2: historical reference unavailable",
+    "https://www.pnp.ru/rss/index.xml",
     "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
@@ -19,6 +20,7 @@
     "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
     "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T20:56:36+00:00",
+    "Правовой портал 2026-11-23",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -31,10 +33,11 @@
     "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: 60421.csv.gz: HTTP Error 404: Not Found; 60421.parquet: HTTP Error 404: Not Found",
     "История · Введённые жилые помещения на 1000 человек населения · Ошибка: 45454.csv.gz: HTTP Error 404: Not Found; 45454.parquet: HTTP Error 404: Not Found",
     "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: 59049.csv.gz: HTTP Error 404: Not Found; 59049.parquet: HTTP Error 404: Not Found",
-    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
+    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found",
+    "История · Архив регионов: agriculture · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7810,
+    "archive": 7812,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -44,8 +47,8 @@
     "cbr_USD": 741,
     "national_series": 13,
     "national_observations": 4133,
-    "historical_series": 32,
-    "historical_observations": 55214,
+    "historical_series": 35,
+    "historical_observations": 61742,
     "official_files": 565,
     "geographic_features": 86,
     "geographic_unique_codes": 83,
@@ -70,16 +73,21 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 0,
+    "freshness_ok": 178,
+    "freshness_cached": 12,
+    "freshness_unavailable": 18,
+    "freshness_waiting": 1,
+    "freshness_archive": 1,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "899d8c810b5a8f1f4837161da7c5f0a6f4ea80491f762c69d18464ada85415fc",
-      "bytes": 3774001
+      "sha256": "a0d54a830fb2411c0897b87030050c78f37c935bcc601e4b5c8468331469ec02",
+      "bytes": 3774608
     },
     "literature.json": {
-      "sha256": "ffd60ee464618d233c55946cb69aace2e37e2d765174d12297036cb1349b51e0",
-      "bytes": 4974265
+      "sha256": "49cec518aef5520f21da8476eb850358d033241fd7fd53a549e0ade46270a879",
+      "bytes": 4988721
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -94,11 +102,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "928e4e771922fecd69057e3f12c5f7c7fe2aaa52582bad107ecb249c2aa0e548",
+      "sha256": "bf1619396fa10e8dcdce97e3cd9c75da885af7b76d929e19823cc5698a2fa972",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "f0dac6035d1554ad5ac0f0fb5f2132a1be806544cd40fccce7aac0b2ada0f5e6",
+      "sha256": "b2dca4675f188bc568bbe45b06ccd75d0210a1c7ba9c6e2dd9fc5b18da629825",
       "bytes": 55538
     },
     "sectors.json": {
@@ -106,27 +114,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "c78ffab43dd4a5ac24f5138d72db7dede1ec8f59674ad464bb7413fffc716e64",
-      "bytes": 36366
+      "sha256": "439ab02c9c8283ff22fd040689a7cde375cd8c5af3a4fb1d0aa956721640124a",
+      "bytes": 36619
     },
     "links.json": {
-      "sha256": "dad476801e9079292c10e705d8924ba2923561e963a4b55eb5e5a3e3f782eed7",
-      "bytes": 1489977
+      "sha256": "51f0db1961162cf755e964fa4d4beb1d74407eea3230988d25ab4d4307555b5b",
+      "bytes": 1491676
     },
     "national.json": {
-      "sha256": "06f80ec8d1a935999072d1c036fb8f9461d93d588faf4b2c4735e130122612ac",
+      "sha256": "ad3a24a00b0fb8245666c1d72fde266bf8e2f05890de60477c8ba79c58fe2f3f",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "da12d295cfef8a4955ac21975e976b8f29e6a04ee2df9c8c4b943961240c783b",
-      "bytes": 95441
+      "sha256": "709c20364c38a3fc566f0b2822bc502ef72d2c0a446d687caa87cf3512711147",
+      "bytes": 98051
     },
     "industrial.json": {
-      "sha256": "c908ceff63628c528597c9458ec70572c18414928df12c70629c945be79dea84",
+      "sha256": "7726c59b29228c799a5084fdef73de4772d0c52cae79939e7f48106e8abf87af",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "1c2346396c60cea782dd33c6ee0fc0e4412a594f83ffd9a403f78f41719e6b9c",
+      "sha256": "ad2725e0e3bc1b193ef8ab238cff5dd3d0917c084f090b7efa2c72cd12ab18c8",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -146,12 +154,16 @@
       "bytes": 169833
     },
     "sme-regions.json": {
-      "sha256": "a813eea414e2b76409c5c178b08a99577c895112b303dc72a91a775bf1ba928c",
-      "bytes": 12964
+      "sha256": "0be5b5aae40ed927a0d571558545d2b3fc786677f5494ef805d55d7e9eb0607c",
+      "bytes": 12968
     },
     "district-meta.json": {
-      "sha256": "b9e4a05251ce4a4d66469a196b64a50eaafadc893f0ff22b1c91f2535f880bb0",
+      "sha256": "a0a621bd31c90a467f680ab6a3b4f778d642c26e7f5a6e6858a7250599b97706",
       "bytes": 430
+    },
+    "freshness.json": {
+      "sha256": "2c29d7e3b5a27c719a3870f70deb96e0d6ffa3f941ae5785ecb1bc3b1c99245f",
+      "bytes": 120303
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
@@ -205,6 +217,10 @@
       "sha256": "c62438bcb8916812694d548f843349e86637a00a190077ecff17f319b0f0349e",
       "bytes": 1313834
     },
+    "regional-data/R_505af17284b98773_fd1adecbd1.json": {
+      "sha256": "8c50a87f75a16e392103a0626c1dab8a0e0657a2a1bb46bbe3f2312a8ab264f0",
+      "bytes": 1660239
+    },
     "regional-data/R_510509d40d0cb785_28f4b5b380.json": {
       "sha256": "15f411889b6c56366bdcced31c168bff48f49efbe12c774e3ebb3aaf42b01171",
       "bytes": 18479
@@ -224,6 +240,10 @@
     "regional-data/R_6887143295c72599_84c74d6e51.json": {
       "sha256": "4a32e1b66aff5322edf578c278133dd709772e790c638988223537088d17adf9",
       "bytes": 1519441
+    },
+    "regional-data/R_71188b5f455e6cd2_1cd8b8a232.json": {
+      "sha256": "08e52c3eb17c15b487b05eff173a180cd045d64153ae20c13fc56635945a7304",
+      "bytes": 2356159
     },
     "regional-data/R_77976ed27f49b4fd_28f4b5b380.json": {
       "sha256": "a6968a0986255a3689e7653462a95c0d5b11dcad06ca5f9fc135d70405947902",
@@ -280,6 +300,10 @@
     "regional-data/R_f54f02504bfb051e_84c74d6e51.json": {
       "sha256": "cf7463f9cb493c368343dc10f3a5bd8360fa4b67727416cc6529567f1205b0fb",
       "bytes": 1459610
+    },
+    "regional-data/R_fca0666f3b1929ac_1cd8b8a232.json": {
+      "sha256": "ce4ae1ef15dde18f2d0f12bc5b6a01977d63a5dadb1ad188f023788404763d11",
+      "bytes": 1715835
     },
     "regional-boundaries.geojson": {
       "sha256": "b1c32477d1aa7973e449e9fead6f73565b870acfaa4b856b6764be8ced33436f",
