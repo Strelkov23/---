@@ -45,3 +45,5 @@
 .skip-link{position:absolute;left:.5rem;top:-100px;background:#fff;padding:.7rem;z-index:20}.skip-link:focus{top:.5rem}
 @media(max-width:800px){.portal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.site-header{padding:.75rem .85rem}.primary-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.25rem}.primary-nav a{justify-content:flex-start;padding:.45rem .5rem;font-size:.88rem}.portal-grid{grid-template-columns:1fr}.section-nav{padding:.65rem}.section-nav>div a{font-size:.86rem}.site-brand{font-size:1.1rem}}
+
+#monthly-summary{font-size:.9rem;color:#43625e}#monthly td:first-child{white-space:nowrap}#monthly-more{margin-right:.4rem}
