@@ -111,6 +111,16 @@ def quality(d,previous=None):
             if len(national)!=len(LABELS) or {r["group"] for r in national}!=set(LABELS) or any(r["region"]!="Российская Федерация" or r["value"] is None for r in national):raise ValueError("Итог РФ не воспроизводится")
             if next(r for r in national if r["group"]=="total")["value"]<=0:raise ValueError("Нулевой итог РФ")
     return dict(regional_manufacturing_groups=sum(any(r["group"]==ident and r["value"] is not None for r in rows) for ident in LABELS if ident!="total"),regional_manufacturing_rows=len(rows),regional_manufacturing_numeric=sum(r["value"] is not None for r in rows),regional_manufacturing_suppressed=sum(str(r["raw_value"]).strip() in ("-77777777","-77777777.0") for r in rows),regional_manufacturing_years=len({r["year"] for r in rows}))
+CSV_FIELDS=["group","region","level","okato","oktmo","year","value","raw_value","subsection","edition","version","sheet","row","note","unit","source","sha256"]
+def csv_rows(d):
+    for r in d["rows"]:yield {**r,"unit":UNIT,"source":SOURCE,"sha256":d["sha256"]}
+def verify_csv(path,d):
+    with path.open(encoding="utf-8-sig",newline="") as f:
+        reader=csv.DictReader(f)
+        if reader.fieldnames!=CSV_FIELDS:raise ValueError("Неверные поля отраслевого CSV")
+        actual=list(reader)
+    expected=[{k:"" if r[k] is None else str(r[k]) for k in CSV_FIELDS} for r in csv_rows(d)]
+    if actual!=expected:raise ValueError("CSV не соответствует проверенному JSON")
 def publish(out,previous,stamp,refresh):
     import historical
     d=empty(stamp);old=None
@@ -129,7 +139,5 @@ def publish(out,previous,stamp,refresh):
     quality(d,old)
     (out/"regional-manufacturing.json").write_text(json.dumps(d,ensure_ascii=False,allow_nan=False,separators=(",",":")),encoding="utf-8")
     with (out/"regional-manufacturing.csv").open("w",encoding="utf-8-sig",newline="") as f:
-        fields=["group","region","level","okato","oktmo","year","value","raw_value","subsection","edition","version","sheet","row","note","unit","source","sha256"]
-        w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
-        for r in d["rows"]:w.writerow({**r,"unit":UNIT,"source":SOURCE,"sha256":d["sha256"]})
+        w=csv.DictWriter(f,fieldnames=CSV_FIELDS);w.writeheader();w.writerows(csv_rows(d))
     return d
