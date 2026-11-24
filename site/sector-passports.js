@@ -79,16 +79,21 @@ document.addEventListener('DOMContentLoaded',async()=>{
    if(!selected.length){financeStatus.textContent='Нет сопоставимых оригинальных таблиц ФНС для этого паспорта в выбранной версии.';return}
    financeStatus.textContent='Год: '+financeYear.value+' · опубликованных позиций: '+selected.length+' · отдельные коэффициенты, не сводная рентабельность отрасли.';
    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
-   for(const label of ['Вид деятельности','Коэффициент','Значение, %','Последний успех','Источник / ячейка'])h.append(node('th',label));
+   for(const label of ['Вид деятельности','Коэффициент','Значение, %','Изменение к предыдущему году, п. п.','Последний успех','Источник / ячейка'])h.append(node('th',label));
    const metric=r=>r.metric==='sales'?'Продажи к затратам':'Активы';
    const value=r=>r.sign==='negative_unspecified'?'Отр (величина не указана)':r.sign==='numeric'&&Number.isFinite(r.value)?fmt(r.value):'Нет данных';
+   const delta=r=>{
+    const candidates=rows.filter(x=>x.year===r.year-1&&x.local_code===r.local_code&&x.metric===r.metric);
+    const prev=candidates.length===1?candidates[0]:null;
+    return prev?.sign==='numeric'&&r.sign==='numeric'&&Number.isFinite(prev.value)&&Number.isFinite(r.value)?Number((r.value-prev.value).toFixed(8)):null
+   };
    for(const r of selected){
-    const tr=body.insertRow();
-    for(const v of [r.title,metric(r),value(r),r.success?.slice(0,10)||'—'])tr.insertCell().textContent=v;
+    const tr=body.insertRow(),diff=delta(r);
+    for(const v of [r.title,metric(r),value(r),diff===null?'—':(diff>0?'+':'')+fmt(diff),r.success?.slice(0,10)||'—'])tr.insertCell().textContent=v;
     const cell=tr.insertCell();cell.append(link('Файл ФНС',r.source),node('small',' · '+r.sheet+' / '+r.row+':'+r.column+' · '+(r.status||'—')))
    }
    financeHost.append(t);
-   financeExport.onclick=()=>csv('sector-finance-'+currentFinance.id+'-'+financeYear.value+'.csv',[['Паспорт','Год','Код (локальный)','Название ФНС','Показатель','Значение, %','Знак','Исходная ячейка','Источник','Лист','Строка','Столбец','SHA-256','Успех','Статус'],...selected.map(r=>[currentFinance.title,r.year,r.local_code,r.title,metric(r),r.value,r.sign,r.raw,r.source,r.sheet,r.row,r.column,r.sha256,r.success,r.status])]);
+   financeExport.onclick=()=>csv('sector-finance-'+currentFinance.id+'-'+financeYear.value+'.csv',[['Паспорт','Год','Код (локальный)','Название ФНС','Показатель','Значение, %','Изменение к предыдущему году, п. п.','Знак','Исходная ячейка','Источник','Лист','Строка','Столбец','SHA-256','Успех','Статус'],...selected.map(r=>[currentFinance.title,r.year,r.local_code,r.title,metric(r),r.value,delta(r),r.sign,r.raw,r.source,r.sheet,r.row,r.column,r.sha256,r.success,r.status])]);
    save(['sp-finance-year']);
   }
   if(financeYear)financeYear.onchange=()=>financeDraw();
