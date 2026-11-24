@@ -222,7 +222,9 @@ with sync_playwright() as p:
             page.wait_for_function("document.querySelector('#geo-status').textContent.startsWith('Год:')")
             assert page.locator("#geo-map svg").count()==1
             assert page.locator("#geo-coverage-current progress").count()==1
-            assert page.locator("#geo-coverage-list button").count()==18
+            theme_values=page.locator("#geo-theme option").evaluate_all("(options) => options.map(o => o.value)")
+            assert set(("living","capital","ict","prices","foreign_trade")).issubset(theme_values)
+            assert page.locator("#geo-coverage-list button").count()==len(set(theme_values)-{"all"})
             page.locator("#geo-coverage summary").click()
             assert page.locator("#geo-coverage-list button").first.is_visible()
             page.locator("#geo-coverage summary").click()
