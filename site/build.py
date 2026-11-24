@@ -12,6 +12,7 @@ import cbr_data
 import national
 import historical
 import industrial_data
+import sector_passports
 import routes
 
 out = Path("public")
@@ -114,9 +115,10 @@ with m.connect() as db:
     failures.extend(national.publish(db,m.now(),out,"--refresh" in sys.argv))
     failures.extend(historical.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html"]:
+sector_passports.publish(out)
+for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","industrial.html","sector-passports.html"]:
     page(name,Path(name).read_text())
-for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js","historical.js","industrial.js"]:
+for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js","national.js","historical.js","industrial.js","sector-passports.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())
 
