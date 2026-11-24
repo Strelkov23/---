@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   for(const p of [...new Set(all.map(r=>r.provider))].sort())provider.add(new Option(p,p));
   restore(ids);
   let balance=null;try{balance=await load('sectors.json')}catch{}
+  let regional=[];try{regional=(await load('historical.json')).series}catch{}
+  const regionalTerms={mining:['добыча полезных ископаемых'],manufacturing:['обрабатывающие производства'],construction:['инвестиции в основной капитал','валовое накопление основного капитала','индексы промышленного производства'],finance:['консолидированных бюджетов субъектов'],services:['фактическое конечное потребление домашних хозяйств'],social:['численность населения','коэффициенты рождаемости','коэффициенты смертности']};
   function draw(){
    const p=profiles.find(p=>p.id===picker.value);if(!p)return;
    const q=norm($('sp-q').value.trim()),cov=$('sp-coverage').value,src=provider.value;
@@ -36,6 +38,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
     if(!related.length)b.append(node('p','Нет однозначно подобранной тематической группы баланса.'));
    }else b.append(node('p','Статические паспорта баланса относятся к текущей сборке, а не закреплённой версии.'));
    b.append(link('Все 19 групп межотраслевого баланса','atlas.html'));
+   const reg=$('sp-regions');reg.replaceChildren();
+   const relatedRegions=regional.filter(r=>(regionalTerms[p.id]||[]).some(t=>norm(r.title).includes(t)));
+   for(const r of relatedRegions){const line=node('p','');line.append(link(r.title,local('historical.html?hist-series='+encodeURIComponent(r.code))),document.createTextNode(' · '+r.unit+' · '+fmt(r.count)+' наблюдений · '+r.kind));reg.append(line)}
+   if(!relatedRegions.length)reg.append(node('p','Специализированные региональные ряды пока не подобраны.'));
+   reg.append(link('Полный региональный каталог',local('historical.html')));
    $('sp-export').disabled=!rows.length;$('sp-export').onclick=()=>csv('sector-passport-'+p.id+'.csv',[['Паспорт','Код','Показатель','Значение','Последний период','Первый период','Наблюдений','Единица','Периодичность','Поставщик','Источник','Успешная проверка','Статус'],...rows.map(r=>[p.title,r.id,r.title,r.value,r.last,r.first,r.count,r.unit,r.frequency,r.provider,r.source,r.checked,r.status])]);save(ids)
   }
   $('sp-form').oninput=draw;$('sp-form').onsubmit=e=>e.preventDefault();$('sp-form').onreset=()=>setTimeout(draw,0);draw()
