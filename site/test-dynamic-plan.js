@@ -19,4 +19,24 @@ if(fs.existsSync(balancePath)){
  assert.ok(rr.every(r=>r.groups.every(g=>g.realized<=g.available+1e-7*Math.max(1,g.available))));
  console.log('Verified actual balance dimensions and feasible five-period scenario');
 }
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,a+' != '+b);
+let opt=d.allocateNext([10,10],[0,8],8,1,0,0);
+near(opt.alpha,.8);near(opt.invest[0],8);near(opt.invest[1],0);
+opt=d.allocateNext([10,10],[0,0],100,1,10,3);
+near(opt.alpha,.3);near(opt.used,6);
+opt=d.allocateNext([0,0],[0,0],10,3,0,0);
+near(opt.alpha,1);near(opt.used,0);
+opt=d.allocateNext([10,20],[0,0],15,1,0,0);
+near(opt.alpha,.5);near(opt.used,15);
+assert.throws(()=>d.allocateNext([10],[0],-1,1,0,0));
+const variants=d.compare(m,p);
+assert.equal(variants.length,3);
+for(const v of variants)assert.equal(v.rows.length,p.years);
+for(const r of variants[2].rows)near(r.nextAlpha,r.nextUpper);
+const tests=d.sensitivity(m,{...p,investment:0});
+assert.equal(tests.length,8);
+assert.ok(tests.filter(t=>t.key==='investment').every(t=>!t.changed&&t.deltaPP===0));
+const asym={...m,output:[100000,300000],demand:[100000,200000],effects:[[100000,100000],[0,100000]]};
+const aa=d.compare(asym,{...p,years:2,spare:0,investment:5});
+assert.ok(aa[2].rows[1].alpha>=aa[0].rows[1].alpha-1e-8&&aa[2].rows[1].alpha>=aa[1].rows[1].alpha-1e-8);
 console.log('Dynamic plan tests passed');
