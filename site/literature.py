@@ -7,7 +7,7 @@ from urllib.request import Request,urlopen
 from urllib.error import HTTPError
 from concurrent.futures import ThreadPoolExecutor
 
-JOURNALS={"0042-8736":"Вопросы экономики","2221-2264":"Журнал Новой экономической ассоциации","1813-8691":"Экономический журнал ВШЭ","2072-6414":"Экономика региона","2222-0372":"Вопросы инновационной экономики","2587-7666":"Вопросы теоретической экономики"}
+JOURNALS={"0042-8736":"Вопросы экономики","2221-2264":"Журнал Новой экономической ассоциации","1813-8691":"Экономический журнал ВШЭ","2072-6414":"Экономика региона","2222-0372":"Вопросы инновационной экономики","2587-7666":"Вопросы теоретической экономики","2712-9306":"Информатизация в цифровой экономике","0235-2494":"Экономика сельскохозяйственных и перерабатывающих предприятий","2542-0593":"Экономика высокотехнологичных производств"}
 REGISTRY = {
  "0042-8736": {
   "tags": [
@@ -65,14 +65,12 @@ REGISTRY = {
    "Scopus",
    "Web of Science",
    "DOAJ",
-   "EconLit",
-   "RePEc",
    "Белый список 1"
   ],
   "site": "https://economyofregion.ru/indeksirovanie/",
   "sources": [
    "https://economyofregion.ru/indeksirovanie/",
-   "https://uiec.ru/regions-economy-journal/",
+   "https://conf.hse.ru/2026/journals",
    "https://asnap.ru/journals/0a0c697b5914"
   ]
  },
@@ -101,6 +99,41 @@ REGISTRY = {
    "https://questionset.ru/",
    "https://journals.rcsi.science/2587-7666/index/index/ru_RU"
   ]
+ },
+
+ "2712-9306": {
+  "tags": [
+   "РИНЦ",
+   "ВАК",
+   "ВАК К3"
+  ],
+  "site": "https://1economic.ru/journals/ide",
+  "sources": [
+   "https://1economic.ru/journals/ide"
+  ]
+ },
+ "0235-2494": {
+  "tags": [
+   "РИНЦ",
+   "ВАК",
+   "ВАК К1",
+   "RSCI",
+   "Белый список 2"
+  ],
+  "site": "https://1economic.ru/journals/espp",
+  "sources": [
+   "https://1economic.ru/journals/espp"
+  ]
+ },
+ "2542-0593": {
+  "tags": [
+   "РИНЦ",
+   "ВАК"
+  ],
+  "site": "https://1economic.ru/journals/evp",
+  "sources": [
+   "https://1economic.ru/journals/evp"
+  ]
  }
 }
 
@@ -114,6 +147,12 @@ TOPICS={
  "Инвестиции и инновации":"инвестиц|invest|инновац|innovat|технолог|technolog",
  "Промышленность и АПК":"промышлен|industr|manufactur|аграр|agricultur|сельск.{1,5} хозяйств",
  "Регионы и пространство":"регион|region|пространствен|spatial|municipal|муницип",
+ "Стратегическое планирование":"планирован|planning|прогноз|forecast|межотрасл|input.output",
+ "Энергетика":"энергет|energy|электроэнерг|electricity|нефт|oil|газов",
+ "АПК и продовольствие":"аграр|agricultur|сельск|продовольств|food|фермер",
+ "Транспорт и логистика":"транспорт|transport|логист|logistic|перевоз",
+ "Цифровая экономика":"цифров|digital|искусственн.{1,5} интеллект|artificial intelligence|автоматизац",
+ "Экономическая теория и история":"политэконом|political economy|экономическ.{1,5} теори|economic theory|экономическ.{1,5} истори|economic history",
  "Государство и институты":"государств|public policy|институт|institution|налог|tax|бюджет|budget",
  "Международная экономика":"торговл|trade|импорт|import|экспорт|export|международ|international",
  "Модели и методы":"модел|model|econometric|эконометр|input.output|затраты.{1,3}выпуск",
