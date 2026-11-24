@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-24T19:21:59+00:00",
+  "built": "2026-11-24T19:30:33+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
@@ -16,7 +16,6 @@
     "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
     "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
     "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-24T19:54:16+00:00",
-    "Правовой портал 2026-11-23",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -55,6 +54,11 @@
     "fbs_complete_resource_balances": 105,
     "fbs_resource_discrepancies": 0,
     "fbs_incomplete_use": 75,
+    "energy_years": 34,
+    "energy_observations": 188,
+    "electricity_complete_years": 26,
+    "electricity_discrepancies": 0,
+    "fuel_complete_years": 34,
     "internal_link_errors": 0
   },
   "files": {
@@ -63,8 +67,8 @@
       "bytes": 3768757
     },
     "literature.json": {
-      "sha256": "f9a764886efc0a095ccc55c71bf53feb58fbca09a957505c71a28c6ed071b0c0",
-      "bytes": 4867737
+      "sha256": "1399c5deb55834be6ce98d3a8ed6bf350c54c1f876e238d622e775a186e2b507",
+      "bytes": 4884081
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -79,11 +83,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "25170dc82ffddf8b90765c4331fc66cef9fbae42c733aacbca986d2618130a89",
+      "sha256": "d33e5a370de735efd1e20b71ad339113b27a06cdd109e5839cdf3cb91f14d242",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "6fb50b8d136d46d3c9237976018efed4f3380af1b34e78146dee2f66f76bd279",
+      "sha256": "bbd922cdb3aee936b3c411e8f2cb4026c8709c6ed239eb669d9acb183966506e",
       "bytes": 55538
     },
     "sectors.json": {
@@ -91,27 +95,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "499d8adda554d797c0c8921d0eec5116f5acca632052b04df2afba0ec12871af",
-      "bytes": 36418
+      "sha256": "aac89101e9903ee954fea959aae81e67fadfe1631491d4be470e2ea09c5d2396",
+      "bytes": 36366
     },
     "links.json": {
-      "sha256": "4ac730348de8570b98caf456af009cf45b011313a2f90b1dda72dff84f26c544",
-      "bytes": 1480214
+      "sha256": "60804fde9bb09c3cd27a5fd3f6c02410127649c0a471520bac61d88dcf41207a",
+      "bytes": 1481229
     },
     "national.json": {
-      "sha256": "28b38289e866368042f4ac0057275527e11b596180ce4e897d6b9d02224eaf87",
+      "sha256": "2dd51bd226c06e61640aecdf5fd40d5fd542c154fdc7cfbf212a111f21b228b2",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "1112956b308a3447345e391f8f6f0c9846923ae9767342824a41caafe8bfd4b6",
+      "sha256": "89c34151e8fcd8480f602ec35cc6ddccc01658b5c1c3aa3215e96c4203a578cf",
       "bytes": 95441
     },
     "industrial.json": {
-      "sha256": "4f1f4fbc0b3caacfcfdcca5867304a410d41ffd017e3427f5e1df7e89b6882a4",
+      "sha256": "1a5b53236449a4c50310b6a758de52f70d89a4170d862c8da3a0712aa5138ca4",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "35e2ae1cfa7bb1f9ae233b0f1c7a27a11a832feee98e1853d8aa363731055947",
+      "sha256": "55fd370e44a0590c7dba443fb90c09a8ad2df3a53e19539a1b276c5451ddbdbe",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -121,6 +125,10 @@
     "food-balance.json": {
       "sha256": "e29f270b7419155335e1ea4218d9217f50672340694f8378e5681e64ff5fc5aa",
       "bytes": 76801
+    },
+    "electricity-balance.json": {
+      "sha256": "fb3b453436428213f4ca713b7db9d021c6fe6068dd4b40596490f211583695a7",
+      "bytes": 8491
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
@@ -257,6 +265,10 @@
     "food-balance.csv": {
       "sha256": "ddc08e76ea3065e468750c6c3e3f43cf8680d11de40a90fbaee4ba27ed3c3c42",
       "bytes": 181798
+    },
+    "electricity-balance.csv": {
+      "sha256": "c9a6da0dff9c3f332cc5e1b1b66b2688d140c080d48e5731a7d0795ea41e4684",
+      "bytes": 33139
     }
   }
 }
