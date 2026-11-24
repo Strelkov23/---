@@ -10,7 +10,7 @@ SOURCE="https://www.invest.amurobl.ru/investor/investment-projects/?section=292"
 BASELINE="https://www.invest.amurobl.ru/upload/iblock/f3b/3p1q88k692k67ub94yaa643moq6cyd8w/Reestr-investitsionnyy-proektov-01.10.2026.xlsx"
 REGION="Амурская область"
 MAX=8_000_000
-NOTE="Региональный перечень реализуемых и запланированных проектов. Плановый объем инвестиций и заявленные рабочие места не подтверждают фактическое освоение средств и занятость. «Наличие инвестора» — статус, не название компании. Статусы, отрасли и стадии сохраняются в исходной классификации. Номера действительны только внутри редакции. Не суммируется с Бурятией, ФРП и СЗПК."
+NOTE="Региональный перечень реализуемых и запланированных проектов. Плановый объем инвестиций и заявленные рабочие места не подтверждают фактическое освоение средств и занятость. «Наличие инвестора» — статус, не название компании. Статусы, отрасли и стадии сохраняются в исходной классификации. Исходная нумерация начинается заново в каждой группе статуса. Дробное значение рабочих мест сохраняется как исходное, но исключается из числовой выборки. Не суммируется с Бурятией, ФРП и СЗПК."
 HEADERS=[
 "№ п/п","Наименование инвестиционного проекта","Наличие инвестора",
 "Наименование органа исполнительной власти Амурской области/органа местного самоуправления Амурской области, в сфере ведения которого",
@@ -21,7 +21,7 @@ HEADERS=[
 "Плановый объем инвестиций, млн рублей","Количество рабочих мест, ед."
 ]
 TEXT_FIELDS=["name","investor_availability","agency","sector","status","stage","support","municipality","location","period"]
-FIELDS=["record","region",*TEXT_FIELDS,"cost_mln_rub","jobs","cost_raw","jobs_raw","cost_state","jobs_state","sheet","row","edition","source","sha256"]
+FIELDS=["record","source_number","region",*TEXT_FIELDS,"cost_mln_rub","jobs","cost_raw","jobs_raw","cost_state","jobs_state","sheet","row","edition","source","sha256"]
 
 def release(url):
     p=urlsplit(url);path=unquote(p.path)
@@ -57,8 +57,15 @@ def match_header(values):
 def numeric(raw,integer=False):
     # Preserve explicit textual source markers, never turn them into zero.
     t=norm(raw)
-    if t in ("","-","—","–","н/д","нет данных","не определено","уточняется","на уточнении","не предусмотрено","не требуется","нет","н.д.","н/а"):
+    if t in ("","-","—","–","н/д","нет данных","не определено","уточняется","на уточнении","не предусмотрено","не требуется","нет","н.д.","н/а","в проработке"):
         return None,"missing" if not t else "source_marker"
+    # A fractional job count is preserved but excluded from numeric analysis.
+    if integer:
+        from decimal import Decimal,InvalidOperation
+        try:
+            v=Decimal(str(raw).replace(" ","").replace(",", "."))
+            if v.is_finite() and 0<=v<=Decimal("1e12") and v!=v.to_integral_value():return None,"noninteger_source"
+        except InvalidOperation:pass
     try:v=number(raw,integer)
     except ValueError:raise ValueError("Нераспознанное числовое поле: "+str(raw)[:80])
     return v,"numeric" if v is not None else "source_marker"
@@ -74,7 +81,7 @@ def parse(raw,url):
     try:
         for ws in book:
             if (ws.max_row or 0)>10000 or (ws.max_column or 0)>200:raise ValueError("Размер листа")
-            rows=[];found=False
+            rows=[];found=False;group=None;group_no=0;seen_groups=set()
             for pos,v in enumerate(ws.iter_rows(max_col=13,values_only=True),1):
                 if pos>10000:raise ValueError("Предел строк")
                 if not found:
@@ -84,17 +91,26 @@ def parse(raw,url):
                 if tuple(v)==tuple(range(1,14)) and not rows:continue
                 if not re.fullmatch(r"\d+",norm(v[0])):raise ValueError("Строка без номера: "+str(pos))
                 n=int(norm(v[0]))
-                if n!=len(rows)+1:raise ValueError("Непоследовательный номер: "+str(n))
+
                 fields={k:clean(str(x if x is not None else "")) for k,x in zip(TEXT_FIELDS,v[1:11])}
                 if not fields["name"] or not fields["sector"] or not fields["status"]:raise ValueError("Неполная карточка: "+str(n))
+                status=fields["status"]
+                if status!=group:
+                    if status in seen_groups:raise ValueError("Повтор группы статуса")
+                    group=status;group_no=0;seen_groups.add(status)
+                group_no+=1
+                if n!=group_no:raise ValueError("Непоследовательный номер в группе: "+str(n))
                 cost_raw=str(v[11] if v[11] is not None else "");jobs_raw=str(v[12] if v[12] is not None else "")
                 try:cost,cs=numeric(cost_raw);jobs,js=numeric(jobs_raw,True)
                 except ValueError as e:raise ValueError("Строка "+str(pos)+": "+str(e))
-                rows.append(dict(record=n,region=REGION,**fields,cost_mln_rub=cost,jobs=jobs,cost_raw=cost_raw,jobs_raw=jobs_raw,cost_state=cs,jobs_state=js,sheet=ws.title,row=pos,edition=day,source=url,sha256=digest))
+                rows.append(dict(record=len(rows)+1,source_number=n,region=REGION,**fields,cost_mln_rub=cost,jobs=jobs,cost_raw=cost_raw,jobs_raw=jobs_raw,cost_state=cs,jobs_state=js,sheet=ws.title,row=pos,edition=day,source=url,sha256=digest))
             if found and rows:tables.append(rows)
     finally:book.close()
     if len(tables)!=1:raise ValueError("Неоднозначная таблица")
     if not 100<=len(tables[0])<=3000:raise ValueError("Неожиданный охват")
+    if day=="2026-10-01":
+        from collections import Counter
+        if dict(Counter(r["status"] for r in tables[0]))!={"Реализуемый":68,"Перспективный":58,"Приостановленный":8,"Инвестиционное предложение":39,"Завершенный":27}:raise ValueError("Охват групп исходной редакции")
     return tables[0]
 
 def empty(stamp):
@@ -107,13 +123,21 @@ def quality(d):
     if rows:
         if not 100<=len(rows)<=3000 or not d["success"] or d["status"] not in ("ok","cached") or release(d["source"]).isoformat()!=d["edition"] or not re.fullmatch(r"[a-f0-9]{64}",d["sha256"] or ""):raise ValueError("Охват/происхождение")
     elif d["status"] in ("ok","cached") or any(d[k] is not None for k in ("success","edition","source","sha256")):raise ValueError("Пустой успешный импорт")
-    seen=set()
+    seen=set();groups=set();group=None;group_no=0
     for i,r in enumerate(rows,1):
         k=(r["sheet"],r["row"])
         if set(r)!=set(FIELDS) or r["record"]!=i or r["region"]!=REGION or not r["name"] or not r["sector"] or not r["status"] or not r["sheet"] or type(r["row"]) is not int or r["row"]<3 or k in seen or any(r[x]!=d[x] for x in ("edition","source","sha256")):raise ValueError("Запись")
         seen.add(k)
+        if r["status"]!=group:
+            if r["status"] in groups:raise ValueError("Повтор группы статуса")
+            group=r["status"];groups.add(group);group_no=0
+        group_no+=1
+        if r["source_number"]!=group_no:raise ValueError("Номер в группе")
         if (r["cost_mln_rub"],r["cost_state"])!=numeric(r["cost_raw"]) or (r["jobs"],r["jobs_state"])!=numeric(r["jobs_raw"],True):raise ValueError("Число/маркер")
-    return dict(amur_project_records=len(rows),amur_project_cost_records=sum(r["cost_state"]=="numeric" for r in rows),amur_project_jobs_records=sum(r["jobs_state"]=="numeric" for r in rows),amur_project_sectors=len({r["sector"] for r in rows}),amur_project_municipalities=len({r["municipality"] for r in rows if r["municipality"]}))
+    if rows and d["edition"]=="2026-10-01":
+        from collections import Counter
+        if dict(Counter(r["status"] for r in rows))!={"Реализуемый":68,"Перспективный":58,"Приостановленный":8,"Инвестиционное предложение":39,"Завершенный":27}:raise ValueError("Охват групп")
+    return dict(amur_project_noninteger_jobs=sum(r["jobs_state"]=="noninteger_source" for r in rows),amur_project_records=len(rows),amur_project_cost_records=sum(r["cost_state"]=="numeric" for r in rows),amur_project_jobs_records=sum(r["jobs_state"]=="numeric" for r in rows),amur_project_sectors=len({r["sector"] for r in rows}),amur_project_municipalities=len({r["municipality"] for r in rows if r["municipality"]}))
 
 def verify_csv(path,d):
     with path.open(encoding="utf-8-sig",newline="") as f:
@@ -156,11 +180,11 @@ def render(d):
         body+='<label>'+label+'<select id="amur-'+field+'" data-amur-filter="'+field+'"><option value="">Все</option>'
         for v in sorted({r[field] for r in rows if r[field]}):body+='<option value="'+e(v)+'">'+e(v)+'</option>'
         body+='</select></label>'
-    body+='<p role="status" id="amur-count">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll"><table><thead><tr>'+''.join('<th>'+h+'</th>' for h in ("№","Проект","Отрасль","Статус","Стадия","Муниципалитет","Место","Инвестор","Механизм","Период","Плановые инвестиции, млн руб.","Рабочие места, ед.","Орган власти"))+'</tr></thead><tbody id="amur-rows">'
+    body+='<p role="status" id="amur-count">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll"><table><thead><tr>'+''.join('<th>'+h+'</th>' for h in ("№ записи","№ в группе","Проект","Отрасль","Статус","Стадия","Муниципалитет","Место","Инвестор","Механизм","Период","Плановые инвестиции, млн руб.","Рабочие места, ед.","Орган власти"))+'</tr></thead><tbody id="amur-rows">'
     for r in rows:
         body+='<tr '+ ' '.join('data-amur-'+f.replace("_","-")+'="'+e(r[f])+'"' for f in ("sector","status","stage","municipality","investor_availability"))+'>'
-        body+=''.join('<td>'+e(r[f])+'</td>' for f in ("record","name","sector","status","stage","municipality","location","investor_availability","support","period"))
-        for field,raw in (("cost_mln_rub","cost_raw"),("jobs","jobs_raw")):body+='<td>'+e(r[field] if r[field] is not None else r[raw])+'</td>'
+        body+=''.join('<td>'+e(r[f])+'</td>' for f in ("record","source_number","name","sector","status","stage","municipality","location","investor_availability","support","period"))
+        for field,raw in (("cost_mln_rub","cost_raw"),("jobs","jobs_raw")):body+='<td>'+e(r[field] if r[field] is not None else (r[raw]+" (не включено в числовые данные)" if r[raw] else ""))+'</td>'
         body+='<td>'+e(r["agency"])+'</td></tr>'
     return body+'</tbody></table></div><p>Плановые значения не складываются с фактическими показателями ВРП, промышленного выпуска и инвестиционной статистики Росстата. Отсутствие записи не означает отсутствие проекта.</p></section><script defer src="amur-projects.js"></script>'
 
