@@ -65,6 +65,13 @@ def make(out):
     for code,title in state["labels"].items():
         items=state["debt"];first,last=bounds(x["period"] for x in items)
         add("debt",code,title+" организаций на конец месяца","млрд руб.","месячная","Россия",len(items),first,last,items[0]["source"],None,None,state["verification"],"manual","financial-state.html","financial-state.json","Запас на конец месяца; "+state["coverage"],"Росстат; оперативная отчётность")
+    costs=load(out,"cost-structure.json")
+    grouped=defaultdict(list)
+    for r in costs["rows"]:grouped[r["code"]].append(r)
+    for code,items in grouped.items():
+        for key,title in costs["labels"].items():
+            first,last=bounds(r["year"] for r in items)
+            add("cost",code+"."+key,items[0]["title"]+" — "+title,"%","годовая","Россия",len(items),first,last,costs["source"],None,None,costs["verification"],"manual","cost-structure.html","cost-structure.json",costs["coverage"],"ОКВЭД2")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])
