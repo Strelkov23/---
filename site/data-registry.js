@@ -19,6 +19,8 @@ const DataRegistry=(()=>{
   else if(r.group==='cost'){const [code,key]=r.code.split('.');result=d.rows.filter(v=>v.code===code).map(v=>row(v.year,v[key],v.source,r.territory,null,'Таблица '+v.table+', стр. '+v.page+'; доля всех затрат'))}
   else if(r.group==='debt')result=d.debt.map(v=>row(v.period,v[r.code],v.source,r.territory,null,'Конец месяца; таблица '+v.table+'; '+d.coverage));
   else if(r.group==='finance'){const pos=r.code.lastIndexOf('.'),code=r.code.slice(0,pos),metric=r.code.slice(pos+1);result=d.rows.filter(v=>v.code===code&&v.metric===metric).map(v=>row(v.year,v.value,v.replica,r.territory,null,'ФНС; '+v.sign+'; '+v.level))}
+  else if(r.group==='budget_law')result=d.rows.map(v=>row(v.year,v.values[r.code],v.source,r.territory,null,'Федеральный закон '+v.law_number+' от '+v.law_date+'; статья '+v.article+'; исходное значение '+v.original[r.code]+' тыс. руб.; документальный снимок'));
+  else if(r.group==='finance_original'){const pos=r.code.lastIndexOf('.'),code=r.code.slice(0,pos),metric=r.code.slice(pos+1);result=d.years.flatMap(batch=>batch.rows.filter(v=>v.code===code&&v.metric===metric&&v.sign==='numeric').map(v=>row(v.year,v.value,v.source,r.territory,batch.success,'Оригинал ФНС; '+v.sheet+' / '+v.row+':'+v.column+'; SHA-256 '+batch.sha256+'; '+batch.status)))}
   else if(r.group==='forecast'){const s=d.series.find(x=>x.code===r.code);if(!s)throw Error('Прогнозный ряд не найден');result=s.results.map(v=>row(v.target,v.point,s.source,r.territory,null,'Последний факт: '+s.last+'; горизонт: '+v.horizon+'; метод: '+v.selected+'; границы описательные',v.low,v.high))}
   else throw Error('Неизвестный тип ряда');
   result=result.filter(v=>typeof v.value==='number'&&Number.isFinite(v.value));
@@ -30,7 +32,7 @@ const DataRegistry=(()=>{
 if(typeof module!=='undefined')module.exports=DataRegistry;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);if(!$('registry-form'))return;
- const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',energy:'Энергетические ряды OWID',fbs:'Продовольственные балансы FAOSTAT',cost:'Структура затрат',debt:'Задолженность организаций',finance:'Финансы организаций',forecast:'Прогнозные расчёты'};
+ const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',energy:'Энергетические ряды OWID',fbs:'Продовольственные балансы FAOSTAT',cost:'Структура затрат',debt:'Задолженность организаций',finance:'Финансы организаций — документальный снимок',finance_original:'Оригинальные таблицы ФНС',budget_law:'Федеральный бюджет по законам',forecast:'Прогнозные расчёты'};
  const modes={auto:'Автоматический сборщик',manual:'Ручной снимок',derived:'Расчётный ряд'};
  const key='economic-registry-selection-v1';let saved=new Set(),storage=true;
  try{const v=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(v))saved=new Set(v.filter(x=>typeof x==='string'))}catch(e){storage=false}
