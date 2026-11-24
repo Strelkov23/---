@@ -7,6 +7,7 @@ on:
 jobs:
   offline:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -19,16 +20,29 @@ jobs:
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m compileall -q .
-          python3 -m unittest test_catalogue.py test_research.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py
           for script in *.js; do node --check "$script"; done
           python3 build.py
           python3 - <<'PY'
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','research.js'):
+          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
           assert not errors, errors
+          report=json.loads((p/'quality.json').read_text())
+          assert not report['errors'], report['errors']
+          assert report['files']['compare.json']['sha256']
           PY
+      - name: Retain validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-validation
+          path: |
+            monitor/public/quality.json
+            monitor/public/links.json
+          if-no-files-found: ignore
+          retention-days: 14
