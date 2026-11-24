@@ -43,3 +43,30 @@ class TestWorkbook(unittest.TestCase):
                 self.assertEqual(len(list(csv.DictReader(file))),366)
             d["reconciliation"]["counts"]["missing"]=0
             with self.assertRaisesRegex(ValueError,"не воспроизводится"):f.quality(d)
+
+    def test_workbook_editions_and_regression_guard(self):
+        import sqlite3
+        from unittest.mock import patch
+        a="https://data.nalog.ru/a.xlsx";b="https://data.nalog.ru/b.xlsx"
+        row=dict(year=2025,title="Всего",code=f.CROSSWALK["total"][0],metric="sales",value=10,sign="numeric",raw="10",source=a,sheet="Рентабельность",row=5,column=2)
+        other=dict(row,metric="assets",value=5,raw="5",column=3)
+        def source_rows(rows,url):return [dict(x,source=url) for x in rows]
+        with sqlite3.connect(":memory:") as db:
+            with patch.object(f,"fetch",return_value=b"first"),patch.object(f,"parse",return_value=[row,other]):
+                d=f.sync(db,"2026-11-25T10:00:00+00:00",True,{2025:a})
+            self.assertEqual(d["years"][0]["editions"],1)
+            with patch.object(f,"fetch",return_value=b"partial") as get,patch.object(f,"parse",return_value=source_rows([row],b)):
+                d=f.sync(db,"2026-11-25T11:00:00+00:00",True,{2025:b})
+                self.assertEqual(get.call_count,1)
+                self.assertEqual(d["years"][0]["url"],a)
+                self.assertEqual(d["years"][0]["attempt_url"],b)
+                self.assertEqual(len(d["years"][0]["rows"]),2)
+                self.assertIn("потеряла",d["years"][0]["status"])
+                f.sync(db,"2026-11-25T12:00:00+00:00",True,{2025:b})
+                self.assertEqual(get.call_count,1)
+            with patch.object(f,"fetch",return_value=b"second"),patch.object(f,"parse",return_value=source_rows([dict(row,value=11,raw="11"),other],b)):
+                d=f.sync(db,"2026-12-03T10:00:00+00:00",True,{2025:b})
+            self.assertEqual(d["years"][0]["editions"],2)
+            self.assertEqual(d["years"][0]["url"],b)
+            self.assertEqual(d["years"][0]["rows"][0]["value"],11)
+            self.assertEqual(db.execute("select count(*) from finance_workbook_editions").fetchone()[0],2)
