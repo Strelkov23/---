@@ -84,3 +84,18 @@ assert.equal(M.chooseProfileObservation([{m:a1,r:null},{m:a2,r:{year:2024,value:
 assert.equal(M.chooseProfileObservation([{m:a2,r:{year:2024,value:100}},{m:a1,r:{year:2024,value:105}}]).m.code,'a1');
 assert.equal(M.chooseProfileObservation([{m:a1,r:{year:2023,value:105}},{m:a2,r:{year:2024,value:100}}]).m.code,'a2');
 assert.equal(M.chooseProfileObservation([{m:a1,r:null},{m:a2,r:{year:2024,value:null}}]),null);
+
+assert.equal(M.passportTheme('chemical'),'chemical');
+assert.equal(M.passportTheme('industry'),'manufacturing');
+assert.equal(M.passportTheme('ict'),'digital');
+assert.equal(M.passportTheme('prices'),null);
+const F=require('./sector-passports.js').financeDelta;
+const profitCurrent={year:2025,local_code:'20',metric:'sales',sign:'numeric',value:25.9},profitPrev={...profitCurrent,year:2024,value:27.6};
+assert.equal(F(profitCurrent,[profitPrev]),-1.7);
+assert.equal(F({...profitCurrent,value:0},[{...profitPrev,value:0}]),0);
+assert.equal(F(profitCurrent,[{...profitPrev,sign:'negative_unspecified',value:null}]),null);
+assert.equal(F({...profitCurrent,sign:'negative_unspecified',value:null},[profitPrev]),null);
+assert.equal(F(profitCurrent,[{...profitPrev,year:2023}]),null);
+assert.equal(F(profitCurrent,[{...profitPrev,local_code:'21'}]),null);
+assert.equal(F(profitCurrent,[{...profitPrev,metric:'assets'}]),null);
+assert.equal(F(profitCurrent,[profitPrev,profitPrev]),null);
