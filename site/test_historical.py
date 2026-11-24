@@ -18,6 +18,14 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(rows[0]["unit"],"млрд руб.")
         s["C6"]=-9
         with self.assertRaises(ValueError):historical.parse_minfin_annual(blob())
+        diagnostics=[]
+        rows=historical.parse_minfin_annual(blob(),diagnostics)
+        self.assertEqual(len(rows),12)
+        self.assertEqual({r["year"] for r in rows},{2021,2022,2023,2024})
+        self.assertEqual(len(diagnostics),1)
+        self.assertIn("2020",diagnostics[0])
+        self.assertIn("остаток",diagnostics[0])
+        self.assertIn("сальдо",diagnostics[0])
     def test_minfin_discovery(self):
         base="https://minfin.gov.ru/ru/statistics/fedbud/execute/"
         links=historical.discover('<a href="/common/Prilozhenie_3_dannye_109-111_—_god.xlsx">Год</a><a href="/common/Prilozhenie_3_dannye_109-111_—_mes.xlsx">Месяц</a>',base)
