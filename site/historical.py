@@ -48,6 +48,7 @@ MIRROR_TITLES={
  "prices":"Цены","foreign_trade":"Внешняя торговля"
 }
 def mirror_title(section):return "Архив регионов · "+MIRROR_TITLES[section]
+MIRROR_MISSING_MARKERS=frozenset((-77777777,-99999999))
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
 PRIMARY="https://rosstat.gov.ru/folder/210/document/13204"
@@ -427,7 +428,7 @@ def mirror_rows(raw,section,selected=False):
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
                     if not y or v is None or not title or not unit or not region:continue
                     # Confirmed confidentiality marker in the licensed archive, not an economic value.
-                    if v==-77777777:continue
+                    if v in MIRROR_MISSING_MARKERS:continue
                     # The publisher explicitly uses mixed units for nationwide budget totals.
                     original_unit=unit
                     if "для значений в целом по россии" in norm(unit):
@@ -805,7 +806,7 @@ def publish(db,stamp,out,refresh):
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
         r=json.loads(row[0])
         # Preserve original database records; exclude reserved marker from public numeric series.
-        if r["source"].startswith(MIRROR) and r["value"]==-77777777:
+        if r["source"].startswith(MIRROR) and r["value"] in MIRROR_MISSING_MARKERS:
             suppressed+=1;continue
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         if (r["indicator"],r["source"]) in mixed_units:key+="_u"+hashlib.sha256(r["unit"].encode()).hexdigest()[:8]
