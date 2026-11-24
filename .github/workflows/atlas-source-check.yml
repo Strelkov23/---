@@ -38,5 +38,37 @@ jobs:
                   break
               except Exception as e:
                   print("FAILED",url,type(e).__name__,str(e))
-          else:raise SystemExit("Neither official workbook was available")
+          else:print("DIRECT WORKBOOK UNAVAILABLE; inspect licensed archive separately")
+          PY
+      - name: Inspect licensed regional archive indicator inventory
+        run: |
+          python3 - <<'PY'
+          from urllib.request import Request,urlopen
+          import io,zipfile,csv,collections,json,re
+          base="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
+          for filename in ["data_08_socio_economic_102_v20260313.zip","data_industry_102_v20260313.zip","data_12_socio_economic_102_v20260313.zip"]:
+              print("ARCHIVE",filename)
+              try:
+                  with urlopen(Request(base+filename,headers={"User-Agent":"Mozilla/5.0"}),timeout=30) as resp:raw=resp.read(35000001)
+                  if len(raw)>35000000:raise ValueError("oversized")
+                  with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                      files=[x for x in z.infolist() if x.filename.endswith(".csv")]
+                      if sum(x.file_size for x in files)>200000000:raise ValueError("oversized CSV")
+                      for m in files:
+                          c=collections.Counter();examples={}
+                          with z.open(m) as f:
+                              reader=csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig"),delimiter=";")
+                              print("HEADER",m.filename,reader.fieldnames)
+                              for row in reader:
+                                  title=row.get("indicator_name") or row.get("name_indicator") or row.get("indicator") or row.get("indicator_title") or ""
+                                  unit=row.get("indicator_unit") or row.get("unit") or row.get("measure") or ""
+                                  subsection=row.get("subsection") or ""
+                                  key=(title,unit,subsection)
+                                  c[key]+=1
+                                  if key not in examples:examples[key]={k:v for k,v in row.items() if k in ("object_name","object_level","year","indicator_id","indicator_code","source","value")}
+                          print("INDICATOR COUNT",len(c))
+                          for key,n in c.items():
+                              if re.search(r"добавленн|структур|отгруженн|производств[ао] текстиль|производств[ао] химич|производств[ао] одежд|производств[ао] лекарствен|производств[ао] метал|производств[ао] пищев",key[0],re.I):
+                                  print("CONCEPT",json.dumps([key,n,examples[key]],ensure_ascii=False))
+              except Exception as e:print("ARCHIVE ERROR",filename,type(e).__name__,str(e))
           PY
