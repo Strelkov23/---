@@ -18,6 +18,7 @@ SOURCES=[
  ("investment","Росстат · Инвестиции","https://rosstat.gov.ru/investment_nonfinancial"),
  ("population","Росстат · Демография","https://rosstat.gov.ru/folder/12781"),
  ("prices","Росстат · Цены","https://rosstat.gov.ru/statistics/price"),
+ ("industry","Росстат · Индексы промышленности и натуральный выпуск","https://www.rosstat.gov.ru/enterprise_industrial"),
  ("shortterm","Росстат · Краткосрочные показатели","https://www.rosstat.gov.ru/compendium/document/50802"),
  ("emiss_open","ЕМИСС · Открытые данные","https://fedstat.ru/opendata/"),
  ("emiss","ЕМИСС · Паспорт среднегодового населения","https://fedstat.ru/indicator/31556"),
