@@ -176,6 +176,16 @@ def metadata(item):
     count=item.get("is-referenced-by-count")
     return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None)
 
+SELECT_FIELDS="DOI,title,author,published,volume,issue,page,article-number,is-referenced-by-count"
+def fetch_batch(issn,filters,cursor,select=True):
+    params=dict(filter=",".join(filters),rows=300,cursor=cursor)
+    if select:params["select"]=SELECT_FIELDS
+    url=f"https://api.crossref.org/journals/{issn}/works?{urlencode(params)}"
+    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)"}),timeout=40) as resp:
+        data=json.load(resp)["message"]
+    if not isinstance(data.get("items"),list):raise ValueError("Invalid Crossref response")
+    return data
+
 def sync(db, stamp, refresh):
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
@@ -192,12 +202,15 @@ def sync(db, stamp, refresh):
         if not full:
             filters.append('from-index-date:'+str(date.fromisoformat(last[0][:10])-timedelta(days=2)))
         cursor='*'
+        selected=True
         try:
             while True:
-                args=urlencode(dict(filter=','.join(filters),rows=300,cursor=cursor,select='DOI,title,author,published,volume,issue,page,article-number,language,is-referenced-by-count'))
-                url=f'https://api.crossref.org/journals/{issn}/works?{args}'
-                with urlopen(Request(url,headers={'User-Agent':'EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)'}),timeout=40) as resp:
-                    batch=json.load(resp)['message']
+                try:batch=fetch_batch(issn,filters,cursor,selected)
+                except HTTPError as err:
+                    if err.code!=400 or not selected:raise
+                    # A rejected field projection must not stop the entire journal archive.
+                    selected=False
+                    batch=fetch_batch(issn,filters,cursor,False)
                 entries=[]
                 details=[]
                 for item in batch['items']:
@@ -212,7 +225,13 @@ def sync(db, stamp, refresh):
                     doi=(item.get('DOI') or '').strip().lower()
                     if not re.fullmatch(r'10\.\d{4,9}/\S+',doi):continue
                     entries.append((doi,journal,when,title,authors,topics))
-                    details.append((doi,json.dumps(metadata(item),ensure_ascii=False),stamp))
+                    meta=metadata(item)
+                    previous=db.execute('select payload from literature_meta where doi=?',(doi,)).fetchone()
+                    if previous:
+                        old=json.loads(previous[0])
+                        for key in meta:
+                            if meta[key] in ('',None) and old.get(key) not in ('',None):meta[key]=old[key]
+                    details.append((doi,json.dumps(meta,ensure_ascii=False),stamp))
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
