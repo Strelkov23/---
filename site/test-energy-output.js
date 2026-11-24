@@ -13,3 +13,12 @@ assert.equal(E.selectRows([{...s,kind:'Отгрузка'}],'месячная','2
 assert.equal(E.selectRows([s],'годовая','2025','').length,0);
 assert.equal(E.selectRows([s],'месячная','2025-02','coal').length,0);
 console.log('Energy output filters, periods and missing values passed');
+
+assert.equal(E.metalGroup('07.10.10'),'ironore');
+assert.equal(E.metalGroup('07.29.12'),'nonferrousore');
+assert.equal(E.metalGroup('24.41.10'),'nonferrous');
+assert.equal(E.metalGroup('24.10.12'),'ferrous');
+assert.equal(E.metalGroup('24.100'),null);
+assert.equal(E.metalGroup('25.11.10'),null);
+assert.equal(E.selectRows([{...s,code:'24.10.12'}],'месячная','2025-02','ferrous',E.metalGroup)[0].delta,10);
+assert.equal(E.selectRows([s],'месячная','2025-02','',E.metalGroup).length,0);

@@ -185,7 +185,10 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==33
+        methods=json.loads(Path("method-passports.json").read_text())
+        assert len(methods)>=33
+        assert page.locator("main .portal-grid article").count()==len(methods)
+        assert page.locator("main .portal-grid a[href=\"methodology.html#metallurgy-output-method\"]").count()==1
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()

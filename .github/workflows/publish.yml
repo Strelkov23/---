@@ -57,6 +57,7 @@ jobs:
           node test-cost-structure.js
           node test-food-balance.js
           node test-electricity-balance.js
+          node test-energy-output.js
           rm -rf public
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
           node test-price-model.js
