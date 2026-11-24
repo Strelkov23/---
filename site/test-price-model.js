@@ -7,6 +7,9 @@ r=P.calculate(m,{importShock:100,residualShock:[0,0]});near(r.rows[0].change,100
 assert.ok(r.rows.every(x=>x.indirect>=0));
 let l=P.labor(m,{hours:[100,200],rublesPerHour:500});near(l[0].fullHours,(.8*100+.1*200)/.61);near(l[0].conditionalRubles,500*l[0].fullHours);
 assert.throws(()=>P.calculate({...m,compatible:false},{importShock:0,residualShock:[0,0]}));assert.throws(()=>P.labor(m,{hours:[100,NaN],rublesPerHour:1}));assert.throws(()=>P.linear([[1,1],[1,1]],[1,1]));
+const hm={...m,output:[100000,200000]},hdr='group_id,group_name,year,output_million_rub,annual_hours,source\n',rowA='1,A,2021,100000,10000000,https://example.org/a\n',rowB='2,B,2021,200000,40000000,https://example.org/b\n';
+assert.deepEqual(P.parseHours(hdr+rowB+rowA,hm).map(r=>r.intensity),[100000,200000]);
+for(const text of [hdr+rowA,hdr+rowA+rowA,hdr+rowA+rowB.replace('40000000',''),hdr+rowA+rowB.replace('2021','2022'),hdr+rowA+rowB.replace('200000','200001')])assert.throws(()=>P.parseHours(text,hm));
 const fs=require('node:fs'),path=require('node:path'),data=JSON.parse(fs.readFileSync(path.join(__dirname,'public','price-data.json'),'utf8'));
 assert.equal(data.names.length,19);
 assert.equal(data.compatible,true,'Negative residual in actual data: do not simulate without reconciling');

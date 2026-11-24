@@ -58,6 +58,34 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#labor-status').textContent.includes('Наблюдений производительности:')")
         assert page.locator("#labor-broad tbody tr").count()>=1
         assert page.locator("#labor-regional tbody tr").count()>=1
+        page.goto("http://localhost:8765/prices.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#price-status').textContent.includes('Баланс 2021 проверен')")
+        assert page.locator("#price-results tbody tr").count()==19
+        page.locator("#price-import").fill("0")
+        assert all(row.locator("td").nth(1).inner_text()=="100" for row in page.locator("#price-results tbody tr").all())
+        page.locator("#price-import").fill("25")
+        with page.expect_download() as d:
+            page.locator("#price-download").click()
+        assert d.value.suggested_filename=="cost-price-scenario.csv"
+        assert page.locator("#price-labor-download").is_disabled()
+        records=list(csv.reader(io.StringIO(Path("labor-hours-template.csv").read_text(encoding="utf-8-sig"))))
+        for row in records[1:]:
+            row[4]=str(float(row[3])/1000*1000)
+            row[5]="Test fixture only: not official data"
+        buf=io.StringIO();csv.writer(buf).writerows(records);payload=buf.getvalue().encode()
+        page.locator("#price-hour-file").set_input_files({"name":"hours.csv","mimeType":"text/csv","buffer":payload})
+        page.wait_for_function("document.querySelector('#price-hour-file-status').textContent.includes('Импортировано 19')")
+        page.locator("#price-hour-value").fill("400")
+        assert page.locator("#price-labor-results tbody tr").count()==19
+        assert not page.locator("#price-labor-download").is_disabled()
+        with page.expect_download() as d:
+            page.locator("#price-labor-download").click()
+        assert d.value.suggested_filename=="labor-hour-valuation.csv"
+        page.locator("#price-hour-file").set_input_files({"name":"bad.csv","mimeType":"text/csv","buffer":payload.replace(b",2021,",b",2022,",1)})
+        page.wait_for_function("document.querySelector('#price-hour-file-status').textContent.includes('Файл не принят')")
+        assert page.locator("#price-labor-results tbody tr").count()==19
+        page.locator("#price-labor-controls input").first.fill("1200")
+        assert "привязка к файлу снята" in page.locator("#price-hour-file-status").inner_text()
         assert not errors,errors
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth+3")
         page.close()

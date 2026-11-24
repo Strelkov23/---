@@ -34,3 +34,7 @@ def publish(out):
     with (out/"price-coefficients.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.writer(f);w.writerow(["group","year","output_million_rub","domestic_intermediate_share","imported_intermediate_share","accounting_remainder","source"])
         for i,name in enumerate(data["names"]):w.writerow([name,2021,data["output"][i],data["domestic"][i],data["imported"][i],data["residual"][i],SOURCE])
+
+    with (out/"labor-hours-template.csv").open("w",encoding="utf-8-sig",newline="") as f:
+        w=csv.writer(f);w.writerow(["group_id","group_name","year","output_million_rub","annual_hours","source"])
+        for i,(name,v) in enumerate(zip(data["names"],data["output"]),1):w.writerow([i,name,2021,v,"",""])
