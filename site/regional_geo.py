@@ -2,6 +2,7 @@
 A map source failure never deletes economic observations or invents geometry.
 """
 import json,hashlib,math
+from collections import Counter
 from pathlib import Path
 from urllib.request import Request,urlopen
 SOURCE="https://maps.pispace.eu/data-download/?file=russia-regions.geojson&set=russia"
@@ -33,6 +34,23 @@ def validate(raw):
     if len(codes)<60:raise ValueError("Слишком мало распознанных кодов RU")
     return len(features)
 
+def inventory(raw):
+    features=json.loads(raw)["features"]
+    codes=Counter()
+    unmatched=vertices=0
+    for f in features:
+        p=f.get("properties") or {};code=p.get("iso_3166_2")
+        if isinstance(code,str) and code.startswith("RU-") and isinstance(p.get("name"),str) and p["name"].strip():
+            codes[code]+=1
+        else:unmatched+=1
+        g=f["geometry"];polygons=[g["coordinates"]] if g["type"]=="Polygon" else g["coordinates"]
+        vertices+=sum(len(ring) for polygon in polygons for ring in polygon)
+    return dict(contours=len(features),unique_codes=sorted(k for k,v in codes.items() if v==1),duplicate_codes=sorted(k for k,v in codes.items() if v>1),unmatched_contours=unmatched,vertices=vertices)
+
+def assert_continuity(old,new):
+    lost=sorted(set(inventory(old)["unique_codes"])-set(inventory(new)["unique_codes"]))
+    if lost:raise ValueError("Пропали или стали неоднозначными прежние коды: "+", ".join(lost))
+
 def publish(out,previous,stamp,refresh):
     target=out/"regional-boundaries.geojson"
     meta_path=out/"regional-boundaries.json"
@@ -51,10 +69,14 @@ def publish(out,previous,stamp,refresh):
             with urlopen(Request(SOURCE,headers={"User-Agent":"EconomicsMonitor/2.3","Accept":"application/geo+json,application/json"}),timeout=25) as response:
                 payload=response.read(MAX_BYTES+1)
             count=validate(payload)
+            if raw is not None:assert_continuity(raw,payload)
             raw=payload;meta.update(status="ok",downloaded=stamp,checked=stamp,features=count,sha256=hashlib.sha256(raw).hexdigest())
             meta.pop("error",None)
         except Exception as e:
             meta.update(checked=stamp,error=str(e)[:200],status="cached" if raw else "unavailable")
-    if raw is not None:target.write_bytes(raw)
+    if raw is not None:
+        target.write_bytes(raw)
+        meta['inventory']=inventory(raw)
+        meta['boundary_level']='ADM1 (обобщённые контуры; не юридический реестр)'
     elif target.exists():target.unlink()
     meta_path.write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")

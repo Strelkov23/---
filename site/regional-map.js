@@ -34,7 +34,13 @@ const RegionalMap=(()=>{
 }
  function isGrowth(code){return /^(GRP_(PC_)?VOLUME_|R_(024d9416ea6f54dc|347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|66b96177c45a01ad)_)/.test(code)}
  function growthBin(v){return !Number.isFinite(v)?-1:v<95?0:v<100?1:v===100?2:v<=105?3:4}
- return {key,project,rings,classes,bin,theme,isGrowth,growthBin,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ const displayNames={...pairs,ARK:'архангельская область',TYU:'тюменская область'};
+ function displayName(code,original){
+  const name=typeof code==='string'&&code.startsWith('RU-')&&Object.prototype.hasOwnProperty.call(displayNames,code.slice(3))?displayNames[code.slice(3)]:null;
+  if(name)return name[0].toUpperCase()+name.slice(1);
+  return typeof original==='string'&&original.trim()?original:'Контур без названия';
+ }
+ return {key,project,rings,classes,bin,theme,isGrowth,growthBin,displayName,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -52,7 +58,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(!geo||!series)return;
   host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
   const Y=Number(year.value),sample=RegionalStats.sample(series.values.filter(r=>r.year===Y)),counts=new Map();
-  const regionName=p=>typeof p?.name==='string'&&p.name.trim()?p.name:'Контур без названия';
+  const regionName=p=>RegionalMap.displayName(p?.iso_3166_2,p?.name);
   const regionKey=p=>typeof p?.name==='string'&&p.name.trim()?RegionalMap.key(p.iso_3166_2):null;
   for(const f of geo.features){const k=regionKey(f.properties);if(k)counts.set(k,(counts.get(k)||0)+1)}
   const features=geo.features.map(feature=>{const f={...feature,properties:feature.properties||{}};const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
@@ -62,6 +68,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code);if(!RegionalMap.isGrowth(series.code))growthPick.value='quantile'}
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
   source.replaceChildren(node('p',series.title+' · '+series.unit+' · '+series.kind),link('Статистический первоисточник',series.source),document.createTextNode(' · '),link('Описание границ и лицензия',meta.documentation),node('p','Границы: '+meta.license+' · получены '+String(meta.downloaded||'—').slice(0,10)+' · '+(meta.status==='cached'?'сохранённая копия':'загруженный файл')));
+  if(meta.inventory){const i=meta.inventory;source.append(node('p','Контуры ADM1: '+i.contours+' · однозначные коды RU: '+i.unique_codes.length+' · дубли кодов: '+i.duplicate_codes.length+' · контуры без кода или названия: '+i.unmatched_contours+' · вершин: '+i.vertices.toLocaleString('ru')))}
   const polygons=features.map(x=>({...x,rings:RegionalMap.rings(x.f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
   for(const x of polygons)for(const ring of x.rings)for(const [u,v] of ring){xmin=Math.min(xmin,u);xmax=Math.max(xmax,u);ymin=Math.min(ymin,v);ymax=Math.max(ymax,v)}
@@ -117,10 +124,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const current=unique.find(f=>f.f.properties.iso_3166_2===chosenRegion);if(current)select(current);else{chosenRegion='';details.append(node('p','Выберите регион из списка или нажмите на контур.'))}
   }else details.append(node('p','Выберите контур, чтобы открыть значение и ссылку на статистический ряд.'));
   const audit=node('details','');audit.append(node('summary','Сопоставление территорий и границ'));
-  const table=node('table',''),hrow=table.createTHead().insertRow(),body=table.createTBody();for(const v of ['Код','Название геометрии','Территория статистики','Значение'])hrow.append(node('th',v));
-  for(const f of features){const tr=body.insertRow();for(const v of [f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,fmtValue(f.r?.value)])tr.insertCell().textContent=v||'—'}
+  const table=node('table',''),hrow=table.createTHead().insertRow(),body=table.createTBody();for(const v of ['Код','Название региона','Название в географическом файле','Территория статистики','Значение'])hrow.append(node('th',v));
+  for(const f of features){const tr=body.insertRow();for(const v of [f.f.properties.iso_3166_2,regionName(f.f.properties),f.f.properties.name,f.r?.region,fmtValue(f.r?.value)])tr.insertCell().textContent=v||'—'}
   audit.append(table,node('p','Наблюдения без контура: '+(unmapped.map(([,r])=>r.region).join('; ')||'нет')));host.append(audit);
-  csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Геометрия','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(activeFields)
+  csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Название региона','Название в географическом файле','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.f.properties.name,f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(activeFields)
  }
  async function choose(){
   const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;

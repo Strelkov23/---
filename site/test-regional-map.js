@@ -16,3 +16,8 @@ assert.equal(M.theme('unknown'),'all');
 assert.equal(M.isGrowth('GRP_PC_VOLUME_95b8dd2585'),true);
 assert.equal(M.isGrowth('GRP_PC_95b8dd2585'),false);
 assert.deepEqual([94,95,99,100,101,105,106,null].map(M.growthBin),[0,1,1,2,3,3,4,-1]);
+
+assert.equal(M.displayName('RU-TYU','Tyumen'),'Тюменская область');
+assert.equal(M.key('RU-TYU'),null);
+assert.equal(M.displayName('RU-MOW','Moscow'),'Москва');
+assert.equal(M.displayName('XX','Original'),'Original');
