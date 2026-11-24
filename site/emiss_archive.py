@@ -3,7 +3,8 @@ Do not conflate dimensions (OKVED, territory definitions, etc.) or invent units.
 The exact download URI is recorded and the publisher's original metadata is linked.
 """
 import csv,gzip,io,re,hashlib,json
-from urllib.parse import urlsplit,unquote
+from urllib.parse import urlsplit,unquote,urljoin
+from html.parser import HTMLParser
 from datetime import date
 from collections import defaultdict
 
@@ -20,36 +21,66 @@ def normalize(x):return " ".join(str(x or "").lower().replace("ё","е").split()
 def resource(code):return BASE+code+".csv.gz"
 def card(code):return "https://repository.nsedc.ru/dataset/emiss_"+code
 def primary(code):return "https://fedstat.ru/indicator/"+code
-def resource_candidates(code,get):
-    # Prefer exact resource URLs from the public CKAN catalogue. Fall back to the documented
-    # storage paths; availability is established only by downloading a valid file.
+STORAGE_HOSTS=("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net")
+def valid_resource(code,url):
+    try:
+        u=urlsplit(url)
+        return (u.scheme=="https" and u.hostname in STORAGE_HOSTS and not u.username and not u.password
+                and u.port in (None,443) and not u.fragment
+                and unquote(u.path.rsplit("/",1)[-1]) in (code+".csv.gz",code+".parquet"))
+    except (TypeError,ValueError):return False
+
+class ResourceLinks(HTMLParser):
+    def __init__(self,code,base):
+        super().__init__(convert_charrefs=True);self.code=code;self.base=base;self.urls=[]
+    def handle_starttag(self,tag,attrs):
+        if tag!="a":return
+        href=dict(attrs).get("href")
+        if href:
+            url=urljoin(self.base,href)
+            if valid_resource(self.code,url):self.urls.append(url)
+
+def resource_candidates(code,get,diagnostics=None):
+    """Prefer actual catalogue links; keep catalogue errors distinct from file errors."""
+    if code not in SPECS:raise ValueError("Неизвестный код ЕМИСС")
+    errors=diagnostics if diagnostics is not None else []
     urls=[]
     try:
         raw,_=get("https://repository.nsedc.ru/api/3/action/package_show?id=emiss_"+code,2_000_000)
         data=json.loads(raw)
         package=data.get("result",{})
-        if data.get("success") and package.get("name")=="emiss_"+code:
-            for item in package.get("resources",[]):
-                url=item.get("url","")
-                u=urlsplit(url)
-                filename=unquote(u.path.rsplit("/",1)[-1])
-                if u.scheme=="https" and u.hostname in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net") and filename in (code+".csv.gz",code+".parquet"):
-                    urls.append(url)
-    except Exception:
-        pass
-    urls.extend((resource(code),"https://datalakeiepru-s3-storage-public.storage.yandexcloud.net/fedstatru/data/parquet/"+code+".parquet"))
-    return list(dict.fromkeys(urls))
+        if not data.get("success") or package.get("name")!="emiss_"+code:
+            raise ValueError("Ответ API не соответствует карточке")
+        urls=[item["url"] for item in package.get("resources",[]) if valid_resource(code,item.get("url",""))]
+        if not urls:raise ValueError("Нет подходящих ссылок в API")
+    except Exception as e:errors.append("API НЦСЭД: "+str(e)[:100])
+    if not urls:
+        try:
+            raw,enc=get(card(code),4_000_000)
+            parser=ResourceLinks(code,card(code));parser.feed(raw.decode(enc or "utf-8",errors="replace"))
+            urls.extend(parser.urls)
+            if not urls:raise ValueError("Нет подходящих ссылок в HTML")
+        except Exception as e:errors.append("Карточка НЦСЭД: "+str(e)[:100])
+    # Published path layout verified in dataset emiss_61483; the older
+    # storage alias remains a candidate only. Download and validation are mandatory.
+    urls.extend((resource(code),
+                 "https://storage.yandexcloud.net/datalakeiepru-s3-storage-public/fedstatru/parquet/"+code+".parquet",
+                 "https://datalakeiepru-s3-storage-public.storage.yandexcloud.net/fedstatru/data/parquet/"+code+".parquet"))
+    return list(dict.fromkeys(urls))[:6]
+
 def retrieve(code,get,numeric,year):
     errors=[]
-    for url in resource_candidates(code,get):
+    for url in resource_candidates(code,get,errors):
         try:
             raw,_=get(url,24_000_000)
             rows=parse(raw,code,numeric,year)
             if raw[:4]==b"PAR1":
                 for row in rows:row["sheet"]=code+".parquet";row["row"]=max(1,row["row"]-1)
             return rows,url
-        except Exception as err:errors.append(url.rsplit("/",1)[-1]+": "+str(err)[:90])
-    raise ValueError("; ".join(errors)[:250])
+        except Exception as err:
+            u=urlsplit(url)
+            errors.append(u.hostname+" "+u.path.rsplit("/",2)[-2]+"/"+u.path.rsplit("/",1)[-1]+": "+str(err)[:90])
+    raise ValueError("; ".join(errors)[:900])
 
 def parse(raw,code,numeric,year):
     if raw[:4]==b'PAR1':
@@ -72,17 +103,20 @@ def parse(raw,code,numeric,year):
     except csv.Error:raise ValueError("Неизвестный разделитель CSV")
     reader=csv.DictReader(io.StringIO(txt),dialect=dialect)
     cols=reader.fieldnames or []
-    if len(cols)!=len(set(cols)):raise ValueError("Неоднозначные заголовки")
+    if len(cols)!=len(set(map(normalize,cols))):raise ValueError("Неоднозначные заголовки")
     def field(names):
-        return next((c for c in cols if normalize(c) in names),None)
+        matches=[c for c in cols if normalize(c) in names]
+        if len(matches)>1:raise ValueError("Неоднозначные поля: "+", ".join(matches))
+        return matches[0] if matches else None
     territory=field({"region","region_name","territory","territory_name","окато","окато наименование","окато (наименование)","регион","территория","наименование территории","субъект российской федерации","справочник регионов","классификатор объектов административно-территориального деления (окато)","классификатор объектов административно-территориального деления"})
     period=field({"year","год","period","период","time_period","time","date","дата","период наблюдения"})
     value=field({"value","значение","obs_value","indicator_value","data","значение показателя","obsvalue"})
     unit=field({"unit","units","unit_name","единица измерения","единицы измерения","единица"})
     if not all((territory,period,value)):raise ValueError("Не распознаны обязательные поля: "+", ".join(cols)[:200])
     if not unit and not expected_unit:raise ValueError("Отсутствует единица измерения")
-    result=[]
+    result=[];seen_values={}
     for r in reader:
+        if None in r or any(v is None for v in r.values()):raise ValueError("Неверное число полей CSV, строка "+str(reader.line_num))
         reg=str(r.get(territory) or "").strip()
         if not reg or not re.search(r"[А-Яа-яЁё]",reg):continue
         p=str(r.get(period) or "").strip()
@@ -103,6 +137,11 @@ def parse(raw,code,numeric,year):
         suffix=" · ".join(k+": "+val for k,val in sorted(attrs.items()))
         label=title+(" · "+suffix if suffix else "")
         key="E_"+code+"_"+hashlib.sha256((suffix+"|"+u).encode()).hexdigest()[:12]
+        obs=(key,reg,y,u)
+        if obs in seen_values:
+            if seen_values[obs]!=v:raise ValueError("Противоречивый дубль: "+reg+" / "+str(y))
+            continue
+        seen_values[obs]=v
         result.append(dict(indicator=key,title=label,region=reg,year=y,value=v,unit=u,sheet=code+".csv.gz",row=reader.line_num,column=cols.index(value)+1,note="; ".join(k+": "+val for k,val in dims.items())+" · Первоисточник: "+primary(code)+" · Карточка: "+card(code)))
         if len(result)>100000:raise ValueError("Слишком много наблюдений")
     if not result:raise ValueError("Нет однозначных годовых наблюдений")
