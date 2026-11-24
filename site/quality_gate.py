@@ -175,7 +175,10 @@ def check(out,previous,stamp):
     except (ValueError,KeyError,TypeError) as e:issues.append("Сверки: "+str(e))
     try:
         import finance_workbooks
-        counts.update(finance_workbooks.quality(data["finance-workbooks.json"]))
+        counts.update(finance_workbooks.quality(data["finance-workbooks.json"],out))
+        for k in ("different","ambiguous"):
+            n=counts.get("finance_reconciliation_"+k,0)
+            if n:warnings.append("Сверка ФНС: "+str(n)+" · "+finance_workbooks.RECONCILIATION_LABELS[k])
     except (ValueError,KeyError,TypeError) as e:issues.append("Импорт рентабельности: "+str(e))
     try:
         import rosstat_workbooks
