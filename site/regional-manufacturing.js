@@ -50,8 +50,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   $('rm-group').replaceChildren(...groups.map(g=>new Option(g.title+' · '+g.okved,g.id)));
   $('rm-year').replaceChildren(...years.map(y=>new Option(String(y),String(y))));
   $('rm-group').value=groups.find(g=>g.id==='light')?'light':groups[0].id;
-  const counts=new Map();for(const f of geo.features){const k=RegionalMap.key(f.properties?.iso_3166_2);if(k)counts.set(k,(counts.get(k)||0)+1)}
-  const features=geo.features.map(f=>({f,key:RegionalMap.key(f.properties?.iso_3166_2),code:f.properties?.iso_3166_2||'',name:RegionalMap.displayName(f.properties?.iso_3166_2,f.properties?.name||'Неизвестный контур'),rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
+  const counts=new Map();for(const f of geo.features){const k=(f.properties?.name||'').trim()?RegionalMap.key(f.properties?.iso_3166_2):null;if(k)counts.set(k,(counts.get(k)||0)+1)}
+  const features=geo.features.map(f=>({f,key:(f.properties?.name||'').trim()?RegionalMap.key(f.properties?.iso_3166_2):null,code:f.properties?.iso_3166_2||'',name:RegionalMap.displayName(f.properties?.iso_3166_2,f.properties?.name||'Неизвестный контур'),rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
   const mapped=features.filter(f=>f.key&&counts.get(f.key)===1).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   select.replaceChildren(new Option('Выберите регион',''),...mapped.map(f=>new Option(f.name,f.code)));
   for(const id of ['rm-group','rm-year','rm-region'])$(id).disabled=false;
@@ -77,7 +77,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     shape(p,'title',{},f.name+' · '+fmtMetric(v,metric));
     if(f.key&&counts.get(f.key)===1){const choose=()=>{select.value=f.code;draw()};p.addEventListener('click',choose);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}})}
    }
-   host.append(svg);
+   const scroll=node('div','');scroll.className='regional-figure-scroll';scroll.append(svg);host.append(scroll);
    const legend=node('div','');legend.className='legend';
    const bins=metric==='localization'?['Менее 0,5','0,5–<1','1–<1,5','1,5–<2','2 и более']:thresholds.length===1?[number(thresholds[0])]:thresholds.slice(1).map((t,i)=>(i?' > ':'')+number(thresholds[i])+' — '+number(t));
    for(const [i,label] of [...bins,'Нет данных'].entries()){const span=node('span','');const sw=node('b','');sw.style.cssText='display:inline-block;width:1rem;height:1rem;border:1px solid #52696e;background:'+(i===bins.length?'#deded9':palette[i]);span.append(sw,document.createTextNode(' '+label));legend.append(span)}
