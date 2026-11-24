@@ -124,6 +124,8 @@ def collect(out,stamp):
         add(ident,"География",title,r.get("documentation") or r.get("source"),r,year,archive=True,available=r["status"] in ("ok","cached"),policy="Фиксированный исторический набор; актуальность не предполагается",href=href)
     r=read("regional-boundaries.json")
     add("adm1","География","Границы субъектов Natural Earth",r.get("documentation"),dict(r,success=r.get("downloaded")),policy="Проверка при смене календарного месяца; не юридический реестр",href="economic-map.html")
+    frp=read("frp-snapshot.json")
+    add("frp-documentary","Предприятия","ФРП · документальный снимок итогов",frp["source"],dict(status="Ручной снимок; прямой запрос HTTP 403"),None,archive=True,available=bool(frp["rows"]),policy="Дата итогов не указана; повторная документальная проверка",href="frp-snapshot.html")
     cert=read("park-certificates.json")
     add("park-certificates","Предприятия","Документы добровольной сертификации АИП",cert["source"],cert,cert.get("success","")[:10] if cert.get("success") else None,days=7,available=bool(cert["rows"]),policy="Проверка каждые 7 суток; после ошибки через 2 суток; календарный срок не подтверждает отсутствие отзыва",href="industrial-parks.html#park-certificates",failure_days=2)
     p=read("industrial-parks.json")
