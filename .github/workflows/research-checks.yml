@@ -25,7 +25,7 @@ jobs:
           cd monitor
           python3 -m compileall -q .
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
           for script in *.js; do node --check "$script"; done
           rm -rf public
           python3 build.py
@@ -33,7 +33,7 @@ jobs:
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html'):
+          for f in ('statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
@@ -255,3 +255,26 @@ jobs:
           assert 'Индекс производства г/г' in s and 'Скачать срез CSV' in s
           print('INDUSTRIAL CROSS SECTION PASSED',m[1])
           PY
+
+      - name: Check sector passports in browser
+        if: github.head_ref == 'stage-03-sector-passports'
+        working-directory: monitor/public
+        run: |
+          python3 -m http.server 8765 >/tmp/passport-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/sector-passports.html >/dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom 'http://localhost:8765/sector-passports.html?sp-sector=agriculture' >/tmp/sector-dom.html
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('sector-passports.json').read_text())
+          assert len(d['profiles'])==14
+          s=Path('/tmp/sector-dom.html').read_text()
+          assert 'Показателей в выборке: 12' in s and 'NV.AGR.EMPL.KD' in s and 'Скачать паспорт CSV' in s
+          print('SECTOR PASSPORTS PASSED',len(d['profiles']),len({r['id'] for p in d['profiles'] for r in p['rows']}))
+          PY
+          for route in version.txt industrial.html industrial.json historical.html; do
+            echo "PUBLIC $route"
+            curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
+            if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
+          done

@@ -25,6 +25,7 @@ class QualityTests(unittest.TestCase):
             "national.json":{},
             "industrial.json":{"series":[],"sources":[]},
             "historical.json":{"series":[],"sources":[]},
+            "sector-passports.json":{"profiles":[]},
         }
         for name,value in self.data.items():self.put(name,value)
     def put(self,name,value):

@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -86,6 +86,16 @@ def check(out,previous,stamp):
     for s in ind["series"]:
         if not s["unit"] or not http_url(s["source"]) or len({r["period"] for r in s["values"]})!=len(s["values"]) or any(not finite(r["value"]) for r in s["values"]):
             issues.append("industrial: некорректный ряд "+s["id"])
+    profiles=data["sector-passports.json"]["profiles"]
+    counts["sector_passports"]=len(profiles)
+    counts["sector_linked_series"]=len({r["id"] for p in profiles for r in p["rows"]})
+    source_ids=set(compare)|{s["id"] for s in ind["series"]}|set(nat)
+    if len({p["id"] for p in profiles})!=len(profiles):issues.append("Паспорта: повторяющиеся идентификаторы")
+    for p in profiles:
+        if len({r["id"] for r in p["rows"]})!=len(p["rows"]):issues.append("Паспорта: дубликаты в "+p["id"])
+        for r in p["rows"]:
+            if r["id"] not in source_ids or not http_url(r["source"]) or not (out/r["href"].split("?",1)[0]).is_file() or (r["count"] and not finite(r["value"])) or (not r["count"] and r["value"] is not None):
+                issues.append("Паспорт: недействительная ссылка на ряд "+r["id"])
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
