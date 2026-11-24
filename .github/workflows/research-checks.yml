@@ -20,7 +20,8 @@ jobs:
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/
           mkdir -p monitor/data
-          if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
+          elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m compileall -q .
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
@@ -118,7 +119,15 @@ jobs:
               total+=len(rows)
           print("PERSISTED REGIONAL OBSERVATIONS",total,"SERIES",len(catalog["series"]),"DB BYTES",Path("regional-integration.db").stat().st_size,flush=True)
           assert total>=50000 and len(catalog["series"])>=25
-          assert Path("regional-integration.db").stat().st_size<85000000
+          import gzip,shutil,hashlib
+          with open("regional-integration.db","rb") as src,gzip.open("regional-integration.db.gz","wb",compresslevel=6) as dst:shutil.copyfileobj(src,dst)
+          compressed=Path("regional-integration.db.gz").stat().st_size
+          print("COMPRESSED DB BYTES",compressed,flush=True)
+          assert compressed<85000000
+          with gzip.open("regional-integration.db.gz","rb") as src,open("regional-restored.db","wb") as dst:shutil.copyfileobj(src,dst)
+          with sqlite3.connect("regional-restored.db") as restored:
+              assert restored.execute("pragma integrity_check").fetchone()[0]=="ok"
+              assert restored.execute("select count(*) from hist_values").fetchone()[0]==count
           s=next(x for x in catalog["series"] if x["code"].startswith("GRP_") and x["title"]=="ВРП в текущих ценах")
           from urllib.parse import urlencode
           query=urlencode({"hist-series":s["code"],"hist-region":"Белгородская область","hist-peer":"Брянская область","hist-mode":"base","hist-from":"2016","hist-to":"2024","hist-rank-year":"2024"})
@@ -139,7 +148,7 @@ jobs:
           print("REGIONAL BROWSER COMPARISON PASSED")
           PY
       - name: Check current public deployment
-        if: github.head_ref == 'stage-02-regional-comparison'
+        if: always() && github.head_ref == 'stage-02-regional-comparison'
         continue-on-error: true
         run: |
           for route in version.txt historical.html historical.json quality.json regions/; do
