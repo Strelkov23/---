@@ -1,6 +1,8 @@
 import json
 import re
-from datetime import date, timedelta
+import time
+from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from html import unescape
 from urllib.parse import urlencode, quote, urlsplit
 from urllib.request import Request,urlopen
@@ -176,6 +178,40 @@ def metadata(item):
     count=item.get("is-referenced-by-count")
     return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None)
 
+class CrossrefRateLimited(Exception):
+    def __init__(self,retry_after=None):
+        super().__init__("Crossref HTTP 429")
+        self.retry_after=retry_after
+
+def stamp_dt(stamp):
+    d=datetime.fromisoformat(stamp)
+    return d.astimezone(timezone.utc) if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+def retry_deadline(stamp,header):
+    now=stamp_dt(stamp)
+    fallback=now+timedelta(hours=1)
+    if header is None:return fallback.isoformat(timespec="seconds")
+    value=str(header).strip()
+    try:
+        if value.isdigit():
+            # A minimum one-minute cooldown avoids immediate retries on Retry-After: 0.
+            return (now+timedelta(seconds=max(60,int(value)))).isoformat(timespec="seconds")
+        d=parsedate_to_datetime(value)
+        if d.tzinfo is None:d=d.replace(tzinfo=timezone.utc)
+        return max(now+timedelta(seconds=60),d.astimezone(timezone.utc)).isoformat(timespec="seconds")
+    except (ValueError,TypeError,OverflowError):return fallback.isoformat(timespec="seconds")
+
+def service_status(db,stamp):
+    db.execute("create table if not exists literature_service(id integer primary key check(id=1),limited_at text,retry_at text)")
+    old=db.execute("select limited_at,retry_at from literature_service where id=1").fetchone()
+    if not old:return dict(cooldown=False,limited_at=None,retry_at=None)
+    return dict(cooldown=stamp_dt(old[1])>stamp_dt(stamp),limited_at=old[0],retry_at=old[1])
+
+def defer_journal(db,issn,deadline):
+    # Do not claim a network check occurred. Preserve the last successful and actual check dates.
+    db.execute("insert into journal_checks values(?,null,null,?) on conflict(issn) do update set status=excluded.status",
+        (issn,"Отложено: Crossref HTTP 429, до "+deadline))
+
 SELECT_FIELDS="DOI,title,author,published,volume,issue,page,is-referenced-by-count"
 def fetch_batch(issn,filters,offset=0,select=False):
     # A bounded, ordinary /works query avoids cursor restrictions introduced in 2026.
@@ -186,6 +222,8 @@ def fetch_batch(issn,filters,offset=0,select=False):
         with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)"}),timeout=40) as resp:
             data=json.load(resp)["message"]
     except HTTPError as err:
+        if err.code==429:
+            raise CrossrefRateLimited(err.headers.get('Retry-After') if err.headers is not None else None) from err
         if err.code==400:
             try:detail=err.read(700).decode("utf-8","replace")
             except Exception:detail=""
@@ -229,14 +267,24 @@ def period_items(issn,filters,date_key,start,end):
     if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
 def sync(db, stamp, refresh):
+    started=time.monotonic()
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
     db.execute("create table if not exists literature_meta(doi text primary key,payload text,checked text)")
     db.execute("create table if not exists literature_meta_checks(issn text primary key,success text)")
+    service=service_status(db,stamp)
+    if not refresh:return
+    if service["cooldown"]:
+        with db:
+            for issn in JOURNALS:defer_journal(db,issn,service["retry_at"])
+        return
+    # Least recently contacted first: after a rate limit, uncontacted journals get priority.
+    checked={r[0]:r[1] or "" for r in db.execute("select issn,checked from journal_checks")}
+    ordered=sorted(JOURNALS,key=lambda issn:checked.get(issn,""))
     # Backfill one previously imported journal per refresh; existing DOI records are not erased.
     backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
-    for issn,journal in JOURNALS.items():
-        if not refresh: continue
+    for position,issn in enumerate(ordered):
+        journal=JOURNALS[issn]
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
         full=not(last and last[0]) or issn==backfill
         today=date.fromisoformat(stamp[:10])
@@ -270,6 +318,15 @@ def sync(db, stamp, refresh):
             with db:
                 db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
                 if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
+        except CrossrefRateLimited as err:
+            observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
+            deadline=retry_deadline(observed,err.retry_after)
+            with db:
+                db.execute("insert or replace into literature_service values(1,?,?)",(observed,deadline))
+                db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",
+                    (issn,observed,"Crossref HTTP 429; повтор не ранее "+deadline))
+                for pending in ordered[position+1:]:defer_journal(db,pending,deadline)
+            break
         except Exception as err:
             with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,str(err)[:180]))
 
