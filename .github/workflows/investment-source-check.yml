@@ -1,0 +1,36 @@
+name: Investment registry source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/investment-source-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install openpyxl==3.1.5
+      - name: Test parser and check original source
+        working-directory: site
+        run: |
+          python3 -m unittest -v test_investment_projects.py
+          python3 - <<'PY'
+          import investment_projects as p
+          from datetime import date
+          import hashlib
+          from collections import Counter
+          raw=p.fetch(p.SOURCE)
+          url=p.discover(raw,date.today())
+          print("DISCOVERED",url,flush=True)
+          raw=p.fetch(url)
+          print("XLSX",len(raw),hashlib.sha256(raw).hexdigest(),flush=True)
+          rows=p.parse(raw,url)
+          print("PARSED",len(rows),dict(Counter(r["status"] for r in rows)),flush=True)
+          print("VALUES",sum(r["cost_mln_rub"] is not None for r in rows),sum(r["jobs"] is not None for r in rows))
+          PY

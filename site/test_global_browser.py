@@ -478,6 +478,20 @@ with sync_playwright() as p:
         assert page.locator("#sp-capital-status").inner_text().startswith("2022")
 
         assert "Лёгкая промышленность" in page.locator("#sp-scope").inner_text()
+        page.goto("http://localhost:8765/investment-projects.html",wait_until="load")
+        projects=json.loads(Path("investment-projects.json").read_text())
+        assert page.locator("#project-rows tr").count()==len(projects["rows"])
+        assert "из "+str(len(projects["rows"])) in page.locator("#project-count").inner_text()
+        page.locator("#project-query").fill("несуществующий-запрос-987654321")
+        assert "Записей в выборке: 0 из " in page.locator("#project-count").inner_text()
+        assert page.locator("#project-rows tr:visible").count()==0
+        page.locator("#project-query").fill("")
+        assert page.locator("#project-rows tr:visible").count()==len(projects["rows"])
+        if projects["rows"]:
+            status=projects["rows"][0]["status"]
+            page.locator("#project-status").select_option(status)
+            assert page.locator("#project-rows tr:visible").count()==sum(r["status"]==status for r in projects["rows"])
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
         if parks["rows"]:
