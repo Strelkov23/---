@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -39,8 +40,9 @@ class CatalogueTests(unittest.TestCase):
             return BytesIO(json.dumps({"message":{"total-results":len(items),"items":items}}).encode())
         with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=request):
             literature.sync(self.db,"2026-11-24T00:00:00+00:00",True)
+        status=self.db.execute("select status from journal_checks where issn=?",("0042-8736",)).fetchone()[0]
+        self.assertEqual(status,"Проверено",f"Crossref sync failed: {status}")
         self.assertGreater(len(requests),1)
-        self.assertEqual(self.db.execute("select status from journal_checks").fetchone()[0],"Проверено")
         self.assertEqual(self.db.execute("select title from literature where doi='10.1234/new'").fetchone()[0],"Test")
     def test_crossref_incomplete_page(self):
         from datetime import date
