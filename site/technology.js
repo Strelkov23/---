@@ -38,7 +38,7 @@ const Technology=(()=>{
   const s=structure(m,p),b=baseline(m,p);
   return {base:summarize(b),changed:summarize(s),structure:s,baseline:b};
  }
- function allocate(m,p,limits,changed=true){
+ function allocate(m,p,limits,changed=true,verifyMarginals=true){
   const s=changed?structure(m,p):baseline(m,p),n=m.names.length;
   if(!within(limits.budget,0,1e6)||!within(limits.importLimit,0,1e6)||!within(limits.spare,0,100)||s.hours!==null&&!within(limits.laborCap,0,1e13))throw Error('Недопустимые ресурсные ограничения');
   const priority=limits.priority;
@@ -61,7 +61,7 @@ const Technology=(()=>{
   });
   // Selected-resource finite difference: valid LP shadow is an upper bound on objective gain
   // after a positive relaxation. Kinks can make it unequal to this finite increment.
-  for(const d of dual.filter(r=>['budget','imports','labor'].includes(r.id)||r.shadow>1e-8&&r.id.startsWith('capacity-')).slice(0,8)){
+  if(verifyMarginals)for(const d of dual.filter(r=>['budget','imports','labor'].includes(r.id)||r.shadow>1e-8&&r.id.startsWith('capacity-')).slice(0,8)){
    const i=constraints.findIndex(r=>r.id===d.id),next=[...b];next[i]+=d.step/factors[i];
    const test=R.solve(A,next,c,{fast:true});
    d.finiteGain=(test.objective-lp.objective)*objectiveScale;
@@ -70,7 +70,19 @@ const Technology=(()=>{
   }
   return {x,score,totalDemand:sum(x),imports:dot(importPer,x),labor:laborPer===null?null:dot(laborPer,x),output:s.L.map(row=>dot(row,x)),dual,gap:lp.gap*objectiveScale,reference:{A,b,c,objective:lp.objective}};
  }
- return {structure,calculate,allocate};
+ function frontier(m,p,limits,axis='importLimit'){
+  if(!['importLimit','budget','laborCap'].includes(axis)||axis==='laborCap'&&p.hours===null)throw Error('Недопустимое ограничение для сравнения');
+  const ceiling=limits[axis];
+  if(!finite(ceiling)||ceiling<0)throw Error('Недопустимый предел');
+  const nodes=ceiling===0?[0]:Array.from({length:6},(_,i)=>ceiling*i/5);
+  const rows=nodes.map(value=>{
+   const local={...limits,[axis]:value},a=allocate(m,p,local,false,false),b=allocate(m,p,local,true,false);
+   return {limit:value,base:a.score,changed:b.score,baseDemand:a.totalDemand,changedDemand:b.totalDemand,baseImport:a.imports,changedImport:b.imports,baseHours:a.labor,changedHours:b.labor};
+  });
+  for(let i=1;i<rows.length;i++)for(const key of ['base','changed'])if(rows[i][key]+1e-6*Math.max(1,rows[i-1][key])<rows[i-1][key])throw Error('Нарушена монотонность оптимальной цели');
+  return {axis,rows};
+ }
+ return {structure,calculate,allocate,frontier};
 })();
 if(typeof module!=='undefined')module.exports=Technology;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -83,14 +95,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const keys=[['material',0,-20,80,'Экономия отечественных затрат'],['imported',0,-20,80,'Экономия импортных затрат'],['productivity',0,-20,200,'Рост производительности'],['demand',3,0,20,'Целевой прирост спроса'],['hours','',0,1e10,'Часы на млрд выпуска'],['priority',1,0,10,'Вес приоритета']];
   const fields=Object.fromEntries(keys.map(([k,v,lo,hi,label])=>[k,m.names.map(name=>field(v,lo,hi,label+': '+name))]));
   table($('tech-controls'),['Продуктовая группа','Экономия отеч. затрат, %','Экономия имп. затрат, %','Рост производительности, %','Прирост спроса, %','Прямые часы на млрд ₽','Вес спроса'],m.names.map((name,i)=>[name,...keys.map(([k])=>fields[k][i])]));
-  const clear=()=>{for(const id of ['tech-summary','tech-detail','tech-alloc','tech-dual','tech-chart'])$(id).replaceChildren();$('tech-csv').disabled=true;$('tech-status').textContent='Параметры изменены. Запустите расчёт.'};
-  const laborState=()=>{const enabled=$('tech-labor').checked;for(const e of [...fields.hours,$('tech-labor-cap')]){e.disabled=!enabled;e.required=enabled}};
+  const clear=()=>{for(const id of ['tech-summary','tech-detail','tech-alloc','tech-dual','tech-chart','tech-frontier','tech-frontier-chart'])$(id).replaceChildren();$('tech-csv').disabled=true;$('tech-status').textContent='Параметры изменены. Запустите расчёт.'};
+  const laborState=()=>{const enabled=$('tech-labor').checked;for(const e of [...fields.hours,$('tech-labor-cap')]){e.disabled=!enabled;e.required=enabled}const select=$('tech-axis');select.querySelector('option[value=laborCap]').disabled=!enabled;if(!enabled&&select.value==='laborCap')select.value='importLimit'};
   laborState();
   $('tech-form').addEventListener('input',()=>{laborState();clear()});$('tech-controls').addEventListener('input',clear);
   $('tech-form').addEventListener('submit',e=>{e.preventDefault();clear();
    try{
     const p=Object.fromEntries(keys.filter(([k])=>k!=='priority').map(([k])=>[k,k==='hours'&&!$('tech-labor').checked?null:fields[k].map(e=>e.valueAsNumber)])),limits={budget:$('tech-budget').valueAsNumber,importLimit:$('tech-import-limit').valueAsNumber,spare:$('tech-spare').valueAsNumber,laborCap:$('tech-labor-cap').valueAsNumber,priority:fields.priority.map(e=>e.valueAsNumber)};
-    const r=Technology.calculate(m,p),a=Technology.allocate(m,p,limits,false),b=Technology.allocate(m,p,limits,true);
+    const r=Technology.calculate(m,p),a=Technology.allocate(m,p,limits,false),b=Technology.allocate(m,p,limits,true),front=Technology.frontier(m,p,limits,$('tech-axis').value);
     const metrics=[['Одинаковый целевой спрос, млрд ₽','demand'],['Требуемый валовой выпуск, млрд ₽','totalOutput'],['Отечественные промежуточные затраты, млрд ₽','totalDomestic'],['Импортные промежуточные затраты, млрд ₽','totalImports'],['Полная потребность в часах','totalLabor'],['Условный индекс затрат (исходный = 100)','basket']];
     table($('tech-summary'),['Показатель','Базовая технология','Изменённая технология','Разница'],metrics.map(([label,k])=>[label,fmt(r.base[k]),fmt(r.changed[k]),fmt(r.base[k]===null||r.changed[k]===null?null:r.changed[k]-r.base[k])]));
     table($('tech-detail'),['Группа','Выпуск до, млрд ₽','Выпуск после, млрд ₽','Импорт до, млрд ₽','Импорт после, млрд ₽','Часы до','Часы после','Индекс затрат после'],m.names.map((name,i)=>[name,...[r.base.output[i],r.changed.output[i],r.base.imports[i],r.changed.imports[i],r.base.labor?.[i],r.changed.labor?.[i],r.structure.costs[i]*100].map(fmt)]));
@@ -98,8 +110,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const shown=b.dual.filter(x=>!x.id.startsWith('demand-'));
     table($('tech-dual'),['Ограничение','Единица','Лимит','Использовано','Остаток','Двойственная оценка за единицу','Шаг проверки','Прирост цели','Верхняя граница прироста'],shown.map(x=>[x.title,x.unit,...[x.limit,x.used,x.slack,x.shadow,x.finiteGain===undefined?null:x.step,x.finiteGain,x.upperGain].map(fmt)]));
     const chart=$('tech-chart'),max=Math.max(1,...[a,b].map(x=>x.score));for(const [label,x] of [['Базовая технология',a],['Изменённая технология',b]]){const d=document.createElement('div'),p=document.createElement('p'),track=document.createElement('div'),fill=document.createElement('div');d.className='dyn-bars';p.textContent=label+' · '+fmt(x.score);track.className='budget-bar-track';fill.className='budget-bar-fill';fill.style.width=(x.score/max*100)+'%';track.append(fill);d.append(p,track);chart.append(d)}
+    const axisLabel={importLimit:'Импортный лимит, млрд ₽',budget:'Бюджет конечного спроса, млрд ₽',laborCap:'Лимит трудовых часов'}[front.axis];
+    table($('tech-frontier'),[axisLabel,'Цель: база','Цель: новая технология','Конечный спрос: база, млрд ₽','Конечный спрос: новая, млрд ₽','Импорт: база, млрд ₽','Импорт: новая, млрд ₽','Часы: база','Часы: новая'],front.rows.map(x=>[x.limit,x.base,x.changed,x.baseDemand,x.changedDemand,x.baseImport,x.changedImport,x.baseHours,x.changedHours].map(fmt)));
+    const plot=$('tech-frontier-chart'),ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 700 275');svg.setAttribute('role','img');svg.setAttribute('aria-label','Компромисс между лимитом и значением цели');
+    const shape=(tag,attrs,text)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;svg.append(e);return e};
+    const ymax=Math.max(1,...front.rows.flatMap(x=>[x.base,x.changed])),xmax=front.rows.at(-1).limit,xx=v=>xmax?110+535*v/xmax:377,yy=v=>225-180*v/ymax;
+    for(let i=0;i<5;i++){const v=ymax*i/4;shape('line',{x1:110,x2:645,y1:yy(v),y2:yy(v),stroke:'#d4dcdf'});shape('text',{x:100,y:yy(v)+4,'font-size':11,'text-anchor':'end'},fmt(v))}
+    for(const x of front.rows)shape('text',{x:xx(x.limit),y:246,'font-size':10,'text-anchor':'middle'},fmt(x.limit));
+    for(const [key,color,dash] of [['base','#527fa6','6 4'],['changed','#006c69','none']]){shape('path',{d:front.rows.map((x,i)=>(i?'L':'M')+xx(x.limit)+' '+yy(x[key])).join(' '),stroke:color,'stroke-width':2.5,'stroke-dasharray':dash,fill:'none'});for(const x of front.rows)shape('circle',{cx:xx(x.limit),cy:yy(x[key]),r:3,fill:color})}
+    shape('text',{x:377,y:270,'text-anchor':'middle','font-size':12},axisLabel);
+    const legend=document.createElement('p');legend.textContent='Пунктир — базовая технология; сплошная — изменённая. Точки — независимо решённые задачи; между ними показана лишь визуальная интерполяция.';plot.append(legend,svg);
     $('tech-status').textContent='Рассчитано '+n+' групп. Проверены балансовые равенства и двойственные оценки. Условный эксперимент, не прогноз.';
-    $('tech-csv').disabled=false;$('tech-csv').onclick=()=>csv('technology-scenario.csv',[['Источник',m.source],['База',2021],['Трудовые часы',p.hours?'пользовательские допущения':'не учитываются'],...Object.entries(limits).filter(([k])=>k!=='priority'&&(k!=='laborCap'||p.hours)),['Группа',...keys.map(([k])=>k)],...m.names.map((name,i)=>[name,...keys.map(([k])=>k==='priority'?limits.priority[i]:p[k]?.[i])]),['Показатель','База','Сценарий'],...metrics.map(([label,k])=>[label,r.base[k],r.changed[k]]),['Группа','Выпуск до','Выпуск после','Импорт до','Импорт после','Часы до','Часы после','Индекс затрат','Распределение спроса до','Распределение спроса после'],...m.names.map((name,i)=>[name,r.base.output[i],r.changed.output[i],r.base.imports[i],r.changed.imports[i],r.base.labor?.[i],r.changed.labor?.[i],r.structure.costs[i]*100,a.x[i],b.x[i]]),['Технология','Ограничение','Единица','Лимит','Использовано','Остаток','Двойственная оценка','Шаг проверки','Прирост цели','Верхняя граница прироста'],...[[a,'Базовая'],[b,'Изменённая']].flatMap(([x,label])=>x.dual.map(d=>[label,d.title,d.unit,d.limit,d.used,d.slack,d.shadow,d.finiteGain===undefined?null:d.step,d.finiteGain,d.upperGain]))]);
+    $('tech-csv').disabled=false;$('tech-csv').onclick=()=>csv('technology-scenario.csv',[['Источник',m.source],['База',2021],['Трудовые часы',p.hours?'пользовательские допущения':'не учитываются'],...Object.entries(limits).filter(([k])=>k!=='priority'&&(k!=='laborCap'||p.hours)),['Группа',...keys.map(([k])=>k)],...m.names.map((name,i)=>[name,...keys.map(([k])=>k==='priority'?limits.priority[i]:p[k]?.[i])]),['Показатель','База','Сценарий'],...metrics.map(([label,k])=>[label,r.base[k],r.changed[k]]),['Группа','Выпуск до','Выпуск после','Импорт до','Импорт после','Часы до','Часы после','Индекс затрат','Распределение спроса до','Распределение спроса после'],...m.names.map((name,i)=>[name,r.base.output[i],r.changed.output[i],r.base.imports[i],r.changed.imports[i],r.base.labor?.[i],r.changed.labor?.[i],r.structure.costs[i]*100,a.x[i],b.x[i]]),['Технология','Ограничение','Единица','Лимит','Использовано','Остаток','Двойственная оценка','Шаг проверки','Прирост цели','Верхняя граница прироста'],...[[a,'Базовая'],[b,'Изменённая']].flatMap(([x,label])=>x.dual.map(d=>[label,d.title,d.unit,d.limit,d.used,d.slack,d.shadow,d.finiteGain===undefined?null:d.step,d.finiteGain,d.upperGain])),['Ограничение для компромисса',axisLabel],['Лимит','Цель: база','Цель: новая','Спрос: база','Спрос: новая','Импорт: база','Импорт: новая','Часы: база','Часы: новая'],...front.rows.map(x=>[x.limit,x.base,x.changed,x.baseDemand,x.changedDemand,x.baseImport,x.changedImport,x.baseHours,x.changedHours])]);
    }catch(err){$('tech-status').textContent='Расчёт остановлен: '+err.message}
   });
   $('tech-example').onclick=()=>{fields.material.forEach(e=>e.value=10);fields.imported.forEach(e=>e.value=5);fields.productivity.forEach(e=>e.value=15);clear()};
