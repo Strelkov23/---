@@ -20,6 +20,7 @@ ANNUAL={
  "NE.EXP.GNFS.ZS":(0,None),
  "NE.IMP.GNFS.ZS":(0,None),
 }
+MONTHLY={"CPI_YOY":None,"RES_TOTAL":(0,None),"M2":(0,None),"M2X":(0,None)}
 LABELS={"last":"Последнее значение","mean3":"Среднее трёх периодов","drift5":"Дрейф за пять периодов","trend8":"Линейный тренд восьми периодов","seasonal":"Тот же месяц прошлого года"}
 MIN_TRAIN=8
 HOLDOUT=5
@@ -81,6 +82,8 @@ def evaluate(values,h,monthly,bounds):
     winner=min(methods,key=lambda m:scores[m]["mae"])
     test_results={m:folds(m,test) for m in methods}
     test_scores={m:metrics(test_results[m]) for m in methods}
+    naive=test_scores['last']['mae']
+    skill=100*(1-test_scores[winner]['mae']/naive) if naive>0 else None
     errs=sorted(abs(r["error"]) for r in test_results[winner])
     # Descriptive range based on the held-out errors, not a calibrated prediction interval.
     # With five errors the 80th nearest-rank absolute error is the fourth.
@@ -92,7 +95,7 @@ def evaluate(values,h,monthly,bounds):
         if bounds[1] is not None:hi=min(hi,bounds[1])
     return dict(horizon=h,selected=winner,origin=period_name(values[-1][0],monthly),
       target=period_name(values[-1][0]+h,monthly),point=point,low=lo,high=hi,error_radius=radius,
-      development=scores,holdout=test_scores,development_folds=dev_results,holdout_folds=test_results,
+      development=scores,holdout=test_scores,skill_vs_last_pct=skill,development_folds=dev_results,holdout_folds=test_results,
       selection_cutoff=period_name(values[test[0]][0],monthly),holdout_start=period_name(values[test[0]+h][0],monthly))
 def series(code,title,unit,raw,monthly,bounds,source,checked,stamp):
     block=tail(raw)
@@ -111,6 +114,19 @@ def publish(out,stamp):
         s=compare[code];meta=catalog[code]
         raw={int(k):v for k,v in s["values"].items() if k.isdigit() and int(k)<current_year and valid(v)}
         rows.append(series(code,s["title"],s["unit"],raw,False,bounds,meta["source"],meta.get("success"),stamp))
+    # Closed calendar months only; even beginning-of-month stock series
+    # use the same conservative cutoff. A target may already be historical.
+    current_month=month_index(stamp[:7])
+    national=json.loads((out/"national.json").read_text())
+    for code,bounds in MONTHLY.items():
+        if code not in national:continue
+        s=national[code];raw={}
+        for r in s["values"]:
+            t=month_index(r["period"])
+            if t>=current_month or not valid(r.get("value")):continue
+            if t in raw:raise ValueError("Duplicate national month")
+            raw[t]=r["value"]
+        rows.append(series(code,s["title"],s["unit"],raw,True,bounds,s["source"],s.get("success"),stamp))
     industry=json.loads((out/"industry.json").read_text())
     # Only verified observations from one homogeneous systematic workbook.
     primary="https://www.rosstat.gov.ru/storage/mediabank/ind_baza_2023.xlsx"
@@ -118,17 +134,18 @@ def publish(out,stamp):
     raw={}
     for r in eligible:
         t=month_index(r["period"])
+        if t>=current_month:continue
         if t in raw:raise ValueError("Duplicate monthly observation")
         raw[t]=r["value"]
     rows.append(series("INDUSTRY_YOY","Индекс промышленного производства к тому же месяцу предыдущего года","% (прошлый год = 100)",raw,True,(0,None),primary,min((r["verified"] for r in eligible),default=None),stamp))
     data=dict(built=stamp,methods=LABELS,series=rows,notice="Последние редакции исторических наблюдений; не реальное историческое наличие данных. Диапазон — описательный по пяти контрольным ошибкам, не вероятностный интервал.")
     (out/"forecast.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"forecast.csv").open("w",encoding="utf-8-sig",newline="") as f:
-        w=csv.writer(f);w.writerow(["code","title","unit","source","last_observation","horizon","target","method","point","descriptive_low","descriptive_high","holdout_mae","holdout_rmse","holdout_bias","holdout_n","selection_cutoff","built"])
+        w=csv.writer(f);w.writerow(["code","title","unit","source","last_observation","horizon","target","method","point","descriptive_low","descriptive_high","holdout_mae","holdout_rmse","holdout_bias","holdout_n","skill_vs_last_pct","selection_cutoff","built"])
         for s in rows:
             for r in s["results"]:
                 score=r["holdout"][r["selected"]]
-                w.writerow([s["code"],s["title"],s["unit"],s["source"],s["last"],r["horizon"],r["target"],r["selected"],r["point"],r["low"],r["high"],score["mae"],score["rmse"],score["bias"],score["n"],r["selection_cutoff"],stamp])
+                w.writerow([s["code"],s["title"],s["unit"],s["source"],s["last"],r["horizon"],r["target"],r["selected"],r["point"],r["low"],r["high"],score["mae"],score["rmse"],score["bias"],score["n"],r["skill_vs_last_pct"],r["selection_cutoff"],stamp])
     with (out/"forecast-backtests.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.writer(f);w.writerow(["code","unit","horizon","split","method","selected","origin","target","prediction","actual","error","source","built"])
         for s in rows:

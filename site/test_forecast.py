@@ -15,6 +15,9 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(r["point"],65)
         self.assertEqual(r["holdout"][r["selected"]]["mae"],0)
         self.assertEqual(r["holdout"][r["selected"]]["n"],5)
+        self.assertEqual(r["skill_vs_last_pct"],100)
+        flat=f.evaluate([(2000+i,1) for i in range(30)],1,False,None)
+        self.assertIsNone(flat["skill_vs_last_pct"])
         self.assertTrue(all(x["target"]<=r["selection_cutoff"] for rows in r["development_folds"].values() for x in rows))
         self.assertTrue(all(x["target"]>=r["holdout_start"] for rows in r["holdout_folds"].values() for x in rows))
         changed=values[:-3]+[(t,100000) for t,_ in values[-3:]]

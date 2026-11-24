@@ -55,9 +55,10 @@ jobs:
           print('Labor data coverage:',len(labor['broad']),len(labor['regional']),labor['coverage'])
           assert len(labor['broad'])>0 and len(labor['regional'])>0
           forecast=json.loads((p/'forecast.json').read_text())
-          assert len(forecast['series'])==13
+          assert len(forecast['series'])==17
           print('Forecast coverage:',[(s['code'],len(s['results']),s['last']) for s in forecast['series']])
-          assert all(s['results'] for s in forecast['series'])
+          assert all(s['results'] for s in forecast['series'] if s['code'] not in ('M2X',))
+          assert all(r['holdout'][r['selected']]['n']==5 for s in forecast['series'] for r in s['results'])
           PY
       - name: Verify horizon optimizer in desktop and mobile browsers
         working-directory: monitor/public

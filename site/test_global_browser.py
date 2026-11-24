@@ -109,6 +109,8 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#forecast-status').textContent.includes('Рассчитано')")
         assert page.locator("#forecast-methods tbody tr").count()==4
         assert page.locator("#forecast-holdout tbody tr").count()==5
+        page.locator("#forecast-series").select_option("CPI_YOY")
+        assert page.locator("#forecast-methods tbody tr").count()==5
         page.locator("#forecast-series").select_option("INDUSTRY_YOY")
         page.locator("#forecast-horizon").select_option("6")
         assert page.locator("#forecast-methods tbody tr").count()==5
