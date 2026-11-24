@@ -165,6 +165,9 @@ with m.connect() as finance_db:
     finance_workbooks.publish(page,out,finance_workbooks.sync(finance_db,m.now(),"--refresh" in sys.argv,finance_check["files"]))
 financial_state.publish(page,out)
 cost_structure.publish(page,out)
+import rosstat_workbooks
+with m.connect() as workbook_db:
+    rosstat_workbooks.publish(page,out,rosstat_workbooks.sync(workbook_db,m.now(),"--refresh" in sys.argv,out))
 with m.connect() as food_db:
     food_balance.publish(page,out,food_balance.sync(food_db,m.now(),"--refresh" in sys.argv))
 with m.connect() as electricity_db:

@@ -41,6 +41,7 @@ class QualityTests(unittest.TestCase):
         fd.publish(self.out,self.prev,"2026-11-24",False)
         sr.publish(self.out,self.prev,"2026-11-24",False)
         dg.publish(self.out,self.prev,"2026-11-24",False)
+        self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
         self.put("consistency.json",cs.create(self.data["national.json"],self.data["cbr.json"],json.loads((self.out/"sme-regions.json").read_text()),"2026-11-24"))
         with sqlite3.connect(":memory:") as db:

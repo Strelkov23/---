@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -175,6 +175,10 @@ def check(out,previous,stamp):
         import finance_workbooks
         counts.update(finance_workbooks.quality(data["finance-workbooks.json"]))
     except (ValueError,KeyError,TypeError) as e:issues.append("Импорт рентабельности: "+str(e))
+    try:
+        import rosstat_workbooks
+        counts.update(rosstat_workbooks.quality(data["rosstat-workbooks.json"]))
+    except (ValueError,KeyError,TypeError) as e:issues.append("Отраслевые таблицы Росстата: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
