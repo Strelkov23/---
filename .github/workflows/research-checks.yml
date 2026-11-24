@@ -204,3 +204,20 @@ jobs:
             curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
             if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
           done
+
+      - name: Inspect assets capacity and finance tables
+        if: github.head_ref == 'stage-03-assets-capacity'
+        working-directory: monitor
+        run: |
+          python3 - <<'PY'
+          import historical as h,openpyxl,io,re
+          from concurrent.futures import ThreadPoolExecutor
+          pages=['https://www.rosstat.gov.ru/folder/14304','https://www.rosstat.gov.ru/enterprise_industrial','https://www.rosstat.gov.ru/statistics/finance']
+          def discover(url):
+              try:
+                  raw,enc=h.get(url,12000000)
+                  files=h.discover(raw.decode(enc,errors='replace'),url)
+                  print('CATALOG',url,[(f['title'],f['url']) for f in files if f['format']=='xlsx'],flush=True)
+              except Exception as e:print('ERROR',url,str(e),flush=True)
+          with ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(discover,pages))
+          PY
