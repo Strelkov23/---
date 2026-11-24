@@ -140,7 +140,6 @@ with m.connect() as db:
     failures.extend(national.publish(db,m.now(),out,"--refresh" in sys.argv))
     failures.extend(historical.publish(db,m.now(),out,"--refresh" in sys.argv))
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-sector_passports.publish(out)
 regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 facility_data.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
@@ -163,6 +162,7 @@ with m.connect() as finance_db:
     finance_data.publish(page,out,finance_check)
     import finance_workbooks
     finance_workbooks.publish(page,out,finance_workbooks.sync(finance_db,m.now(),"--refresh" in sys.argv,finance_check["files"]))
+sector_passports.publish(out)
 financial_state.publish(page,out)
 cost_structure.publish(page,out)
 import rosstat_workbooks
