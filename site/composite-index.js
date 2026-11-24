@@ -67,12 +67,25 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const headers=['Период',...selected.map(c=>c.r.title+' (нормированный индекс)'),'Взвешенный арифметический','Взвешенный геометрический','Равновзвешенный арифметический','Статус'];
     table($('composite-result'),headers,r.rows.map(x=>[x.period,...x.indices.map(fmt),fmt(x.arithmetic),fmt(x.geometric),fmt(x.equal_arithmetic),x.status]));
     const chart=$('composite-chart'),series=[['arithmetic','Взвешенный арифметический'],['geometric','Взвешенный геометрический'],['equal_arithmetic','Равновзвешенный арифметический']].map(([code,name])=>({code,name,values:r.rows.map(x=>x[code])}));
+    const values=series.flatMap(s=>s.values.filter(Number.isFinite));
+    if(values.length){
+     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 720 280');svg.setAttribute('role','img');svg.setAttribute('aria-label','Сравнение трёх способов агрегации составного индекса');
+     const shape=(tag,attrs,text)=>{const e=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));if(text!==undefined)e.textContent=text;svg.append(e);return e};
+     let lo=Math.min(100,...values),hi=Math.max(100,...values);if(lo===hi){lo-=5;hi+=5}
+     const x=i=>r.rows.length===1?392:110+565*i/(r.rows.length-1),y=v=>215-175*(v-lo)/(hi-lo);
+     for(let i=0;i<5;i++){const v=lo+(hi-lo)*i/4;shape('line',{x1:110,x2:675,y1:y(v),y2:y(v),stroke:'#d4dcdf'});shape('text',{x:103,y:y(v)+4,'font-size':11,'text-anchor':'end'},fmt(v))}
+     shape('line',{x1:110,x2:675,y1:y(100),y2:y(100),stroke:'#8a959a','stroke-dasharray':'2 3'});
+     chartTickIndices(r.rows.length,6).forEach(i=>shape('text',{x:x(i),y:240,'font-size':10,'text-anchor':'middle'},r.rows[i].period));
+     const colors=['#006c69','#a24724','#365e95'],dashes=['none','7 4','2 4'];
+     series.forEach((s,j)=>{let d='';s.values.forEach((v,i)=>{if(Number.isFinite(v)){d+=(i&&Number.isFinite(s.values[i-1])?'L':'M')+x(i)+' '+y(v)+' ';shape('circle',{cx:x(i),cy:y(v),r:2.5,fill:colors[j]})}});shape('path',{d,stroke:colors[j],fill:'none','stroke-width':2.5,'stroke-dasharray':dashes[j]})});
+     const legend=document.createElement('p');legend.textContent='Сплошная зелёная — взвешенная арифметическая; коричневая штриховая — геометрическая; синяя точечная — равновзвешенная. Серая линия — базовый уровень 100.';chart.append(svg,legend);
+    }
     chartTools(chart,'Пользовательский составной индекс, база '+p.base,'индекс (база = 100)',r.rows.map(x=>x.period),series,{monthly:r.frequency==='monthly',source:'Пользовательские веса; '+r.formula+'; отпечаток '+manifest.data_fingerprint,url:'methodology.html#composite-index-method'});
     const report={schema:'1',method_version:'1.0',archive_revision:version||null,source_revision:manifest.source_revision,data_fingerprint:manifest.data_fingerprint,registry_sha256:registry.sha256,parameters:p,components:data.map(({observations,...c})=>c),...r};
     $('composite-json').disabled=false;$('composite-json').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='composite-index.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)};
     $('composite-csv').disabled=false;$('composite-csv').onclick=()=>csv('composite-index.csv',[['Методика',r.formula],['Ограничение',r.note],['База',p.base],['Метод',p.method],['Отпечаток',manifest.data_fingerprint],['Ряд','Вес','Нормированный вес','Направление','Единица','Источник','Хеш файла','Методика источника'],...data.map((c,i)=>[c.id,c.weight,r.weights[i],c.direction,c.passport.unit,c.passport.source,c.sha256,c.passport.method_formula]),[...headers,...data.map(c=>c.id+' исходное значение')],...r.rows.map(x=>[x.period,...x.indices,x.arithmetic,x.geometric,x.equal_arithmetic,x.status,...x.raw])]);
    }catch(err){if(run===token)$('composite-status').textContent='Расчёт остановлен: '+err.message}
   });
-  clear();
+  $('composite-run').disabled=false;clear();
  }catch(e){$('composite-status').textContent='Каталог не подтверждён: '+e.message}
 });

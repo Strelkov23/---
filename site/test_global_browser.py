@@ -216,6 +216,7 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#composite-json").click()
         c=json.loads(d.value.path().read_text())
+        assert page.locator('#composite-chart svg').count()==1
         assert c["weights"]==[0.5,0.5] and len(c["components"])==2
         assert abs(next(x for x in c["rows"] if x["period"]=="2020")["selected"]-100)<1e-9
         assert not errors,errors
