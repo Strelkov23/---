@@ -8,11 +8,19 @@ const ReportBuilder=(()=>{
   const s=B.prepare(observations,p.territory);
   if(s.frequency!==a.frequency)throw Error('Частота ряда отличается от выбранного периода');
   const rows=[];for(let t=a.key;t<=b.key;t++)rows.push({period:period(t,s.frequency),value:s.index.get(t)??null});
+  // Changes are computed strictly inside the requested window.
+  for(let i=0;i<rows.length;i++){
+   const r=rows[i],previous=i?rows[i-1].value:null;
+   r.change=previous!==null&&r.value!==null?r.value-previous:null;
+   r.growth=previous>0&&r.value!==null&&r.value>=0?100*(r.value/previous-1):null;
+   if(!Number.isFinite(r.change))r.change=null;
+   if(!Number.isFinite(r.growth))r.growth=null;
+  }
   const actual=rows.filter(x=>x.value!==null),first=rows[0].value,last=rows.at(-1).value;
   const delta=first!==null&&last!==null?last-first:null;
   const growth=first>0&&last!==null&&last>=0?100*(last/first-1):null;
   const safe=x=>Number.isFinite(x)?x:null;
-  return {rows,observed:actual.length,expected:rows.length,coverage:100*actual.length/rows.length,first,last,delta:safe(delta),growth:safe(growth),min:actual.length?Math.min(...actual.map(x=>x.value)):null,max:actual.length?Math.max(...actual.map(x=>x.value)):null};
+  return {rows,observed:actual.length,expected:rows.length,coverage:100*actual.length/rows.length,first_observed:actual[0]?.period??null,last_observed:actual.at(-1)?.period??null,first,last,delta:safe(delta),growth:safe(growth),min:actual.length?Math.min(...actual.map(x=>x.value)):null,max:actual.length?Math.max(...actual.map(x=>x.value)):null};
  }
  function bibliography(items){
   if(!Array.isArray(items))return [];
@@ -50,13 +58,15 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   let d='';vals.forEach((v,i)=>{if(Number.isFinite(v)){d+=(i&&Number.isFinite(vals[i-1])?'L':'M')+xx(i)+' '+yy(v)+' ';shape('circle',{cx:xx(i),cy:yy(v),r:2.5,fill:'#006c69'})}});shape('path',{d,stroke:'#006c69','stroke-width':2,fill:'none'});return svg;
  }
  function render(r){
-  const h=$('report-preview');h.replaceChildren(node('h1',r.title),node('p','Период: '+r.start+' — '+r.end+' · Сформировано UTC: '+r.generated),node('p','Автоматический описательный доклад. Не причинная оценка, не прогноз, не научная рецензия.'),node('h2','1. Методика и происхождение'),node('p','Методика доклада 1.0: покрытие = 100 × число имеющихся наблюдений / число календарных периодов; изменение = значение конца − значение начала; прирост = 100 × (конец / начало − 1), если начало положительно и конец неотрицателен. Минимум и максимум — только среди имеющихся наблюдений. Если границы отсутствуют, изменение не вычисляется. Пропуски не заполняются. Разность процентных величин — в процентных пунктах. Причины динамики автоматически не определяются.'),node('p','Отпечаток данных: '+r.data_fingerprint),node('p','Архивная ревизия (если доступна): '+(r.archive_revision||'не определена')+' · Ревизия сборки набора: '+(r.source_revision||'не определена')));
-  h.append(node('h2','2. Статистические разделы'));
+  const h=$('report-preview');h.replaceChildren(node('h1',r.title),node('p','Период: '+r.start+' — '+r.end+' · Сформировано UTC: '+r.generated),node('p','Автоматический описательный доклад. Не причинная оценка, не прогноз, не научная рецензия.'),node('h2','1. Методика и происхождение'),node('p','Методика доклада 1.0: покрытие = 100 × число имеющихся наблюдений / число календарных периодов; изменение = значение конца − значение начала; прирост = 100 × (конец / начало − 1), если начало положительно и конец неотрицателен. Минимум и максимум — только среди имеющихся наблюдений. Если границы отсутствуют, изменение не вычисляется. Изменение к предыдущему периоду рассчитывается только по соседним календарным периодам внутри интервала; первая строка без сравнения. Пропуски не заполняются. Разность процентных величин — в процентных пунктах. Причины динамики автоматически не определяются.'),node('p','Отпечаток данных: '+r.data_fingerprint),node('p','Архивная ревизия (если доступна): '+(r.archive_revision||'не определена')+' · Ревизия сборки набора: '+(r.source_revision||'не определена')));
+  h.append(node('h2','2. Сводка покрытия и статистические разделы'),node('p','Сводка показывает полноту, а не качество или экономическую значимость. Показатели не суммируются и не ранжируются по их величине.'));
+  const coverage=table(['Показатель','Единица','Имеется / ожидается','Покрытие, %','Первый факт в интервале','Последний факт в интервале','Есть обе границы'],r.series.map(s=>[s.passport.title,s.passport.unit,s.summary.observed+' / '+s.summary.expected,fmt(s.summary.coverage),s.summary.first_observed??'—',s.summary.last_observed??'—',s.summary.first!==null&&s.summary.last!==null?'Да':'Нет']));
+  coverage.id='report-coverage';h.append(coverage);
   for(const [i,s] of r.series.entries()){
    const d=s.summary,p=s.passport,section=node('section');section.className='report-series';
    section.append(node('h3',(i+1)+'. '+p.title),node('p','Территория: '+s.territory+' · Единица: '+p.unit+' · Тип: '+p.measurement_kind),node('p','Определение: '+p.method_definition),node('p','Способ получения: '+p.method_formula),node('p','Ограничения источника: '+p.method_caution),node('p','Статус источника: '+p.status+' · Успешное получение: '+(p.success||'не указано')),node('p','Наблюдений: '+d.observed+' из '+d.expected+' ('+fmt(d.coverage)+'%).'),node('p','Начало: '+fmt(d.first)+'; конец: '+fmt(d.last)+'; изменение: '+fmt(d.delta)+' '+(p.unit.startsWith('%')?'п.п.':p.unit)+'; относительный прирост: '+fmt(d.growth)+(d.growth===null?' (не определён)':'%')+'. Минимум: '+fmt(d.min)+'; максимум: '+fmt(d.max)+'.'));
    if(d.growth!==null)section.append(node('p','Прирост относится к опубликованному показателю, не обязательно к реальному выпуску; для ставок и индексов интерпретировать с осторожностью.'));
-   section.append(graph(s),table(['Период','Значение ('+p.unit+')'],d.rows.map(x=>[x.period,fmt(x.value)])));
+   section.append(graph(s),table(['Период','Значение ('+p.unit+')','Изменение к предыдущему периоду ('+(p.unit.startsWith('%')?'п.п.':p.unit)+')','Прирост к предыдущему периоду, %'],d.rows.map(x=>[x.period,fmt(x.value),fmt(x.change),fmt(x.growth)])));
    const source=node('p','Источник: ');source.append(link(p.source,p.source),document.createTextNode(' · '),link('Метаданные',p.method_url));section.append(source,node('p','Файл: '+s.file+' · SHA-256: '+s.sha256+' · Паспорт '+p.method_version));
    h.append(section);
   }
@@ -91,7 +101,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    }catch(err){if(run===token)$('report-status').textContent='Доклад не сформирован: '+err.message}
   });
   $('report-json').onclick=()=>{if(report)download('economic-report.json',JSON.stringify(report,null,2),'application/json')};
-  $('report-csv').onclick=()=>{if(report)csv('economic-report-observations.csv',[['ID','Показатель','Территория','Единица','Период','Значение','Источник','Методика источника','SHA-256','Отпечаток'],...report.series.flatMap(s=>s.summary.rows.map(x=>[s.passport.id,s.passport.title,s.territory,s.passport.unit,x.period,x.value,s.passport.source,s.passport.method_formula,s.sha256,report.data_fingerprint]))])};
+  $('report-csv').onclick=()=>{if(report)csv('economic-report-observations.csv',[['ID','Показатель','Территория','Единица','Период','Значение','Изменение к предыдущему периоду','Единица изменения','Прирост к предыдущему периоду, %','Источник','Методика источника','SHA-256','Отпечаток'],...report.series.flatMap(s=>s.summary.rows.map(x=>[s.passport.id,s.passport.title,s.territory,s.passport.unit,x.period,x.value,x.change,s.passport.unit.startsWith('%')?'п.п.':s.passport.unit,x.growth,s.passport.source,s.passport.method_formula,s.sha256,report.data_fingerprint]))])};
   $('report-html').onclick=()=>{if(report){const doc=document.implementation.createHTMLDocument(report.title);const meta=doc.createElement('meta');meta.charset='utf-8';doc.head.prepend(meta);const style=doc.createElement('style');style.textContent='body{font-family:system-ui,sans-serif;max-width:950px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#152a36}p{overflow-wrap:anywhere;white-space:pre-wrap}svg{width:100%;height:auto;max-width:750px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cbd5df;padding:.4rem;text-align:left}section{margin:2rem 0}a{overflow-wrap:anywhere}@media print{body{max-width:none;margin:0}tr{break-inside:avoid}h2,h3{break-after:avoid}}';doc.head.append(style);doc.body.append(doc.importNode($('report-preview'),true));download('economic-report.html','<!doctype html>\n'+doc.documentElement.outerHTML,'text/html;charset=utf-8')}};
   $('report-print').onclick=()=>{if(report)window.print()};
   search();show();clear();

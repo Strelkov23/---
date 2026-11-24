@@ -228,12 +228,14 @@ with sync_playwright() as p:
         page.locator("#report-run").click()
         page.wait_for_function("document.querySelector('#report-status').textContent.includes('Доклад сформирован')")
         assert page.locator("#report-preview .report-series").count()==1
-        assert page.locator("#report-preview tbody tr").count()==5
+        assert page.locator("#report-preview .report-series tbody tr").count()==5
+        assert page.locator("#report-coverage tbody tr").count()==1
         assert page.locator("#report-preview svg").count()==1
         with page.expect_download() as d:
             page.locator("#report-json").click()
         report=json.loads(d.value.path().read_text())
         assert report["series"][0]["summary"]["expected"]==5
+        assert report["series"][0]["summary"]["rows"][0]["change"] is None
         assert report["data_fingerprint"]==manifest["data_fingerprint"]
         with page.expect_download() as d:
             page.locator("#report-html").click()
