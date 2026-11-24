@@ -68,6 +68,25 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(request.call_count,2)
             from urllib.parse import unquote
             self.assertIn("issn:2221-2264",unquote(request.call_args.args[0].full_url))
+    def test_retry_after_is_relative_to_response_time(self):
+        stamp="2026-11-24T00:00:00+00:00"
+        err=HTTPError("https://api.crossref.org/works",429,"Too many requests",{"Retry-After":"120"},None)
+        with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=err),patch("literature.time.monotonic",side_effect=[100,700]):
+            literature.sync(self.db,stamp,True)
+        state=literature.service_status(self.db,"2026-11-24T00:11:00+00:00")
+        self.assertEqual(state["limited_at"],"2026-11-24T00:10:00+00:00")
+        self.assertEqual(state["retry_at"],"2026-11-24T00:12:00+00:00")
+        self.assertTrue(state["cooldown"])
+    def test_rate_limit_recovery(self):
+        stamp="2026-11-24T00:00:00+00:00"
+        err=HTTPError("https://api.crossref.org/works",429,"Too many requests",{"Retry-After":"60"},None)
+        with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True):
+            with patch("literature.urlopen",side_effect=err):
+                literature.sync(self.db,stamp,True)
+            with patch("literature.fetch_batch",return_value={"total-results":0,"items":[]}):
+                literature.sync(self.db,"2026-11-24T00:02:00+00:00",True)
+        self.assertFalse(literature.service_status(self.db,"2026-11-24T00:02:00+00:00")["cooldown"])
+        self.assertEqual(self.db.execute("select status from journal_checks where issn='0042-8736'").fetchone()[0],"Проверено")
     def test_retry_after_formats(self):
         stamp="2026-11-24T00:00:00+00:00"
         self.assertEqual(literature.retry_deadline(stamp,"Tue, 24 Nov 2026 00:10:00 GMT"),"2026-11-24T00:10:00+00:00")

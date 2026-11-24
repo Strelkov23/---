@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
@@ -266,6 +267,7 @@ def period_items(issn,filters,date_key,start,end):
     if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
 def sync(db, stamp, refresh):
+    started=time.monotonic()
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
     db.execute("create table if not exists literature_meta(doi text primary key,payload text,checked text)")
@@ -317,11 +319,12 @@ def sync(db, stamp, refresh):
                 db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
                 if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
         except CrossrefRateLimited as err:
-            deadline=retry_deadline(stamp,err.retry_after)
+            observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
+            deadline=retry_deadline(observed,err.retry_after)
             with db:
-                db.execute("insert or replace into literature_service values(1,?,?)",(stamp,deadline))
+                db.execute("insert or replace into literature_service values(1,?,?)",(observed,deadline))
                 db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",
-                    (issn,stamp,"Crossref HTTP 429; повтор не ранее "+deadline))
+                    (issn,observed,"Crossref HTTP 429; повтор не ранее "+deadline))
                 for pending in ordered[position+1:]:defer_journal(db,pending,deadline)
             break
         except Exception as err:
