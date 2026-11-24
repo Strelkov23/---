@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 700 240');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label',s.title+' — '+unit);
    const shape=(tag,attrs,t)=>{const x=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))x.setAttribute(k,v);if(t!==undefined)x.textContent=t;svg.append(x);return x};
    const vals=series.flatMap(t=>t.values.filter(Number.isFinite)),min=Math.min(...vals),max=Math.max(...vals),x=i=>90+580*i/Math.max(1,years.length-1),y=v=>max===min?105:175-150*(v-min)/(max-min);
-   for(let i=0;i<5;i++){const v=min+(max-min)*i/4;shape('line',{x1:90,x2:670,y1:y(v),y2:y(v),stroke:'#b9c8c8'});if(i===0||max!==min)shape('text',{x:85,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'currentColor'},fmt(v))}
+   for(let i=0;i<5;i++){const v=min+(max-min)*i/4;shape('line',{x1:90,x2:670,y1:y(v),y2:y(v),stroke:'#b9c8c8'});if(i===0||max!==min)shape('text',{x:85,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'currentColor'},v.toLocaleString('ru',{maximumSignificantDigits:5}))}
    series.forEach((t,j)=>{const color=j?'#a24724':'#006c69';let path='';t.values.forEach((v,i)=>{if(!Number.isFinite(v))return;path+=(i&&Number.isFinite(t.values[i-1])?'L':'M')+x(i)+' '+y(v)+' ';const c=shape('circle',{cx:x(i),cy:y(v),r:3,fill:color});const tip=document.createElementNS(ns,'title');tip.textContent=t.name+' · '+years[i]+' · '+fmt(v);c.append(tip)});shape('path',{d:path,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':j?'7 4':'none'});});
    chartTickIndices(years.length,6).forEach(i=>shape('text',{x:x(i),y:195,'text-anchor':i===0?'start':i===years.length-1?'end':'middle','font-size':11,fill:'currentColor'},years[i]));
    const chartLegend=node('div','');chartLegend.className='legend';series.forEach((t,j)=>{const item=node('span',(j?'— — ':'━━ ')+t.name);item.style.color=j?'#a24724':'#006c69';chartLegend.append(item)});graph.append(chartLegend,svg);chartTools(graph,s.title,unit,years,series,{source:s.kind,territory:'Сравнение территорий',url:s.source});
@@ -79,10 +79,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const shape=(tag,attrs,t,parent=svg)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(t!==undefined)e.textContent=t;parent.append(e);return e};
    const text=(x,y,t,extra={})=>shape('text',{x,y,fill:'#162e39','font-family':'Arial,sans-serif','font-size':14,...extra},t);
    shape('rect',{x:0,y:0,width:w,height:h,fill:'#fff'});
-   text(20,27,title,{'font-size':19,'font-weight':'bold'});text(20,50,subtitle,{'font-size':13});
+   text(20,27,title,{'font-size':19,'font-weight':'bold'});chartFitLabel(text(20,50,subtitle,{'font-size':13}),w-40);
    draw(shape,text);
    const foot=source.kind+' · '+source.code+' · версия '+(version||'не закреплена');
-   text(20,h-27,foot,{'font-size':11});text(20,h-12,'Источник и методология — в паспорте показателя и CSV.',{'font-size':11});
+   chartFitLabel(text(20,h-27,foot,{'font-size':11}),w-40);text(20,h-12,'Источник и методология — в паспорте показателя и CSV.',{'font-size':11});
    const frame=node('div','');frame.className='regional-figure-scroll';frame.append(svg);host.append(frame);
    const tools=node('div','');tools.className='actions';const result=node('span','');result.setAttribute('role','status');
    const blob=()=>new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     shape('line',{x1:zero,x2:zero,y1:64,y2:h-42,stroke:'#526b72','stroke-width':1});
     subset.forEach((r,i)=>{const y=69+i*27,bar=shape('rect',{x:Math.min(zero,x(r.value)),y,width:Math.abs(x(r.value)-zero),height:19,fill:r.value<0?'#a24724':'#087e75'});
      shape('title',{},r.region+' · '+fmt(r.value)+' '+s.unit,bar);
-     text(20,y+14,r.region.length>43?r.region.slice(0,40)+'…':r.region,{'font-size':13});text(R+8,y+14,fmt(r.value),{'font-size':13})});
+     chartFitLabel(text(20,y+14,r.region,{'font-size':13}),L-30);chartFitLabel(text(R+8,y+14,r.value.toLocaleString('ru',{maximumSignificantDigits:6}),{'font-size':13}),W-R-18)});
    });
    rankingHost.append(node('p','Территориальные агрегаты могут пересекаться. Это сравнение значений, а не рейтинг эффективности. Полный срез доступен ниже.'));
    const names=subset.map(r=>r.region),years=Array.from({length:nYears},(_,i)=>year-nYears+1+i);
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const cell=42,HW=Math.max(1000,L+years.length*cell+35),HH=183+names.length*26;
    makeFigure(heatHost,'Тепловая карта динамики',s.unit+' · '+years[0]+'–'+year+' · единая шкала исходных значений',s,HW,HH,(shape,text)=>{
     years.forEach((yr,i)=>text(L+i*cell+cell/2,72,yr,{'font-size':11,'text-anchor':'middle'}));
-    names.forEach((name,j)=>{const y=82+j*26;text(20,y+16,name.length>43?name.slice(0,40)+'…':name,{'font-size':13});
+    names.forEach((name,j)=>{const y=82+j*26;chartFitLabel(text(20,y+16,name,{'font-size':13}),L-30);
      years.forEach((yr,i)=>{const v=values.get(name+'\u0000'+yr),rect=shape('rect',{x:L+i*cell,y,width:cell-2,height:24,fill:Number.isFinite(v)?color(v):'#e1e4e5',stroke:'#fff'});
       shape('title',{},name+' · '+yr+' · '+(Number.isFinite(v)?fmt(v)+' '+s.unit:'нет данных'),rect)})});
     const y=89+names.length*26;[0,.25,.5,.75,1].forEach((p,i)=>shape('rect',{x:L+i*38,y,width:38,height:15,fill:color(min+(max-min)*p)}));
