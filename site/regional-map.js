@@ -114,13 +114,19 @@ const RegionalMap=(()=>{
     ratio:value!==null&&Number.isFinite(base)&&base>0&&value>=0?100*value/base:null};
   }).filter(Boolean)
  }
+ function rankProfileCandidates(catalog,id,limit=4){
+  return catalog.filter(s=>theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||Number(isGrowth(b.code,b.title,b.unit))-Number(isGrowth(a.code,a.title,a.unit))||b.count-a.count||String(a.code).localeCompare(String(b.code))).slice(0,limit)
+ }
+ function chooseProfileObservation(items){
+  return items.filter(x=>x.r&&Number.isFinite(x.r.value)).sort((a,b)=>b.r.year-a.r.year||Number(isGrowth(b.m.code,b.m.title,b.m.unit))-Number(isGrowth(a.m.code,a.m.title,a.m.unit))||b.m.count-a.m.count||String(a.m.code).localeCompare(String(b.m.code)))[0]||null
+ }
  function profileObservation(values,key,year,sample){
   if(!key||!Number.isInteger(year))return null;
   const years=[...new Set(values.map(r=>r.year).filter(y=>Number.isInteger(y)&&y<=year))].sort((a,b)=>b-a);
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -147,7 +153,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  }
  const profileCodes=[
   ['Экономика','GRP_95b8dd2585'],['Экономика','GRP_PC_95b8dd2585'],['Экономика','GRP_VOLUME_95b8dd2585'],
-  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','R_c4e8751efbd23309_031d7fe105'],
+  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','R_f55cefbbeba36842_099b62c9d9'],
   ['Инвестиции','R_88230ed30f2f2738_bf6a5a3983'],['Инвестиции','R_66b96177c45a01ad_bf6a5a3983'],
   ['Труд','R_65254a01945743d3_1db3db8e79'],['Труд','R_a4138d558584b81a_1db3db8e79'],
   ['Бюджет','R_77976ed27f49b4fd_28f4b5b380'],['Бюджет','R_8728bc736516e87c_28f4b5b380'],
@@ -189,17 +195,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const cards=node('div','');cards.className='geo-brief-grid';box.append(cards);details.append(box);
   const y=Math.max(0,...catalog.map(s=>s.last).filter(Number.isInteger));
   const primary=[['Численность населения','R_f39e59bbabc208f3_4c391d1044'],['ВРП на человека','GRP_PC_95b8dd2585'],['Промышленный индекс','R_347ab451705a6d33_031d7fe105'],['Безработица','R_a4138d558584b81a_1db3db8e79']];
-  const subsectors=RegionalMap.industryThemes.map(([id,label,symbol])=>{
-   const candidates=catalog.filter(s=>RegionalMap.theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||b.count-a.count);
-   return [label,candidates[0]?.code,id,symbol]
-  });
+  const subsectors=RegionalMap.industryThemes.map(([id,label,symbol])=>[label,RegionalMap.rankProfileCandidates(catalog,id).map(s=>s.code),id,symbol]);
   async function item([label,code,id,symbol]){
    const card=node('article','');card.className='geo-brief-item';if(id){const icon=node('span',symbol);icon.className='sector-symbol';icon.style.background=RegionalMap.palette(id)[4];card.append(icon)}card.append(node('strong',label));cards.append(card);
-   const m=catalog.find(s=>s.code===code);
-   if(!m||!f.key){card.append(node('p','Нет сопоставимого ряда'));return false}
+   const candidates=(Array.isArray(code)?code:[code]).map(c=>catalog.find(s=>s.code===c)).filter(Boolean);
+   if(!candidates.length||!f.key){card.append(node('p','Нет сопоставимого ряда'));return false}
    try{
-    const data=await profileFile(m.file),r=RegionalMap.profileObservation(data.values,f.key,y,RegionalStats.sample);
-    if(!r){card.append(node('p','Нет наблюдения для региона'));return false}
+    const checked=await Promise.allSettled(candidates.map(async m=>{const data=await profileFile(m.file);return {m,data,r:RegionalMap.profileObservation(data.values,f.key,y,RegionalStats.sample)}}));
+    const failed=checked.filter(x=>x.status==='rejected').length;
+    const selected=RegionalMap.chooseProfileObservation(checked.filter(x=>x.status==='fulfilled').map(x=>x.value));
+    if(!selected){card.append(node('p',failed?'Нет доступного проверенного наблюдения; ошибок загрузки: '+failed:'Нет наблюдения для региона'));return false}
+    const {m,data,r}=selected;
+    if(failed)card.append(node('small','Не все альтернативные ряды удалось проверить.'));
     card.append(node('p',fmtValue(r.value)+' '+m.unit),node('small',String(r.year)+' · '+m.title));
     const previous=RegionalStats.sample(data.values.filter(v=>v.year===r.year-1)).out.get(f.key);
     const index=RegionalMap.isGrowth(m.code,m.title,m.unit);
@@ -226,7 +233,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }).catch(()=>{businessStatus.textContent='Срез реестра недоступен в данной версии'});
   Promise.all([...primary,...subsectors].map(item)).then(results=>{
    if(!box.isConnected)return;
-   state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Стрелки означают изменение показателя, а не оценку качества экономики. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
+   state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Для отраслей проверяется до четырёх рядов, выбирается наиболее свежий доступный в данном регионе; показатели не объединяются. Стрелки означают изменение показателя, а не оценку качества экономики. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
   })
  }
  const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region','geo-palette'].filter(id=>$(id)),...compareIds];
