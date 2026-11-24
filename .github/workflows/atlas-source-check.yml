@@ -41,6 +41,11 @@ jobs:
           assert counts["regional_mining_energy_rows"]==1920
           assert counts["regional_mining_energy_groups"]==10
           Path("history/published/regional-mining-energy.json").write_text(json.dumps(e,ensure_ascii=False),encoding="utf-8")
+          import industrial_parks as parks
+          with urlopen(Request(parks.SOURCE,headers={"User-Agent":"Mozilla/5.0"}),timeout=25) as f:pr=f.read(parks.MAX+1)
+          pd={**parks.empty("2026-11-25"),"rows":parks.parse(pr),"sha256":hashlib.sha256(pr).hexdigest(),"checked":"2026-11-25","success":"2026-11-25","status":"ok"}
+          print("PARKS",json.dumps(parks.quality(pd),ensure_ascii=False))
+          Path("history/published/industrial-parks.json").write_text(json.dumps(pd,ensure_ascii=False),encoding="utf-8")
           PY
       - name: Build using real archive and saved database
         run: |
@@ -52,8 +57,9 @@ jobs:
           else exit 1; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2 playwright==1.51.0
-          python3 -m unittest test_regional_manufacturing.py test_regional_industry_extra.py
+          python3 -m unittest test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py
           node test-regional-manufacturing.js
+          node test-industrial-parks.js
           ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
           git rev-parse HEAD > public/source-version.txt
           cp public/source-version.txt public/version.txt
@@ -81,4 +87,6 @@ jobs:
             monitor/public/regional-manufacturing.csv
             monitor/public/regional-mining-energy.json
             monitor/public/regional-mining-energy.csv
+            monitor/public/industrial-parks.json
+            monitor/public/industrial-parks.csv
           if-no-files-found: ignore
