@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const industrialById=new Map((industry?.series||[]).map(s=>[s.id,s]));
   let balance=null;try{balance=await load('sectors.json')}catch{}
   let regional=[];try{regional=(await load('historical.json')).series}catch{}
-  const regionalTerms={mining:['добыча полезных ископаемых'],manufacturing:['обрабатывающие производства'],construction:['инвестиции в основной капитал','валовое накопление основного капитала','индексы промышленного производства'],finance:['консолидированных бюджетов субъектов'],services:['фактическое конечное потребление домашних хозяйств'],social:['численность населения','коэффициенты рождаемости','коэффициенты смертности']};
+  const regionalTerms={agriculture:['продукция сельского хозяйства','валовой сбор зерна','производство молока'],light:['производство текстильных изделий','производство одежды','производство кожи'],chemical:['производство химических веществ','химическое производство'],pharma:['производство лекарственных средств'],metal:['металлургическое производство','производство металлургическое','производство готовых металлических изделий'],wood:['обработка древесины','производство бумаги'],materials:['производство резиновых и пластмассовых изделий','производство прочей неметаллической минеральной продукции'],food:['производство пищевых продуктов','производство напитков','производство табачных изделий'],machinery:['производство машин и оборудования','производство компьютеров','производство автотранспортных средств','производство прочих транспортных средств','производство электрического оборудования'],energy:['обеспечение электрической энергией','производство и распределение электроэнергии'],transport:['грузооборот автомобильного транспорта','перевозки грузов автомобильным транспортом','перевозки пассажиров автобусами'],technology:['объем инновационных товаров','внутренние затраты на исследования и разработки'],mining:['добыча полезных ископаемых'],manufacturing:['обрабатывающие производства'],construction:['инвестиции в основной капитал','валовое накопление основного капитала','индексы промышленного производства'],finance:['консолидированных бюджетов субъектов'],services:['фактическое конечное потребление домашних хозяйств'],social:['численность населения','коэффициенты рождаемости','коэффициенты смертности']};
 
   function observed(r){
    if(r.provider==='Всемирный банк, WDI')return Object.entries(wdi?.[r.id]?.values||{}).map(([period,value])=>({period,value}));
@@ -64,8 +64,36 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(const r of activeRows.slice(0,3)){const c=node('article','');c.append(node('small',r.provider+' · '+r.last),node('strong',fmt(r.value)),node('p',r.title+' · '+r.unit));const b=node('button','Показать динамику');b.type='button';b.onclick=()=>{choice.value=r.id;chart()};c.append(b);highlights.append(c)}
    chart()
   }
+  const financeYear=$('sp-finance-year'),financeStatus=$('sp-finance-status'),financeHost=$('sp-finance-table'),financeExport=$('sp-finance-export');
+  let currentFinance=null;
+  function financeDraw(p){
+   if(!financeYear||!financeStatus||!financeHost||!financeExport)return;
+   if(p)currentFinance=p;
+   const rows=currentFinance?.finance||[],years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
+   const old=financeYear.value||new URLSearchParams(location.search).get('sp-finance-year');
+   financeYear.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
+   if(years.includes(Number(old)))financeYear.value=old;
+   financeYear.disabled=!years.length;
+   const selected=rows.filter(r=>r.year===Number(financeYear.value));
+   financeExport.disabled=!selected.length;financeHost.replaceChildren();
+   if(!selected.length){financeStatus.textContent='Нет сопоставимых оригинальных таблиц ФНС для этого паспорта в выбранной версии.';return}
+   financeStatus.textContent='Год: '+financeYear.value+' · опубликованных позиций: '+selected.length+' · отдельные коэффициенты, не сводная рентабельность отрасли.';
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+   for(const label of ['Вид деятельности','Коэффициент','Значение, %','Последний успех','Источник / ячейка'])h.append(node('th',label));
+   const metric=r=>r.metric==='sales'?'Продажи к затратам':'Активы';
+   const value=r=>r.sign==='negative_unspecified'?'Отр (величина не указана)':r.sign==='numeric'&&Number.isFinite(r.value)?fmt(r.value):'Нет данных';
+   for(const r of selected){
+    const tr=body.insertRow();
+    for(const v of [r.title,metric(r),value(r),r.success?.slice(0,10)||'—'])tr.insertCell().textContent=v;
+    const cell=tr.insertCell();cell.append(link('Файл ФНС',r.source),node('small',' · '+r.sheet+' / '+r.row+':'+r.column+' · '+(r.status||'—')))
+   }
+   financeHost.append(t);
+   financeExport.onclick=()=>csv('sector-finance-'+currentFinance.id+'-'+financeYear.value+'.csv',[['Паспорт','Год','Код (локальный)','Название ФНС','Показатель','Значение, %','Знак','Исходная ячейка','Источник','Лист','Строка','Столбец','SHA-256','Успех','Статус'],...selected.map(r=>[currentFinance.title,r.year,r.local_code,r.title,metric(r),r.value,r.sign,r.raw,r.source,r.sheet,r.row,r.column,r.sha256,r.success,r.status])]);
+   save(['sp-finance-year']);
+  }
+  if(financeYear)financeYear.onchange=()=>financeDraw();
   function draw(){
-   const p=profiles.find(p=>p.id===picker.value);if(!p)return;
+   const p=profiles.find(p=>p.id===picker.value);if(!p)return;financeDraw(p);
    const q=norm($('sp-q').value.trim()),cov=$('sp-coverage').value,src=provider.value;
    const rows=p.rows.filter(r=>(!src||src===r.provider)&&(!cov||(cov==='yes'?r.count>0:r.count===0))&&norm([r.title,r.id,r.unit].join(' ')).includes(q));
    prepareCharts(rows);
