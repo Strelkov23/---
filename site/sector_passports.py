@@ -11,6 +11,12 @@ PROFILES=[
  ("mining","Добыча полезных ископаемых","Раздел B ОКВЭД2; отдельные классы не следует складывать с разделом.",[],["B","05","06","07","08","09"],["Добыч"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
  ("manufacturing","Обрабатывающая промышленность","Раздел C ОКВЭД2. Производительность промышленности WDI относится также к добыче, энергетике и строительству, поэтому здесь не используется.",["NV.IND.MANF.KD.ZG","NV.IND.MANF.CD"],["C","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33"],["Обрабатывающ","Машиностро"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
  ("machinery","Машиностроение и электроника","Классы 26–30 ОКВЭД2. Патенты и высокотехнологичный экспорт всей экономики не являются показателями только этих отраслей.",[],["26","27","28","29","30"],["Машин","Электрон","Транспортн"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("light","Лёгкая промышленность","Классы 13–15 ОКВЭД2: текстиль, одежда, кожа и изделия из кожи. Показатели классов приводятся раздельно; общего индекса лёгкой промышленности без официальных весов не рассчитываем.",[],["13","14","15"],["Текстиль","Одежд","Кож"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("chemical","Химическая промышленность","Класс 20 ОКВЭД2 — химические вещества и химические продукты. Лекарства, нефтепродукты, резина и пластмассы не входят в этот класс.",[],["20"],["Химическ"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("pharma","Фармацевтическая промышленность","Класс 21 ОКВЭД2 — лекарственные средства и материалы для медицинских целей. Не отождествляется с оборотом аптек или расходами здравоохранения.",[],["21"],["Фармацевт","Лекарствен"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("metal","Металлургия и металлообработка","Классы 24–25 ОКВЭД2: металлургия и готовые металлические изделия. Не включают добычу руд или машиностроение; индексы классов не суммируются.",[],["24","25"],["Металлург","Металлическ"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("wood","Деревообработка и целлюлозно-бумажная промышленность","Классы 16–17 ОКВЭД2. Лесозаготовка (02), полиграфия (18) и мебель (31) не входят в данный тематический профиль.",[],["16","17"],["Древесин","Бумаж"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
+ ("materials","Резина, пластмассы и неметаллические материалы","Классы 22–23 ОКВЭД2. Не объединяются с химическим классом 20, строительством или добычей сырья.",[],["22","23"],["Резинов","Пластмасс","Неметаллическ"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
  ("energy","Энергетика","Раздел D ОКВЭД2 включает электроэнергию, газ, пар и кондиционирование. Доли выработки WDI относятся только к электрогенерации.",["EG.ELC.ACCS.ZS","EG.USE.ELEC.KH.PC","EG.USE.PCAP.KG.OE","EG.FEC.RNEW.ZS","EG.ELC.NUCL.ZS","EG.ELC.HYRO.ZS","EG.ELC.COAL.ZS","EG.ELC.NGAS.ZS"],["D","35"],["Электроэнерг","Энерг"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
  ("utilities","Водоснабжение и отходы","Раздел E ОКВЭД2; обеспеченность водой населения и выпуск коммунальных организаций — разные понятия.",[],["E","36","37","38","39"],["Водоснаб","Отход"],["https://www.rosstat.gov.ru/enterprise_industrial"]),
  ("construction","Промышленность и строительство (широкий агрегат)","Агрегат WDI включает промышленность и строительство. Валовое накопление капитала относится ко всей экономике, не к строительству отдельно.",["NV.IND.TOTL.KD.ZG","NV.IND.EMPL.KD","SL.IND.EMPL.ZS"],[],["Строитель"],["https://rosstat.gov.ru/"]),
@@ -21,12 +27,36 @@ PROFILES=[
  ("social","Образование и здравоохранение","Расходы в процентах ВВП и ресурсы здравоохранения на душу — показатели разных типов.",["SH.XPD.CHEX.GD.ZS","SE.XPD.TOTL.GD.ZS","SH.MED.PHYS.ZS","SH.MED.BEDS.ZS"],[],["Образован","Здравоохран"],["https://rosstat.gov.ru/"]),
  ("technology","Наука и технологии","Расходы на НИОКР, патенты и исследователи относятся к экономике в целом; не отражают исключительно государственное финансирование.",["GB.XPD.RSDV.GD.ZS","IP.PAT.RESD","IP.PAT.NRES","SP.POP.SCIE.RD.P6","TX.VAL.TECH.MF.ZS"],[],["Научн","Исследован"],["https://rosstat.gov.ru/"]),
 ]
+# Explicit local documentary FNS identifiers; only exact thematic coverage.
+FNS_SCOPE={
+ "agriculture":["A","01","02","03"],"food":["10","11","12"],
+ "mining":["B","05","06","07","08"],"manufacturing":["C",*map(str,range(10,34))],
+ "machinery":["26","27","28","29","30"],"light":["13","14","15"],
+ "chemical":["20"],"pharma":["21"],"metal":["24","25"],"wood":["16","17"],
+ "materials":["22","23"],"energy":["D","35.1","35.2","35.3"],"utilities":["E"],
+ "transport":["H","49.1","49.2","49.3","49.4","49.5","50","51","53"],
+ "digital":["J"],"social":["P","Q"],"technology":["72"]
+}
+def finance_rows(profile,workbooks):
+    import finance_workbooks
+    allowed={code:local for local in FNS_SCOPE.get(profile,[]) for code in finance_workbooks.CROSSWALK.get(local,())}
+    result=[]
+    for batch in workbooks.get("years",[]):
+        seen=set()
+        for r in batch["rows"]:
+            local=allowed.get(r["code"])
+            if local is None:continue
+            key=(local,r["metric"])
+            if key in seen:raise ValueError("Неоднозначное соответствие отрасли ФНС "+local)
+            seen.add(key)
+            result.append(dict(r,local_code=local,checked=batch.get("checked"),success=batch.get("success"),status=batch.get("status"),sha256=batch.get("sha256")))
+    return sorted(result,key=lambda r:(-r["year"],r["local_code"],r["metric"]))
 def summary(values):
     pairs=sorted((str(k),v) for k,v in values.items() if v is not None)
     return dict(count=len(pairs),first=pairs[0][0] if pairs else None,last=pairs[-1][0] if pairs else None,value=pairs[-1][1] if pairs else None)
 def query(page,**params):
     return page+"?"+urlencode(params)
-def create(compare,catalog,industrial,national):
+def create(compare,catalog,industrial,national,finance=None):
     result=[]
     for ident,title,note,codes,okved,terms,sources in PROFILES:
         rows=[]
@@ -41,9 +71,9 @@ def create(compare,catalog,industrial,national):
         if ident=="finance":
             for code,s in national.items():
                 rows.append(dict(id=code,title=s["title"],unit=s["unit"],frequency="месячная",provider="Банк России",source=s["source"],checked=s.get("success"),status=s.get("status"),href=query("national.html",**{"national-code":code}),**summary({r["period"]:r["value"] for r in s["values"]})))
-        result.append(dict(id=ident,title=title,note=note,terms=terms,sources=sources,rows=rows))
+        result.append(dict(id=ident,title=title,note=note,terms=terms,sources=sources,rows=rows,finance=finance_rows(ident,finance or {})))
     return result
 def publish(out):
     def read(name):return json.loads((out/name).read_text(encoding="utf-8"))
-    profiles=create(read("compare.json"),read("catalog.json"),read("industrial.json"),read("national.json"))
+    profiles=create(read("compare.json"),read("catalog.json"),read("industrial.json"),read("national.json"),read("finance-workbooks.json"))
     (out/"sector-passports.json").write_text(json.dumps({"profiles":profiles},ensure_ascii=False,allow_nan=False,separators=(",",":")),encoding="utf-8")
