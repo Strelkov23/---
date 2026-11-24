@@ -7,6 +7,31 @@ class HistoricalTests(unittest.TestCase):
         links=historical.discover('<a href="/storage/mediabank/test.xlsx">ВРП</a><a href="https://evil.example/data.xlsx">Bad</a>',"https://rosstat.gov.ru/statistics/accounts")
         self.assertEqual(len(links),1)
         self.assertEqual(links[0]["url"],"https://rosstat.gov.ru/storage/mediabank/test.xlsx")
+    def test_import_fallback(self):
+        from unittest.mock import patch
+        spec=historical.SPECS[1]
+        url="https://rosstat.gov.ru/storage/mediabank/current.xlsx"
+        sources=[dict(files=[dict(url=url,title="Инвестиции в основной капитал",format="xlsx")])]
+        calls=[]
+        def fetch(u,limit):
+            calls.append(u)
+            if u!=url:raise ValueError("404")
+            return b"workbook",""
+        with patch.object(historical,"parse_xlsx",return_value=[{"value":10}]):
+            rows,used,errors=historical.import_candidates(spec[0],spec[2],spec[3],spec[4],sources,fetch)
+        self.assertEqual(used,url)
+        self.assertEqual(len(calls),2)
+        self.assertEqual(len(errors),1)
+    def test_import_status_preserves_success(self):
+        import sqlite3
+        with sqlite3.connect(":memory:") as db:
+            db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
+            f=dict(url="https://rosstat.gov.ru/a.xlsx",title="Таблица",format="xlsx")
+            historical.import_status(db,"test","A",f["url"],"2026-11-23","ok",True,[f])
+            r=historical.import_status(db,"test","A",f["url"],"2026-11-24","Ошибка",False)
+            self.assertEqual(r["success"],"2026-11-23")
+            self.assertEqual(r["files"],[f])
+            self.assertEqual(r["checked"],"2026-11-24")
     def test_workbook(self):
         b=openpyxl.Workbook();s=b.active
         s.append(["Валовой региональный продукт в текущих основных ценах, млн руб."])

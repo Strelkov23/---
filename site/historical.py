@@ -92,7 +92,7 @@ def region_like(v):
 # Selection is intentionally conservative: only exact indicator concepts and explicit units.
 SPECS=[
  ("GRP","Валовой региональный продукт в текущих основных ценах",r"валов(?:ой|ого) региональн(?:ый|ого) продукт",r"(?:млн\.?\s*руб|миллионов рублей)",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|формирование"),
- ("INV","Инвестиции в основной капитал в фактически действовавших ценах",r"инвестици[ияй] в основной капитал",r"млн\.?\s*руб",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|без субъект|не относящ"),
+ ("INV","Инвестиции в основной капитал в фактически действовавших ценах",r"инвестици[ияй] в основной капитал",r"(?:млн\.?\s*руб|миллионов рублей)",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|без субъект|не относящ|малого предпринимательства|квартал"),
  ("POP","Численность населения",r"численность (?:постоянного )?населения",r"тыс\.?\s*человек",r"трудоспособ|среднегод|городск|сельск|возраст|прирост|мужчин|женщин"),
 ]
 # Exact files found in the official source catalogue in the 2026-11-24 build.
@@ -110,6 +110,29 @@ def candidates_for(code,pat,exclude,sources):
             if f["format"]=="xlsx" and re.search(pat,norm(f["title"])) and not re.search(exclude,norm(f["title"])) and all(x["url"]!=f["url"] for x in matches):
                 matches.append(f)
     return matches
+def import_candidates(code,pat,unit,exclude,sources,fetch=None):
+    """Try a bounded set of actual published candidates, not guessed filenames."""
+    fetch=fetch or get
+    errors=[]
+    for f in candidates_for(code,pat,exclude,sources)[:3]:
+        try:
+            raw,_=fetch(f["url"],24_000_000)
+            rows=parse_vrp(raw) if code=="GRP" and f["url"]==DIRECT_FILES["GRP"] else parse_xlsx(raw,code,pat,unit,exclude)
+            if not rows:raise ValueError("Не распознана однозначная таблица")
+            return rows,f["url"],errors
+        except Exception as e:errors.append(f["url"]+" · "+str(e)[:100])
+    raise ValueError("; ".join(errors)[:600] or "Нет подходящего файла в каталоге")
+def import_status(db,code,title,url,stamp,status,success,files=None):
+    """Persist actual attempt and most recent success independently, also across failed builds."""
+    old=db.execute("select success,files from hist_sources where code=?",(code,)).fetchone()
+    if success:
+        saved=stamp
+        kept=files or []
+    else:
+        saved=old[0] if old else None
+        kept=json.loads(old[1]) if old else []
+    db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,saved,status,json.dumps(kept,ensure_ascii=False)))
+    return dict(code=code,title=title,url=url,checked=stamp,success=saved,status=status,files=kept)
 def parse_vrp(raw):
     """Read the observed Rosstat workbook layout; each title and its unit must match.
     Preserve note markers, named territory variants and the sheet period.
@@ -356,17 +379,18 @@ def publish(db,stamp,out,refresh):
     n=store(seed,regional_seed.SOURCE,regional_seed.TITLE,"Росстат · опубликованный бюллетень, текстовая транскрипция")
     sources.append(dict(code="nw_bulletin_2026q1",title=regional_seed.TITLE,url=regional_seed.SOURCE,checked=None,success=None,status="Транскрипция опубликованных таблиц: "+str(n)+" наблюдений; повторная доступность PDF не подтверждена",files=[]))
     if refresh:
-        # At most one official workbook for each concept per run; no guessing of columns.
+        # Try up to three catalogued official workbooks per concept, retaining prior successes.
         for code,title,pat,unit,exclude in SPECS:
             matches=candidates_for(code,pat,exclude,sources)
-            if matches:
-                f=matches[0]
-                try:
-                    raw,_=get(f["url"],24_000_000);rows=parse_vrp(raw) if code=="GRP" and f["url"]==DIRECT_FILES["GRP"] else parse_xlsx(raw,code,pat,unit,exclude)
-                    if not rows:raise ValueError("Не распознана однозначная таблица")
-                    n=store(rows,f["url"],title,"Росстат · прямой импорт")
-                    sources.append(dict(code="import_"+code,title=title,url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
-                except Exception as e:sources.append(dict(code="import_"+code,title=title,url=f["url"],checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
+            if not matches:continue
+            url=matches[0]["url"]
+            try:
+                rows,url,errors=import_candidates(code,pat,unit,exclude,sources)
+                n=store(rows,url,title,"Росстат · прямой импорт")
+                if not n:raise ValueError("Нет однозначных наблюдений")
+                sources.append(import_status(db,"import_"+code,title,url,stamp,"Ключей: "+str(n)+(f"; отклонено альтернатив: {len(errors)}" if errors else ""),True,[dict(url=url,title=title,format="xlsx")]))
+            except Exception as e:
+                sources.append(import_status(db,"import_"+code,title,url,stamp,"Ошибка: "+str(e)[:400],False))
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
         budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
         for f in budget_files[:3]:
@@ -374,17 +398,20 @@ def publish(db,stamp,out,refresh):
                 raw,_=get(f["url"],35_000_000);rows=parse_budget(raw,unquote(urlsplit(f["url"]).path.rsplit("/",1)[-1]))
                 if not rows:raise ValueError("Годовая форма 0503117 не распознана")
                 n=store(rows,f["url"],"Федеральный бюджет","Казначейство · прямой импорт")
-                sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
-            except Exception as e:sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
+                sources.append(import_status(db,"budget_import_"+hashlib.sha256(f["url"].encode()).hexdigest()[:12],"Годовое исполнение бюджета",f["url"],stamp,"Ключей: "+str(n),True,[f]))
+            except Exception as e:sources.append(import_status(db,"budget_import_"+hashlib.sha256(f["url"].encode()).hexdigest()[:12],"Годовое исполнение бюджета",f["url"],stamp,"Ошибка: "+str(e)[:160],False))
         # EMISS publisher-coded historical archives: preserve every dimension and cite the primary portal.
         for code,(title,agency,unit) in emiss_archive.SPECS.items():
             url=emiss_archive.resource(code)
             try:
                 rows,url=emiss_archive.retrieve(code,get,numeric,year)
                 n=store(rows,url,title,agency+" · ЕМИСС, архив НЦСЭД (CC BY)")
-                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
+                if not n:raise ValueError("Нет однозначных наблюдений")
+                sources.append(import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ключей: "+str(n),True,[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
-                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
+                failed=import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ошибка: "+str(e)[:250],False)
+                if not failed["files"]:failed["files"]=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]
+                sources.append(failed)
         # Backfill up to three not-yet-loaded sections per refresh to keep builds bounded. Afterwards rotate one per day.
         # Use published provider ZIPs with exact original indicator and unit, not derived values.
         sections=[]
@@ -414,6 +441,15 @@ def publish(db,stamp,out,refresh):
                 status="Ошибка: "+str(e)[:160]
                 db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,status,"[]"))
                 sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status=status,files=[]))
+    # Include historical check metadata even if this build used cached data.
+    present={s["code"] for s in sources}
+    for code,checked,success,status,raw_files in db.execute("select code,checked,success,status,files from hist_sources"):
+        if code in present or not code.startswith(("import_","emiss_","budget_import_")):continue
+        files=json.loads(raw_files);url=files[0]["url"] if files else None
+        if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
+            title=emiss_archive.SPECS[code[6:]][0];url=emiss_archive.primary(code[6:])
+        else:title=files[0]["title"] if files else code
+        if url:sources.append(dict(code=code,title=title,url=url,checked=checked,success=success,status=status,files=files))
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):

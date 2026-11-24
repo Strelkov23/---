@@ -33,14 +33,25 @@ def trusted(url):
     except ValueError:return False
 
 def http_check(url):
+    if not trusted(url):return url,"unchecked","Вне списка публичных источников"
+    headers={"User-Agent":"EconomicsMonitor/1.0","Accept":"text/html,application/pdf,*/*"}
     try:
-        req=Request(url,headers={"User-Agent":"EconomicsMonitor/1.0","Accept":"text/html,application/pdf,*/*","Range":"bytes=0-1023"})
-        with urlopen(req,timeout=8) as r:
-            return url,"ok",str(r.status)
+        try:
+            # A range response is useful for files; some servers reject range requests.
+            with urlopen(Request(url,headers=dict(headers,Range="bytes=0-1023")),timeout=8) as r:
+                return url,"ok",str(r.status)
+        except HTTPError as e:
+            if e.code!=416:raise
+            # Retry a normal GET for range incompatibility only, never for access restrictions.
+            with urlopen(Request(url,headers=headers),timeout=8) as r:
+                return url,"ok",str(r.status)+" (без Range)"
     except HTTPError as e:
         status="missing" if e.code in (404,410) else "restricted" if e.code in (401,403,429,451) else "error"
         return url,status,str(e.code)
-    except Exception as e:return url,"error",type(e).__name__
+    except Exception as e:
+        import ssl
+        cause=getattr(e,"reason",e)
+        return url,"error",("TLS: сертификат не подтверждён" if isinstance(cause,ssl.SSLCertVerificationError) else type(cause).__name__)
 
 def scan(out):
     pages={p.relative_to(out).as_posix():Page(p.read_text(encoding="utf-8")) for p in out.rglob("*.html")}
