@@ -1,0 +1,38 @@
+name: FRP source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/frp-source-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect public aggregate statistics section
+        run: |
+          python3 - <<'PY'
+          from urllib.request import Request,urlopen
+          from html.parser import HTMLParser
+          from collections import Counter
+          class Inspect(HTMLParser):
+              def __init__(self):super().__init__();self.stack=[];self.hits=[]
+              def handle_starttag(self,t,a):
+                  if t not in ('meta','link','input','img','br','hr','source','area','wbr','base','embed','param','col','track'):self.stack.append((t,dict(a).get('class','')))
+              def handle_endtag(self,t):
+                  for i in range(len(self.stack)-1,-1,-1):
+                      if self.stack[i][0]==t:self.stack=self.stack[:i];break
+              def handle_data(self,s):
+                  v=' '.join(s.split())
+                  if any(x in v.lower() for x in ('общая сумма займов','выданных займов','объём будущих','инвестиции предприятий','увеличивших выпуск','будет создано','будут поданы','объём выручки')):self.hits.append((v,self.stack[-8:]))
+          for url in ('https://www.frprf.ru/?a=2','https://frprf.ru/','https://www.frprf.ru/'):
+              try:
+                  with urlopen(Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=20) as f:
+                      raw=f.read(10000001);print('RESPONSE',f.geturl(),len(raw))
+                  if len(raw)>10000000:raise ValueError('oversized')
+                  p=Inspect();p.feed(raw.decode('utf-8-sig'));print('HITS',p.hits[:30])
+                  if p.hits:break
+              except Exception as e:print('UNAVAILABLE',url,type(e).__name__,str(e))
+          PY
