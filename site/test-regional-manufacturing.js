@@ -24,3 +24,12 @@ assert.equal(M.calculate({groups,rows:full.rows.filter(x=>x.group!=='mining_tota
 assert.equal(M.calculate(full,'mining_total',2024,S.sample).nationalShare,100);
 assert.equal(M.calculate(full,'energy_total',2024,S.sample).rows.get('московская область').localization,1);
 console.log('Industry atlas: section denominators cannot be interchanged');
+
+const base={region:a,level:'Регион',okato:'1',oktmo:'2',version:'v20260313',group:'coal',year:2022,value:100,share:20,localization:1.5};
+const end={...base,year:2024,value:150,share:25,localization:2};
+assert.deepEqual(M.changeBetween(base,end),{from:2022,to:2024,valueDelta:50,nominalChange:50,shareDelta:5,localizationDelta:.5});
+assert.equal(M.changeBetween(base,{...end,okato:'3'}),null);
+assert.equal(M.changeBetween(base,{...end,group:'heat'}),null);
+assert.equal(M.changeBetween({...base,value:0},end).nominalChange,null);
+assert.equal(M.changeBetween(base,{...end,value:null,share:null}).shareDelta,null);
+assert.equal(M.changeBetween(end,base),null);
