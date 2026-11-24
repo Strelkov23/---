@@ -59,8 +59,11 @@ def make(out):
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])
         add("forecast",s["code"],s["title"]+" — статистическая экстраполяция",s["unit"],"месячная" if s["monthly"] else "годовая","Россия",len(s["results"]),first,last,s["source"],None,s.get("checked"),s["status"],"derived","forecast.html","forecast.json","Целевые периоды, не факты; исходный последний факт: "+str(s["last"])+"; диапазоны описательные")
+    metadata=load(out,"wdi-metadata.json")
     for r in rows:
         r.update(method_passports.describe(r))
+        provider=metadata["rows"].get(r["code"],{}) if r["group"]=="wdi" else {}
+        r.update(provider_definition=provider.get("sourceNote",""),provider_organization=provider.get("sourceOrganization",""),provider_metadata_seen=provider.get("seen"),provider_metadata_status=metadata["status"] if r["group"]=="wdi" else "")
         if r["mode"]=="manual":r["checked"]=None;r["success"]=None
     ids=[r["id"] for r in rows]
     if len(ids)!=len(set(ids)):raise ValueError("Duplicate data registry identifiers")
