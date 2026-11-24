@@ -181,6 +181,8 @@ import freshness
 freshness.publish(page,out,m.now())
 import stat_revisions
 stat_revisions.publish(page,out,Path('../history/published'),m.now())
+import consistency
+consistency.publish(page,out,m.now())
 provenance.publish(page,out,m.now())
 routes.publish(out)
 

@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import quality_gate as q
+import consistency as cs
 import food_balance as f
 import electricity_balance as e
 import facility_data as fd
@@ -40,6 +41,7 @@ class QualityTests(unittest.TestCase):
         fd.publish(self.out,self.prev,"2026-11-24",False)
         sr.publish(self.out,self.prev,"2026-11-24",False)
         dg.publish(self.out,self.prev,"2026-11-24",False)
+        self.put("consistency.json",cs.create(self.data["national.json"],self.data["cbr.json"],json.loads((self.out/"sme-regions.json").read_text()),"2026-11-24"))
         with sqlite3.connect(":memory:") as db:
             f.publish(lambda *args:None,self.out,f.sync(db,"2026-11-24T00:00:00+00:00",False))
             e.publish(self.out,e.sync(db,"2026-11-24T00:00:00+00:00",False))

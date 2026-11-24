@@ -36,7 +36,7 @@ jobs:
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py
+          python3 -m unittest test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           node test-regional-disparities.js

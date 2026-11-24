@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -164,6 +164,13 @@ def check(out,previous,stamp):
         counts.update(stat_revisions.quality(data["stat-revisions.json"]))
     except (ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("Пересмотры статистики: "+str(e))
+    try:
+        import consistency
+        d=data["consistency.json"]
+        if d!=consistency.create(nat,cbr,data["sme-regions.json"],d["built"]):raise ValueError("Результаты не воспроизводятся")
+        for k,v in d["counts"].items():counts["consistency_"+k]=v
+        if d["counts"].get("расхождение"):warnings.append("Сверки: "+str(d["counts"]["расхождение"])+" расхождений; см. consistency.html")
+    except (ValueError,KeyError,TypeError) as e:issues.append("Сверки: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
