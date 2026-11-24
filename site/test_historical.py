@@ -50,6 +50,23 @@ class HistoricalTests(unittest.TestCase):
         self.assertTrue(all("fedstat.ru/indicator/61483" in x["note"] for x in r))
         with self.assertRaises(ValueError):
             emiss_archive.parse(gzip.compress(b"unknown;foo\n1;2\n"),"61483",historical.numeric,historical.year)
+    def test_direct_files_and_emiss_fallback(self):
+        import emiss_archive,gzip
+        from unittest.mock import patch
+        self.assertIn("VRP_s1998.xlsx",historical.candidates_for("GRP","grp","bad",[])[0]["url"])
+        links=historical.discover('<a href="/storage/mediabank/VRP_s1998.xlsx"> XLSX</a>',"https://rosstat.gov.ru/statistics/accounts")
+        self.assertEqual(links[0]["title"],"VRP_s1998.xlsx")
+        self.assertTrue(historical.allowed("https://datalakeiepru-s3-storage-public.storage.yandexcloud.net/fedstatru/data/parquet/61483.parquet"))
+        import pyarrow as pa, pyarrow.parquet as pq
+        table=pa.table({"region":["Москва"],"year":[2020],"value":[100.0],"unit":["рубль"]})
+        buf=io.BytesIO();pq.write_table(table,buf)
+        def get(url,limit):
+            if url.endswith(".parquet"):return buf.getvalue(),""
+            raise ValueError("Unavailable")
+        rows,url=emiss_archive.retrieve("61483",get,historical.numeric,historical.year)
+        self.assertTrue(url.endswith(".parquet"))
+        self.assertEqual(rows[0]["value"],100)
+        self.assertEqual(rows[0]["sheet"],"61483.parquet")
     def test_seed(self):
         import regional_seed
         rows=list(regional_seed.rows())

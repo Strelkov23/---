@@ -4,7 +4,7 @@ Keep source URLs, sheet/cell coordinates, original units and explicit failure st
 import json,re,io,math,ssl,hashlib,zipfile,csv
 from pathlib import Path
 from html.parser import HTMLParser
-from urllib.parse import urljoin,urlsplit,unquote
+from urllib.parse import urljoin,urlsplit,unquote,quote,urlunsplit
 from urllib.request import Request,urlopen
 from datetime import date
 from collections import defaultdict
@@ -37,7 +37,7 @@ def norm(v):return " ".join(str(v if v is not None else "").lower().replace("ё"
 def allowed(url):
     try:
         u=urlsplit(url);h=u.hostname or ""
-        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h=="storage.yandexcloud.net" or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru")))
+        return u.scheme=="https" and not u.username and not u.password and u.port in (None,443) and (h in ("storage.yandexcloud.net","datalakeiepru-s3-storage-public.storage.yandexcloud.net","repository.nsedc.ru") or any(h==d or h.endswith("."+d) for d in ("rosstat.gov.ru","fedstat.ru","roskazna.gov.ru","cbr.ru","budget.gov.ru")))
     except ValueError:return False
 class Anchors(HTMLParser):
     def __init__(self):super().__init__(convert_charrefs=True);self.links=[];self.href=None;self.label=[]
@@ -53,7 +53,9 @@ def get(url,limit):
     context=ssl.create_default_context()
     cert=Path(__file__).with_name("rosstat-root.pem")
     if cert.exists():context.load_verify_locations(cafile=str(cert))
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.3"}),timeout=18,context=context) as r:
+    p=urlsplit(url)
+    encoded=urlunsplit((p.scheme,p.netloc,quote(p.path,safe="/%:@!()*+,;=-._~"),quote(p.query,safe="%=&+/:?"),""))
+    with urlopen(Request(encoded,headers={"User-Agent":"EconomicsMonitor/2.3"}),timeout=18,context=context) as r:
         if not allowed(r.geturl()):raise ValueError("Перенаправление вне источников")
         b=r.read(limit+1)
         if len(b)>limit:raise ValueError("Превышен размер")
@@ -64,7 +66,9 @@ def discover(raw,base):
         url=urljoin(base,href)
         path=unquote(urlsplit(url).path).lower()
         if allowed(url) and re.search(r"\.(xlsx|xls|csv|zip|rar|pdf)$",path):
-            result[url]={"url":url,"title":title or unquote(path.rsplit("/",1)[-1]),"format":path.rsplit(".",1)[-1]}
+            filename=unquote(urlsplit(url).path.rsplit("/",1)[-1])
+            meaningful=re.sub(r"[\ue000-\uf8ff]","",title).strip()
+            result[url]={"url":url,"title":filename if not meaningful or meaningful.lower() in ("xlsx","xls","csv","zip","rar","pdf") else title,"format":path.rsplit(".",1)[-1]}
     return list(result.values())
 def numeric(v):
     if isinstance(v,bool) or v is None:return None
@@ -87,6 +91,21 @@ SPECS=[
  ("INV","Инвестиции в основной капитал в фактически действовавших ценах",r"инвестици[ияй] в основной капитал",r"млн\.?\s*руб",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|без субъект|не относящ"),
  ("POP","Численность населения",r"численность (?:постоянного )?населения",r"тыс\.?\s*человек",r"трудоспособ|среднегод|городск|сельск|возраст|прирост|мужчин|женщин"),
 ]
+# Exact files found in the official source catalogue in the 2026-11-24 build.
+DIRECT_FILES={
+ "GRP": "https://rosstat.gov.ru/storage/mediabank/VRP_s1998.xlsx",
+ "INV": "https://rosstat.gov.ru/storage/mediabank/Invest_sub_2000-2025.xlsx",
+}
+def candidates_for(code,pat,exclude,sources):
+    matches=[]
+    if code in DIRECT_FILES:
+        url=DIRECT_FILES[code]
+        matches.append({"url":url,"title":url.rsplit("/",1)[-1],"format":"xlsx"})
+    for source in sources:
+        for f in source["files"]:
+            if f["format"]=="xlsx" and re.search(pat,norm(f["title"])) and not re.search(exclude,norm(f["title"])) and all(x["url"]!=f["url"] for x in matches):
+                matches.append(f)
+    return matches
 def parse_xlsx(raw,code,pattern,unit,exclude):
     import openpyxl
     book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
@@ -227,7 +246,7 @@ def publish(db,stamp,out,refresh):
     if refresh:
         # At most one official workbook for each concept per run; no guessing of columns.
         for code,title,pat,unit,exclude in SPECS:
-            matches=[f for s in sources for f in s["files"] if f["format"]=="xlsx" and re.search(pat,norm(f["title"])) and not re.search(exclude,norm(f["title"]))]
+            matches=candidates_for(code,pat,exclude,sources)
             if matches:
                 f=matches[0]
                 try:
@@ -249,10 +268,9 @@ def publish(db,stamp,out,refresh):
         for code,(title,agency,unit) in emiss_archive.SPECS.items():
             url=emiss_archive.resource(code)
             try:
-                raw,_=get(url,18_000_000)
-                rows=emiss_archive.parse(raw,code,numeric,year)
+                rows,url=emiss_archive.retrieve(code,get,numeric,year)
                 n=store(rows,url,title,agency+" · ЕМИСС, архив НЦСЭД (CC BY)")
-                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="CSV (архив НЦСЭД)",format="csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
+                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
         # One bounded independent processed archive per update; rotate sections.

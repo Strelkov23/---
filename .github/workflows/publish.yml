@@ -19,6 +19,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Restore archive and build
         run: |
           unzip -q EconomicsPages.zip -d monitor
@@ -26,7 +29,7 @@ jobs:
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
-          python3 -m pip install openpyxl==3.1.5
+          python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
           python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
