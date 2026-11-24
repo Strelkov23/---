@@ -34,13 +34,13 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  let exactId=new URLSearchParams(location.search).get('id')||'';
  const p=()=>({exactId,methodLevel:$('registry-method-level').value,q:$('registry-q').value,group:$('registry-group').value,mode:$('registry-mode').value,availability:$('registry-availability').value,onlySelected:$('registry-selected').checked});
  try{
-  const data=await load('data-registry.json'),rows=data.rows,ids=new Set(rows.map(r=>r.id));saved=new Set([...saved].filter(x=>ids.has(x)));
+  const manifest=await Provenance.validateManifest(await load('data-manifest.json')),verifiedRegistry=await Provenance.get(manifest,'data-registry.json',root),data=verifiedRegistry.data,rows=data.rows,ids=new Set(rows.map(r=>r.id));saved=new Set([...saved].filter(x=>ids.has(x)));
   const group=$('registry-group');group.add(new Option('Все наборы',''));for(const [k,n] of Object.entries(data.groups))group.add(new Option((labels[k]||k)+' ('+n+')',k));
   const list=$('registry-list'),size=20;let index=0,filtered=[],exporting=false;
   const link=(label,url)=>{const a=document.createElement('a');a.textContent=label;a.href=url;return a};
   const line=(label,value)=>{const p=document.createElement('p');const b=document.createElement('strong');b.textContent=label+': ';p.append(b,fmt(value));return p};
   function selectedStatus(){$('registry-save-status').textContent='Сохранено рядов: '+saved.size+(storage?' · локально в браузере':' · только в текущей вкладке');$('registry-export-selected').disabled=!saved.size;$('registry-clear').disabled=!saved.size;$('registry-values').disabled=exporting||!saved.size||saved.size>20}
-  function download(name,items){const fields=['id','group','code','title','unit','frequency','territory','count','first','last','source','checked','success','status','mode','page','file','note','classification','method_version','method_level','measurement_kind','method_definition','method_formula','method_caution','method_url','method_anchor','provider_definition','provider_organization','provider_metadata_seen'];csv(name,[['Сборка каталога',data.built],fields,...items.map(r=>fields.map(k=>r[k]))])}
+  function download(name,items){const fields=['id','group','code','title','unit','frequency','territory','count','first','last','source','checked','success','status','mode','page','file','note','classification','method_version','method_level','measurement_kind','method_definition','method_formula','method_caution','method_url','method_anchor','provider_definition','provider_organization','provider_metadata_seen'];csv(name,[['Сборка каталога',data.built],['Отпечаток данных',manifest.data_fingerprint],['SHA-256 каталога',verifiedRegistry.sha256],fields,...items.map(r=>fields.map(k=>r[k]))])}
   function draw(){
    filtered=DataRegistry.filter(rows,p(),saved);const pages=Math.max(1,Math.ceil(filtered.length/size));index=Math.min(index,pages-1);
    list.replaceChildren();
@@ -49,7 +49,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     article.append(line('Набор',labels[r.group]||r.group),line('Код',r.code),line('Единицы и частота',r.unit+' · '+r.frequency),line('Охват',r.territory+' · '+r.count+' записей · '+fmt(r.first)+' — '+fmt(r.last)),line('Режим',modes[r.mode]),line('Последнее успешное получение / проверка источника',r.success),line('Последняя попытка',r.checked),line('Статус',r.status));
     if(r.note)article.append(line('Описание',r.note));
     const method=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Методика и ограничения';method.append(summary,line('Тип показателя',r.measurement_kind),line('Уровень описания',({explained:'Локальное пояснение; не полная верификация методики',source:'Требуется изучить методику первоисточника',calculated:'Расчёт сайта'})[r.method_level]),line('Определение',r.method_definition),line('Формула или способ получения',r.method_formula),line('Сопоставимость',r.method_caution),line('Версия паспорта',r.method_version),link('Метаданные источника',r.method_url),' · ',link('Методология сайта',r.method_anchor));if(r.group==='wdi'){method.append(line('Статус метаданных WDI',r.provider_metadata_status),line('Дата получения определения',r.provider_metadata_seen));if(r.provider_definition)method.append(line('Оригинальное определение WDI (EN)',r.provider_definition));if(r.provider_organization)method.append(line('Поставщик данных (EN)',r.provider_organization))}article.append(method);
-    const actions=document.createElement('div');actions.className='registry-actions';actions.append(link('Открыть раздел',r.page),link('Файл данных',r.file),link('Первоисточник',r.source));
+    const actions=document.createElement('div');actions.className='registry-actions';actions.append(link('Открыть раздел',r.page),link('Файл данных',pinned?root+(['capital','capacity'].includes(r.group)?'capital-data.json':r.file):r.file),link('Первоисточник',r.source));
     const button=document.createElement('button');button.type='button';button.textContent=saved.has(r.id)?'Убрать из сохранённых':'Сохранить ряд';button.setAttribute('aria-pressed',String(saved.has(r.id)));button.onclick=()=>{if(saved.has(r.id))saved.delete(r.id);else saved.add(r.id);persist();if(p().onlySelected)draw();else{button.textContent=saved.has(r.id)?'Убрать из сохранённых':'Сохранить ряд';button.setAttribute('aria-pressed',String(saved.has(r.id)));selectedStatus()}};
     actions.append(button);article.append(actions);list.append(article);
    }
@@ -65,11 +65,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const cache=new Map(),values=[];
     for(const r of selection){
      const path=['capital','capacity'].includes(r.group)?'capital-data.json':r.file;
-     if(!cache.has(path))cache.set(path,await load(path));
-     values.push(...DataRegistry.observations(r,cache.get(path)));
+     if(!cache.has(path))cache.set(path,await Provenance.get(manifest,path,root));
+     const source=cache.get(path);
+     values.push(...DataRegistry.observations(r,source.data).map(v=>({...v,data_fingerprint:manifest.data_fingerprint,source_file:path,source_file_sha256:source.sha256,registry_sha256:verifiedRegistry.sha256,source_revision:manifest.source_revision})));
     }
     if(!values.length){status.textContent='В выбранных рядах нет наблюдений.';return}
-    const fields=['id','title','kind','period','territory','unit','value','low','high','source','seen','note','method_version','method_level','measurement_kind','method_formula','method_caution','method_url','method_anchor','provider_definition','provider_organization','provider_metadata_seen'];
+    const fields=['id','title','kind','period','territory','unit','value','low','high','source','seen','note','method_version','method_level','measurement_kind','method_formula','method_caution','method_url','method_anchor','provider_definition','provider_organization','provider_metadata_seen','data_fingerprint','source_file','source_file_sha256','registry_sha256','source_revision'];
     csv('data-registry-observations.csv',[fields,...values.map(v=>fields.map(k=>v[k]))]);
     status.textContent='Выгружено строк: '+values.length+'; рядов в подборке: '+selection.length+'.';
    }catch(e){status.textContent='Выгрузка остановлена: '+e.message;console.error(e)}
@@ -78,5 +79,5 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   $('registry-form').addEventListener('input',()=>{exactId='';index=0;draw()});$('registry-form').addEventListener('submit',e=>e.preventDefault());$('registry-reset').onclick=()=>{$('registry-form').reset();exactId='';index=0;draw()};
   $('registry-prev').onclick=()=>{index--;draw()};$('registry-next').onclick=()=>{index++;draw()};$('registry-export').onclick=()=>download('data-registry-filtered.csv',filtered);$('registry-export-selected').onclick=()=>download('data-registry-selection.csv',rows.filter(r=>saved.has(r.id)));$('registry-clear').onclick=()=>{saved.clear();persist();draw()};
   draw();
- }catch(e){console.error(e);$('registry-status').textContent='Каталог недоступен. Откройте полный CSV или раздел источников.'}
+ }catch(e){console.error(e);$('registry-status').textContent='Каталог не подтверждён: '+e.message+'. Откройте текущую сборку или раздел источников.'}
 });
