@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const {chartTickIndices,chartWrap,chartAdjacent}=require('./chart-export.js');
+assert.deepEqual(chartTickIndices(0),[]);
+assert.deepEqual(chartTickIndices(1),[0]);
+assert.deepEqual(chartTickIndices(3),[0,1,2]);
+assert.deepEqual(chartTickIndices(20,5),[0,5,10,14,19]);
+assert.deepEqual(chartWrap('Очень длинный заголовок',8,s=>s.length),['Очень','длинный','заголово','к']);
+const lines=chartWrap('https://example.com/'+('x'.repeat(100)),15,s=>s.length);assert.ok(lines.every(s=>s.length<=15));
+assert.equal(chartAdjacent('2024-12','2025-01',true),true);
+assert.equal(chartAdjacent('2024-12','2025-02',true),false);
+assert.equal(chartAdjacent(2020,2022),false);
+console.log('Chart layout tests passed');
