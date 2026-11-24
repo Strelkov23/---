@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),L=require('./labor-calibration.js');
+const m={names:['A','B, quote "x"'],output:[100000,200000],demand:[50000,100000],effects:[[100000,20000],[50000,100000]]};
+const header='group_id,group_name,year,output_million_rub,annual_fte,source\n',a='1,A,2021,100000,1000,https://example.org/a\n',b='2,"B, quote ""x""",2021,200000,4000,"source, table"\n';
+const rows=L.parse('\uFEFF'+header+b+a,m);
+assert.deepEqual(rows.map(r=>r.intensity),[10,20]);
+assert.deepEqual(L.multipliers(m,[10,20]).map(r=>r.perBillion),[40,22]);
+for(const text of [header+a,header+a+a,header+a+b.replace('4000',''),header+a+b.replace('200000','200001'),header+a+b.replace('2021','2022'),header+a+b.replace('"source, table"',''),header+a+b.replace('4000','NaN')])assert.throws(()=>L.parse(text,m));
+assert.throws(()=>L.parseCSV('"unterminated'));
+assert.equal(L.multipliers({...m,demand:[0,100000]},[10,20])[0].perBillion,null);
+console.log('Labor calibration tests passed');
