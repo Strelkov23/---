@@ -77,3 +77,73 @@ jobs:
           assert len({r["indicator"] for r in results[0]})>=7
           print("TOTAL VERIFIED OBSERVATIONS",sum(map(len,results)),flush=True)
           PY
+
+      - name: Verify persisted regional catalogue and browser comparisons
+        if: github.head_ref == 'stage-02-regional-comparison' || github.event_name == 'workflow_dispatch'
+        working-directory: monitor
+        run: |
+          python3 - <<'PY'
+          import historical as h, sqlite3, json
+          from pathlib import Path
+          from unittest.mock import patch
+          from concurrent.futures import ThreadPoolExecutor
+          from datetime import datetime,timezone
+          tasks=[("vrp",h.DIRECT_FILES["GRP"])]
+          tasks += [(n,h.MIRROR+"data_"+code+"_socio_economic_102_v20260313.zip") for n,code in h.REGIONAL_ZIPS.items()]
+          def fetch(task):
+              name,url=task
+              raw,enc=h.get(url,35000000)
+              return url,(raw,enc)
+          with ThreadPoolExecutor(max_workers=2) as pool: cache=dict(pool.map(fetch,tasks))
+          # Only verified files are served for this integration test. Other sources are deliberately offline.
+          def get(url,limit):
+              if url not in cache:raise ValueError("Source not part of this test")
+              raw,enc=cache[url]
+              assert len(raw)<=limit
+              return raw,enc
+          db=sqlite3.connect("regional-integration.db")
+          stamp=datetime.now(timezone.utc).isoformat()
+          out=Path("public")
+          with patch("historical.get",side_effect=get):
+              h.publish(db,stamp,out,True)
+              count=db.execute("select count(*) from hist_values").fetchone()[0]
+              h.publish(db,stamp,out,True)
+              assert count==db.execute("select count(*) from hist_values").fetchone()[0],"Repeated import duplicated observations"
+          db.close()
+          catalog=json.loads((out/"historical.json").read_text())
+          total=0
+          for s in catalog["series"]:
+              rows=json.loads((out/s["file"]).read_text())["values"]
+              assert len(rows)==s["count"]==len({(r["region"],r["year"]) for r in rows})
+              total+=len(rows)
+          print("PERSISTED REGIONAL OBSERVATIONS",total,"SERIES",len(catalog["series"]),"DB BYTES",Path("regional-integration.db").stat().st_size,flush=True)
+          assert total>=50000 and len(catalog["series"])>=25
+          assert Path("regional-integration.db").stat().st_size<85000000
+          s=next(x for x in catalog["series"] if x["code"].startswith("GRP_") and x["title"]=="ВРП в текущих ценах")
+          from urllib.parse import urlencode
+          query=urlencode({"hist-series":s["code"],"hist-region":"Белгородская область","hist-peer":"Брянская область","hist-mode":"base","hist-from":"2016","hist-to":"2024","hist-rank-year":"2024"})
+          Path("/tmp/regional-query.txt").write_text(query)
+          PY
+          cd public
+          python3 -m http.server 8765 > /tmp/regional-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/historical.html > /dev/null
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=12000 --dump-dom "http://localhost:8765/historical.html?$(cat /tmp/regional-query.txt)" > /tmp/regional-dom.html
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("/tmp/regional-dom.html").read_text()
+          assert "совместных лет: 9" in s
+          assert "2016 = 100" in s
+          assert "Территорий в срезе:" in s
+          assert "Разность A − B" in s
+          print("REGIONAL BROWSER COMPARISON PASSED")
+          PY
+      - name: Check current public deployment
+        if: github.head_ref == 'stage-02-regional-comparison'
+        continue-on-error: true
+        run: |
+          for route in version.txt historical.html historical.json quality.json regions/; do
+            echo "PUBLIC $route"
+            curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
+            if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
+          done
