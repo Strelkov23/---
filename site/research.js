@@ -54,6 +54,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
     table($('month-list'),['Месяц','Индекс, %','Прирост г/г, %','Источник'],rows)
    }else $('month-list').textContent='Нет доступных наблюдений';
+   try{
+    const data=await load('cbr.json');
+    for(const [code,m] of Object.entries(data)){
+     const host=node('article',''),latest=m.values.at(-1),monthly=new Map();
+     for(const r of m.values)monthly.set(r.date.slice(0,7),r);
+     host.append(node('h3',m.title),node('p',latest?f(latest.value)+' '+m.unit+' · '+latest.date:'Нет наблюдений'),node('p',m.status+' · проверено: '+(m.checked||'—')),a('Первоисточник',m.source),document.createTextNode(' · '),a('Запрос данных',m.query));
+     const details=node('details',''),body=node('div',''),summary=node('summary','Последние 36 месяцев');details.append(summary,body);
+     table(body,['Месяц','Дата последнего наблюдения',m.unit],[...monthly.entries()].slice(-36).reverse().map(([k,r])=>[k,r.date,f(r.value)]));host.append(details);
+     const b=node('button','Скачать дневные наблюдения CSV');b.disabled=!m.values.length;b.onclick=()=>csv('cbr-'+code+'.csv',[['Дата','Значение','Единица','Источник','Проверено UTC'],...m.values.map(r=>[r.date,r.value,m.unit,m.source,m.success])]);host.append(b);$('cbr-list').append(host)
+    }
+   }catch{$('cbr-list').textContent='Данные Банка России недоступны в этой версии.'}
   }catch(e){console.error(e);$('stat-status').textContent=missing}
  }
  if($('diag-form')){
