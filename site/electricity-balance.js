@@ -12,7 +12,8 @@ function scenario(v,p){
  const available=generation+net-m.gap;
  return {generation,demand,net,available,gap:available-demand,requiredNetImport:demand-generation+m.gap,baselineGap:m.gap};
 }
-return {metrics,scenario};
+function fuelSummary(v,b,keys){const totalOf=x=>keys.every(k=>Number.isFinite(x[k])&&x[k]>=0)?keys.reduce((s,k)=>s+x[k],0):null;const total=totalOf(v),base=totalOf(b);return {total,change:total!==null&&base!==null?total-base:null,growth:total!==null&&base!==null&&base>0?100*(total/base-1):null,shares:Object.fromEntries(keys.map(k=>[k,total>0?100*v[k]/total:null]))}}
+return {metrics,scenario,fuelSummary};
 })();
 if(typeof module!=='undefined')module.exports=ElectricityBalance;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -22,9 +23,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  try{
   const manifest=await Provenance.validateManifest(await load('data-manifest.json')),verified=await Provenance.get(manifest,'electricity-balance.json',root),d=verified.data;
   $('electricity-status').textContent=d.status+' · последняя попытка: '+(d.checked||'—')+' · успешная: '+(d.success||'—')+' · лет с наблюдениями: '+d.rows.length;
+  renderFuels(d,manifest,verified,$,fmt);
   if(!d.rows.length)return;
   const byYear=new Map(d.rows.map(r=>[r.year,r.values])),min=Math.min(...byYear.keys()),max=Math.max(...byYear.keys()),years=Array.from({length:max-min+1},(_,i)=>min+i),keys=Object.keys(d.metrics);
-  for(const r of d.rows.slice().reverse())year.add(new Option(r.year,r.year));
+  for(const r of d.rows.filter(r=>keys.some(k=>Number.isFinite(r.values[k]))).slice().reverse())year.add(new Option(r.year,r.year));
   const t=document.createElement('table'),h=t.createTHead().insertRow(),b=t.createTBody();
   for(const label of ['Год',...Object.values(d.metrics),'Выработка + чистый импорт − спрос, ТВт·ч','Чистый импорт / спрос, %']){
    const th=document.createElement('th');th.scope='col';th.textContent=label;h.append(th)
@@ -51,3 +53,19 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   clear();
  }catch(e){$('electricity-status').textContent='Набор не подтверждён: '+e.message}
 });
+
+function renderFuels(d,manifest,verified,$,fmt){
+ const host=$('fuel-table'),status=$('fuel-status'),exp=$('fuel-export');if(!host)return;
+ const labels=d.fuels||{},keys=Object.keys(labels),src=d.rows.filter(r=>keys.some(k=>Number.isFinite(r.values[k])));
+ if(keys.length!==3||!src.length){status.textContent='Нет загруженных наблюдений по добыче; '+d.status;return}
+ const byYear=new Map(src.map(r=>[r.year,r.values])),start=Math.min(...byYear.keys()),end=Math.max(...byYear.keys()),years=Array.from({length:end-start+1},(_,i)=>start+i);
+ const rows=years.map(y=>{const v=byYear.get(y)||{};return {y,v,...ElectricityBalance.fuelSummary(v,byYear.get(y-1)||{},keys)}});
+ const table=document.createElement('table'),head=table.createTHead().insertRow(),body=table.createTBody();
+ for(const label of ['Год',...Object.values(labels),'Сумма трёх топлив, ТВт·ч','Изменение суммы, ТВт·ч','Прирост суммы, %',...Object.values(labels).map(x=>x+' — доля, %')]){const th=document.createElement('th');th.scope='col';th.textContent=label;head.append(th)}
+ for(const r of rows.slice().reverse()){const tr=body.insertRow();for(const v of [r.y,...keys.map(k=>fmt(r.v[k])),fmt(r.total),fmt(r.change),fmt(r.growth),...keys.map(k=>fmt(r.shares[k]))])tr.insertCell().textContent=v}
+ host.replaceChildren(table);status.textContent='Полных лет: '+rows.filter(r=>r.total!==null).length+' из '+rows.length+' · '+d.status;
+ chartTools($('fuel-charts'),'Добыча ископаемого топлива России — энергосодержание','ТВт·ч',years,keys.map(k=>({name:labels[k],code:k,values:rows.map(r=>r.v[k]??null)})),{source:'OWID Energy, Energy Institute и другие источники',url:d.metadata});
+ exp.disabled=false;exp.onclick=()=>csv('fossil-production.csv',[
+ ['Год',...keys.map(k=>k+' (ТВт·ч)'),'Сумма трёх топлив (ТВт·ч)','Изменение суммы (ТВт·ч)','Прирост суммы (%)',...keys.map(k=>k+' доля (%)'),'Источник','SHA-256 CSV','SHA-256 JSON','Отпечаток набора'],
+ ...rows.map(r=>[r.y,...keys.map(k=>r.v[k]??null),r.total,r.change,r.growth,...keys.map(k=>r.shares[k]),d.source,d.source_sha256,verified.sha256,manifest.data_fingerprint])]);
+}

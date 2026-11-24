@@ -61,6 +61,14 @@ def describe(r):
         if g=="capital":definition,formula,caution=CAPITAL[c.rsplit(".",1)[1]]
         else:definition="Использование среднегодовой производственной мощности, без субъектов малого предпринимательства.";formula="100 × фактический выпуск / среднегодовая мощность; готовый показатель таблицы 16.5.";caution="Незагруженная доля 100−U не равна резерву к выпуску (100/U−1)×100. Резерв условный; не коэффициент баланса 2021."
         level="explained";anchor="methodology.html#capital-data-method"
+    elif g=="energy":
+        definition=r["title"]+". Годовой ряд OWID Energy для ISO RUS."
+        formula="Импорт готового значения в ТВт·ч; не пересчёт из тонн или кубометров."
+        caution="Топливное энергосодержание и электрическая выработка не суммируются. Не официальный ряд Росстата. "+r.get("note","")
+        if c=="oil_production_twh":caution+=" Включает конденсат, газовые жидкости и другие жидкие топлива."
+        if c=="gas_production_twh":caution+=" Не включает сожжённый в факелах или возвращённый газ."
+        level="explained";method_url="https://catalog.ourworldindata.org/energy/owid_energy/"
+        anchor="methodology.html#fossil-production-method" if c.endswith("_production_twh") else "methodology.html#electricity-balance-method"
     elif g=="fbs":
         definition=r["title"]+". Натуральная величина в определении FAOSTAT FBS."
         formula="Опубликованная величина, не пересчитывается сайтом; P+M−X−ΔS=D, положительная ΔS — накопление."
@@ -116,6 +124,7 @@ MODELS=[
 ("forecast.html","forecast-method","Статистический прогноз","Выбор по MAE и контроль","Не структурный прогноз."),
 ("forecast.html","forecast-range-method","Диапазоны и сводка","Контроль попаданий","Не вероятность покрытия."),
 ("capital.html","capital-data-method","Фонды и мощности","Учётные и физические показатели","Не автоматическая калибровка."),
+("industrial.html","fossil-production-method","Добыча топлива","Сумма трёх топлив, доли и годовой прирост","Энергосодержание, не электричество и не полный баланс."),
 ("food-balance.html","food-balance-method","Натуральный продовольственный баланс","P+M−X−ΔS и сценарное покрытие потребности","Оценки FAO, не запасы в наличии и не прогноз розничного дефицита."),
 ("cost-structure.html","cost-structure-method","Структура затрат и прямой сценарий","Доли расходов и взвешенное изменение при неизменном выпуске","Не цена, прибыль или межотраслевой эффект."),
 ("finance.html","finance-method","Рентабельность организаций","Опубликованные отношения и изменение в п.п.","Не маржа к выручке; отрицательная величина без числа не вычисляется."),

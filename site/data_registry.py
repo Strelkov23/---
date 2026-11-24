@@ -81,6 +81,12 @@ def make(out):
             if not vals:continue
             first,last=bounds(r["year"] for r in vals)
             add("fbs",code+"."+key,items[0]["title"]+" — "+title,"тыс. т","годовая","Россия",len(vals),first,last,items[0]["source"],fbs["checked"],fbs["success"],fbs["status"],"auto" if fbs["mode"]=="official_archive" else "manual","food-balance.html","food-balance.json","Оценки FAOSTAT; флаги и примечания в файле. Режим: "+fbs["mode"],"FBS")
+    energy=load(out,"electricity-balance.json")
+    for key,title in {**energy["metrics"],**energy.get("fuels",{})}.items():
+        vals=[r for r in energy["rows"] if key in r["values"]]
+        first,last=bounds(r["year"] for r in vals)
+        page="industrial.html#fossil-production" if key in energy.get("fuels",{}) else "industrial.html#electricity-balance"
+        add("energy",key,title,"ТВт·ч","годовая","Россия",len(vals),first,last,energy["source"],energy["checked"],energy["success"],energy["status"],"auto",page,"electricity-balance.json","OWID Energy; энергосодержание топлива отдельно от электричества; не официальная российская статистика.","OWID")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])

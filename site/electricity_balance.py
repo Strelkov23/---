@@ -12,11 +12,13 @@ METRICS={"electricity_generation_twh":"Выработка электроэнер
          "electricity_net_imports_twh":"Чистый импорт (импорт минус экспорт)",
          "electricity_demand_twh":"Спрос на электроэнергию"}
 G,N,D=METRICS
+FUELS={"coal_production_twh":"Добыча угля (энергосодержание)","oil_production_twh":"Добыча нефти и жидких топлив (энергосодержание)","gas_production_twh":"Добыча природного газа (энергосодержание)"}
+ALL_METRICS={**METRICS,**FUELS}
 LIMIT=30_000_000
 
 def parse(raw,max_year):
     reader=csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
-    required={"iso_code","year",*METRICS}
+    required={"iso_code","year",*ALL_METRICS}
     if not required<=set(reader.fieldnames or []) or len(set(reader.fieldnames))!=len(reader.fieldnames):
         raise ValueError("OWID schema changed")
     rows=[];seen=set()
@@ -26,7 +28,7 @@ def parse(raw,max_year):
         if not 1992<=y<=max_year:continue
         if y in seen:raise ValueError("Duplicate Russian year")
         seen.add(y);values={}
-        for k in METRICS:
+        for k in ALL_METRICS:
             raw_value=r[k]
             if raw_value is None:raise ValueError("Truncated CSV row")
             if not raw_value.strip():continue
@@ -36,6 +38,7 @@ def parse(raw,max_year):
         if values:rows.append({"year":y,"values":values})
     if sum(all(k in r["values"] for k in METRICS) for r in rows)<5:
         raise ValueError("Insufficient common-year coverage")
+    if any(sum(k in r["values"] for r in rows)<5 for k in FUELS):raise ValueError("Insufficient fuel production coverage")
     return sorted(rows,key=lambda r:r["year"])
 
 def keys(rows):
@@ -51,7 +54,8 @@ def fetch(max_year):
 def sync(db,stamp,refresh):
     db.execute("create table if not exists electricity_snapshot(id integer primary key check(id=1),checked text,success text,status text,payload text,sha text)")
     old=db.execute("select checked,success,status,payload,sha from electricity_snapshot where id=1").fetchone()
-    due=not old or datetime.fromisoformat(stamp)>=datetime.fromisoformat(old[0])+timedelta(days=14 if old[0]==old[1] else 1)
+    expand=bool(old and old[3] and not set(FUELS)<={k for r in json.loads(old[3]) for k in r["values"]})
+    due=not old or (expand and old[0]==old[1]) or datetime.fromisoformat(stamp)>=datetime.fromisoformat(old[0])+timedelta(days=14 if old[0]==old[1] else 1)
     if refresh and due:
         try:
             rows,sha=fetch(int(stamp[:4]))
@@ -61,7 +65,7 @@ def sync(db,stamp,refresh):
         except Exception as e:
             with db:db.execute("insert into electricity_snapshot values(1,?,null,?,null,null) on conflict(id) do update set checked=excluded.checked,status=excluded.status",(stamp,"Ошибка: "+str(e)[:180]))
     old=db.execute("select checked,success,status,payload,sha from electricity_snapshot where id=1").fetchone()
-    return dict(rows=json.loads(old[3]) if old and old[3] else [],checked=old[0] if old else None,success=old[1] if old else None,status=old[2] if old else "Ожидается первая загрузка",source_sha256=old[4] if old else None,source=SOURCE,metadata=CATALOG,metrics=METRICS,unit="TWh")
+    return dict(rows=json.loads(old[3]) if old and old[3] else [],checked=old[0] if old else None,success=old[1] if old else None,status=old[2] if old else "Ожидается первая загрузка",source_sha256=old[4] if old else None,source=SOURCE,metadata=CATALOG,metrics=METRICS,fuels=FUELS,unit="TWh")
 
 def publish(out,data):
     (out/"electricity-balance.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")

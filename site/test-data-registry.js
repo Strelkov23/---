@@ -22,3 +22,6 @@ const debt={id:'debt:payable',group:'debt',code:'payable',territory:'Росси�
 const debtRows=R.observations(debt,{coverage:'test',debt:[{period:'2025-12',payable:100,table:'5'},{period:'2026-01',payable:110,table:'12'}]});
 assert.deepEqual(debtRows.map(x=>x.value),[100,110]);
 assert.equal(debtRows[0].period,'2025-12');
+
+const energy={...w,group:'energy',code:'gas_production_twh',count:1};
+assert.equal(R.observations(energy,{rows:[{year:2021,values:{gas_production_twh:70}},{year:2022,values:{}}],source:w.source,source_sha256:'a'}).at(0).value,70);
