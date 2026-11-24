@@ -191,6 +191,11 @@ with sync_playwright() as p:
             assert page.locator("#facility-list article").count()>0
             page.locator("#facility-query").fill("zzzz_no_such_facility")
             assert page.locator("#facility-list article").count()==0
+        page.wait_for_function("!document.querySelector('#sme-status').textContent.startsWith('Загрузка')",timeout=30000)
+        if page.locator("#sme-status").inner_text().startswith("Срез:"):
+            assert page.locator("#sme-map svg").count()==1
+            page.locator("#sme-metric").select_option("workers")
+            assert "Работники" in page.locator("#sme-map svg").text_content()
         page.goto("http://localhost:8765/glossary.html",wait_until="load")
         assert page.locator("#glossary-list article").count()>=20
         page.locator("#glossary-query").fill("ВРП")

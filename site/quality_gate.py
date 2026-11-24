@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -138,6 +138,14 @@ def check(out,previous,stamp):
         counts.update(fc);warnings.extend(fw)
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("Производственные площадки: "+str(e))
+    try:
+        import sme_regions
+        old_file=previous/"sme-regions.json"
+        old=json.loads(old_file.read_text(encoding="utf-8")) if old_file.is_file() else None
+        sc,sw=sme_regions.quality(data["sme-regions.json"],old)
+        counts.update(sc);warnings.extend(sw)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("МСП: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

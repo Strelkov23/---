@@ -158,3 +158,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #facility-map [role=button]{cursor:pointer}#facility-map [role=button]:focus circle{stroke:#e3a14d;stroke-width:3px}#facility-list article{overflow-wrap:anywhere}#facility-status{overflow-wrap:anywhere}
 
 .geo-profile{margin-top:1rem;padding:.75rem;border:1px solid #cfdcdb;border-radius:.4rem}.geo-profile summary{cursor:pointer;font-weight:650}.geo-profile table{min-width:700px}.geo-profile button{margin-top:.75rem}
+
+#sme-map path[role=button]{cursor:pointer}#sme-map path[role=button]:focus{stroke:#a24724;stroke-width:2}#sme-status,#sme-detail{overflow-wrap:anywhere}#sme-table table{min-width:650px}

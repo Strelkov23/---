@@ -6,6 +6,7 @@ import quality_gate as q
 import food_balance as f
 import electricity_balance as e
 import facility_data as fd
+import sme_regions as sr
 import sqlite3
 
 class QualityTests(unittest.TestCase):
@@ -34,6 +35,7 @@ class QualityTests(unittest.TestCase):
         }
         for name,value in self.data.items():self.put(name,value)
         fd.publish(self.out,self.prev,"2026-11-24",False)
+        sr.publish(self.out,self.prev,"2026-11-24",False)
         with sqlite3.connect(":memory:") as db:
             f.publish(lambda *args:None,self.out,f.sync(db,"2026-11-24T00:00:00+00:00",False))
             e.publish(self.out,e.sync(db,"2026-11-24T00:00:00+00:00",False))
