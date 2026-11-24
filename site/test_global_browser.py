@@ -462,6 +462,20 @@ with sync_playwright() as p:
         else:
             page.wait_for_function("document.querySelector('#park-status').textContent.startsWith('Каталог ещё не загружен')",timeout=30000)
             assert page.locator("#park-export").is_disabled()
+        certs=json.loads(Path("park-certificates.json").read_text())
+        if certs["rows"]:
+            page.wait_for_function("document.querySelector('#cert-status').textContent.startsWith('Документы:')",timeout=30000)
+            assert page.locator("#cert-table tbody tr").count()==len(certs["rows"])
+            page.locator("#cert-query").fill(certs["rows"][0]["number"])
+            assert page.locator("#cert-table tbody tr").count()>=1
+            with page.expect_download() as cd:
+                page.locator("#cert-export").click()
+            assert cd.value.suggested_filename=="industrial-park-certificates.csv"
+            page.locator("#cert-query").fill("unlikely certificate 999999999")
+            assert page.locator("#cert-export").is_disabled()
+        else:
+            page.wait_for_function("document.querySelector('#cert-status').textContent.startsWith('Список документов не загружен')",timeout=30000)
+            assert page.locator("#cert-export").is_disabled()
         page.goto("http://localhost:8765/regional-manufacturing.html?rm-group=light&rm-year=2024&rm-region=RU-MOS",wait_until="load")
         manufacturing=json.loads(Path("regional-manufacturing.json").read_text())
         if manufacturing["rows"]:
