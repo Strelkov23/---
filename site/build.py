@@ -94,6 +94,10 @@ with m.connect() as db:
         from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) m
         left join industry_verified v on m.period=v.period and m.value=v.value and m.url=v.url
         where m.rn=1 order by m.period""")]
+    for row in months:
+        alternative=industry.ALTERNATIVES.get(row["period"])
+        if alternative and abs(alternative[0]-row["value"])<1e-8:
+            row["alternative_url"]=alternative[1]
     write("industry.json", months)
     cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
     for c in json.loads((out/"cbr.json").read_text()).values():
