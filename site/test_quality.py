@@ -43,7 +43,9 @@ class QualityTests(unittest.TestCase):
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
-        self.put("consistency.json",cs.create(self.data["national.json"],self.data["cbr.json"],json.loads((self.out/"sme-regions.json").read_text()),"2026-11-24"))
+        import federal_budget
+        federal_budget.publish(lambda *args:None,self.out,"2026-11-25")
+        self.put("consistency.json",cs.create(self.data["national.json"],self.data["cbr.json"],json.loads((self.out/"sme-regions.json").read_text()),"2026-11-24",cs.budget_observations(self.out)))
         with sqlite3.connect(":memory:") as db:
             f.publish(lambda *args:None,self.out,f.sync(db,"2026-11-24T00:00:00+00:00",False))
             e.publish(self.out,e.sync(db,"2026-11-24T00:00:00+00:00",False))
@@ -92,6 +94,10 @@ class QualityTests(unittest.TestCase):
         self.put(file,dict(meta,values=rows))
         self.put("historical.json",dict(series=[dict(series,last=2025)],sources=[]))
         self.assertTrue(any("Охват ряда" in x for x in self.report()["errors"]))
+    def test_federal_budget_csv_mismatch(self):
+        p=self.out/"federal-budget.csv"
+        with p.open("a",encoding="utf-8") as f:f.write("2025,fake\n")
+        self.assertTrue(any("Документальный федеральный бюджет" in e for e in self.report()["errors"]))
     def test_missing(self):
         (self.out/"cbr.json").unlink()
         self.assertTrue(self.report()["errors"])
