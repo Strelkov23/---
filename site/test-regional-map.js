@@ -30,3 +30,12 @@ assert.equal(M.profileObservation(observations,null,2024,sample),null);
 
 assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_13_socio_economic_102_v20260313.zip'),'agriculture');
 assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_16_socio_economic_102_v20260313.zip'),'transport');
+
+const industrySource='https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_12_socio_economic_102_v20260313.zip';
+assert.equal(M.industryTheme('Индексы производства: производство текстильных изделий',industrySource),'light');
+assert.equal(M.industryTheme('Индексы производства: производство химических веществ',industrySource),'chemical');
+assert.equal(M.industryTheme('Производство химических веществ','https://example.org/'),null);
+assert.equal(M.industryTheme('Производство текстильных изделий и производство химических веществ',industrySource),null);
+assert.ok(M.palette('light')[4]!==M.palette('chemical')[4]);
+assert.deepEqual(M.palette('light','auto',true),M.palette('chemical','contrast',true));
+assert.equal(M.theme('new',industrySource,'Объем отгруженных товаров: металлургическое производство'),'metal');

@@ -225,7 +225,12 @@ with sync_playwright() as p:
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0
             assert page.locator("#geo-map g[role=button]").count()<=8
+            page.locator("#geo-scale").select_option("quantile")
+            page.locator("#geo-palette").select_option("contrast")
+            assert page.locator("#geo-map svg").count()==1
             page.locator("#geo-region").select_option("RU-MOW")
+            page.wait_for_function("document.querySelector('.geo-brief [role=status]').textContent.startsWith('Доступно')",timeout=30000)
+            assert page.locator(".geo-brief-item").count()==10
             page.locator("#geo-detail .geo-profile summary").click()
             page.wait_for_function("document.querySelector('#geo-detail .geo-profile [role=status]').textContent.startsWith('Доступно:')",timeout=30000)
             assert page.locator("#geo-detail .geo-profile tbody tr").count()==15

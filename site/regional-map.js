@@ -23,11 +23,49 @@ const RegionalMap=(()=>{
   return [...new Set([0,.2,.4,.6,.8,1].map(q))];
  }
  function bin(v,thresholds){if(!Number.isFinite(v)||!thresholds.length)return -1;if(thresholds.length===1)return 0;const i=thresholds.slice(1).findIndex(t=>v<=t);return i<0?thresholds.length-2:i}
- function theme(code,source=''){
+ const industryThemes=[
+ ['light','Лёгкая промышленность','ЛП',/производств[ао]\s+(?:текстильн[а-я]*|одежд[а-я]*|кожи|кожаных изделий)|текстильное и швейное производство/iu],
+ ['chemical','Химическая промышленность','ХИМ',/производств[ао]\s+химическ|химическое производство/iu],
+ ['food','Пищевая промышленность','ПИЩ',/производств[ао]\s+пищевых продуктов|производств[ао]\s+напитков/iu],
+ ['metal','Металлургия','МЕТ',/металлургическ[а-я]+\s+производств[ао]/iu],
+ ['machinery','Машиностроение','МАШ',/производств[ао]\s+(?:машин и оборудования|автотранспортных средств|прочих транспортных средств|электрического оборудования|компьютеров,? электронных)/iu],
+ ['energy','Энергетика','ЭН',/обеспечени[ея]\s+электрической энергией|производств[ао]\s+и распределени[ея]\s+электроэнергии/iu]];
+ function industryTheme(title,source){
+  if(!/\/data_12_socio_economic_102_v20260313\.zip$/.test(String(source)))return null;
+  const t=String(title||'').toLowerCase().replaceAll('ё','е');
+  const matches=industryThemes.filter(x=>x[3].test(t));return matches.length===1?matches[0][0]:null
+ }
+ const palettes={
+  economy:['#e8f3fb','#b6d9ee','#75b5db','#367fb8','#124577'],
+  industry:['#f4e7df','#e7bd9c','#cf8e59','#a65c31','#703311'],
+  light:['#f9e8f1','#ebbad5','#d985b6','#a84c89','#762559'],
+  chemical:['#f0eafa','#d5c4ec','#b49cdb','#8061ba','#4b2e83'],
+  food:['#fff4cf','#f5d88a','#dcb14d','#ad7b12','#704b07'],
+  metal:['#e8edf2','#bfcbd7','#8da3b7','#536f8b','#263f57'],
+  machinery:['#e4f4f8','#aadce7','#68b8ca','#277e96','#104c66'],
+  energy:['#fff2d9','#ffd19c','#f4a458','#c96519','#87340c'],
+  agriculture:['#edf4d7','#c9dea2','#91bd67','#548b36','#2d551c'],
+  investment:['#f4edfa','#d9c6e9','#b09ad2','#8263b2','#503980'],
+  labor:['#e2f4f0','#b1ddd1','#6fbbaa','#368b79','#155b4e'],
+  budget:['#eee9fa','#d6caed','#b6a0db','#8065b4','#503584'],
+  people:['#fff0ec','#f8c8be','#e99b90','#bf605c','#823639'],
+  construction:['#fcf0db','#f1d09b','#d8a657','#ac7933','#724915'],
+  trade:['#e2f3ee','#b0dcd0','#70b9a5','#358b75','#155844'],
+  transport:['#edf0fa','#c7d2ed','#92a9d7','#577ab7','#294a82'],
+  innovation:['#f6e9f6','#e1c5e2','#c39ac6','#9a619f','#64386c'],
+  enterprises:['#e7f0f3','#b5d3dc','#81b2c0','#4c8495','#255563'],
+  contrast:['#fff4cb','#f5c36b','#cf873e','#895b8b','#34235d'],
+  all:['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953']};
+ function palette(theme,choice='auto',growth=false){
+  if(growth)return ['#a53e35','#e8a39b','#f0f0ed','#a3d6bc','#207a57'];
+  return [...(palettes[choice==='auto'?theme:choice]||palettes.all)]
+ }
+ function theme(code,source='',title=''){
+ const sub=industryTheme(title,source);if(sub)return sub;
  const section=String(source).match(/\/data_(11|13|14|15|16|18)_socio_economic_102_v20260313\.zip$/)?.[1];
  if(section)return {'11':'enterprises','13':'agriculture','14':'construction','15':'trade','16':'transport','18':'innovation'}[section];
  if(/^(GRP_|NW_GRP_|R_024d9416ea6f54dc_|R_7e8fd799d1d06897_|R_f54f02504bfb051e_)/.test(code))return 'economy';
- if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code))return 'industry';
+ if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code)||/\/data_12_socio_economic_102_v20260313\.zip$/.test(source))return 'industry';
  if(/^R_(66b96177c45a01ad|6887143295c72599|88230ed30f2f2738|90575f546cc99ce3)_/.test(code))return 'investment';
  if(/^R_(65254a01945743d3|a4138d558584b81a|b8ff4db9a1b3092e|e8fd80380742955e)_/.test(code))return 'labor';
  if(/^R_(510509d40d0cb785|77976ed27f49b4fd|8728bc736516e87c|b7f9afa8b1ac06d9)_/.test(code))return 'budget';
@@ -48,7 +86,7 @@ const RegionalMap=(()=>{
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,isGrowth,growthBin,displayName,profileObservation,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,isGrowth,growthBin,displayName,profileObservation,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -58,7 +96,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const fmtValue=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumSignificantDigits:6}):'нет данных';
  const link=(t,u)=>{const a=node('a',t);a.href=u;a.target='_blank';a.rel='noopener noreferrer';return a};
  let catalog=[],geo=null,meta=null,series=null,seq=0,first=true;
- const colors=['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953'];
+ const palettePick=$('geo-palette');
  const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers'),regionPick=$('geo-region');
  let chosenRegion=saved.get('geo-region')||'';
  const profileEnabled=Boolean($('geo-region')),profileCache=new Map();
@@ -109,7 +147,34 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    }finally{busy=false}
   }
  }
- const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region'].filter(id=>$(id))];
+ function addBrief(f){
+  if(!profileEnabled)return;
+  const box=node('section','');box.className='geo-brief';box.append(node('h4','Последние доступные сведения о регионе'));
+  const state=node('p','Загрузка справки…');state.setAttribute('role','status');box.append(state);
+  const cards=node('div','');cards.className='geo-brief-grid';box.append(cards);details.append(box);
+  const y=new Date().getUTCFullYear();
+  const primary=[['Численность населения','R_f39e59bbabc208f3_4c391d1044'],['ВРП на человека','GRP_PC_95b8dd2585'],['Промышленный индекс','R_347ab451705a6d33_031d7fe105'],['Безработица','R_a4138d558584b81a_1db3db8e79']];
+  const subsectors=RegionalMap.industryThemes.map(([id,label,symbol])=>{
+   const candidates=catalog.filter(s=>RegionalMap.theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||b.count-a.count);
+   return [label,candidates[0]?.code,id,symbol]
+  });
+  async function item([label,code,id,symbol]){
+   const card=node('article','');card.className='geo-brief-item';if(id){const icon=node('span',symbol);icon.className='sector-symbol';icon.style.background=RegionalMap.palette(id)[4];card.append(icon)}card.append(node('strong',label));cards.append(card);
+   const m=catalog.find(s=>s.code===code);
+   if(!m||!f.key){card.append(node('p','Нет сопоставимого ряда'));return false}
+   try{
+    const data=await profileFile(m.file),r=RegionalMap.profileObservation(data.values,f.key,y,RegionalStats.sample);
+    if(!r){card.append(node('p','Нет наблюдения для региона'));return false}
+    card.append(node('p',fmtValue(r.value)+' '+m.unit),node('small',String(r.year)+' · '+m.title));if(/^https?:\/\//i.test(data.source))card.append(link('Источник',data.source));
+    return true
+   }catch{card.append(node('p','Ряд не удалось проверить'));return false}
+  }
+  Promise.all([...primary,...subsectors].map(item)).then(results=>{
+   if(!box.isConnected)return;
+   state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
+  })
+ }
+ const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region','geo-palette'].filter(id=>$(id))];
  function draw(){
   if(!geo||!series)return;
   host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
@@ -120,7 +185,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const features=geo.features.map(feature=>{const f={...feature,properties:feature.properties||{}};const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
   const matched=features.filter(x=>x.r),unmapped=[...sample.out].filter(([key])=>counts.get(key)!==1);
   const thresholds=RegionalMap.classes(matched.map(x=>x.r.value));
-  const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code)),palette=growth?['#a53e35','#e8a39b','#f0f0ed','#a3d6bc','#207a57']:colors;
+  const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code)),theme=RegionalMap.theme(series.code,series.source,series.title),palette=RegionalMap.palette(theme,palettePick?.value||'auto',growth);if(palettePick)palettePick.disabled=growth;
   if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code);if(!RegionalMap.isGrowth(series.code))growthPick.value='quantile'}
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
   source.replaceChildren(node('p',series.title+' · '+series.unit+' · '+series.kind),link('Статистический первоисточник',series.source),document.createTextNode(' · '),link('Описание границ и лицензия',meta.documentation),node('p','Границы: '+meta.license+' · получены '+String(meta.downloaded||'—').slice(0,10)+' · '+(meta.status==='cached'?'сохранённая копия':'загруженный файл')));
@@ -138,7 +203,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
   const select=f=>{const p=f.f.properties,r=f.r;chosenRegion=p.iso_3166_2||'';if(regionPick)regionPick.value=chosenRegion;for(const e of svg.querySelectorAll('[data-region]')){if(e.dataset.region===chosenRegion)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
     if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}
-    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1)addProfile(f,Y);save(activeFields)};
+    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1){addBrief(f);addProfile(f,Y)}else if(profileEnabled){details.append(node('p','Для этого контура нет однозначного соответствия статистике.'));}save(activeFields)};
   for(const f of polygons){
    const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
    if(!d)continue;
@@ -153,8 +218,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const mean=ring.reduce((s,p)=>[s[0]+p[0]/ring.length,s[1]+p[1]/ring.length],[0,0]);
     const [u,v]=ring.reduce((a,p)=>Math.hypot(p[0]-mean[0],p[1]-mean[1])<Math.hypot(a[0]-mean[0],a[1]-mean[1])?p:a,ring[0]);
     const g=shape('g',{transform:'translate('+x(u)+' '+y(v)+')',role:'button',tabindex:0,'aria-label':'Региональный показатель: '+f.r.region+' '+fmtValue(f.r.value)});
-    shape('circle',{r:10,fill:'#173e52',stroke:'#fff','stroke-width':1.5},undefined,g);
-    shape('path',{d:'M-6 5 V-1 L-2 1 V-4 L2 -1 V-6 H5 V5 Z',fill:'#fff'},undefined,g);
+    const symbol=RegionalMap.industryThemes.find(t=>t[0]===theme)?.[2]||'ТОП';
+    shape('circle',{r:13,fill:RegionalMap.palette(theme)[4],stroke:'#fff','stroke-width':1.5},undefined,g);
+    shape('text',{x:0,y:3,'font-size':8,'font-weight':'bold','text-anchor':'middle',fill:'#fff'},symbol,g);
     shape('title',{},'Региональная статистика, не предприятие: '+f.r.region+' · '+fmtValue(f.r.value),g);
     g.addEventListener('click',()=>select(f));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(f)}});
    }
@@ -196,14 +262,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(!['ok','cached'].includes(meta.status)){status.textContent='Файл границ пока недоступен; используйте тепловые карты и территориальные таблицы.';source.append(link('Документация источника',meta.documentation),node('p',meta.error||''));return}
   [geo,catalog]=await Promise.all([mapLoad('regional-boundaries.geojson'),mapLoad('historical.json').then(x=>x.series.filter(s=>s.regions>=3))]);
   function populate(preferred){
-   const subset=catalog.filter(s=>!themePick||themePick.value==='all'||RegionalMap.theme(s.code,s.source)===themePick.value);
+   const subset=catalog.filter(s=>!themePick||themePick.value==='all'||(RegionalMap.theme(s.code,s.source,s.title)===themePick.value||(themePick.value==='industry'&&RegionalMap.industryThemes.some(t=>t[0]===RegionalMap.theme(s.code,s.source,s.title)))));
    pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.kind,s.code)));
    if(subset.some(s=>s.code===preferred))pick.value=preferred;
    else {const def=subset.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code}
    if(!subset.length){status.textContent='В этом слое нет загруженных рядов.';host.replaceChildren();details.replaceChildren();csvButton.disabled=true;return false}
    return true
   }
-  if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code,requested.source);restore(['geo-theme','geo-scale','geo-markers']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
-  populate(saved.get('geo-series'));restore(['geo-series']);pick.onchange=choose;year.onchange=draw;if(growthPick)growthPick.onchange=draw;if(markerPick)markerPick.onchange=draw;form.onsubmit=e=>e.preventDefault();choose()
+  if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code,requested.source,requested.title);restore(['geo-theme','geo-scale','geo-markers','geo-palette']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
+  populate(saved.get('geo-series'));restore(['geo-series']);pick.onchange=choose;year.onchange=draw;if(growthPick)growthPick.onchange=draw;if(markerPick)markerPick.onchange=draw;if(palettePick)palettePick.onchange=draw;form.onsubmit=e=>e.preventDefault();choose()
  }catch(e){console.error(e);status.textContent='Географические данные недоступны для этой версии. Откройте текущую сборку или используйте таблицы.'}
 });

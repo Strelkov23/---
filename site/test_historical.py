@@ -24,6 +24,9 @@ class HistoricalTests(unittest.TestCase):
         rows=historical.mirror_rows(f.getvalue(),"grp")
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]["value"],10.5)
+    def test_industrial_activity_selection(self):
+        rows=[dict(indicator="A",title="Индексы промышленного производства: ОКВЭД2",unit="%"),dict(indicator="B",title="Индексы производства: производство текстильных изделий",unit="%"),dict(indicator="C",title="Объем отгруженных товаров: производство химических веществ",unit="млн руб.")]
+        self.assertEqual({r["indicator"] for r in historical.select_mirror(rows,"industry")},{"A","B","C"})
     def test_new_sector_selection(self):
         rows=[dict(indicator="A",title="Оборот розничной торговли",unit="млн руб."),dict(indicator="B",title="Иной показатель",unit="человек")]
         self.assertEqual([r["indicator"] for r in historical.select_mirror(rows,"trade")],["A"])

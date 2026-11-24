@@ -204,6 +204,13 @@ MIRROR_PRIORITY={
  "transport":[r"^перевозки грузов автомобильным транспортом",r"^грузооборот автомобильного транспорта",r"^плотность автомобильных дорог общего пользования",r"^перевозки пассажиров автобусами"],
  "innovation":[r"^внутренние затраты на исследования и разработки",r"^численность персонала,? занятого исследованиями и разработками",r"^уровень инновационной активности организаций",r"^объем инновационных товаров, работ, услуг"]
 }
+INDUSTRY_ACTIVITY=[
+ r"производств[ао]\s+(?:текстильн[а-я]*|одежд[а-я]*|кожи|кожаных изделий)|текстильное и швейное производство",
+ r"производств[ао]\s+химическ|химическое производство",
+ r"производств[ао]\s+пищевых продуктов|производств[ао]\s+напитков",
+ r"металлургическ[а-я]+\s+производств[ао]",
+ r"производств[ао]\s+(?:машин и оборудования|автотранспортных средств|прочих транспортных средств|электрического оборудования|компьютеров,? электронных)",
+ r"обеспечени[ея]\s+электрической энергией|производств[ао]\s+и распределени[ея]\s+электроэнергии"]
 def select_mirror(rows,section,limit=4):
     by=defaultdict(list)
     for r in rows:by[r["indicator"]].append(r)
@@ -216,6 +223,12 @@ def select_mirror(rows,section,limit=4):
     if not picked and section not in {'enterprises','agriculture','construction','trade','transport','innovation'}:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
+    if section=='industry':
+        used=set(picked[:limit])
+        for pat in INDUSTRY_ACTIVITY:
+            candidates=[(k,v) for k,v in by.items() if k not in used and re.search(pat,norm(v[0]['title'])) and re.search(r'^индекс|^объем отгруженных',norm(v[0]['title']))]
+            for k,v in sorted(candidates,key=lambda item:(-len(item[1]),item[0]))[:2]:
+                selected.extend(v);used.add(k)
     # Include a separate nationwide budget unit only when its exact indicator title is selected.
     if section=="finance":
         titles={r["title"] for r in selected}
@@ -378,6 +391,10 @@ def publish(db,stamp,out,refresh):
         for section in REGIONAL_ZIPS:
             saved=db.execute("select success from hist_sources where code=?",("mirror_"+section,)).fetchone()
             if not saved or not saved[0]:sections.append(section)
+        expanded=db.execute("select success from hist_sources where code=?",("mirror_industry_activity_v2",)).fetchone()
+        if not expanded or not expanded[0]:
+            sections=[s for s in sections if s!="industry"]
+            sections.insert(0,"industry")
         if sections:
             # A permanently failing source must not starve later sections.
             offset=date.fromisoformat(stamp[:10]).toordinal()%len(sections)
@@ -391,6 +408,7 @@ def publish(db,stamp,out,refresh):
                 if not n:raise ValueError("Нет однозначных наблюдений")
                 status="Ключей выбранных основных показателей: "+str(n)
                 db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,status,"[]"))
+                if section=="industry":db.execute("insert or replace into hist_sources values(?,?,?,?,?)",("mirror_industry_activity_v2",stamp,stamp,status,"[]"))
                 sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=stamp,status=status,files=[]))
             except Exception as e:
                 status="Ошибка: "+str(e)[:160]
