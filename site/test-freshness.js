@@ -1,1 +1,2 @@
 const assert=require('node:assert/strict'),F=require('./freshness.js'),rows=[{title:'Банк России',group:'Финансы',state:'ok'},{title:'ЕМИСС',group:'Статистика',state:'cached'}];assert.equal(F.filter(rows,'','cached','').length,1);assert.equal(F.filter(rows,'Финансы','','банк').length,1);assert.equal(F.filter(rows,'Финансы','cached','').length,0);console.log('Freshness filter tests passed');
+assert.equal(F.labels.partial,'Частичный импорт');assert.equal(F.filter([{title:'Минфин',group:'Финансы',state:'partial'}],'','partial','').length,1);
