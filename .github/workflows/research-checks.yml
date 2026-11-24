@@ -206,24 +206,31 @@ jobs:
           done
 
 
-      - name: Inspect assets capacity and finance tables
+
+      - name: Inspect alternate official editions
         if: github.head_ref == 'stage-03-assets-capacity'
         working-directory: monitor
         run: |
           python3 - <<'PY'
-          import historical as h,openpyxl,io
+          import historical as h,openpyxl,io,re
           from concurrent.futures import ThreadPoolExecutor
           names=['Nal_of_pus_ved-2024.xlsx','St_izn_of_ved-2024.xlsx','Vvod_of_ved-2024.xlsx','Urov_motsh_2017-2024.xlsx','fin_sost org_2025.xlsx','Koef_of-2024.xlsx']
-          def probe(name):
+          urls=['https://rosstat.gov.ru/storage/mediabank/'+n for n in names]
+          def probe(url):
               try:
-                  raw,_=h.get('https://www.rosstat.gov.ru/storage/mediabank/'+name,35000000)
-                  w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
-                  lines=[f'FILE {name} {len(raw)}']
-                  for s in list(w)[:5]:
-                      lines.append(f'SHEET {s.title!r} {s.max_row} {s.max_column}')
-                      for i,r in enumerate(s.iter_rows(values_only=True,max_row=13,max_col=18),1):lines.append(f'ROW {i} {r!r}'[:1400])
-                  w.close()
-                  print('\n'.join(lines),flush=True)
-              except Exception as e:print(name,type(e).__name__,str(e),flush=True)
-          with ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(probe,names))
+                  raw,enc=h.get(url,35000000)
+                  if url.endswith('.xlsx'):
+                      w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                      lines=['FILE '+url]
+                      for s in list(w)[:4]:
+                          lines.append(f'SHEET {s.title!r} {s.max_row} {s.max_column}')
+                          for i,r in enumerate(s.iter_rows(values_only=True,max_row=12,max_col=15),1):lines.append(f'ROW {i} {r!r}'[:1200])
+                      w.close()
+                      print('\n'.join(lines),flush=True)
+                  else:
+                      p=h.Anchors();p.feed(raw.decode(enc,errors='replace'))
+                      print('EDITION',url,[(label,href) for href,label in p.links if re.search(r'2025|\.xlsx|\.zip|\.xls|\.htm',href,re.I)][:100],flush=True)
+              except Exception as e:print('UNAVAILABLE',url,str(e),flush=True)
+          urls+=['https://rosstat.gov.ru/storage/mediabank/Prom_proiz_2025.htm','https://www.rosstat.gov.ru/folder/210/document/13225']
+          with ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(probe,urls))
           PY
