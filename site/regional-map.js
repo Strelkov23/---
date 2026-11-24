@@ -132,7 +132,22 @@ const RegionalMap=(()=>{
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ // Exact source title/units and same region/year; no extrapolation, no cross-year ratios.
+ const derivedSpecs=[
+  {id:'investment_intensity',title:'Инвестиции в основной капитал / ВРП',unit:'%',a:'R_88230ed30f2f2738_bf6a5a3983',b:'GRP_95b8dd2585',units:['В фактически действовавших ценах, миллионов рублей','млн руб.'],formula:'100 × инвестиции / ВРП',op:'ratio',factor:100,note:'Не доля валового накопления в ВРП.'},
+  {id:'output_per_worker',title:'ВРП на среднегодового занятого',unit:'руб./чел.',a:'GRP_95b8dd2585',b:'R_65254a01945743d3_1db3db8e79',units:['млн руб.','Тысяч человек'],formula:'1000 × ВРП / занятые',op:'ratio',factor:1000,note:'Текущие цены; не физическая производительность труда.'},
+  {id:'regional_budget_balance',title:'Сальдо консолидированного бюджета субъекта',unit:'млн руб.',a:'R_77976ed27f49b4fd_28f4b5b380',b:'R_8728bc736516e87c_28f4b5b380',units:['млн руб.','млн руб.'],formula:'Доходы − расходы',op:'difference',factor:1,note:'Арифметическое сальдо; не федеральный бюджет.'},
+  {id:'natural_increase',title:'Коэффициент естественного прироста',unit:'на 1000 чел.',a:'R_88f3fb354016c809_4c391d1044',b:'R_2308ddd83ecf600c_4c391d1044',units:['Число родившихся на 1000 человек населения','Число умерших на 1000 человек населения'],formula:'Рождаемость − смертность',op:'difference',factor:1,note:'Не учитывает миграцию.'}
+ ];
+ function deriveProfile(results){
+  const by=new Map(results.map(r=>[r.code,r]));
+  return derivedSpecs.map(spec=>{
+   const a=by.get(spec.a),b=by.get(spec.b),x=a?.r,y=b?.r;
+   const ok=x&&y&&a.unit===spec.units[0]&&b.unit===spec.units[1]&&x.region===y.region&&x.year===y.year&&Number.isFinite(x.value)&&Number.isFinite(y.value)&&x.value>=0&&y.value>=0&&(spec.op!=='ratio'||y.value>0);
+   return {...spec,inputs:[a,b],year:ok?x.year:null,region:ok?x.region:null,value:ok?(spec.op==='ratio'?spec.factor*x.value/y.value:x.value-y.value):null};
+  })
+ }
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -364,8 +379,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     filter.onchange=render;available.onchange=render;
     const exportButton=node('button','Скачать досье CSV');exportButton.type='button';
     exportButton.onclick=()=>csv('regional-profile-'+f.f.properties.iso_3166_2+'-'+Y+'.csv',[['Регион карты','Регион источника','Выбранный год','Раздел','Код','Показатель','Год наблюдения','Значение','Единица','Источник','Метод получения','Статус','Лист','Строка','Столбец','Примечание','Файл архива','SHA-256 JSON','Отпечаток манифеста'],...filtered().map(v=>[RegionalMap.displayName(f.f.properties.iso_3166_2,f.f.properties.name),v.r?.region,Y,v.group,v.code,v.title,v.r?.year,v.r?.value??'',v.unit,v.source,v.kind,v.error||(!v.r?'Нет наблюдения':v.r.year===Y?'Выбранный год':'Более ранний год'),v.r?.sheet,v.r?.row,v.r?.column,v.r?.note,v.file,manifest.files[v.file]?.sha256,manifest.data_fingerprint])]);
-    const wrap=node('div','');wrap.className='table-scroll';wrap.append(table);
-    body.replaceChildren(label,availableLabel,wrap,exportButton);render();loaded=!results.some(v=>v.error&&v.error!=='Ряд отсутствует');
+    const wrap=node('div','');wrap.className='table-scroll geo-profile-observations';wrap.append(table);
+    const derived=RegionalMap.deriveProfile(results),calc=node('section','');calc.className='geo-derived';calc.append(node('h4','Расчётные показатели'),node('p','Только при совпадении года, исходного названия территории и заданных единиц. Исходные наблюдения не заменяются расчётами.'));
+    const ct=node('table',''),ch=ct.createTHead().insertRow(),cb=ct.createTBody();for(const t of ['Показатель','Значение','Год','Формула и ограничение'])ch.append(node('th',t));
+    for(const v of derived){const tr=cb.insertRow();for(const text of [v.title,v.value===null?'Нет сопоставимой пары':fmtValue(v.value)+' '+v.unit,v.year||'—',v.formula+' · '+v.note])tr.insertCell().textContent=text}
+    const cw=node('div','');cw.className='table-scroll';cw.append(ct);calc.append(cw);
+    const calcExport=node('button','Скачать расчётные показатели CSV');calcExport.type='button';
+    calcExport.onclick=()=>csv('regional-derived-'+f.f.properties.iso_3166_2+'-'+Y+'.csv',[['Показатель','Регион источника','Год','Значение','Единица','Формула','Ограничение','Первый код','Первое значение','Первый год','Первая единица','Первый источник','Первый лист','Первая строка','Первый столбец','Первый SHA-256 JSON','Второй код','Второе значение','Второй год','Вторая единица','Второй источник','Второй лист','Вторая строка','Второй столбец','Второй SHA-256 JSON','Отпечаток манифеста'],...derived.map(v=>[v.title,v.region,v.year,v.value,v.unit,v.formula,v.note,...v.inputs.flatMap(r=>[r?.code,r?.r?.value,r?.r?.year,r?.unit,r?.source,r?.r?.sheet,r?.r?.row,r?.r?.column,manifest.files[r?.file]?.sha256]),manifest.data_fingerprint])]);calc.append(calcExport);
+    body.replaceChildren(label,availableLabel,wrap,exportButton,calc);render();loaded=!results.some(v=>v.error&&v.error!=='Ряд отсутствует');
    }catch(e){if(section.isConnected)status.textContent='Не удалось проверить досье: '+String(e.message||e)}finally{busy=false}
   }
  }
