@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-24T21:12:08+00:00",
+  "built": "2026-11-24T21:21:28+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
@@ -19,8 +19,6 @@
     "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
     "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
     "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-24T21:57:48+00:00",
-    "Правовой портал 2026-11-24",
-    "Правовой портал 2026-11-23",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -37,7 +35,7 @@
     "История · Архив регионов: agriculture · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7824,
+    "archive": 7826,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -47,9 +45,9 @@
     "cbr_USD": 741,
     "national_series": 13,
     "national_observations": 4133,
-    "historical_series": 45,
-    "historical_observations": 82838,
-    "official_files": 566,
+    "historical_series": 52,
+    "historical_observations": 86294,
+    "official_files": 560,
     "geographic_features": 86,
     "geographic_unique_codes": 83,
     "geographic_unmatched_contours": 3,
@@ -73,12 +71,12 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 0,
-    "freshness_ok": 188,
+    "freshness_ok": 190,
     "freshness_unavailable": 18,
     "freshness_waiting": 1,
     "freshness_cached": 11,
     "freshness_archive": 1,
-    "revision_builds": 2,
+    "revision_builds": 3,
     "revision_events": 0,
     "consistency_согласовано": 1443,
     "consistency_нет данных": 96,
@@ -86,12 +84,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "ade60e7c745f1fdae7cffc5c152d7deb8f46a610358ebac0097230496513925c",
-      "bytes": 3778497
+      "sha256": "df0e77c23c96e8b1c8b2aa68a2c98315e9be0b964b610c1dbe097e821243a285",
+      "bytes": 3779274
     },
     "literature.json": {
-      "sha256": "eedf06ae39248720989afbaecd9a69b68c632bdd3ed708a1381c3fedaaf62814",
-      "bytes": 5016004
+      "sha256": "1a89afb45abe6cd34835610b9e1b4f3cb4ab015b90b4e326e74355f3cc49d29f",
+      "bytes": 5030254
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -106,11 +104,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "ed9ae803b67487e8d27c90fa5f6ae82e45e9dfe32c2991af5043eb87bc52a6df",
+      "sha256": "c1acc45b0b6190f2a6764a31c64f4477d9a7e6382890a15f2cc7c9805a55a7f2",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "fdc1d9fc3cd5afda74e41b2554aee937aeab0e6a2387534c91c06e41438c727f",
+      "sha256": "4b5fab3267cd6ed5113f1b40e4eed0b6f0f172840f1f74c2a33f590fa085b201",
       "bytes": 55538
     },
     "sectors.json": {
@@ -118,27 +116,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "b5720130263e9a4199b75d2269e9eed5305ff0b26d3fe3206361625d79ed9733",
-      "bytes": 36796
+      "sha256": "c3c6badd576bc1afe4374485ae9a4bc10db7e5ff6e3d2721bb423a66d987c2c0",
+      "bytes": 36692
     },
     "links.json": {
-      "sha256": "6ad155b81d362054963a9a1a9168d129e73734b192345cc7e59ed8bec1176fb4",
-      "bytes": 1497599
+      "sha256": "a20b1b2398aad312193e4fbac8529e323fcb33f943882871aec1b4cb43fcccfa",
+      "bytes": 1498716
     },
     "national.json": {
-      "sha256": "7c6e5aa3839cc66e91312251b66b6cf44da1f83a4e3f6bc844e11f88958dcf71",
+      "sha256": "8ff16fa4c48727fb8741306b289f7e262c004186c56353e52363899499c3965e",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "feffa7445dcd9221506f706af190c0e990ac32fa850ed9a6fbf7bcd4e6010558",
-      "bytes": 111476
+      "sha256": "62f3590e6355d0a22e6a5c2c63b80b90bda986e49ff450c647f55b13af8889c1",
+      "bytes": 116542
     },
     "industrial.json": {
-      "sha256": "632164645e7699bff42f9447ca259fc7e6e30eda51655e15255859041dd66be9",
+      "sha256": "517f9a0ba99d95d7e27d87874cc4bfef7866f4ed60a07bf5692bde51af63ad08",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "bcb4faebed9b66e00eec0ea263d243ab761f09702b0f3d91ecf1f0bf9093f1f4",
+      "sha256": "40c5a691a32d23c50bc888febf45044e4107ad861891c5dd13ca8bc9c2489b0b",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -162,19 +160,19 @@
       "bytes": 12968
     },
     "district-meta.json": {
-      "sha256": "3f1346fbfc28df9da7fd3b0219a1a4b849907a53d15f03b05db67a5ffd6c68cd",
-      "bytes": 484
+      "sha256": "72dfde9aa23bebc2ad2085526147b4ac54ffb1020ce713d832cd81ea9d473bae",
+      "bytes": 508
     },
     "freshness.json": {
-      "sha256": "f3e91b4fb77451e2efbcdf0c636a855cc027a17b8b6da34256ec7f0b8d125a64",
-      "bytes": 127353
+      "sha256": "ca6048c27591ff847d807d276692675a7c67654a7d436792892ba7e5f745e70a",
+      "bytes": 128778
     },
     "stat-revisions.json": {
-      "sha256": "caf1ff2fe51b535ede65d978e1641b56a4b8e9850530bc7f2fc26288f4a4e8a7",
-      "bytes": 555
+      "sha256": "b1dcd000d9b81a6296f66f61f6135a441f3f0197268f7ae01e22b89954df9a04",
+      "bytes": 784
     },
     "consistency.json": {
-      "sha256": "a30e21ede67ad03223afba4820546be25ca23aacc0ad65dcf49cab3d19bbe218",
+      "sha256": "49274e9afe94028851dded64242e58ba771741c88fb74a1b6b965a39e83b7d9b",
       "bytes": 257217
     },
     "regional-data/GRP_95b8dd2585.json": {
@@ -216,6 +214,10 @@
     "regional-data/R_024d9416ea6f54dc_84c74d6e51.json": {
       "sha256": "d57de05929dea907909c61be337eb09218af9c7367aab27139f6583b29b092fb",
       "bytes": 1443037
+    },
+    "regional-data/R_05c763647727a568_099b62c9d9.json": {
+      "sha256": "9ce7f800be0976575489e1f84a315c73549087fd52ab3329c039327ca106c36b",
+      "bytes": 106239
     },
     "regional-data/R_1f8efa58e94578b7_fca0b9a0b9.json": {
       "sha256": "4af16b2dcd0da4246a55b3c9a027b05d8569dfc54b35c337ec778408cdfb758a",
@@ -305,6 +307,14 @@
       "sha256": "9340b117a2257630a7d047da25b09eec4c7c0fa5d09fa097a23df93798d5621f",
       "bytes": 1950885
     },
+    "regional-data/R_975b9c501d870374_099b62c9d9.json": {
+      "sha256": "13f880f83dae3e33e628fe9a1a13bcebac29b3cf2792831e3afe682f947a7c9c",
+      "bytes": 710864
+    },
+    "regional-data/R_9b96293c7c45f30c_f2cb408b61.json": {
+      "sha256": "90ecea069c741da1ce85a0ba9d10e9609c6b25be1c185791979974b2fac7967c",
+      "bytes": 462324
+    },
     "regional-data/R_a4138d558584b81a_1db3db8e79.json": {
       "sha256": "ff505c904cdbcceb3018fa5fffcd77ed54964de95371e3ecbbe7c4cfb9d2e5a2",
       "bytes": 2170968
@@ -325,6 +335,10 @@
       "sha256": "0896cd3f2655f7cf6136b71d674795f742d98738c1a0b60ed831d1be629944d8",
       "bytes": 2183636
     },
+    "regional-data/R_bcdc96d51a2791cc_f2cb408b61.json": {
+      "sha256": "221b4f068c2799c2985c349f3bf6be384a26c87efb8055f42529f65133d27370",
+      "bytes": 250161
+    },
     "regional-data/R_c4e8751efbd23309_031d7fe105.json": {
       "sha256": "90560808d6440f70cff76932bf2f7fdf47874d04dfecf56b53ee017758565159",
       "bytes": 1195185
@@ -337,6 +351,14 @@
       "sha256": "5a9de5607e24eba7cfbf695cf2d4383a72206624e22d9df1d36d5759169d9b7f",
       "bytes": 1533172
     },
+    "regional-data/R_d7e928d7b9e2a713_f2cb408b61.json": {
+      "sha256": "d255bccee6e54c74c2e5badd46ea31c97a5fe89bbc8f4fd7e85b34bb0031843d",
+      "bytes": 442852
+    },
+    "regional-data/R_e4213a365e1ad5fb_f2cb408b61.json": {
+      "sha256": "67e82fec344c1961a3abd88bdc21e78defa23754a405da647ff2b34fe182aafa",
+      "bytes": 250305
+    },
     "regional-data/R_e8fd80380742955e_1db3db8e79.json": {
       "sha256": "a7114af3bbd059ff83ccda76456b75a0ee8eab1fae6e1fedb2ef513e9e2dbe1b",
       "bytes": 2840910
@@ -348,6 +370,10 @@
     "regional-data/R_f54f02504bfb051e_84c74d6e51.json": {
       "sha256": "cf7463f9cb493c368343dc10f3a5bd8360fa4b67727416cc6529567f1205b0fb",
       "bytes": 1459610
+    },
+    "regional-data/R_f55cefbbeba36842_099b62c9d9.json": {
+      "sha256": "5c3fc57d36d7a649f80fe1935dd2e60f2fedbb823fd2bc44d8102d92f30cb1fe",
+      "bytes": 112017
     },
     "regional-data/R_fca0666f3b1929ac_1cd8b8a232.json": {
       "sha256": "ce4ae1ef15dde18f2d0f12bc5b6a01977d63a5dadb1ad188f023788404763d11",
