@@ -226,6 +226,14 @@ with sync_playwright() as p:
             page.locator("#geo-coverage summary").click()
             assert page.locator("#geo-coverage-list button").first.is_visible()
             page.locator("#geo-coverage summary").click()
+            page.locator("#geo-comparison summary").click()
+            page.locator("#geo-compare-a").select_option("RU-MOW")
+            page.locator("#geo-compare-b").select_option("RU-SPE")
+            assert page.locator("#geo-compare-result tbody tr").count()==2
+            with page.expect_download() as comparison:
+                page.locator("#geo-compare-export").click()
+            assert comparison.value.suggested_filename.startswith("regional-comparison-")
+            page.locator("#geo-comparison summary").click()
             page.locator("#geo-scale").select_option("growth")
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0

@@ -57,3 +57,9 @@ assert.equal(M.coverage(cat,'industry').count,1);
 assert.equal(M.coverage(cat,'all').count,2);
 assert.equal(M.isGrowth('new','Индексы производства','В процентах к предыдущему году'),true);
 assert.equal(M.isGrowth('new','Доля организаций','%'),false);
+
+const testItems=[{code:'a',value:10},{code:'b',value:20},{code:'c',value:20},{code:'d',value:null},{code:'z',value:0}];
+assert.deepEqual(M.compareRows(testItems,['a','b','b','d']).map(x=>[x.code,x.rank,x.difference,x.ratio]),[['a',3,0,100],['b',1,10,200],['d',null,null,null]]);
+assert.equal(M.compareRows(testItems,['z','a'])[1].ratio,null);
+assert.equal(M.compareRows(testItems,['','a'])[0].difference,null);
+assert.equal(M.compareRows(testItems,['d','a'])[1].ratio,null);

@@ -99,13 +99,23 @@ const RegionalMap=(()=>{
   if(previous.value<=0||current.value<0)return {type:'absolute',delta,base:previous.value,year:previous.year};
   return {type:'relative',delta:100*delta/previous.value,base:previous.value,year:previous.year}
  }
+ function compareRows(items,codes){
+  const ranked=items.filter(x=>Number.isFinite(x.value)).sort((a,b)=>b.value-a.value),base=items.find(x=>x.code===codes[0])?.value;
+  return [...new Set(codes.filter(Boolean))].map(code=>{
+   const item=items.find(x=>x.code===code);if(!item)return null;
+   const value=Number.isFinite(item.value)?item.value:null;
+   return {...item,value,rank:value===null?null:1+ranked.filter(x=>x.value>value).length,
+    difference:value!==null&&Number.isFinite(base)?value-base:null,
+    ratio:value!==null&&Number.isFinite(base)&&base>0&&value>=0?100*value/base:null};
+  }).filter(Boolean)
+ }
  function profileObservation(values,key,year,sample){
   if(!key||!Number.isInteger(year))return null;
   const years=[...new Set(values.map(r=>r.year).filter(y=>Number.isInteger(y)&&y<=year))].sort((a,b)=>b-a);
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,trend,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -118,6 +128,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const palettePick=$('geo-palette');
  const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers'),regionPick=$('geo-region');
  let chosenRegion=saved.get('geo-region')||'';
+ const compareIds=['geo-compare-a','geo-compare-b','geo-compare-c'].filter(id=>$(id));
  const profileEnabled=Boolean($('geo-region')),profileCache=new Map();
  let profileManifest;
  async function mapLoad(file){
@@ -213,7 +224,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    state.textContent='Доступно '+results.filter(Boolean).length+' из '+results.length+' показателей. Последние опубликованные наблюдения могут относиться к разным годам. Стрелки означают изменение показателя, а не оценку качества экономики. Наличие ряда не подтверждает текущую работу конкретных предприятий.';
   })
  }
- const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region','geo-palette'].filter(id=>$(id))];
+ const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region','geo-palette'].filter(id=>$(id)),...compareIds];
+ function clearCompare(message){const panel=$('geo-compare-result');if(panel)panel.replaceChildren(node('p',message));const b=$('geo-compare-export');if(b)b.disabled=true;for(const id of compareIds)$(id).disabled=true}
  function draw(){
   if(!geo||!series)return;
   host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
@@ -223,6 +235,28 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   for(const f of geo.features){const k=regionKey(f.properties);if(k)counts.set(k,(counts.get(k)||0)+1)}
   const features=geo.features.map(feature=>{const f={...feature,properties:feature.properties||{}};const key=regionKey(f.properties),r=key&&counts.get(key)===1?sample.out.get(key):null;return {f,key,r}});
   const matched=features.filter(x=>x.r),unmapped=[...sample.out].filter(([key])=>counts.get(key)!==1);
+  if(compareIds.length){
+   const result=$('geo-compare-result'),exp=$('geo-compare-export');
+   const items=features.filter(f=>f.key&&counts.get(f.key)===1).map(f=>({code:f.f.properties.iso_3166_2,name:regionName(f.f.properties),value:f.r?.value??null,region:f.r?.region||'',sheet:f.r?.sheet,row:f.r?.row,column:f.r?.column})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+   const available=items.filter(x=>Number.isFinite(x.value)).length;
+   for(const id of compareIds){
+    const field=$(id),old=field.value||saved.get(id)||'';field.replaceChildren(new Option('Не выбран',''),...items.map(x=>new Option(x.name+(x.value===null?' · нет данных':''),x.code)));field.disabled=false;
+    if(items.some(x=>x.code===old))field.value=old;
+   }
+   function renderCompare(){
+    const codes=compareIds.map(id=>$(id).value),rows=RegionalMap.compareRows(items,codes);
+    result.replaceChildren(node('p',series.title+' · '+Y+' г. · '+series.unit+' · '+available+' территорий с наблюдениями'));
+    exp.disabled=rows.length<2;
+    if(rows.length<2){result.append(node('p','Выберите минимум два разных региона.'));save(compareIds);return}
+    if(codes.filter(Boolean).length!==rows.length)result.append(node('p','Повторяющийся регион показан один раз.'));
+    const table=node('table',''),head=table.createTHead().insertRow(),body=table.createTBody();
+    for(const label of ['Регион','Значение','Место по величине','Разница с базой','% от базы'])head.append(node('th',label));
+    for(const r of rows){const tr=body.insertRow();for(const value of [r.name,r.value===null?'Нет наблюдения':fmtValue(r.value),r.rank===null?'—':r.rank+' из '+available,r.difference===null?'—':fmtValue(r.difference),r.ratio===null?'—':fmtValue(r.ratio)+'%'])tr.insertCell().textContent=value}
+    result.append(table,node('p',codes[0]?'База: '+(items.find(x=>x.code===codes[0])?.name||'—')+'. Разница выражена в единицах показателя; для процентных величин — в процентных пунктах. Место не означает оценку эффективности.':'Выберите базовый регион для расчёта разницы.'));
+    exp.onclick=()=>csv('regional-comparison-'+series.code+'-'+Y+'.csv',[['Год','Ряд','Показатель','Код','Регион','Территория источника','Значение','Единица','Место по величине','Число сопоставленных','Базовый регион','Разница','% от базы','Источник','Лист','Строка','Столбец'],...rows.map(r=>[Y,series.code,series.title,r.code,r.name,r.region,r.value,series.unit,r.rank,available,codes[0],r.difference,r.ratio,series.source,r.sheet,r.row,r.column])]);save(compareIds)
+   }
+   for(const id of compareIds)$(id).onchange=renderCompare;renderCompare()
+  }
   const thresholds=RegionalMap.classes(matched.map(x=>x.r.value));
   const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code,series.title,series.unit)),theme=RegionalMap.theme(series.code,series.source,series.title),palette=RegionalMap.palette(theme,palettePick?.value||'auto',growth);if(palettePick)palettePick.disabled=growth;
   if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code,series.title,series.unit);if(!RegionalMap.isGrowth(series.code,series.title,series.unit))growthPick.value='quantile'}
@@ -298,10 +332,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Название региона','Название в географическом файле','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.f.properties.name,f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(activeFields)
  }
  async function choose(){
-  const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
+  const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;clearCompare('Загрузка выбранного ряда…');
   const m=catalog.find(s=>s.code===pick.value);if(!m)return;
   status.textContent='Загрузка ряда…';
-  try{const data=await mapLoad(m.file);if(token!==seq)return;series={...data,code:m.code};const ys=[...new Set(data.values.map(r=>r.year))].sort((a,b)=>b-a);year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.'}}
+  try{const data=await mapLoad(m.file);if(token!==seq)return;series={...data,code:m.code};const ys=[...new Set(data.values.map(r=>r.year))].sort((a,b)=>b-a);year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.';clearCompare('Ряд недоступен для сравнения.')}}
  }
  try{
   meta=await mapLoad('regional-boundaries.json');
@@ -326,7 +360,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.first+'–'+s.last,s.code)));
    if(subset.some(s=>s.code===preferred))pick.value=preferred;
    else {const def=subset.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code}
-   if(!subset.length){++seq;series=null;status.textContent='В этом слое нет загруженных рядов. Выберите другой слой или откройте региональную справку.';host.replaceChildren();source.replaceChildren();details.replaceChildren();year.replaceChildren();csvButton.disabled=true;$('geo-coverage-current')?.replaceChildren();if(regionPick){const code=chosenRegion;const eligible=geo.features.filter(f=>RegionalMap.key(f.properties?.iso_3166_2));const unique=eligible.filter(f=>eligible.filter(z=>z.properties.iso_3166_2===f.properties.iso_3166_2).length===1);regionPick.replaceChildren(new Option('Выберите регион',''),...unique.sort((a,b)=>RegionalMap.displayName(a.properties.iso_3166_2,a.properties.name).localeCompare(RegionalMap.displayName(b.properties.iso_3166_2,b.properties.name),'ru')).map(f=>new Option(RegionalMap.displayName(f.properties.iso_3166_2,f.properties.name),f.properties.iso_3166_2)));regionPick.onchange=()=>{chosenRegion=regionPick.value;details.replaceChildren();const f=unique.find(x=>x.properties.iso_3166_2===chosenRegion);if(f){details.append(node('h3',RegionalMap.displayName(chosenRegion,f.properties.name)));addBrief({f,key:RegionalMap.key(chosenRegion)});}save(activeFields)};regionPick.value=code;regionPick.onchange()}save(activeFields);return false}
+   if(!subset.length){++seq;series=null;clearCompare('В этом слое нет данных для сравнения.');status.textContent='В этом слое нет загруженных рядов. Выберите другой слой или откройте региональную справку.';host.replaceChildren();source.replaceChildren();details.replaceChildren();year.replaceChildren();csvButton.disabled=true;$('geo-coverage-current')?.replaceChildren();if(regionPick){const code=chosenRegion;const eligible=geo.features.filter(f=>RegionalMap.key(f.properties?.iso_3166_2));const unique=eligible.filter(f=>eligible.filter(z=>z.properties.iso_3166_2===f.properties.iso_3166_2).length===1);regionPick.replaceChildren(new Option('Выберите регион',''),...unique.sort((a,b)=>RegionalMap.displayName(a.properties.iso_3166_2,a.properties.name).localeCompare(RegionalMap.displayName(b.properties.iso_3166_2,b.properties.name),'ru')).map(f=>new Option(RegionalMap.displayName(f.properties.iso_3166_2,f.properties.name),f.properties.iso_3166_2)));regionPick.onchange=()=>{chosenRegion=regionPick.value;details.replaceChildren();const f=unique.find(x=>x.properties.iso_3166_2===chosenRegion);if(f){details.append(node('h3',RegionalMap.displayName(chosenRegion,f.properties.name)));addBrief({f,key:RegionalMap.key(chosenRegion)});}save(activeFields)};regionPick.value=code;regionPick.onchange()}save(activeFields);return false}
    return true
   }
   if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code,requested.source,requested.title);restore(['geo-theme','geo-scale','geo-markers','geo-palette']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
