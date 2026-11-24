@@ -185,11 +185,26 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==26
+        assert page.locator("main .portal-grid article").count()==27
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
         page.wait_for_function("document.querySelector('#repro-result').textContent.includes('Совпадает:')")
+        page.goto("http://localhost:8765/index-builder.html?id=wdi%3ANY.GDP.MKTP.KD",wait_until="load")
+        page.wait_for_function("!document.querySelector('#builder-run').disabled")
+        page.locator("#builder-run").click()
+        assert "Подтвердите" in page.locator("#builder-status").inner_text()
+        page.locator("#builder-confirm").check()
+        page.locator("#builder-method").select_option("base")
+        page.locator("#builder-run").click()
+        assert "Рассчитано" in page.locator("#builder-status").inner_text()
+        with page.expect_download() as d:
+            page.locator("#builder-json").click()
+        report=json.loads(d.value.path().read_text())
+        assert report["method"]=="base" and report["data_fingerprint"]==manifest["data_fingerprint"]
+        assert any(x["period"]==report["parameters"]["base"] and x["value"]==100 for x in report["rows"])
+        page.locator("#builder-method").select_option("mean")
+        assert page.locator("#builder-json").is_disabled()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

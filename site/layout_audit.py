@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 ROOT=sys.argv[1] if len(sys.argv)>1 else "http://localhost:8765/"
 OUT=Path(sys.argv[2] if len(sys.argv)>2 else "/tmp/layout-audit")
 OUT.mkdir(parents=True,exist_ok=True)
-PAGES=["index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","statistics.html","national.html","historical.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html"]
+PAGES=["index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","statistics.html","national.html","historical.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html","index-builder.html"]
 AUDIT="""() => {
  const root=document.documentElement;
  const isVisible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden'};

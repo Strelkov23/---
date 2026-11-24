@@ -124,3 +124,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 .method-panel{border:1px solid #c6d4d8;border-radius:.65rem;padding:.75rem 1rem;margin:1rem 0;overflow-wrap:anywhere}.method-panel p,.method-panel ul{margin:.4rem 0}.method-panel li{margin:.25rem 0}#registry-list details{margin:.5rem 0;overflow-wrap:anywhere}#registry-list summary{cursor:pointer;font-weight:600}#pair-method-warning{overflow-wrap:anywhere}
 
 #repro-fingerprint,#repro-source,#repro-version,#repro-result,#repro-status{overflow-wrap:anywhere}#repro-file{width:100%;max-width:100%;min-width:0}
+
+.builder-control{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%;margin:.6rem 0}.builder-control select,.builder-control input{min-width:0;width:100%;max-width:100%}#builder-chart svg{display:block;width:100%;max-width:950px;height:auto}#builder-table table{min-width:620px}#builder-passport,#builder-formula{overflow-wrap:anywhere}
