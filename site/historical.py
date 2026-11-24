@@ -28,7 +28,7 @@ SOURCES=[
  ("budget_regions","Казначейство · Бюджеты субъектов","https://roskazna.gov.ru/ispolnenie-byudzhetov/konsolidirovannye-byudzhety-subektov-rossijskoj-federacii"),
 ]
 REGIONAL_ZIPS={
- "population":"01","labor":"02","grp":"08","investment":"10","industry":"12"
+ "population":"01","labor":"02","grp":"08","investment":"10","industry":"12","finance":"19"
 }
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
@@ -87,7 +87,7 @@ def region_like(v):
     return bool(s and re.search(r"республик|област|край|округ|москва|санкт-петербург|севастопол|российская федерация",s) and len(s)<130 and not re.search(r"в том числе|итого|субъект|на душу|численность|инвестиции|валовой",s))
 # Selection is intentionally conservative: only exact indicator concepts and explicit units.
 SPECS=[
- ("GRP","Валовой региональный продукт в текущих основных ценах",r"валов(?:ой|ого) региональн(?:ый|ого) продукт",r"млн\.?\s*руб",r"душу|индекс|структур|дол[яи]|сопоставим|темп"),
+ ("GRP","Валовой региональный продукт в текущих основных ценах",r"валов(?:ой|ого) региональн(?:ый|ого) продукт",r"(?:млн\.?\s*руб|миллионов рублей)",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|формирование"),
  ("INV","Инвестиции в основной капитал в фактически действовавших ценах",r"инвестици[ияй] в основной капитал",r"млн\.?\s*руб",r"душу|индекс|структур|дол[яи]|сопоставим|темп|источник|без субъект|не относящ"),
  ("POP","Численность населения",r"численность (?:постоянного )?населения",r"тыс\.?\s*человек",r"трудоспособ|среднегод|городск|сельск|возраст|прирост|мужчин|женщин"),
 ]
@@ -106,6 +106,55 @@ def candidates_for(code,pat,exclude,sources):
             if f["format"]=="xlsx" and re.search(pat,norm(f["title"])) and not re.search(exclude,norm(f["title"])) and all(x["url"]!=f["url"] for x in matches):
                 matches.append(f)
     return matches
+def parse_vrp(raw):
+    """Read the observed Rosstat workbook layout; each title and its unit must match.
+    Preserve note markers, named territory variants and the sheet period.
+    Income structure tables with repeated subcolumns are not included.
+    """
+    import openpyxl
+    specs=[
+        ("GRP",r"^валовой региональный продукт по субъектам",r"в текущих ценах; миллионов рублей","млн руб.","ВРП в текущих ценах"),
+        ("GRP_PC",r"^валовой региональный продукт на душу населения",r"\(рублей\)","руб.","ВРП на душу населения"),
+        ("GRP_VOLUME",r"^индексы физического объема валового регионального продукта в ",r"в постоянных ценах; в процентах к предыдущему году","% к предыдущему году","Индекс физического объёма ВРП"),
+        ("GRP_SHARE",r"^региональная структура валового регионального продукта",r"\(в процентах\)","%","Доля региона в суммарном ВРП"),
+        ("GRP_PC_VOLUME",r"^индексы физического объема валового регионального продукта на душу населения",r"в процентах к предыдущему году","% к предыдущему году","Индекс физического объёма ВРП на душу населения"),
+        ("HH_CONS",r"^фактическое конечное потребление домашних хозяйств в ",r"в текущих рыночных ценах; миллионов рублей","млн руб.","Фактическое конечное потребление домашних хозяйств"),
+        ("HH_CONS_PC",r"^фактическое конечное потребление домашних хозяйств на душу населения",r"в текущих рыночных ценах; рублей","руб.","Фактическое конечное потребление домашних хозяйств на душу населения"),
+    ]
+    book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+    result=[]
+    try:
+        for sheet in book:
+            rows=list(sheet.iter_rows(values_only=True,max_row=min(sheet.max_row or 400,400),max_col=min(sheet.max_column or 100,100)))
+            # Identify by the exact title in its cell, not by text from data rows or contents.
+            titles=[(i,norm(x)) for i,row in enumerate(rows[:8]) for x in row[:2] if x is not None]
+            hits=[(i,t,spec) for i,t in titles for spec in specs if re.search(spec[1],t) and re.search(spec[2],t)]
+            if len(hits)!=1:continue
+            ti,caption,(code,_,__,unit,title)=hits[0]
+            # The year may carry an original printed footnote, e.g. 20244).
+            headers=[]
+            for i in range(ti+1,min(ti+5,len(rows))):
+                cols=[]
+                for j,v in enumerate(rows[i][1:],1):
+                    m=re.fullmatch(r"(19[89]\d|20[0-2]\d)(?:\s*\d+\))?",norm(v))
+                    if m:cols.append((j,int(m[1]),str(v)))
+                ys=[y for j,y,v in cols]
+                if len(ys)>=3 and ys==list(range(ys[0],ys[-1]+1)) and [j for j,y,v in cols]==list(range(1,len(cols)+1)):
+                    headers.append((i,cols))
+            if len(headers)!=1:continue
+            i,cols=headers[0]
+            local=[]
+            for rn,row in enumerate(rows[i+1:],i+2):
+                reg=str(row[0] or "").strip()
+                if not (region_like(reg) or re.match(r"^г\.\s*(москва|санкт-петербург|севастополь)",norm(reg)) or re.match(r"^чувашская республика",norm(reg)) or re.match(r"^валовой региональный продукт по субъектам российской федерации",norm(reg))):continue
+                for j,y,marker in cols:
+                    v=numeric(row[j]) if j<len(row) else None
+                    if v is None or v<0:continue
+                    local.append(dict(indicator=code,title=title,region=reg,year=y,value=v,unit=unit,sheet=sheet.title,row=rn,column=j+1,note="Заголовок: "+caption+"; обозначение года: "+marker+". Сноски и границы территории — в оригинале; не суммировать пересекающиеся территории."))
+            if len(set(r["region"] for r in local))>=10:result.extend(local)
+    finally:book.close()
+    return result
+
 def parse_xlsx(raw,code,pattern,unit,exclude):
     import openpyxl
     book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
@@ -146,11 +195,11 @@ def mirror_rows(raw,section):
                 fields={norm(x):x for x in (reader.fieldnames or [])}
                 def field(*names):return next((fields[n] for n in names if n in fields),None)
                 keys={
-                  "region":field("region","region_name","territory","территория","регион","name_region"),
+                  "region":field("region","region_name","territory","территория","регион","name_region","object_name"),
                   "year":field("year","год"),
                   "value":field("value","значение","indicator_value"),
                   "title":field("indicator","indicator_name","indicator_title","показатель","название показателя","name_indicator"),
-                  "unit":field("unit","units","единица измерения","единица","measure"),
+                  "unit":field("unit","units","единица измерения","единица","measure","indicator_unit"),
                   "note":field("comment","comments","note","примечание","комментарий"),
                   "code":field("indicator_id","indicator_code","id_indicator","code","код показателя"),
                 }
@@ -160,8 +209,9 @@ def mirror_rows(raw,section):
                     y=year(val("year"));v=numeric(val("value"));title=val("title");unit=val("unit");region=val("region")
                     if not y or v is None or not title or not unit or not region:continue
                     # Keep definitions separate by exact title, unit and provider code.
-                    code=hashlib.sha256((val("code")+"|"+title+"|"+unit).encode()).hexdigest()[:16]
-                    result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":val("note")})
+                    code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
+                    note=val("note")+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
+                    result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
                     if len(result)>200000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Не распознана документированная структура CSV")
     return result
@@ -250,7 +300,7 @@ def publish(db,stamp,out,refresh):
             if matches:
                 f=matches[0]
                 try:
-                    raw,_=get(f["url"],24_000_000);rows=parse_xlsx(raw,code,pat,unit,exclude)
+                    raw,_=get(f["url"],24_000_000);rows=parse_vrp(raw) if code=="GRP" and f["url"]==DIRECT_FILES["GRP"] else parse_xlsx(raw,code,pat,unit,exclude)
                     if not rows:raise ValueError("Не распознана однозначная таблица")
                     n=store(rows,f["url"],title,"Росстат · прямой импорт")
                     sources.append(dict(code="import_"+code,title=title,url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
@@ -273,13 +323,26 @@ def publish(db,stamp,out,refresh):
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
-        # One bounded independent processed archive per update; rotate sections.
-        section=list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]
-        url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
-        try:
-            raw,_=get(url,35_000_000);n=store(mirror_rows(raw,section),url,section,"Росстат · обработка «Если быть точным», CC BY 4.0")
-            sources.append(dict(code="mirror_"+section,title="Архив регионов: "+section,url=url,checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
-        except Exception as e:sources.append(dict(code="mirror_"+section,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
+        # Backfill six source sections once. Afterwards rotate one per day.
+        # Use published provider ZIPs with exact original indicator and unit, not derived values.
+        sections=[]
+        for section in REGIONAL_ZIPS:
+            saved=db.execute("select success from hist_sources where code=?",("mirror_"+section,)).fetchone()
+            if not saved or not saved[0]:sections.append(section)
+        if not sections:sections=[list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]]
+        for section in sections:
+            code="mirror_"+section
+            url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
+            try:
+                raw,_=get(url,35_000_000);n=store(mirror_rows(raw,section),url,section,"Росстат · обработка «Если быть точным», CC BY 4.0")
+                if not n:raise ValueError("Нет однозначных наблюдений")
+                status="Ключей: "+str(n)
+                db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,status,"[]"))
+                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=stamp,status=status,files=[]))
+            except Exception as e:
+                status="Ошибка: "+str(e)[:160]
+                db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,status,"[]"))
+                sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status=status,files=[]))
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
