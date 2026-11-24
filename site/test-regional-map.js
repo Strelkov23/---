@@ -74,3 +74,13 @@ for(const [n,id] of Object.entries(addedThemes)){
  assert.notEqual(M.palette(id)[4],M.palette('all')[4]);
 }
 assert.equal(new Set(Object.values(addedThemes).map(id=>M.palette(id)[4])).size,5);
+
+const sectorSource='https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_industry_102_v20260313.zip';
+const a1={code:'a1',source:sectorSource,title:'Индексы производства: производство химических веществ',unit:'В процентах к предыдущему году',last:2024,count:1000};
+const a2={code:'a2',source:sectorSource,title:'Объем отгруженных товаров: производство химических веществ',unit:'млн руб.',last:2024,count:1500};
+const a3={code:'a3',source:sectorSource,title:'Индексы производства: производство химических веществ',unit:'В процентах к предыдущему году',last:2023,count:3000};
+assert.deepEqual(M.rankProfileCandidates([a1,a2,a3],'chemical').map(s=>s.code),['a1','a2','a3']);
+assert.equal(M.chooseProfileObservation([{m:a1,r:null},{m:a2,r:{year:2024,value:0}},{m:a3,r:{year:2023,value:105}}]).m.code,'a2');
+assert.equal(M.chooseProfileObservation([{m:a2,r:{year:2024,value:100}},{m:a1,r:{year:2024,value:105}}]).m.code,'a1');
+assert.equal(M.chooseProfileObservation([{m:a1,r:{year:2023,value:105}},{m:a2,r:{year:2024,value:100}}]).m.code,'a2');
+assert.equal(M.chooseProfileObservation([{m:a1,r:null},{m:a2,r:{year:2024,value:null}}]),null);
