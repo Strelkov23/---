@@ -1,8 +1,10 @@
 {
-  "built": "2026-11-24T12:52:41+00:00",
+  "built": "2026-11-24T13:01:48+00:00",
   "errors": [],
   "warnings": [
     "Часть месячных данных унаследована из архива и не подтверждена повторно",
+    "Правовой портал 2026-11-24",
+    "Правовой портал 2026-11-23",
     "Месячная промышленность · Месячный выпуск не подтверждён при текущем обновлении; Недоступных страниц: 11; HTTP Error 404: Not Found",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
@@ -10,16 +12,18 @@
     "История · Казначейство · Федеральный бюджет · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Консолидированный бюджет РФ · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Бюджеты субъектов · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
-    "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: HTTP Error 404: Not Found",
-    "История · Доля городского населения на 1 января · Ошибка: HTTP Error 404: Not Found",
-    "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: HTTP Error 404: Not Found",
-    "История · Введённые жилые помещения на 1000 человек населения · Ошибка: HTTP Error 404: Not Found",
-    "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: HTTP Error 404: Not Found",
-    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: HTTP Error 404: Not Found",
+    "История · Валовой региональный продукт в текущих основных ценах · Ошибка: Не распознана однозначная таблица",
+    "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: HTTP Error 404: Not Found",
+    "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: 61483.csv.gz: HTTP Error 404: Not Found; 61483.parquet: HTTP Error 404: Not Found",
+    "История · Доля городского населения на 1 января · Ошибка: 36057.csv.gz: HTTP Error 404: Not Found; 36057.parquet: HTTP Error 404: Not Found",
+    "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: 60421.csv.gz: HTTP Error 404: Not Found; 60421.parquet: HTTP Error 404: Not Found",
+    "История · Введённые жилые помещения на 1000 человек населения · Ошибка: 45454.csv.gz: HTTP Error 404: Not Found; 45454.parquet: HTTP Error 404: Not Found",
+    "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: 59049.csv.gz: HTTP Error 404: Not Found; 59049.parquet: HTTP Error 404: Not Found",
+    "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found",
     "История · Архив регионов: industry · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7293,
+    "archive": 7300,
     "papers": 8166,
     "indicators": 105,
     "indicators_with_data": 105,
@@ -28,20 +32,20 @@
     "cbr_KEY": 762,
     "cbr_USD": 741,
     "national_series": 13,
-    "national_observations": 2701,
+    "national_observations": 4133,
     "historical_series": 2,
     "historical_observations": 52,
-    "official_files": 291,
+    "official_files": 445,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "6721af98cf4c6fb04aa7b34336f384913a28485278c612b832d2f964df541026",
-      "bytes": 3505968
+      "sha256": "ca64ce41cf425095a68c2801bac76b2c380a0d792e904c1f005e1c2f2ef9b6d0",
+      "bytes": 3508268
     },
     "literature.json": {
-      "sha256": "80e628f15f8b406af7fbc518b48324bb9938ae1d4c51914ee37bb4ca62cecd96",
-      "bytes": 3346642
+      "sha256": "3c7d67c43d3ba60037c8c9ecdeaa33f161254bde0ebdc577ac36983b8084a14c",
+      "bytes": 3362776
     },
     "compare.json": {
       "sha256": "0c3d8766cceb77f4c1f8bf031a5e544b961edf5c596e702d0bca422e5b9f9e55",
@@ -60,7 +64,7 @@
       "bytes": 1048
     },
     "cbr.json": {
-      "sha256": "cbb40f44ed79c84f716e15978bd4e10d6163c734d5c3b71f44d23924b8506841",
+      "sha256": "dd2554d93c9b0662b3d6bc5d2d4d681a9dde47d88409270ffef3885e96c47871",
       "bytes": 55538
     },
     "sectors.json": {
@@ -68,20 +72,20 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "2272905a23c984c8b1d0e21973797aa217f730ba111a6dab2ab4df5965eb4895",
-      "bytes": 33789
+      "sha256": "832d57cf9468897733a24cab6df1754f5a50843b4e9215b854bbd3bd9c8fd3d9",
+      "bytes": 34612
     },
     "links.json": {
-      "sha256": "82cb82b87b25b71bc9eae239a91120d2c16cdcd14c5f85f59625148c85079a67",
-      "bytes": 1327248
+      "sha256": "48dfa592adaa9a19870f943638f3938538624dd3684856158a0142fd08b7ef13",
+      "bytes": 1352207
     },
     "national.json": {
-      "sha256": "35e28fbd5dc79bcd23b0371021d0e8c522b4afb23da43a89194a08299d44fe88",
-      "bytes": 542024
+      "sha256": "a74902a131c6b62d0c7d126b71529daa582d874e6023eecf520a24230dfa9c53",
+      "bytes": 772824
     },
     "historical.json": {
-      "sha256": "9dde3c899a36f9596c386d3a94d262ed46912337dcddfb7c4bf965717eac1813",
-      "bytes": 42628
+      "sha256": "86473000bdd52e709afcdcce7af7c7ad18c601736988cdc1632bb92b1d5e81d8",
+      "bytes": 63392
     },
     "regional-data/NW_GRP_2026Q1_ecd0c71d74.json": {
       "sha256": "27d797882d8342d4bee8fc2bbad48b014c1fa2f121c0d56070a8707321f43dc5",
