@@ -121,8 +121,16 @@ def verify_csv(path,d):
         actual=list(reader)
     expected=[{k:"" if r[k] is None else str(r[k]) for k in CSV_FIELDS} for r in csv_rows(d)]
     if actual!=expected:raise ValueError("CSV не соответствует проверенному JSON")
+_verified_raw=None
+def verified_archive():
+    global _verified_raw
+    if _verified_raw is None:
+        import historical
+        raw,_=historical.get(SOURCE,35_000_000)
+        if hashlib.sha256(raw).hexdigest()!=EXPECTED_SHA256:raise ValueError("Изменился хеш фиксированного выпуска; требуется проверка источника")
+        _verified_raw=raw
+    return _verified_raw
 def publish(out,previous,stamp,refresh):
-    import historical
     d=empty(stamp);old=None
     try:
         old=json.loads((previous/"regional-manufacturing.json").read_text(encoding="utf-8"));quality(old);d={**old,"built":stamp}
@@ -130,8 +138,7 @@ def publish(out,previous,stamp,refresh):
     due=not d["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(d["checked"][:10])+timedelta(days=30 if d["checked"]==d["success"] else 2)
     if refresh and due:
         try:
-            raw,_=historical.get(SOURCE,35_000_000)
-            if hashlib.sha256(raw).hexdigest()!=EXPECTED_SHA256:raise ValueError("Изменился хеш фиксированного выпуска; требуется проверка источника")
+            raw=verified_archive()
             candidate={**empty(stamp),"checked":stamp,"success":stamp,"status":"Импортировано","sha256":hashlib.sha256(raw).hexdigest(),"rows":parse(raw)}
             quality(candidate,old);d=candidate
         except Exception as e:
