@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -107,6 +107,15 @@ def check(out,previous,stamp):
         for r in p["rows"]:
             if r["id"] not in source_ids or not http_url(r["source"]) or not (out/r["href"].split("?",1)[0]).is_file() or (r["count"] and not finite(r["value"])) or (not r["count"] and r["value"] is not None):
                 issues.append("Паспорт: недействительная ссылка на ряд "+r["id"])
+    try:
+        import food_balance
+        fbs_csv=out/"food-balance.csv"
+        fbs_counts,fbs_warnings=food_balance.quality(data["food-balance.json"],fbs_csv,int(stamp[:4]))
+        counts.update(fbs_counts);warnings.extend(fbs_warnings)
+        raw=fbs_csv.read_bytes()
+        hashes["food-balance.csv"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("Продовольственные балансы: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

@@ -51,7 +51,32 @@ def parse(raw):
                 if k in row["values"]:raise ValueError("Duplicate FAOSTAT key")
                 row["values"][k]=v;row["flags"][k]=r["Flag"];row["notes"][k]=r.get("Note") or ""
     if set(c for c,y in groups)!=set(ITEMS) or len(groups)<35:raise ValueError("Insufficient country coverage")
-    return sorted(groups.values(),key=lambda r:(r["code"],r["year"]))
+    rows=sorted(groups.values(),key=lambda r:(r["code"],r["year"]))
+    validate_coverage(rows)
+    return rows
+def observations(rows):
+    return {(r["code"],r["year"],k) for r in rows for k in r["values"]}
+
+def validate_coverage(rows,previous=None):
+    """Conservative completeness gate; do not silently discard published observations."""
+    complete={c:set() for c in ITEMS}
+    for r in rows:
+        if r["code"] in complete and all(k in r["values"] for k in CORE):
+            complete[r["code"]].add(r["year"])
+    for c,years in complete.items():
+        if len(years)<5:
+            raise ValueError("FBS: fewer than five complete resource balances for "+c)
+    if previous is not None:
+        removed=observations(previous)-observations(rows)
+        if removed:
+            raise ValueError("FBS: revision removes "+str(len(removed))+" previously published observations; review required")
+
+def due(old,stamp):
+    if not old or not old[0]:
+        return True
+    days=14 if old[1]==old[0] else 1
+    return datetime.fromisoformat(stamp)>=datetime.fromisoformat(old[0])+timedelta(days=days)
+
 def fetch():
     with urlopen(Request(SOURCE,headers={"User-Agent":"EconomicsMonitor/2.0"}),timeout=60) as f:
         if urlsplit(f.geturl()).hostname!="bulks-faostat.fao.org":raise ValueError("Unexpected redirect")
@@ -61,14 +86,65 @@ def fetch():
 def sync(db,stamp,refresh):
     db.execute("create table if not exists fbs_snapshot(id integer primary key check(id=1),checked text,success text,status text,payload text,hash text)")
     old=db.execute("select checked,success,status,payload,hash from fbs_snapshot where id=1").fetchone()
-    if refresh and (not old or stamp[:10]>= (datetime.fromisoformat(old[0])+timedelta(days=14)).date().isoformat()):
+    if refresh and due(old,stamp):
         try:
             rows,h=fetch()
+            validate_coverage(rows,json.loads(old[3]) if old and old[3] else None)
             with db:db.execute("insert or replace into fbs_snapshot values(1,?,?,?,?,?)",(stamp,stamp,"Получен архив FAOSTAT",json.dumps(rows,ensure_ascii=False),h))
         except Exception as e:
             with db:db.execute("insert into fbs_snapshot values(1,?,null,?,null,null) on conflict(id) do update set checked=excluded.checked,status=excluded.status",(stamp,"Ошибка: "+str(e)[:180]))
     old=db.execute("select checked,success,status,payload,hash from fbs_snapshot where id=1").fetchone()
     return dict(rows=json.loads(old[3]) if old and old[3] else seed(),mode="official_archive" if old and old[3] else "replica_seed",checked=old[0] if old else None,success=old[1] if old else None,status=old[2] if old else "Ожидается первая загрузка FAOSTAT",archive_sha256=old[4] if old else None,source=SOURCE,metadata=META,replica=REPLICA,labels=LABELS,unit="1000 t")
+def quality(data,csv_path,max_year):
+    """Audit the published JSON/CSV pair. Missing optional observations remain missing."""
+    if data.get("mode") not in ("official_archive","replica_seed") or data.get("unit")!="1000 t":
+        raise ValueError("FBS: invalid mode or unit")
+    if data["mode"]=="official_archive" and (not data.get("success") or not isinstance(data.get("archive_sha256"),str) or len(data["archive_sha256"])!=64 or any(ch not in "0123456789abcdef" for ch in data["archive_sha256"])):
+        raise ValueError("FBS: missing source archive provenance")
+    expected={};seen=set();complete=0;discrepant=0;missing_use=0
+    for r in data["rows"]:
+        c,y=r["code"],r["year"]
+        if c not in ITEMS or type(y) is not int or not 2010<=y<=max_year or (c,y) in seen or r["title"]!=ITEMS[c]:
+            raise ValueError("FBS: invalid or duplicate product-year")
+        seen.add((c,y));v=r["values"];flags=r["flags"];notes=r["notes"]
+        if not v or set(v)!=set(flags) or not set(notes)<=set(v):
+            raise ValueError("FBS: inconsistent flags or notes")
+        source=SOURCE if data["mode"]=="official_archive" else REPLICA
+        if r["source"]!=source:
+            raise ValueError("FBS: inconsistent source provenance")
+        for k,x in v.items():
+            if k not in LABELS or type(x) not in (int,float) or not math.isfinite(x) or (k not in ("stock_change","residual","tourism") and x<0) or not isinstance(flags[k],str) or not isinstance(notes.get(k,""),str):
+                raise ValueError("FBS: invalid value, flag or note")
+            expected[(c,str(y),k)]=(r["title"],str(x),data["unit"],flags[k],notes.get(k,""),source,data["mode"])
+        if all(k in v for k in CORE):
+            complete+=1
+            discrepant+=abs(v["production"]+v["imports"]-v["exports"]-v["stock_change"]-v["supply"])>3
+        missing_use+=any(k not in v for k in ("feed","seed","losses","processing","other","food"))
+    if set(c for c,y in seen)!=set(ITEMS):
+        raise ValueError("FBS: missing product group")
+    if data["mode"]=="official_archive":
+        validate_coverage(data["rows"])
+    with csv_path.open(encoding="utf-8-sig",newline="") as fh:
+        reader=csv.DictReader(fh)
+        if reader.fieldnames!=["code","product","year","element","value","unit","flag","note","source","mode"]:
+            raise ValueError("FBS: invalid CSV header")
+        actual={}
+        for r in reader:
+            key=(r["code"],r["year"],r["element"])
+            if key in actual:
+                raise ValueError("FBS: duplicate CSV observation")
+            actual[key]=tuple(r[k] for k in ("product","value","unit","flag","note","source","mode"))
+    if actual!=expected:
+        raise ValueError("FBS: JSON/CSV mismatch")
+    counts={"fbs_product_years":len(seen),"fbs_observations":len(expected),"fbs_complete_resource_balances":complete,"fbs_resource_discrepancies":discrepant,"fbs_incomplete_use":missing_use}
+    warnings=[]
+    if data["mode"]=="replica_seed":warnings.append("FAOSTAT: используется ограниченная документальная реплика, прямой импорт не подтверждён")
+    if discrepant:warnings.append("FAOSTAT: ресурсное расхождение выше 3 тыс. т: "+str(discrepant))
+    if complete<len(seen):warnings.append("FAOSTAT: неполные ресурсные балансы: "+str(len(seen)-complete))
+    if missing_use:warnings.append("FAOSTAT: неполная детализация использования: "+str(missing_use))
+    if data.get("checked")!=data.get("success"):warnings.append("FAOSTAT: последняя попытка не является успешной загрузкой")
+    return counts,warnings
+
 def publish(page,out,data):
     (out/"food-balance.json").write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"food-balance.csv").open("w",encoding="utf-8-sig",newline="") as f:
