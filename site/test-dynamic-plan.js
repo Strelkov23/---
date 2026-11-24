@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),d=require('./dynamic-plan.js');
+const m={names:['A','B'],output:[100000,100000],demand:[100000,100000],imports:[10000,10000],effects:[[100000,0],[0,100000]]};
+const p={years:3,spare:0,investment:10,capitalRatio:1,depreciation:0,importLimit:100,allocation:'gap',growth:[5,5]};
+let r=d.calculate(m,p);
+assert.equal(r[0].alpha,0);assert.equal(r[0].investment,10);assert.equal(r[1].available,10);assert.ok(r[1].alpha>0&&r[1].alpha<1);
+assert.equal(r[2].available,20);assert.ok(r[2].groups.every(g=>g.realized<=g.available+1e-9));
+r=d.calculate(m,{...p,spare:100,importLimit:0});assert.equal(r[0].alpha,0);assert.equal(r[0].importBinding,true);
+r=d.calculate(m,{...p,growth:[0,0]});assert.equal(r[0].alpha,1);assert.equal(r[0].investment,0);assert.equal(r[0].unusedInvestment,10);
+r=d.calculate(m,{...p,allocation:'output',depreciation:50});assert.equal(r[2].available,15);
+assert.throws(()=>d.calculate(m,{...p,growth:[-1,5]}));
+console.log('Dynamic plan tests passed');
