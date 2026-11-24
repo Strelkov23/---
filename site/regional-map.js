@@ -114,6 +114,7 @@ const RegionalMap=(()=>{
     ratio:value!==null&&Number.isFinite(base)&&base>0&&value>=0?100*value/base:null};
   }).filter(Boolean)
  }
+ function passportTheme(id){return ({industry:'manufacturing',light:'light',chemical:'chemical',food:'food',metal:'metal',machinery:'machinery',energy:'energy',agriculture:'agriculture',transport:'transport',ict:'digital',innovation:'technology'})[id]||null}
  function rankProfileCandidates(catalog,id,limit=4){
   return catalog.filter(s=>theme(s.code,s.source,s.title)===id).sort((a,b)=>b.last-a.last||Number(isGrowth(b.code,b.title,b.unit))-Number(isGrowth(a.code,a.title,a.unit))||b.count-a.count||String(a.code).localeCompare(String(b.code))).slice(0,limit)
  }
@@ -126,7 +127,7 @@ const RegionalMap=(()=>{
   for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
   return null
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -198,6 +199,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const subsectors=RegionalMap.industryThemes.map(([id,label,symbol])=>[label,RegionalMap.rankProfileCandidates(catalog,id).map(s=>s.code),id,symbol]);
   async function item([label,code,id,symbol]){
    const card=node('article','');card.className='geo-brief-item';if(id){const icon=node('span',symbol);icon.className='sector-symbol';icon.style.background=RegionalMap.palette(id)[4];card.append(icon)}card.append(node('strong',label));cards.append(card);
+   const passport=RegionalMap.passportTheme(id);
+   if(passport){const u=new URL('sector-passports.html',location.href);u.searchParams.set('sp-sector',passport);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Паспорт отрасли');a.href=u.href;card.append(a)}
    const candidates=(Array.isArray(code)?code:[code]).map(c=>catalog.find(s=>s.code===c)).filter(Boolean);
    if(!candidates.length||!f.key){card.append(node('p','Нет сопоставимого ряда'));return false}
    try{
@@ -281,6 +284,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    if(eligible){const progress=node('progress','');progress.max=eligible;progress.value=matched.length;progress.setAttribute('aria-label','Сопоставлено '+matched.length+' из '+eligible+' однозначных контуров');coverageHost.append(progress,node('p',Math.round(100*matched.length/eligible)+'% однозначно сопоставимых контуров. Это охват карты, не доля экономики.'))}
   }
   source.replaceChildren(node('p',series.title+' · '+series.unit+' · '+series.kind),link('Статистический первоисточник',series.source),document.createTextNode(' · '),link('Описание границ и лицензия',meta.documentation),node('p','Границы: '+meta.license+' · получены '+String(meta.downloaded||'—').slice(0,10)+' · '+(meta.status==='cached'?'сохранённая копия':'загруженный файл')));
+  const passport=RegionalMap.passportTheme(theme);
+  if(passport){const u=new URL('sector-passports.html',location.href);u.searchParams.set('sp-sector',passport);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть отраслевой паспорт');a.href=u.href;source.append(node('p',''),a)}
   if(meta.inventory){const i=meta.inventory;source.append(node('p','Контуры ADM1: '+i.contours+' · однозначные коды RU: '+i.unique_codes.length+' · дубли кодов: '+i.duplicate_codes.length+' · контуры без кода или названия: '+i.unmatched_contours+' · вершин: '+i.vertices.toLocaleString('ru')))}
   const polygons=features.map(x=>({...x,rings:RegionalMap.rings(x.f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
