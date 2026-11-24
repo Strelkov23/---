@@ -65,7 +65,9 @@ const RegionalMap=(()=>{
   if(growth)return ['#a53e35','#e8a39b','#f0f0ed','#a3d6bc','#207a57'];
   return [...(palettes[choice==='auto'?theme:choice]||palettes.all)]
  }
+ const manufacturingThemes={total:'industry',light:'light',chemical:'chemical',food:'food',metal:'metal',wood:'industry',print:'industry',oil_rubber:'industry',minerals:'industry',electronics:'machinery',machinery:'machinery',vehicles:'machinery',furniture:'industry',repair:'industry'};
  function theme(code,source='',title=''){
+ const mfg=Object.keys(manufacturingThemes).find(k=>String(code).startsWith('MFG_'+k+'_'));if(mfg)return manufacturingThemes[mfg];
  const sub=industryTheme(title,source);if(sub)return sub;
  if(/\/data_farming_102_v20260313\.zip$/.test(String(source)))return 'agriculture';
  const section=String(source).match(/\/data_(03|09|11|13|14|15|16|17|18|20|21)_socio_economic_102_v20260313\.zip$/)?.[1];
@@ -154,7 +156,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  }
  const profileCodes=[
   ['Экономика','GRP_95b8dd2585'],['Экономика','GRP_PC_95b8dd2585'],['Экономика','GRP_VOLUME_95b8dd2585'],
-  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','R_f55cefbbeba36842_099b62c9d9'],
+  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','MFG_total_099b62c9d9'],
   ['Инвестиции','R_88230ed30f2f2738_bf6a5a3983'],['Инвестиции','R_66b96177c45a01ad_bf6a5a3983'],
   ['Труд','R_65254a01945743d3_1db3db8e79'],['Труд','R_a4138d558584b81a_1db3db8e79'],
   ['Бюджет','R_77976ed27f49b4fd_28f4b5b380'],['Бюджет','R_8728bc736516e87c_28f4b5b380'],
@@ -300,7 +302,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
   const select=f=>{const p=f.f.properties,r=f.r;chosenRegion=p.iso_3166_2||'';if(regionPick)regionPick.value=chosenRegion;for(const e of svg.querySelectorAll('[data-region]')){if(e.dataset.region===chosenRegion)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
     if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}
-    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1){addBrief(f);addProfile(f,Y)}else if(profileEnabled){details.append(node('p','Для этого контура нет однозначного соответствия статистике.'));}save(activeFields)};
+    if(chosenRegion){const u=new URL('regional-manufacturing.html',location.href);u.searchParams.set('rm-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Отраслевая структура отгрузки региона');a.href=u.href;details.append(node('p',''),a)};if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1){addBrief(f);addProfile(f,Y)}else if(profileEnabled){details.append(node('p','Для этого контура нет однозначного соответствия статистике.'));}save(activeFields)};
   for(const f of polygons){
    const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
    if(!d)continue;
