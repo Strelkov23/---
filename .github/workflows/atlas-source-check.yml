@@ -1,4 +1,4 @@
-name: Atlas source check
+name: Atlas source integration
 on:
   push:
     branches: [main]
@@ -7,110 +7,69 @@ on:
 permissions:
   contents: read
 jobs:
-  inspect:
+  real-source:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python3 -m pip install openpyxl==3.1.5
-      - name: Check original Rosstat workbook layout
-        run: |
-          python3 - <<'PY'
-          from urllib.request import urlopen, Request
-          import io, hashlib, openpyxl, json
-          urls=["https://rosstat.gov.ru/storage/mediabank/VRP_OKVED2_s_2016.xlsx","https://www.rosstat.gov.ru/storage/mediabank/VRP_OKVED2_s_2016.xlsx"]
-          for url in urls:
-              try:
-                  with urlopen(Request(url,headers={"User-Agent":"EconomicMonitor/1.0 (public statistical research)"}),timeout=25) as resp:
-                      raw=resp.read(15000001)
-                  if len(raw)>15000000:raise ValueError("oversized")
-                  book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
-                  print("SOURCE",url,"SHA256",hashlib.sha256(raw).hexdigest(),"BYTES",len(raw))
-                  for ws in book:
-                      print("SHEET",ws.title,ws.max_row,ws.max_column)
-                      for i,row in enumerate(ws.iter_rows(min_row=1,max_row=min(ws.max_row,36),max_col=min(ws.max_column,32),values_only=True),1):
-                          print(i,json.dumps([(j+1,str(v)[:350]) for j,v in enumerate(row) if v is not None],ensure_ascii=False))
-                      for i,row in enumerate(ws.iter_rows(min_row=max(1,ws.max_row-12),max_row=ws.max_row,max_col=min(ws.max_column,32),values_only=True),max(1,ws.max_row-12)):
-                          print(i,json.dumps([(j+1,str(v)[:350]) for j,v in enumerate(row) if v is not None],ensure_ascii=False))
-                  book.close()
-                  break
-              except Exception as e:
-                  print("FAILED",url,type(e).__name__,str(e))
-          else:print("DIRECT WORKBOOK UNAVAILABLE; inspect licensed archive separately")
-          PY
-      - name: Inspect licensed regional archive indicator inventory
-        run: |
-          python3 - <<'PY'
-          from urllib.request import Request,urlopen
-          import io,zipfile,csv,collections,json,re
-          base="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
-          for filename in ["data_08_socio_economic_102_v20260313.zip","data_industry_102_v20260313.zip","data_12_socio_economic_102_v20260313.zip"]:
-              print("ARCHIVE",filename)
-              try:
-                  with urlopen(Request(base+filename,headers={"User-Agent":"Mozilla/5.0"}),timeout=30) as resp:raw=resp.read(35000001)
-                  if len(raw)>35000000:raise ValueError("oversized")
-                  with zipfile.ZipFile(io.BytesIO(raw)) as z:
-                      files=[x for x in z.infolist() if x.filename.endswith(".csv")]
-                      if sum(x.file_size for x in files)>200000000:raise ValueError("oversized CSV")
-                      for m in files:
-                          c=collections.Counter();examples={}
-                          with z.open(m) as f:
-                              reader=csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig"),delimiter=";")
-                              print("HEADER",m.filename,reader.fieldnames)
-                              for row in reader:
-                                  title=row.get("indicator_name") or row.get("name_indicator") or row.get("indicator") or row.get("indicator_title") or ""
-                                  unit=row.get("indicator_unit") or row.get("unit") or row.get("measure") or ""
-                                  subsection=row.get("subsection") or ""
-                                  key=(title,unit,subsection)
-                                  c[key]+=1
-                                  if key not in examples:examples[key]={k:v for k,v in row.items() if k in ("object_name","object_level","year","indicator_id","indicator_code","source","value")}
-                          print("INDICATOR COUNT",len(c))
-                          for key,n in c.items():
-                              if re.search(r"добавленн|структур|отгруженн|производств[ао] текстиль|производств[ао] химич|производств[ао] одежд|производств[ао] лекарствен|производств[ао] метал|производств[ао] пищев",key[0],re.I):
-                                  print("CONCEPT",json.dumps([key,n,examples[key]],ensure_ascii=False))
-              except Exception as e:print("ARCHIVE ERROR",filename,type(e).__name__,str(e))
-          PY
-      - name: Validate exact manufacturing parser on real archive
+      - name: Verify fixed archive and exact rows
         run: |
           PYTHONPATH=site python3 - <<'PY'
           import regional_manufacturing as m
           from urllib.request import Request,urlopen
-          from collections import Counter
+          from pathlib import Path
           import hashlib,json
           with urlopen(Request(m.SOURCE,headers={"User-Agent":"Mozilla/5.0"}),timeout=30) as f:
               raw=f.read(35000001)
-          import io,csv,zipfile
-          from decimal import Decimal,InvalidOperation
-          with zipfile.ZipFile(io.BytesIO(raw)) as z:
-              fn=next(x for x in z.namelist() if x.endswith("data_industry_102_v20260313.csv"))
-              with z.open(fn) as f:
-                  all_rows=[r for r in csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig"),delimiter=";") if r["indicator_code"]==m.CODE]
-          print("SOURCE YEARS",sorted({r["year"] for r in all_rows}))
-          print("SOURCE LEVELS",dict(Counter(r["object_level"] for r in all_rows)))
-          print("SOURCE VERSIONS",dict(Counter(r["version_date"] for r in all_rows)))
-          print("SOURCE COUNTRIES",dict(Counter(r["object_name"] for r in all_rows if r["object_level"]=="Страна")))
-          bad=[]
-          for r in all_rows:
-              try:m.number(r["indicator_value"])
-              except ValueError as e:bad.append((r["indicator_value"],r["comment"],r["source"],str(e)))
-          print("INVALID VALUE MARKERS",json.dumps([list(x)+[n] for x,n in Counter(bad).items()],ensure_ascii=False)[:12000])
-          rows=m.parse(raw)
-          print("MANUFACTURING",json.dumps({"sha256":hashlib.sha256(raw).hexdigest(),"years":sorted({r["year"] for r in rows}),"count":len(rows),"numeric":sum(r["value"] is not None for r in rows),"groups":dict(Counter(r["group"] for r in rows))},ensure_ascii=False))
+          sha=hashlib.sha256(raw).hexdigest()
+          assert sha==m.EXPECTED_SHA256,sha
+          d={**m.empty("2026-11-25"),"rows":m.parse(raw),"sha256":sha,"checked":"2026-11-25","success":"2026-11-25","status":"Импортировано"}
+          counts=m.quality(d)
+          print("MANUFACTURING",json.dumps(counts,ensure_ascii=False))
+          assert counts["regional_manufacturing_rows"]==2688
+          assert counts["regional_manufacturing_numeric"]==2576
+          assert counts["regional_manufacturing_suppressed"]==112
+          # Only the temporary runner checkout receives the validated file. Nothing is pushed.
+          p=Path("history/published/regional-manufacturing.json");p.write_text(json.dumps(d,ensure_ascii=False),encoding="utf-8")
           PY
-      - name: Check existing published historical archive for numeric missing markers
-        if: always()
+      - name: Build using real archive and saved database
         run: |
+          unzip -q EconomicsPages.zip -d monitor
+          cp site/* monitor/
+          mkdir -p monitor/data
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
+          elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db
+          else exit 1; fi
+          cd monitor
+          python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2 playwright==1.51.0
+          python3 -m unittest test_regional_manufacturing.py
+          node test-regional-manufacturing.js
+          ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
+          git rev-parse HEAD > public/source-version.txt
+          cp public/source-version.txt public/version.txt
           python3 - <<'PY'
-          import json,re,collections
+          import json
           from pathlib import Path
-          for p in sorted(Path("history/published/regional-data").glob("*.json")):
-              d=json.loads(p.read_text())
-              if "tochno-st-catalog/Rosstat/" not in d.get("source",""):continue
-              rows=d["values"]
-              bad=[r for r in rows if re.fullmatch(r"-([1-9])\1{5,}(?:\.0+)?",str(r["value"]))]
-              if bad:
-                  print("ARCHIVE MARKERS",json.dumps({"file":p.name,"title":d["title"],"markers":dict(collections.Counter(str(r["value"]) for r in bad)),"notes":list(dict.fromkeys(r["note"][:450] for r in bad))[:3]},ensure_ascii=False))
+          q=json.loads(Path("public/quality.json").read_text())
+          print("QUALITY",json.dumps(q,ensure_ascii=False))
+          assert not q["errors"],q["errors"]
           PY
+      - name: Browser integration against real data
+        run: |
+          cd monitor/public
+          python3 -m http.server 8765 > /tmp/layout-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          for i in $(seq 1 30); do if curl --silent --fail http://localhost:8765/index.html > /dev/null; then break; fi; sleep 1; done
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-atlas-quality
+          path: |
+            monitor/public/quality.json
+            monitor/public/regional-manufacturing.json
+            monitor/public/regional-manufacturing.csv
+          if-no-files-found: ignore
