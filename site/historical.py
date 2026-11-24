@@ -153,6 +153,20 @@ def choose_sections(db,stamp,limit=3):
             options.append((1,row[0] or "",section))
     return [s for _,__,s in sorted(options)[:limit]]
 
+def budget_import_code(url):
+    return "budget_import_"+hashlib.sha256(url.encode()).hexdigest()[:12]
+
+def choose_budget_files(db,files,stamp,limit=3):
+    """Deduplicate, then select untried and longest-overdue reports before applying limit."""
+    options=[]
+    for url,f in {f["url"]:f for f in files}.items():
+        row=db.execute("select checked,success from hist_sources where code=?",(budget_import_code(url),)).fetchone()
+        if not row or not row[0]:
+            options.append((0,"",url,f))
+        elif due_date(*row,stamp,30,2)<=stamp[:10]:
+            options.append((1,row[0],url,f))
+    return [f for _,__,___,f in sorted(options)[:limit]]
+
 def import_status(db,code,title,url,stamp,status,success,files=None):
     """Persist actual attempt and most recent success independently, also across failed builds."""
     old=db.execute("select success,files from hist_sources where code=?",(code,)).fetchone()
@@ -477,14 +491,14 @@ def publish(db,stamp,out,refresh):
                 sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ошибка: "+str(e)[:200],False))
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
         budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
-        for f in budget_files[:3]:
-            if not due(db,'budget_import_'+hashlib.sha256(f['url'].encode()).hexdigest()[:12],stamp,30,2):continue
+        for f in choose_budget_files(db,budget_files,stamp):
+            code=budget_import_code(f["url"])
             try:
                 raw,_=get(f["url"],35_000_000);rows=parse_budget(raw,unquote(urlsplit(f["url"]).path.rsplit("/",1)[-1]))
                 if not rows:raise ValueError("Годовая форма 0503117 не распознана")
                 n=store(rows,f["url"],"Федеральный бюджет","Казначейство · прямой импорт")
-                sources.append(import_status(db,"budget_import_"+hashlib.sha256(f["url"].encode()).hexdigest()[:12],"Годовое исполнение бюджета",f["url"],stamp,"Ключей: "+str(n),True,[f]))
-            except Exception as e:sources.append(import_status(db,"budget_import_"+hashlib.sha256(f["url"].encode()).hexdigest()[:12],"Годовое исполнение бюджета",f["url"],stamp,"Ошибка: "+str(e)[:160],False))
+                sources.append(import_status(db,code,"Годовое исполнение бюджета",f["url"],stamp,"Ключей: "+str(n),True,[f]))
+            except Exception as e:sources.append(import_status(db,code,"Годовое исполнение бюджета",f["url"],stamp,"Ошибка: "+str(e)[:160],False))
         # EMISS publisher-coded historical archives: preserve every dimension and cite the primary portal.
         for code,(title,agency,unit) in emiss_archive.SPECS.items():
             if not due(db,'emiss_'+code,stamp,30,7):continue
@@ -524,6 +538,11 @@ def publish(db,stamp,out,refresh):
         files=json.loads(raw_files);url=files[0]["url"] if files else None
         if code.startswith("emiss_") and code[6:] in emiss_archive.SPECS:
             title=emiss_archive.SPECS[code[6:]][0];url=emiss_archive.primary(code[6:])
+        elif code.startswith("budget_import_"):
+            title="Годовое исполнение бюджета"
+            if not url:
+                candidate=next((f for source in sources if source["code"]=="budget" for f in source["files"] if budget_import_code(f["url"])==code),None)
+                if candidate:url=candidate["url"]
         else:
             title=files[0]["title"] if files else next((t for k,t,*_ in SPECS if code=="import_"+k),code)
             if not url and code=="import_minfin_budget":url="https://minfin.gov.ru/ru/statistics/fedbud/execute/";title="Годовые итоги федерального бюджета Минфина"
