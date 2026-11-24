@@ -159,7 +159,10 @@ price_data.publish(out)
 forecast.publish(out,m.now())
 capital_data.publish(page,out)
 with m.connect() as finance_db:
-    finance_data.publish(page,out,finance_data.check_files(finance_db,m.now(),"--refresh" in sys.argv))
+    finance_check=finance_data.check_files(finance_db,m.now(),"--refresh" in sys.argv)
+    finance_data.publish(page,out,finance_check)
+    import finance_workbooks
+    finance_workbooks.publish(page,out,finance_workbooks.sync(finance_db,m.now(),"--refresh" in sys.argv,finance_check["files"]))
 financial_state.publish(page,out)
 cost_structure.publish(page,out)
 with m.connect() as food_db:

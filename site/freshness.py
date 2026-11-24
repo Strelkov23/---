@@ -59,6 +59,8 @@ def collect(out,stamp):
         add("cbr-"+k,"Банк России",r["title"],r["source"],r,latest(x.get("date") for x in r["values"]),1,"Проверка при ежедневной сборке; торговые/рабочие дни",href="national.html")
     for k,r in read("national.json").items():
         add("nat-"+k,"Банк России",r["title"],r["source"],r,latest(x.get("period") for x in r["values"]),1,"Проверка при сборке; период публикации зависит от показателя",href="national.html")
+    for b in read("finance-workbooks.json")["years"]:
+        add("fns-profit-"+str(b["year"]),"Финансы организаций","Рентабельность ФНС "+str(b["year"]),b["url"],b,str(b["year"]) if b["rows"] else None,policy="30 суток после успеха, 7 после ошибки; до двух файлов за сборку",href="finance-workbooks.html")
     cmp=read("compare.json")
     for k,r in read("catalog.json").items():
         add("wdi-"+k,"Всемирный банк",r["title"],r["source"],r,latest(cmp.get(k,{}).get("values",{})),policy="Ротация годовых рядов; точный день не назначен",href="statistics.html")
