@@ -17,6 +17,7 @@ SOURCES=[
  ("accounts","Росстат · Национальные счета","https://rosstat.gov.ru/statistics/accounts"),
  ("investment","Росстат · Инвестиции","https://rosstat.gov.ru/investment_nonfinancial"),
  ("population","Росстат · Демография","https://rosstat.gov.ru/folder/12781"),
+ ("food","Росстат · Продовольственные балансы","https://rosstat.gov.ru/enterprise_economy/"),
  ("costs","Росстат · Затраты на производство и реализацию","https://rosstat.gov.ru/statistics/instituteconomics"),
  ("finance","Росстат · Финансы организаций и задолженность","https://rosstat.gov.ru/statistics/finance"),
  ("prices","Росстат · Цены","https://rosstat.gov.ru/statistics/price"),
