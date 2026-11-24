@@ -15,6 +15,10 @@ RULES={
  "budget_exp":("Федеральный бюджет: расходы Минфина и Казначейства","млрд руб.",0.2,"Тот же год, фактические федеральные расходы; Казначейство в рублях переводится в млрд руб. Различия могут отражать уточнения отчётности."),
  "budget_bal":("Федеральный бюджет: сальдо Минфина и Казначейства","млрд руб.",0.2,"Годовой дефицит/профицит, доходы минус расходы, без смены знака. Две публикации не обязательно независимы.")
 }
+# Separate documentary law comparisons; never overwrite automatic observations.
+for _metric,_title in (("rev","доходы"),("exp","расходы"),("bal","сальдо")):
+    for _provider,_label in (("minfin","Минфин"),("treasury","Казначейство")):
+        RULES["law_"+_provider+"_"+_metric]=("Федеральный бюджет: "+_title+" по закону и "+_label,"млрд руб.",0.2,"Годовой итог по статье 1 закона минус автоматически импортированное значение. Сальдо = доходы − расходы. Возможны различия редакций; допуск 0,2 млрд руб. учитывает округление.")
 def finite(v):return type(v) in (int,float) and math.isfinite(v)
 def vals(s,k):return {r[k]:r["value"] for r in (s or {}).get("values",[]) if finite(r.get("value"))}
 BUDGET_METRICS=("REV","EXP","BAL")
@@ -34,6 +38,15 @@ def budget_observations(out):
             if row["region"]!="Российская Федерация" or not finite(row["value"]):continue
             v=row["value"] if code.startswith("MINFIN_") else row["value"]/1_000_000_000
             result.setdefault(code,{}).setdefault(str(row["year"]),[]).append((v,series["source"]))
+    path=out/"federal-budget.json"
+    if path.is_file():
+        law=json.loads(path.read_text(encoding="utf-8"))
+        if law.get("unit")!="млрд руб." or law.get("mode")!="documentary":raise ValueError("Некорректная единица или режим законов об исполнении")
+        for r in law["rows"]:
+            for metric,key in (("REV","revenue"),("EXP","expenditure"),("BAL","balance")):
+                v=r["values"][key]
+                if not finite(v):raise ValueError("Некорректный итог закона")
+                result.setdefault("LAW_"+metric,{}).setdefault(str(r["year"]),[]).append((v,r["source"]))
     return result
 
 def budget_value(entries):
@@ -73,6 +86,14 @@ def create(national,cbr,sme,stamp,budget=None):
             if not period.isdigit() or int(period)>=int(stamp[:4]):continue
             va,sa=budget_value(a.get(period,[]));vb,sb=budget_value(b.get(period,[]))
             emit("budget_"+metric.lower(),period,va,vb,"Минфин: "+sa+"; Казначейство: "+sb)
+    for metric in BUDGET_METRICS:
+        legal=budget.get("LAW_"+metric,{})
+        for period,entries in sorted(legal.items()):
+            if not period.isdigit() or int(period)>=int(stamp[:4]):continue
+            va,sa=budget_value(entries)
+            for prefix,name,label in (("MINFIN_","minfin","Минфин"),("BUD_","treasury","Казначейство")):
+                vb,sb=budget_value(budget.get(prefix+metric,{}).get(period,[]))
+                emit("law_"+name+"_"+metric.lower(),period,va,vb,"Закон: "+sa+"; "+label+": "+sb)
     return dict(schema=1,built=stamp,rules={k:list(v) for k,v in RULES.items()},rows=rows,counts=dict(Counter(r["status"] for r in rows)))
 def publish(page,out,stamp):
     def read(n):return json.loads((out/n).read_text(encoding="utf-8"))
@@ -90,7 +111,7 @@ def publish(page,out,stamp):
         if not rows:body+="<p>Нет наблюдений для проверки.</p>"
         else:
             ordered=sorted(rows,key=lambda r:(r["status"]=="согласовано",r["period"]),reverse=False)
-            first,second=("Минфин","Казначейство") if key.startswith("budget_") else ("Первое","Второе")
+            first,second=("Закон","Минфин" if key.startswith("law_minfin_") else "Казначейство") if key.startswith("law_") else ("Минфин","Казначейство") if key.startswith("budget_") else ("Первое","Второе")
             body+="<details><summary>Показать таблицу (до 30 строк; полный CSV выше)</summary><div style='overflow-x:auto'><table><tr><th>Период</th><th>"+first+"</th><th>"+second+"</th><th>Разность</th><th>Результат</th><th>Примечание</th></tr>"
             for r in ordered[:30]:body+="<tr>"+"".join("<td>"+escape(fmt(r[k]))+"</td>" for k in ("period","first","second","delta","status"))+"<td style='min-width:14rem;overflow-wrap:anywhere'>"+escape(r["note"])+"</td></tr>"
             body+="</table></div></details>"
