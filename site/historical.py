@@ -184,7 +184,29 @@ def parse_xlsx(raw,code,pattern,unit,exclude):
             if len(set(x["region"] for x in local))>=10:records.extend(local)
     finally:book.close()
     return records
-def mirror_rows(raw,section):
+# Choose a bounded set of core concepts first. Do not copy hundreds of unreviewed series
+# into the SQLite archive (GitHub file size limit); all source files remain in the registry.
+MIRROR_PRIORITY={
+ "population":[r"^численность населения$",r"^среднегодовая численность населения$",r"^общие коэффициенты рождаемости",r"^общие коэффициенты смертности"],
+ "labor":[r"^уровень безработицы",r"^среднегодовая численность занятых",r"^уровень занятости населения",r"^численность безработных"],
+ "grp":[r"^валовой региональный продукт(?: \(.*\))?$",r"^валовой региональный продукт на душу населения",r"^валовое накопление основного капитала",r"^индекс.*физического объема валового регионального продукта"],
+ "investment":[r"^инвестиции в основной капитал$",r"^инвестиции в основной капитал на душу населения",r"^индекс.*физического объема инвестиций в основной капитал",r"^инвестиции в основной капитал.*всего"],
+ "industry":[r"^индекс.*промышленного производства.*оквэд2",r"^индекс.*производства.*обрабатывающие производства.*оквэд2",r"^индекс.*производства.*добыча полезных ископаемых.*оквэд2",r"^объем отгруженных.*обрабатывающие"],
+ "finance":[r"^доходы консолидированных бюджетов субъектов",r"^расходы консолидированных бюджетов субъектов",r"^сальдированный финансовый результат",r"^удельный вес убыточных организаций"]
+}
+def select_mirror(rows,section,limit=4):
+    by=defaultdict(list)
+    for r in rows:by[r["indicator"]].append(r)
+    picked=[]
+    for pat in MIRROR_PRIORITY.get(section,[]):
+        candidates=[(k,v) for k,v in by.items() if k not in picked and re.search(pat,norm(v[0]["title"]))]
+        if candidates:
+            # Prefer the largest complete historical series, not the first arbitrary CSV row.
+            picked.append(max(candidates,key=lambda item:(len(item[1]),item[0]))[0])
+    if not picked:
+        picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
+    return [r for k in picked[:limit] for r in by[k]]
+def mirror_rows(raw,section,selected=False):
     """Accept only explicit long-format schemas. Never infer which field is value."""
     result=[]
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -212,9 +234,9 @@ def mirror_rows(raw,section):
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
                     result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
-                    if len(result)>200000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
+                    if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Не распознана документированная структура CSV")
-    return result
+    return select_mirror(result,section) if selected else result
 
 def parse_budget(raw,filename=""):
     """Annual actual federal budget totals from 0503117 only.
@@ -334,9 +356,9 @@ def publish(db,stamp,out,refresh):
             code="mirror_"+section
             url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
             try:
-                raw,_=get(url,35_000_000);n=store(mirror_rows(raw,section),url,section,"Росстат · обработка «Если быть точным», CC BY 4.0")
+                raw,_=get(url,35_000_000);n=store(mirror_rows(raw,section,selected=True),url,section,"Росстат · обработка «Если быть точным», CC BY 4.0")
                 if not n:raise ValueError("Нет однозначных наблюдений")
-                status="Ключей: "+str(n)
+                status="Ключей выбранных основных показателей: "+str(n)
                 db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,status,"[]"))
                 sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=stamp,success=stamp,status=status,files=[]))
             except Exception as e:
