@@ -392,16 +392,18 @@ def parse_minfin_annual(raw):
 def budget_report_year(header):
     """Use dates from the report itself, never the filename alone."""
     dates=set()
-    for d,m,y in re.findall(r"\b(\d{2})[./-](\d{2})[./-](20\d{2})\b",header):
+    for d,m,y in re.findall(r"\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b",header):
         dates.add((int(y),int(m),int(d)))
     for y,m,d in re.findall(r"\b(20\d{2})-(\d{2})-(\d{2})\b",header):
         dates.add((int(y),int(m),int(d)))
+    months=("января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря")
+    for d,m,y in re.findall(r"\b(\d{1,2})\s+("+"|".join(months)+r")\s+(20\d{2})\b",header):
+        dates.add((int(y),months.index(m)+1,int(d)))
     if len(dates)!=1:return None
     y,m,d=next(iter(dates))
     return y-1 if m==d==1 and 2000<=y<=date.today().year else None
 
 def budget_rubles(header):
-    # Never relabel scaled amounts as rubles. OKEI 383 is rubles.
     if re.search(r"(?:тыс(?:\.|яч\w*)?|млн\.?|миллион\w*|млрд\.?|миллиард\w*|трлн\.?)\s*руб",header):return False
     return bool(re.search(r"\bруб(?:\.|\b|л[ьяеи]\b|лей\b)|оке[ий]\s*[:—-]?\s*383\b",header))
 
@@ -410,51 +412,106 @@ def check_xlsx_size(blob,limit=80_000_000):
         if sum(x.file_size for x in z.infolist())>limit or len(z.infolist())>2000:
             raise ValueError("Превышен размер распакованной книги")
 
+BUDGET_LABELS={"доходы бюджета - всего":"BUD_REV","доходы бюджета всего":"BUD_REV","доходы - всего":"BUD_REV","расходы бюджета - всего":"BUD_EXP","расходы бюджета всего":"BUD_EXP","расходы - всего":"BUD_EXP","результат исполнения бюджета":"BUD_BAL"}
+BUDGET_TITLES={"BUD_REV":"Федеральный бюджет: исполненные доходы","BUD_EXP":"Федеральный бюджет: исполненные расходы","BUD_BAL":"Федеральный бюджет: сальдо исполнения"}
+def budget_label(v):
+    label=norm(v).replace("–","-").replace("—","-")
+    label=re.sub(r"\s*в том числе\s*:?\s*$","",label).strip().rstrip(":")
+    return BUDGET_LABELS.get(label)
+def budget_header(rows,n=20):
+    return " ".join(norm(x) for row in rows[:n] for x in row if x is not None)
+def budget_totals(rows,col,keys,sheet,require_marker=False):
+    vals={};conflicts=set()
+    for i,row in enumerate(rows,1):
+        if not row:continue
+        key=budget_label(row[0])
+        if key not in keys:continue
+        if require_marker:
+            # A classification code is a detail row, not an aggregate.
+            codes=[norm(x) for x in row[2:col-1] if x is not None and norm(x)]
+            if not any(x in ("x","х") for x in codes) or any(x not in ("x","х","000") for x in codes):continue
+        v=numeric(row[col]) if col<len(row) else None
+        if v is None:continue
+        if key in vals and vals[key][0]!=v:conflicts.add(key)
+        elif key not in vals:vals[key]=(v,sheet,i,col+1)
+    if conflicts:raise ValueError("Противоречивые итоговые строки "+sheet)
+    return vals
+def budget_execution_column(rows,expected=None,header_rows=25):
+    cols={j for row in rows[:header_rows] for j,v in enumerate(row) if norm(v) in ("исполнено","исполнено всего","исполнение")}
+    if len(cols)!=1:return None
+    col=next(iter(cols))
+    return col if expected is None or expected==col else None
+
 def parse_budget(raw,filename=""):
-    """Annual actual federal budget totals from 0503117 only.
-    Require year-end date, rubles, single actual-execution column, balance identity.
-    Other report forms and monthly cumulative totals are not relabelled annual.
-    """
+    """Completed federal budget years only, with sheet/cell provenance."""
     import openpyxl
     result=[]
     def workbook(blob,member):
         check_xlsx_size(blob)
         book=openpyxl.load_workbook(io.BytesIO(blob),read_only=True,data_only=True)
         try:
+            def sheet_rows(sheet):
+                if not sheet.max_row or not sheet.max_column or sheet.max_row>10000 or sheet.max_column>80:return []
+                return list(sheet.iter_rows(values_only=True))
+            def emit(vals,yr):
+                if set(vals)!=set(BUDGET_TITLES):return
+                rev,exp,bal=[vals[k][0] for k in ("BUD_REV","BUD_EXP","BUD_BAL")]
+                if rev<0 or exp<0 or abs(rev-exp-bal)>max(1,abs(rev)*1e-9):return
+                for k,title in BUDGET_TITLES.items():
+                    value,sheet,row,column=vals[k]
+                    result.append(dict(indicator=k,title=title,region="Российская Федерация",year=yr,value=value,unit="руб.",sheet=member+" / "+sheet,row=row,column=column,note="Форма 0503117; годовой итог на 1 января следующего года. Контроль: доходы минус расходы равны сальдо; итоги не суммируются."))
+            # Observed 2025 annual layout: income sheet without administrator
+            # uses column F; federal expenditure sheet uses column H.
+            names={norm(n):n for n in book.sheetnames}
+            if "доходы без ад" in names and "расходы фб" in names:
+                inc=book[names["доходы без ад"]];exp=book[names["расходы фб"]]
+                a,b=sheet_rows(inc),sheet_rows(exp)
+                if not a or not b:return
+                header=budget_header(a,16)+" "+budget_header(b,6)
+                yr=budget_report_year(header)
+                if yr is None or "0503117" not in header+" "+member or not budget_rubles(header) or "федеральн" not in header or "бюджет" not in header:return
+                ac=budget_execution_column(a,5,16);bc=budget_execution_column(b,7,6)
+                if ac is None or bc is None:return
+                vals=budget_totals(a,ac,{"BUD_REV"},inc.title,True)
+                vals.update(budget_totals(b,bc,{"BUD_EXP","BUD_BAL"},exp.title,True))
+                emit(vals,yr)
+                return
+            # Compact historical formats: all three explicitly named totals
+            # must reside in the same dated sheet with one execution column.
             for sheet in book:
-                if not sheet.max_row or not sheet.max_column or sheet.max_row>10000 or sheet.max_column>80:continue
-                rows=list(sheet.iter_rows(values_only=True))
-                header=" ".join(norm(x) for row in rows[:20] for x in row if x is not None)
-                if "0503117" not in header+" "+member or not budget_rubles(header):continue
-                if "федеральн" not in header or "бюджет" not in header:continue
+                if sheet.sheet_state!="visible":continue
+                rows=sheet_rows(sheet)
+                if not rows:continue
+                header=budget_header(rows)
+                if "0503117" not in header+" "+member or not budget_rubles(header) or "федеральн" not in header or "бюджет" not in header:continue
                 yr=budget_report_year(header)
                 if yr is None:continue
-                cols=set(j for row in rows[:25] for j,v in enumerate(row) if norm(v) in ("исполнено","исполнено всего","исполнение"))
-                if len(cols)!=1:continue
-                col=next(iter(cols));vals={};conflicts=set()
-                labels={"доходы бюджета - всего":"BUD_REV","доходы бюджета всего":"BUD_REV","доходы - всего":"BUD_REV","расходы бюджета - всего":"BUD_EXP","расходы бюджета всего":"BUD_EXP","расходы - всего":"BUD_EXP","результат исполнения бюджета":"BUD_BAL"}
-                for i,row in enumerate(rows):
-                    for x in row[:col]:
-                        label=norm(x).replace("–","-").replace("—","-")
-                        if label not in labels:continue
-                        key=labels[label];v=numeric(row[col]) if col<len(row) else None
-                        if v is None:continue
-                        if key in vals and vals[key][0]!=v:conflicts.add(key)
-                        elif key not in vals:vals[key]=(v,i+1)
-                if conflicts or any(k not in vals for k in ("BUD_REV","BUD_EXP","BUD_BAL")):continue
-                rev,exp,bal=[vals[k][0] for k in ("BUD_REV","BUD_EXP","BUD_BAL")]
-                if rev<0 or exp<0 or abs(rev-exp-bal)>max(1,abs(rev)*1e-9):continue
-                for k,title in (("BUD_REV","Федеральный бюджет: исполненные доходы"),("BUD_EXP","Федеральный бюджет: исполненные расходы"),("BUD_BAL","Федеральный бюджет: сальдо исполнения")):
-                    result.append(dict(indicator=k,title=title,region="Российская Федерация",year=yr,value=vals[k][0],unit="руб.",sheet=member+" / "+sheet.title,row=vals[k][1],column=col+1,note="Форма 0503117; годовой итог на 1 января следующего года. Контроль: доходы минус расходы равны сальдо."))
+                col=budget_execution_column(rows)
+                if col is None:continue
+                try:vals=budget_totals(rows,col,set(BUDGET_TITLES),sheet.title)
+                except ValueError:continue
+                emit(vals,yr)
         finally:book.close()
     if filename.lower().endswith(".zip"):
-        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        with zipfile.ZipFile(io.BytesIO(raw),metadata_encoding="cp866") as z:
             members=[item for item in z.infolist() if item.filename.lower().endswith(".xlsx") and "0503117" in item.filename]
             if len(members)>30 or sum(item.file_size for item in members)>100_000_000 or any(item.file_size>25_000_000 for item in members):
                 raise ValueError("Превышен лимит годовых книг в архиве")
             for item in members:workbook(z.read(item),item.filename)
     else:workbook(raw,filename)
-    return result
+    unique={}
+    for row in result:
+        key=row["indicator"],row["year"]
+        if key in unique and unique[key]["value"]!=row["value"]:raise ValueError("Противоречивые итоги годовых книг")
+        unique.setdefault(key,row)
+    return list(unique.values())
+
+def budget_candidate(f):
+    if f.get("format") not in ("zip","xlsx"):return False
+    label=norm(f.get("title","")+" "+unquote(f.get("url","")))
+    return bool(re.search(r"исполнени|0503117",label) and
+        (re.search(r"01[._-]01[._-]20\d\d|\b0?1\s+января\s+20\d\d\b",label) or
+         (re.search(r"\bгодов\w*",label) and re.search(r"\b20\d\d\b",label))))
 
 def publish(db,stamp,out,refresh):
     db.execute("create table if not exists hist_sources(code text primary key,checked text,success text,status text,files text)")
@@ -519,7 +576,7 @@ def publish(db,stamp,out,refresh):
             except Exception as e:
                 sources.append(import_status(db,"import_minfin_budget","Годовые итоги федерального бюджета Минфина",url,stamp,"Ошибка: "+str(e)[:200],False))
         # Year-end federal reports only. Keep the other Treasury files in the source registry.
-        budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if f["format"] in ("zip","xlsx") and re.search(r"01[._-]01[._-]20\d\d",f["title"]+" "+unquote(f["url"])) and re.search(r"исполнени|0503117",norm(f["title"]+" "+unquote(f["url"])))]
+        budget_files=[f for x in sources if x["code"]=="budget" for f in x["files"] if budget_candidate(f)]
         for f in choose_budget_files(db,budget_files,stamp):
             code=budget_import_code(f["url"])
             try:
