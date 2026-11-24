@@ -31,7 +31,8 @@ SOURCES=[
  ("budget_regions","Казначейство · Бюджеты субъектов","https://roskazna.gov.ru/ispolnenie-byudzhetov/konsolidirovannye-byudzhety-subektov-rossijskoj-federacii"),
 ]
 REGIONAL_ZIPS={
- "population":"01","labor":"02","grp":"08","investment":"10","industry":"12","finance":"19"
+ "population":"01","labor":"02","grp":"08","investment":"10","industry":"12","finance":"19",
+ "enterprises":"11","agriculture":"13","construction":"14","trade":"15","transport":"16","innovation":"18"
 }
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
@@ -195,7 +196,13 @@ MIRROR_PRIORITY={
  "grp":[r"^валовой региональный продукт(?: \(.*\))?$",r"^валовой региональный продукт на душу населения",r"^валовое накопление основного капитала",r"^индекс.*физического объема валового регионального продукта"],
  "investment":[r"^инвестиции в основной капитал$",r"^инвестиции в основной капитал на душу населения",r"^индекс.*физического объема инвестиций в основной капитал",r"^инвестиции в основной капитал.*всего"],
  "industry":[r"^индекс.*промышленного производства.*оквэд2",r"^индекс.*производства.*обрабатывающие производства.*оквэд2",r"^индекс.*производства.*добыча полезных ископаемых.*оквэд2",r"^объем отгруженных.*обрабатывающие"],
- "finance":[r"^доходы консолидированных бюджетов субъектов",r"^расходы консолидированных бюджетов субъектов",r"^сальдированный финансовый результат",r"^удельный вес убыточных организаций"]
+ "finance":[r"^доходы консолидированных бюджетов субъектов",r"^расходы консолидированных бюджетов субъектов",r"^сальдированный финансовый результат",r"^удельный вес убыточных организаций"],
+ "enterprises":[r"^(?:число|количество) предприятий и организаций(?:$|:)",r"^(?:число|количество) малых предприятий(?:$|:)",r"^оборот организаций(?:$|:)",r"^число средних предприятий(?:$|:)"],
+ "agriculture":[r"^(?:объем )?(?:производства )?продукци[яи] сельского хозяйства(?:$|:| в хозяйствах всех категорий)",r"^индекс.*производства продукции сельского хозяйства",r"^валов(?:ой|ые) сбор(?:ы)? зерновых",r"^производство молока(?:$|:| в хозяйствах всех категорий)"],
+ "construction":[r"^объем работ,? выполненных по виду экономической деятельности.{0,4}строительство",r"^ввод в действие жилых домов",r"^индекс.*физического объема работ.*строительств",r"^введено.*жилых помещений"],
+ "trade":[r"^оборот розничной торговли(?:$|:)",r"^оборот розничной торговли на душу населения",r"^оборот оптовой торговли(?:$|:)",r"^объем платных услуг населению(?:$|:)"],
+ "transport":[r"^перевозки грузов автомобильным транспортом",r"^грузооборот автомобильного транспорта",r"^плотность автомобильных дорог общего пользования",r"^перевозки пассажиров автобусами"],
+ "innovation":[r"^внутренние затраты на исследования и разработки",r"^численность персонала,? занятого исследованиями и разработками",r"^уровень инновационной активности организаций",r"^объем инновационных товаров, работ, услуг"]
 }
 def select_mirror(rows,section,limit=4):
     by=defaultdict(list)
@@ -206,7 +213,7 @@ def select_mirror(rows,section,limit=4):
         if candidates:
             # Prefer the largest complete historical series, not the first arbitrary CSV row.
             picked.append(max(candidates,key=lambda item:(len(item[1]),item[1][0]["unit"]=="млн руб.",item[0]))[0])
-    if not picked:
+    if not picked and section not in {'enterprises','agriculture','construction','trade','transport','innovation'}:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
     # Include a separate nationwide budget unit only when its exact indicator title is selected.
@@ -248,6 +255,8 @@ def mirror_rows(raw,section,selected=False):
                         elif level in ("регион","федеральный округ","фо"):
                             unit="млн руб."
                         else:continue
+                    # For new large sections retain only indicators selected by the declared concepts.
+                    if selected and section in {'enterprises','agriculture','construction','trade','transport','innovation'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
@@ -363,13 +372,17 @@ def publish(db,stamp,out,refresh):
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
                 sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
-        # Backfill six source sections once. Afterwards rotate one per day.
+        # Backfill up to three not-yet-loaded sections per refresh to keep builds bounded. Afterwards rotate one per day.
         # Use published provider ZIPs with exact original indicator and unit, not derived values.
         sections=[]
         for section in REGIONAL_ZIPS:
             saved=db.execute("select success from hist_sources where code=?",("mirror_"+section,)).fetchone()
             if not saved or not saved[0]:sections.append(section)
-        if not sections:sections=[list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]]
+        if sections:
+            # A permanently failing source must not starve later sections.
+            offset=date.fromisoformat(stamp[:10]).toordinal()%len(sections)
+            sections=(sections[offset:]+sections[:offset])[:3]
+        else:sections=[list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]]
         for section in sections:
             code="mirror_"+section
             url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"

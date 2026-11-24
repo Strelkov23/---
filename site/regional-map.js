@@ -23,7 +23,9 @@ const RegionalMap=(()=>{
   return [...new Set([0,.2,.4,.6,.8,1].map(q))];
  }
  function bin(v,thresholds){if(!Number.isFinite(v)||!thresholds.length)return -1;if(thresholds.length===1)return 0;const i=thresholds.slice(1).findIndex(t=>v<=t);return i<0?thresholds.length-2:i}
- function theme(code){
+ function theme(code,source=''){
+ const section=String(source).match(/\/data_(11|13|14|15|16|18)_socio_economic_102_v20260313\.zip$/)?.[1];
+ if(section)return {'11':'enterprises','13':'agriculture','14':'construction','15':'trade','16':'transport','18':'innovation'}[section];
  if(/^(GRP_|NW_GRP_|R_024d9416ea6f54dc_|R_7e8fd799d1d06897_|R_f54f02504bfb051e_)/.test(code))return 'economy';
  if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code))return 'industry';
  if(/^R_(66b96177c45a01ad|6887143295c72599|88230ed30f2f2738|90575f546cc99ce3)_/.test(code))return 'investment';
@@ -194,14 +196,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(!['ok','cached'].includes(meta.status)){status.textContent='Файл границ пока недоступен; используйте тепловые карты и территориальные таблицы.';source.append(link('Документация источника',meta.documentation),node('p',meta.error||''));return}
   [geo,catalog]=await Promise.all([mapLoad('regional-boundaries.geojson'),mapLoad('historical.json').then(x=>x.series.filter(s=>s.regions>=3))]);
   function populate(preferred){
-   const subset=catalog.filter(s=>!themePick||themePick.value==='all'||RegionalMap.theme(s.code)===themePick.value);
+   const subset=catalog.filter(s=>!themePick||themePick.value==='all'||RegionalMap.theme(s.code,s.source)===themePick.value);
    pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.kind,s.code)));
    if(subset.some(s=>s.code===preferred))pick.value=preferred;
    else {const def=subset.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code}
    if(!subset.length){status.textContent='В этом слое нет загруженных рядов.';host.replaceChildren();details.replaceChildren();csvButton.disabled=true;return false}
    return true
   }
-  if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code);restore(['geo-theme','geo-scale','geo-markers']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
+  if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code,requested.source);restore(['geo-theme','geo-scale','geo-markers']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
   populate(saved.get('geo-series'));restore(['geo-series']);pick.onchange=choose;year.onchange=draw;if(growthPick)growthPick.onchange=draw;if(markerPick)markerPick.onchange=draw;form.onsubmit=e=>e.preventDefault();choose()
  }catch(e){console.error(e);status.textContent='Географические данные недоступны для этой версии. Откройте текущую сборку или используйте таблицы.'}
 });

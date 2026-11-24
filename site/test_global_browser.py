@@ -233,6 +233,8 @@ with sync_playwright() as p:
             with page.expect_download() as profile:
                 page.locator("#geo-detail .geo-profile button").click()
             assert profile.value.suggested_filename.startswith("regional-profile-")
+            page.locator("#geo-theme").select_option("agriculture")
+            page.wait_for_function("document.querySelector('#geo-status').textContent.startsWith('Год:') || document.querySelector('#geo-status').textContent.includes('нет загруженных рядов')")
         page.goto("http://localhost:8765/district-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#district-status').textContent.startsWith('Загрузка')",timeout=45000)
         if page.locator("#district-status").inner_text().startswith("2017 год"):

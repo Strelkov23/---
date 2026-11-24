@@ -14,6 +14,9 @@ class SME(unittest.TestCase):
         self.assertEqual(s.target("2026-11-03"),"2026-10-10")
         self.assertEqual(s.target("2026-01-01"),"2025-12-10")
         self.assertEqual(s.target("2026-11-24"),"2026-11-10")
+    def test_aggregate_rows_not_regions(self):
+        d=self.fixture();d[0]["ssrf"]="00";d.insert(1,dict(ssrf="00",cnt_name="Федеральный округ",stat_date="10.11.2026"))
+        self.assertEqual(len(self.parse(d)["rows"]),80)
     def test_duplicate(self):
         d=self.fixture();d[2]["ssrf"]="01"
         with self.assertRaises(ValueError):self.parse(d)

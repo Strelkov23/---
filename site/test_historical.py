@@ -24,6 +24,12 @@ class HistoricalTests(unittest.TestCase):
         rows=historical.mirror_rows(f.getvalue(),"grp")
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]["value"],10.5)
+    def test_new_sector_selection(self):
+        rows=[dict(indicator="A",title="Оборот розничной торговли",unit="млн руб."),dict(indicator="B",title="Иной показатель",unit="человек")]
+        self.assertEqual([r["indicator"] for r in historical.select_mirror(rows,"trade")],["A"])
+        self.assertEqual(historical.select_mirror(rows,"transport"),[])
+        self.assertEqual(historical.REGIONAL_ZIPS["agriculture"],"13")
+        self.assertEqual(historical.REGIONAL_ZIPS["innovation"],"18")
     def test_observed_vrp_layout(self):
         b=openpyxl.Workbook()
         for i,header in enumerate(("Валовой региональный продукт по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(в текущих  ценах; миллионов рублей)","Валовой региональный продукт на душу населения по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(рублей)","Индексы физического объема валового регионального продукта в 2017-2024 гг.\n(в постоянных ценах; в процентах к предыдущему году)")):

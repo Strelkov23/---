@@ -40,9 +40,9 @@ def parse(raw,expected):
         if not isinstance(r,dict):raise ValueError("unexpected row")
         if r.get("cnt_name")=="Российская Федерация":
             if period(r.get("stat_date"))!=expected:raise ValueError("national period mismatch")
-            national.append(measures(r))
+            national.append(measures(r));continue
         code=r.get("ssrf")
-        if code is None or str(code).strip()=="":continue
+        if code is None or str(code).strip() in ("","0","00"):continue
         code=str(code).strip().zfill(2)
         if not re.fullmatch(r"\d{2}",code) or code=="00" or code in seen:raise ValueError("invalid or duplicate region")
         if period(r.get("stat_date"))!=expected:raise ValueError("regional period mismatch")
@@ -85,11 +85,12 @@ def publish(out,previous,stamp,refresh):
     path=out/"sme-regions.json";base=dict(schema=1,source=SOURCE,documentation=DOCUMENTATION,status="not_loaded",checked=stamp,rows=[],note="Агрегаты реестра МСП, не выпуск и не число физических площадок. Работники — показатель реестра, не текущая занятость.")
     try:
         old=json.loads((previous/path.name).read_text(encoding="utf-8"));quality(old)
-        if old.get("rows"):base.update(old);base["status"]="cached"
+        base.update(old)
+        if old.get("rows"):base["status"]="cached"
     except (OSError,ValueError,TypeError,KeyError,AttributeError):pass
     expected=target(stamp)
     # Once per calendar day until the monthly snapshot becomes available.
-    if refresh and base.get("period")!=expected and str(base.get("checked",""))[:10]!=stamp[:10] or refresh and not base.get("rows") and base.get("status")=="not_loaded":
+    if refresh and base.get("period")!=expected and (base["status"]=="not_loaded" or str(base.get("checked",""))[:10]!=stamp[:10]):
         try:
             req=Request(SOURCE,data=urlencode({"statDate":date.fromisoformat(expected).strftime("%d.%m.%Y")}).encode(),headers={"User-Agent":"EconomicMonitor/2.5","Content-Type":"application/x-www-form-urlencoded","Accept":"application/json"})
             with urlopen(req,timeout=25) as response:raw=response.read(MAX+1)

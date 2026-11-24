@@ -27,3 +27,6 @@ assert.equal(M.profileObservation(observations,'москва',2023,sample).value
 assert.equal(M.profileObservation(observations,'москва',2024,sample).value,15);
 assert.equal(M.profileObservation(observations,'москва',2021,sample),null);
 assert.equal(M.profileObservation(observations,null,2024,sample),null);
+
+assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_13_socio_economic_102_v20260313.zip'),'agriculture');
+assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_16_socio_economic_102_v20260313.zip'),'transport');
