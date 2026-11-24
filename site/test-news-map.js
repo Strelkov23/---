@@ -13,3 +13,4 @@ assert.equal(N.windowRows(rows,'2026-11-24',7,'Промышленность','')
 assert.equal(N.windowRows(rows,'2026-11-24',7,'Инвестиции','').length,1);
 assert.equal(N.windowRows([...rows,rows[0]],'2026-11-24',7,'','москва').length,1);
 console.log('Regional news mapping and calendar tests passed');
+assert.deepEqual(codes('В Ямало-Ненецком автономном округе'),['RU-YAN']);

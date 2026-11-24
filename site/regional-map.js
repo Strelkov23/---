@@ -45,8 +45,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const link=(t,u)=>{const a=node('a',t);a.href=u;a.target='_blank';a.rel='noopener noreferrer';return a};
  let catalog=[],geo=null,meta=null,series=null,seq=0,first=true;
  const colors=['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953'];
- const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers');
- const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers'].filter(id=>$(id))];
+ const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers'),regionPick=$('geo-region');
+ let chosenRegion=saved.get('geo-region')||'';
+ const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region'].filter(id=>$(id))];
  function draw(){
   if(!geo||!series)return;
   host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
@@ -72,13 +73,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   shape('rect',{width:w,height:h,fill:'#fff'});txt(30,33,'Региональная статистика · '+Y,23);
   chartFitLabel(txt(30,58,series.title+' · '+series.unit,15),1120);
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
-  const select=f=>{const p=f.f.properties,r=f.r;details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
-    if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}};
+  const select=f=>{const p=f.f.properties,r=f.r;chosenRegion=p.iso_3166_2||'';if(regionPick)regionPick.value=chosenRegion;for(const e of svg.querySelectorAll('[data-region]')){if(e.dataset.region===chosenRegion)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
+    if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}
+    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}save(activeFields)};
   for(const f of polygons){
    const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
    if(!d)continue;
    const bin=growth?RegionalMap.growthBin(f.r?.value):RegionalMap.bin(f.r?.value,thresholds),fill=bin<0?'#deded9':palette[Math.min(bin,palette.length-1)];
-   const p=shape('path',{d,fill,stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd',tabindex:0,role:'button','aria-label':(f.r?.region||regionName(f.f.properties))+': '+fmtValue(f.r?.value)});
+   const p=shape('path',{d,fill,stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd','data-region':f.f.properties.iso_3166_2||'',tabindex:0,role:'button','aria-label':(f.r?.region||regionName(f.f.properties))+': '+fmtValue(f.r?.value)});
    shape('title',{},(f.r?.region||regionName(f.f.properties))+' · '+fmtValue(f.r?.value),p);p.addEventListener('click',()=>select(f));p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(f)}});
   }
   if(markerPick?.value==='top'){
@@ -106,7 +108,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const saveFile=(b,ext)=>{const u=URL.createObjectURL(b),a=node('a','');a.href=u;a.download='regional-map-'+series.code+'-'+Y+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(u),30000)};
   const png=async()=>{const u=URL.createObjectURL(blob());try{const img=new Image();img.src=u;await img.decode();const c=document.createElement('canvas');c.width=w*2;c.height=h*2;c.getContext('2d').drawImage(img,0,0,c.width,c.height);return await new Promise((r,j)=>c.toBlob(b=>b?r(b):j(Error('PNG')),'image/png'))}finally{URL.revokeObjectURL(u)}};
   for(const [label,fn] of [['Скачать SVG',()=>saveFile(blob(),'svg')],['Скачать PNG',async()=>saveFile(await png(),'png')],['Копировать карту',async()=>navigator.clipboard.write([new ClipboardItem({'image/png':png()})])]]){const b=node('button',label);b.type='button';b.onclick=async()=>{try{await fn();msg.textContent='Готово'}catch{msg.textContent='Экспорт недоступен; используйте SVG.'}};toolbar.append(b)}toolbar.append(msg);host.append(toolbar);
-  details.append(node('p','Выберите контур, чтобы открыть значение и ссылку на статистический ряд.'));
+  if(regionPick){
+   const options=polygons.filter(f=>f.f.properties.iso_3166_2).sort((a,b)=>(a.r?.region||regionName(a.f.properties)).localeCompare(b.r?.region||regionName(b.f.properties),'ru'));
+   const counts=new Map();for(const f of options){const code=f.f.properties.iso_3166_2;counts.set(code,(counts.get(code)||0)+1)}
+   const unique=options.filter(f=>counts.get(f.f.properties.iso_3166_2)===1);
+   regionPick.replaceChildren(new Option('Выберите регион',''),...unique.map(f=>new Option((f.r?.region||regionName(f.f.properties))+(f.r?'':' · нет данных'),f.f.properties.iso_3166_2)));
+   regionPick.onchange=()=>{chosenRegion=regionPick.value;const f=unique.find(x=>x.f.properties.iso_3166_2===chosenRegion);if(f)select(f);else{details.replaceChildren(node('p','Выберите регион или контур на карте.'));for(const e of svg.querySelectorAll('[data-selected]'))e.removeAttribute('data-selected');save(activeFields)}};
+   const current=unique.find(f=>f.f.properties.iso_3166_2===chosenRegion);if(current)select(current);else{chosenRegion='';details.append(node('p','Выберите регион из списка или нажмите на контур.'))}
+  }else details.append(node('p','Выберите контур, чтобы открыть значение и ссылку на статистический ряд.'));
   const audit=node('details','');audit.append(node('summary','Сопоставление территорий и границ'));
   const table=node('table',''),hrow=table.createTHead().insertRow(),body=table.createTBody();for(const v of ['Код','Название геометрии','Территория статистики','Значение'])hrow.append(node('th',v));
   for(const f of features){const tr=body.insertRow();for(const v of [f.f.properties.iso_3166_2,regionName(f.f.properties),f.r?.region,fmtValue(f.r?.value)])tr.insertCell().textContent=v||'—'}

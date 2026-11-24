@@ -2,7 +2,7 @@
 const NewsGeo=(()=>{
  const norm=s=>String(s??'').toLowerCase().replaceAll('ё','е').replace(/[\u2010-\u2015]/g,'-').replace(/\s+/g,' ').trim();
  const esc=s=>s.replace(/[.*+?^$(){}|[\]\\]/g,'\\$&');
- const wrap=s=>new RegExp('(?:^|[^а-яa-z0-9])('+s+')(?=$|[^а-яa-z0-9])','u');
+ const wrap=s=>new RegExp('(?:^|[^а-яa-z0-9-])('+s+')(?=$|[^а-яa-z0-9-])','u');
  function dictionary(names){
   const result=new Map(),special={
    'RU-MOW':'москва|москве|москву|москвы|москвой','RU-SPE':'санкт-петербург(?:а|е|у|ом)?',
@@ -49,7 +49,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const ns='http://www.w3.org/2000/svg';
  function renderList(){
   const selection=selected?groups.get(selected)||[]:rows.filter(r=>r.matches.length);
-  list.replaceChildren();$('news-geo-selection').textContent=(selected?label(selected):'Все регионы с упоминаниями')+' · публикаций: '+selection.length;
+  list.replaceChildren();if(selected){const a=node('a','Экономическая статистика региона'),u=new URL('economic-map.html',location.href);u.searchParams.set('geo-region',selected);if(pinned)u.searchParams.set('snapshot',pinned);a.href=u.href;list.append(a)}$('news-geo-selection').textContent=(selected?label(selected):'Все регионы с упоминаниями')+' · публикаций: '+selection.length;
   for(const r of selection.slice(0,limit)){
    const art=node('article',''),h=node('h3',''),a=node('a',r.title);a.href=r.url;a.target='_blank';a.rel='noopener noreferrer';h.append(a);
    art.append(node('small',[String(r.published).slice(0,10),r.source,r.topics].filter(Boolean).join(' · ')),h,node('p','Упоминание: '+r.matches.map(m=>label(m.code)+' («'+m.match+'»)').join('; ')));list.append(art)
@@ -58,7 +58,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   more.hidden=selection.length<=limit;exp.disabled=!selection.length;
   exp.onclick=()=>csv('regional-news.csv',[['Дата','Заголовок','Источник','Темы','URL','Региональные упоминания','Правило','Отпечаток данных'],...selection.map(r=>[String(r.published).slice(0,10),r.title,r.source,r.topics,r.url,r.matches.map(m=>m.code+': '+m.match).join('; '),'Явное упоминание в заголовке',manifest.data_fingerprint])])
  }
- function select(code){selected=code;region.value=code;limit=25;renderList();save(fields)}
+ function select(code){selected=code;region.value=code;limit=25;for(const e of host.querySelectorAll('[data-region]')){if(e.dataset.region===selected)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}renderList();save(fields)}
  function drawMap(){
   host.replaceChildren();let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
   for(const f of polygons)for(const ring of f.rings)for(const [u,v] of ring){xmin=Math.min(xmin,u);xmax=Math.max(xmax,u);ymin=Math.min(ymin,v);ymax=Math.max(ymax,v)}
@@ -72,7 +72,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   shape('rect',{width:w,height:h,fill:'#fff'});txt(25,32,'Экономические новости · '+days.value+' дней · до '+end,22);txt(25,55,'Административные контуры; значки — региональные упоминания, не место события.',14);
   for(const f of polygons){
    const code=f.code,n=count(code),d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
-   const p=shape('path',{d,fill:fill(n),stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd'}),name=names[code]?label(code):String(f.name||'Контур без сопоставления');
+   const p=shape('path',{d,fill:fill(n),stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd','data-region':code||''}),name=names[code]?label(code):String(f.name||'Контур без сопоставления');
    shape('title',{},name+' · '+n+' упоминаний',p);if(n)activate(p,code,name,n)
   }
   const placed=[];
@@ -80,9 +80,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const ring=f.rings.slice().sort((a,b)=>b.length-a.length)[0];if(!ring?.length)continue;
    const mean=ring.reduce((s,p)=>[s[0]+p[0]/ring.length,s[1]+p[1]/ring.length],[0,0]),p=ring.reduce((a,p)=>Math.hypot(p[0]-mean[0],p[1]-mean[1])<Math.hypot(a[0]-mean[0],a[1]-mean[1])?p:a,ring[0]);
    const xx=x(p[0]),yy=y(p[1]);if(placed.some(([a,b])=>Math.hypot(a-xx,b-yy)<30))continue;placed.push([xx,yy]);
-   const n=count(f.code),g=shape('g',{transform:'translate('+xx+' '+yy+')','class':'news-pin'});
-   shape('circle',{r:13,fill:'#173e52',stroke:'#fff','stroke-width':1.6},undefined,g);
-   shape('text',{x:0,y:4,'font-size':10,'font-family':'Arial, sans-serif','font-weight':'bold','text-anchor':'middle',fill:'#fff'},n>99?'99+':String(n),g);
+   const n=count(f.code),g=shape('g',{'class':'news-pin'});
+   shape('circle',{cx:xx,cy:yy,r:13,fill:'#173e52',stroke:'#fff','stroke-width':1.6},undefined,g);
+   shape('text',{x:xx,y:yy+4,'font-size':10,'font-family':'Arial, sans-serif','font-weight':'bold','text-anchor':'middle',fill:'#fff'},n>99?'99+':String(n),g);
    shape('title',{},label(f.code)+' · '+n+' публикаций',g);activate(g,f.code,label(f.code),n)
   }
   [[0,'Нет упоминаний'],[1,'1–2'],[3,'3–5'],[6,'6–10'],[11,'Более 10']].forEach(([n,t],i)=>{shape('rect',{x:25+i*220,y:565,width:20,height:16,fill:fill(n),stroke:'#52696e','stroke-width':.5});txt(52+i*220,578,t,13)});
@@ -94,10 +94,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   rows=NewsGeo.windowRows(archive,end,Number(days.value),topic.value,query.value).map(r=>({...r,matches:NewsGeo.mentions(r.title,dict)}));
   groups=new Map();for(const r of rows)for(const m of r.matches){if(!groups.has(m.code))groups.set(m.code,[]);groups.get(m.code).push(r)}
   region.replaceChildren(new Option('Все регионы с упоминаниями',''),...[...groups.keys()].sort((a,b)=>label(a).localeCompare(label(b),'ru')).map(k=>new Option(label(k)+' ('+groups.get(k).length+')',k)));
-  if(!groups.has(selected))selected='';region.value=selected;limit=25;
+  if(selected&&!names[selected])selected='';if(selected&&!groups.has(selected))region.add(new Option(label(selected)+' (0)',selected));region.value=selected;limit=25;
   const n=rows.filter(r=>r.matches.length).length;
   status.textContent='Период до '+end+' · публикаций: '+rows.length+' · с региональными упоминаниями: '+n+' · без привязки: '+(rows.length-n)+' · регионов: '+groups.size;
-  drawMap();renderList();save(fields)
+  drawMap();select(selected)
  }
  try{
   manifest=await Provenance.validateManifest(await load('data-manifest.json'));end=String(manifest.built).slice(0,10);

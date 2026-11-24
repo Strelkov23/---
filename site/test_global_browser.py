@@ -197,6 +197,10 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/news-map.html",wait_until="load")
         page.wait_for_function("document.querySelector('#news-geo-status').textContent.startsWith('Период до')",timeout=30000)
         assert page.locator("#news-geo-map svg").count()==1
+        page.locator("#news-geo-map .map-controls button").nth(1).click()
+        assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
+        page.locator("#news-geo-map .map-controls button").nth(2).click()
+        assert "100%" in page.locator("#news-geo-map .map-controls").inner_text()
         page.locator("#news-geo-days").select_option("90")
         if page.locator("#news-geo-region option").count()>1:
             page.locator("#news-geo-region").select_option(index=1)
