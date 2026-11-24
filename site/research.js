@@ -67,39 +67,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
    }catch{$('cbr-list').textContent='Данные Банка России недоступны в этой версии.'}
   }catch(e){console.error(e);$('stat-status').textContent=missing}
  }
- if($('diag-form')){
-  try{
-   const series=await load('compare.json');
-   const rules=[
-    ['Разрыв темпов: обработка и ВВП','NV.IND.MANF.KD.ZG','NY.GDP.MKTP.KD.ZG','Темп реального роста обработки минус темп реального роста ВВП. Различия состава и базисов не позволяют трактовать результат как вклад отрасли в ВВП.'],
-    ['Сальдо торговли товарами и услугами / ВВП','NE.EXP.GNFS.ZS','NE.IMP.GNFS.ZS','Экспорт минус импорт, оба в % ВВП. Это не сальдо текущего счёта.'],
-    ['Сбережения минус валовое накопление','NY.GNS.ICTR.ZS','NE.GDI.TOTL.ZS','Валовые сбережения минус валовое накопление, оба в % ВВП; не равно дефициту бюджета или износу фондов.'],
-    ['Разрыв отраслевых темпов: промышленность и услуги','NV.IND.TOTL.KD.ZG','NV.SRV.TOTL.KD.ZG','Разность годовых темпов реальной добавленной стоимости; промышленность WDI включает строительство.']
-   ];
-   const ids=['diag-from','diag-to'];restore(ids);
-   function draw(){
-    const from=$('diag-from').valueAsNumber,to=$('diag-to').valueAsNumber;
-    const host=$('diag-list');host.replaceChildren();const all=[];
-    if(!Number.isInteger(from)||!Number.isInteger(to)||from>to||from<1991||to>2100){$('diag-status').textContent='Укажите допустимый период';$('diag-csv').disabled=true;return}
-    for(const [title,c1,c2,note] of rules){
-     const x=series[c1],y=series[c2],box=node('article',''),list=[];
-     if(x&&y)for(let year=from;year<=to;year++){const a=x.values[year],b=y.values[year];if(Number.isFinite(a)&&Number.isFinite(b))list.push([year,a,b,a-b])}
-     box.append(node('h2',title),node('p',note),node('p','Формула: A − B, процентные пункты. Совместных наблюдений: '+list.length));
-     if(list.length){
-      const last=list.at(-1);metric(box,'последний общий год '+last[0],f(last[3])+' п. п.');
-      const detail=node('details',''),summary=node('summary','Таблица и исходные ряды'),holder=node('div','');detail.append(summary,holder);
-      table(holder,['Год','A: '+x.title,'B: '+y.title,'A − B, п. п.'],list.map(r=>[r[0],f(r[1]),f(r[2]),f(r[3])]));
-      box.append(detail,a('Открыть сравнение исходных рядов','compare.html?left='+c1+'&right='+c2+'&begin='+from+'&finish='+to+(pinned?'&snapshot='+encodeURIComponent(pinned):'')));
-      for(const r of list)all.push([title,c1,c2,...r,note]);
-     }else box.append(node('p','Нет сопоставимых наблюдений; расчёт не выполнен.'));
-     host.append(box)
-    }
-    $('diag-status').textContent='Рассчитано наблюдений: '+fmt(all.length)+' · источник WDI';$('diag-csv').disabled=!all.length;
-    $('diag-csv').onclick=()=>csv('diagnostics.csv',[['Диагностика','Код A','Код B','Год','A','B','Разность, п.п.','Ограничение'],...all]);save(ids);
-   }
-   $('diag-form').oninput=draw;$('diag-form').onsubmit=e=>e.preventDefault();draw()
-  }catch(e){console.error(e);$('diag-status').textContent=missing}
- }
  if($('scenario-form')){
   try{
    const m=await load('sectors.json'),inputs=[];
