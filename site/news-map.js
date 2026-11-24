@@ -28,9 +28,39 @@ const NewsGeo=(()=>{
   }
   return result
  }
- function mentions(title,dict){const t=norm(title);return [...dict].flatMap(([code,re])=>{const m=re.exec(t);return m?[{code,match:m[1]}]:[]})}
+ // Deliberately narrow dictionary: named cities with a stable region association.
+ const cities={
+  'RU-TA':'казан(?:ь|и|ью)|набережн(?:ые|ых|ым|ыми) челн(?:ы|ах|ам|ами|ов)',
+  'RU-SVE':'екатеринбург(?:а|е|у|ом)?|нижн(?:ий|его|ем|ему|им) тагил(?:а|е|у|ом)?',
+  'RU-PRI':'владивосток(?:а|е|у|ом)?',
+  'RU-NVS':'новосибирск(?:а|е|у|ом)?',
+  'RU-NIZ':'нижн(?:ий|его|ем|ему|им) новгород(?:а|е|у|ом)?',
+  'RU-CHE':'челябинск(?:а|е|у|ом)?|магнитогорск(?:а|е|у|ом)?',
+  'RU-KYA':'красноярск(?:а|е|у|ом)?',
+  'RU-ROS':'ростов(?:а|е|у|ом)?-на-дону',
+  'RU-SAM':'тольятти',
+  'RU-KHA':'хабаровск(?:а|е|у|ом)?|комсомольск(?:а|е|у|ом)?-на-амуре',
+  'RU-KGD':'калининград(?:а|е|у|ом)?',
+  'RU-VGG':'волгоград(?:а|е|у|ом)?',
+  'RU-IRK':'иркутск(?:а|е|у|ом)?',
+  'RU-VOR':'воронеж(?:а|е|у|ем)?',
+  'RU-BA':'стерлитамак(?:а|е|у|ом)?',
+  'RU-SA':'якутск(?:а|е|у|ом)?',
+  'RU-KEM':'новокузнецк(?:а|е|у|ом)?',
+  'RU-TYU':'тюмен(?:ь|и|ью)',
+  'RU-ARK':'архангельск(?:а|е|у|ом)?'
+ };
+ function mentions(title,dict,includeCities=true){
+  const t=norm(title),out=[];
+  for(const [code,re] of dict){const m=re.exec(t);
+   if(m){out.push({code,match:m[1],rule:'region'});continue}
+   if(includeCities&&Object.prototype.hasOwnProperty.call(cities,code)){const city=wrap(cities[code]).exec(t);if(city)out.push({code,match:city[1],rule:'city'})}
+  }return out
+ }
+ function addedUrls(oldRows,newRows){const old=new Set(oldRows.map(r=>r.url));return new Set(newRows.map(r=>r.url).filter(url=>typeof url==='string'&&!old.has(url)))}
+
  function windowRows(rows,end,days,topic,q){
-  const t=Date.parse(end+'T00:00:00Z');if(!Number.isFinite(t)||![7,30,90].includes(days))return [];
+  const t=Date.parse(end+'T00:00:00Z');if(!Number.isFinite(t)||![1,3,7,30,90].includes(days))return [];
   const from=new Date(t-(days-1)*86400000).toISOString().slice(0,10),search=norm(q),seen=new Set();
   return rows.filter(r=>{const date=String(r.published||'').slice(0,10);
    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<from||date>end||!/^https?:\/\//i.test(r.url||'')||seen.has(r.url)||topic&&!String(r.topics||'').split(' · ').includes(topic)||search&&!norm(r.title).includes(search))return false;
@@ -44,13 +74,14 @@ const NewsGeo=(()=>{
   if(Date.parse(next.built)<=Date.parse(previous.built))throw Error('Получена более старая или противоречивая версия');
   return 'new';
  }
- return {norm,dictionary,mentions,windowRows,updateState}
+ return {norm,dictionary,mentions,windowRows,updateState,addedUrls}
 })();
 if(typeof module!=='undefined')module.exports=NewsGeo;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),form=$('news-geo-form');if(!form)return;
  const status=$('news-geo-status'),host=$('news-geo-map'),list=$('news-geo-list'),region=$('news-geo-region'),days=$('news-geo-days'),topic=$('news-geo-topic'),query=$('news-geo-query'),more=$('news-geo-more'),exp=$('news-geo-export');
- const fields=['news-geo-days','news-geo-topic','news-geo-region','news-geo-query'];
+ const fields=['news-geo-days','news-geo-topic','news-geo-region','news-geo-query','news-geo-rule'];
+ const rule=$('news-geo-rule');let newUrls=new Set();
  let limit=25,selected='',rows=[],groups=new Map(),manifest,names,dict,polygons,archive,end,checking=false;
  const updateButton=$('news-geo-update'),freshness=$('news-geo-freshness');
  const label=code=>{const s=names[code]||code||'—';return s[0].toUpperCase()+s.slice(1)};
@@ -60,11 +91,11 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   list.replaceChildren();if(selected){const a=node('a','Экономическая статистика региона'),u=new URL('economic-map.html',location.href);u.searchParams.set('geo-region',selected);if(pinned)u.searchParams.set('snapshot',pinned);a.href=u.href;list.append(a)}$('news-geo-selection').textContent=(selected?label(selected):'Все регионы с упоминаниями')+' · публикаций: '+selection.length;
   for(const r of selection.slice(0,limit)){
    const art=node('article',''),h=node('h3',''),a=node('a',r.title);a.href=r.url;a.target='_blank';a.rel='noopener noreferrer';h.append(a);
-   art.append(node('small',[String(r.published).slice(0,10),r.source,r.topics].filter(Boolean).join(' · ')),h,node('p','Упоминание: '+r.matches.map(m=>label(m.code)+' («'+m.match+'»)').join('; ')));list.append(art)
+   art.append(node('small',[String(r.published).slice(0,10),r.source,r.topics].filter(Boolean).join(' · ')),h,node('p','Упоминание: '+r.matches.map(m=>label(m.code)+' («'+m.match+'», '+(m.rule==='city'?'город':'регион')+')').join('; ')));if(newUrls.has(r.url))art.prepend(node('small','Добавлено в последней полученной сборке'));list.append(art)
   }
   if(!selection.length)list.append(node('p','Нет публикаций в выбранной выборке. Измените период или тему.'));
   more.hidden=selection.length<=limit;exp.disabled=!selection.length;
-  exp.onclick=()=>csv('regional-news.csv',[['Дата','Заголовок','Источник','Темы','URL','Региональные упоминания','Правило','Отпечаток данных'],...selection.map(r=>[String(r.published).slice(0,10),r.title,r.source,r.topics,r.url,r.matches.map(m=>m.code+': '+m.match).join('; '),'Явное упоминание в заголовке',manifest.data_fingerprint])])
+  exp.onclick=()=>csv('regional-news.csv',[['Дата','Заголовок','Источник','Темы','URL','Региональные упоминания','Правило','Отпечаток данных'],...selection.map(r=>[String(r.published).slice(0,10),r.title,r.source,r.topics,r.url,r.matches.map(m=>m.code+': '+m.match).join('; '),r.matches.map(m=>m.rule==='city'?'Явное упоминание города':'Явное упоминание региона').join('; '),manifest.data_fingerprint])])
  }
  function select(code){selected=code;region.value=code;limit=25;for(const e of host.querySelectorAll('[data-region]')){if(e.dataset.region===selected)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}renderList();save(fields)}
  function drawMap(){
@@ -89,9 +120,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const mean=ring.reduce((s,p)=>[s[0]+p[0]/ring.length,s[1]+p[1]/ring.length],[0,0]),p=ring.reduce((a,p)=>Math.hypot(p[0]-mean[0],p[1]-mean[1])<Math.hypot(a[0]-mean[0],a[1]-mean[1])?p:a,ring[0]);
    const xx=x(p[0]),yy=y(p[1]);if(placed.some(([a,b])=>Math.hypot(a-xx,b-yy)<30))continue;placed.push([xx,yy]);
    const n=count(f.code),g=shape('g',{'class':'news-pin'});
-   shape('circle',{cx:xx,cy:yy,r:13,fill:'#173e52',stroke:'#fff','stroke-width':1.6},undefined,g);
+   const recent=(groups.get(f.code)||[]).some(r=>newUrls.has(r.url));
+   shape('circle',{cx:xx,cy:yy,r:13,fill:'#173e52',stroke:recent?'#e3a14d':'#fff','stroke-width':recent?3:1.6},undefined,g);
    shape('text',{x:xx,y:yy+4,'font-size':10,'font-family':'Arial, sans-serif','font-weight':'bold','text-anchor':'middle',fill:'#fff'},n>99?'99+':String(n),g);
-   shape('title',{},label(f.code)+' · '+n+' публикаций',g);activate(g,f.code,label(f.code),n)
+   shape('title',{},label(f.code)+' · '+n+' публикаций'+(recent?' · есть новые записи':''),g);activate(g,f.code,label(f.code),n)
   }
   [[0,'Нет упоминаний'],[1,'1–2'],[3,'3–5'],[6,'6–10'],[11,'Более 10']].forEach(([n,t],i)=>{shape('rect',{x:25+i*220,y:565,width:20,height:16,fill:fill(n),stroke:'#52696e','stroke-width':.5});txt(52+i*220,578,t,13)});
   txt(25,600,'Близкие значки скрыты для читаемости; все регионы с новостями доступны в списке.',13);
@@ -99,12 +131,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap)
  }
  function refresh(){
-  rows=NewsGeo.windowRows(archive,end,Number(days.value),topic.value,query.value).map(r=>({...r,matches:NewsGeo.mentions(r.title,dict)}));
+  rows=NewsGeo.windowRows(archive,end,Number(days.value),topic.value,query.value).map(r=>({...r,matches:NewsGeo.mentions(r.title,dict,rule.value!=='region')}));
   groups=new Map();for(const r of rows)for(const m of r.matches){if(!groups.has(m.code))groups.set(m.code,[]);groups.get(m.code).push(r)}
   region.replaceChildren(new Option('Все регионы с упоминаниями',''),...[...groups.keys()].sort((a,b)=>label(a).localeCompare(label(b),'ru')).map(k=>new Option(label(k)+' ('+groups.get(k).length+')',k)));
   if(selected&&!names[selected])selected='';if(selected&&!groups.has(selected))region.add(new Option(label(selected)+' (0)',selected));region.value=selected;limit=25;
   const n=rows.filter(r=>r.matches.length).length;
-  status.textContent='Период до '+end+' · публикаций: '+rows.length+' · с региональными упоминаниями: '+n+' · без привязки: '+(rows.length-n)+' · регионов: '+groups.size;
+  status.textContent='Период до '+end+' · публикаций: '+rows.length+' · с региональными упоминаниями: '+n+' · без привязки: '+(rows.length-n)+' · регионов: '+groups.size+' · с упоминанием только города: '+rows.filter(r=>r.matches.length&&r.matches.every(m=>m.rule==='city')).length+' · новых записей в выборке: '+rows.filter(r=>r.matches.length&&newUrls.has(r.url)).length;
   drawMap();select(selected)
  }
  async function fetchManifest(){
@@ -138,9 +170,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    if(!pinned){const [after,confirm]=await Promise.all([liveVersion(),fetchManifest()]);if(before!==after||candidate.data_fingerprint!==confirm.data_fingerprint||candidate.built!==confirm.built)throw Error('Публикация ещё обновляется; повторим проверку')}
    const oldTopic=topic.value;
    const topics=[...new Set(nextArchive.flatMap(r=>String(r.topics||'').split(' · ')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+   newUrls=hadData?NewsGeo.addedUrls(archive,nextArchive):new Set();
    manifest=candidate;archive=nextArchive;names=nextNames;dict=nextDict;polygons=nextPolygons;end=String(candidate.built).slice(0,10);version=before;
    topic.replaceChildren(new Option('Все темы',''),...topics.map(t=>new Option(t,t)));
-   if(!hadData){restore(['news-geo-days','news-geo-topic','news-geo-query']);selected=new URLSearchParams(location.search).get('news-geo-region')||''}
+   if(!hadData){restore(['news-geo-days','news-geo-topic','news-geo-query','news-geo-rule']);selected=new URLSearchParams(location.search).get('news-geo-region')||''}
    else if(topics.includes(oldTopic))topic.value=oldTopic;
    refresh();
    freshness.textContent=freshnessText()+(pinned?' · закреплённый архив, автообновление выключено':hadData?' · получена новая сборка':' · автоматическая проверка каждые 5 минут');
@@ -149,7 +182,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    else{status.textContent='Карта недоступна для этой версии: '+e.message;freshness.textContent='Архив не загружен';exp.disabled=true}
   }finally{checking=false;updateButton.disabled=Boolean(pinned)}
  }
- days.onchange=topic.onchange=()=>{if(manifest)refresh()};query.oninput=()=>{if(manifest)refresh()};region.onchange=()=>{if(manifest)select(region.value)};more.onclick=()=>{limit+=25;renderList()};form.onsubmit=e=>e.preventDefault();
+ days.onchange=topic.onchange=rule.onchange=()=>{if(manifest)refresh()};query.oninput=()=>{if(manifest)refresh()};region.onchange=()=>{if(manifest)select(region.value)};more.onclick=()=>{limit+=25;renderList()};form.onsubmit=e=>e.preventDefault();
  updateButton.onclick=checkUpdate;
  await checkUpdate();
  if(!pinned){

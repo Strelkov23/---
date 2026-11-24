@@ -244,6 +244,11 @@ with sync_playwright() as p:
         assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
         page.locator("#news-geo-map .map-controls button").nth(2).click()
         assert "100%" in page.locator("#news-geo-map .map-controls").inner_text()
+        page.locator("#news-geo-days").select_option("1")
+        assert "1 дней" in page.locator("#news-geo-map svg").text_content()
+        page.locator("#news-geo-rule").select_option("region")
+        assert "только города: 0" in page.locator("#news-geo-status").inner_text()
+        page.locator("#news-geo-rule").select_option("all")
         page.locator("#news-geo-days").select_option("90")
         if page.locator("#news-geo-region option").count()>1:
             page.locator("#news-geo-region").select_option(index=1)

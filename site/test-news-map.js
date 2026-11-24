@@ -22,3 +22,14 @@ assert.equal(N.updateState(old,fresh),'new');
 assert.throws(()=>N.updateState(fresh,old));
 assert.throws(()=>N.updateState(old,{...old,data_fingerprint:'c'}));
 assert.throws(()=>N.updateState(old,{built:'bad'}));
+
+assert.deepEqual(codes('В Казани открылась выставка'),['RU-TA']);
+assert.deepEqual(codes('В Екатеринбурге и Владивостоке'),['RU-SVE','RU-PRI']);
+assert.equal(N.mentions('В Казани',d,false).length,0);
+assert.equal(N.mentions('В Казани',d)[0].rule,'city');
+assert.equal(N.mentions('Казань и Татарстан',d)[0].rule,'region');
+assert.deepEqual(codes('В Ростове-на-Дону'),['RU-ROS']);
+assert.equal(N.windowRows(rows,'2026-11-24',1,'','').length,1);
+assert.equal(N.windowRows(rows,'2026-11-24',3,'','').length,1);
+assert.deepEqual([...N.addedUrls(rows.slice(0,2),rows)],['https://a.test/3','https://a.test/4']);
+assert.deepEqual(codes('Московская компания'),[]);
