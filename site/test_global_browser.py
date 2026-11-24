@@ -442,6 +442,24 @@ with sync_playwright() as p:
             assert page.locator("#sp-finance-export").is_disabled()
         page.locator("#sp-sector").select_option("light")
         assert "Лёгкая промышленность" in page.locator("#sp-scope").inner_text()
+        page.goto("http://localhost:8765/regional-manufacturing.html?rm-group=light&rm-year=2024&rm-region=RU-MOS",wait_until="load")
+        manufacturing=json.loads(Path("regional-manufacturing.json").read_text())
+        if manufacturing["rows"]:
+            page.wait_for_function("document.querySelector('#rm-status').textContent.startsWith('Отрасль:')",timeout=30000)
+            assert page.locator("#rm-group option").count()==14
+            assert page.locator("#rm-group").input_value()=="light"
+            assert page.locator("#rm-year").input_value()=="2024"
+            assert page.locator("#rm-map svg path[data-region]").count()>70
+            assert page.locator("#rm-table tbody tr").count()>65
+            assert "Московская" in page.locator("#rm-detail").inner_text()
+            page.locator("#rm-group").select_option("chemical")
+            assert "фармацевтика" in page.locator("#rm-status").inner_text()
+            with page.expect_download() as rm:
+                page.locator("#rm-export").click()
+            assert rm.value.suggested_filename=="regional-manufacturing-chemical-2024.csv"
+        else:
+            page.wait_for_function("document.querySelector('#rm-status').textContent.startsWith('Нет загруженных наблюдений')",timeout=30000)
+            assert page.locator("#rm-export").is_disabled()
         page.goto("http://localhost:8765/stat-revisions.html",wait_until="load")
         page.wait_for_function("document.querySelector('#rev-status').textContent.startsWith('Снимок')",timeout=30000)
         assert page.locator("#rev-build option").count()>0
