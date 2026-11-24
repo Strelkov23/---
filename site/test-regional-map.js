@@ -63,3 +63,14 @@ assert.deepEqual(M.compareRows(testItems,['a','b','b','d']).map(x=>[x.code,x.ran
 assert.equal(M.compareRows(testItems,['z','a'])[1].ratio,null);
 assert.equal(M.compareRows(testItems,['','a'])[0].difference,null);
 assert.equal(M.compareRows(testItems,['d','a'])[1].ratio,null);
+
+const addedThemes={'03':'living','09':'capital','17':'ict','20':'prices','21':'foreign_trade'};
+const themeSources=Object.keys(addedThemes).map(n=>({code:'new-'+n,title:'Test',source:industrySource.replace('data_12_','data_'+n+'_'),last:2024,regions:96}));
+for(const [n,id] of Object.entries(addedThemes)){
+ const s=themeSources.find(s=>s.code==='new-'+n);
+ assert.equal(M.theme(s.code,s.source,s.title),id);
+ assert.equal(M.coverage(themeSources,id).count,1);
+ assert.equal(M.palette(id).length,5);
+ assert.notEqual(M.palette(id)[4],M.palette('all')[4]);
+}
+assert.equal(new Set(Object.values(addedThemes).map(id=>M.palette(id)[4])).size,5);
