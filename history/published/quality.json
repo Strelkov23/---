@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-24T21:39:29+00:00",
+  "built": "2026-11-24T21:47:59+00:00",
   "errors": [],
   "warnings": [
     "FAOSTAT: неполная детализация использования: 75",
@@ -27,7 +27,6 @@
     "История · Казначейство · Федеральный бюджет · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Консолидированный бюджет РФ · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
     "История · Казначейство · Бюджеты субъектов · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)>",
-    "История · Годовые итоги федерального бюджета Минфина · Ошибка: Нарушено бюджетное тождество за 2022",
     "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: https://rosstat.gov.ru/storage/mediabank/Invest_sub_2000-2025.xlsx · HTTP Error 404: Not Found",
     "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: 61483.csv.gz: HTTP Error 404: Not Found; 61483.parquet: HTTP Error 404: Not Found",
     "История · Доля городского населения на 1 января · Ошибка: 36057.csv.gz: HTTP Error 404: Not Found; 36057.parquet: HTTP Error 404: Not Found",
@@ -35,10 +34,11 @@
     "История · Введённые жилые помещения на 1000 человек населения · Ошибка: 45454.csv.gz: HTTP Error 404: Not Found; 45454.parquet: HTTP Error 404: Not Found",
     "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: 59049.csv.gz: HTTP Error 404: Not Found; 59049.parquet: HTTP Error 404: Not Found",
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found",
+    "История · Годовые итоги федерального бюджета Минфина · Ошибка: Нарушено бюджетное тождество за 2022",
     "История · Архив регионов: agriculture · Ошибка: Не распознана документированная структура CSV"
   ],
   "counts": {
-    "archive": 7840,
+    "archive": 7844,
     "papers": 9213,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -74,29 +74,29 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 2327,
-    "freshness_ok": 195,
+    "freshness_ok": 197,
     "freshness_unavailable": 20,
     "freshness_waiting": 1,
     "freshness_cached": 11,
     "freshness_archive": 2,
-    "revision_builds": 5,
+    "revision_builds": 6,
     "revision_events": 0,
     "consistency_согласовано": 1443,
     "consistency_нет данных": 96,
-    "finance_workbook_years": 4,
-    "finance_workbook_observations": 488,
+    "finance_workbook_years": 6,
+    "finance_workbook_observations": 732,
     "rosstat_workbook_files": 0,
     "rosstat_workbook_observations": 0,
     "internal_link_errors": 0
   },
   "files": {
     "archive.json": {
-      "sha256": "5a05c87892f00b36854213f0ec6af7a31d36a37be7ea0b0a956f2afba430e412",
-      "bytes": 3784000
+      "sha256": "e1e87bfe47ee1ea629a42bd3f46dc8aa804a60a533e566f68dfec920bbaf45da",
+      "bytes": 3785369
     },
     "literature.json": {
-      "sha256": "d603f9806ce70e1021340579d990b7a4e0f723af22798e88afdbd9a8256cf830",
-      "bytes": 5058369
+      "sha256": "dad2caf7ef8af42de39fbfb63c87718aeb93b6ab961f16911ee78d939f8aff28",
+      "bytes": 5074197
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -111,11 +111,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "c63bb9aa497795811ad042ae656b9060cc09593b5e25a29922dc7a9a24fcca71",
+      "sha256": "425c01f32d508dcf4ec692aedb1e3cc217fe8d43964e6f603b18ccad6877e7a2",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "5f57a290f692b17b718ef9382b275e9ea65afd80459c9596932c4668982b9b17",
+      "sha256": "52129ef327a949f3c4f21dc3567de8fc514b411e61b6e1c6d918a78d9aee94dd",
       "bytes": 55538
     },
     "sectors.json": {
@@ -123,27 +123,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "4efd476852fc6666680ba97b00b2fbb8b58c3be46f15ee9c4fec5800acbde799",
+      "sha256": "afa57a0295c596933b017c24ca5abb1886c1a879b67d7a5a7c04814617782daa",
       "bytes": 36979
     },
     "links.json": {
-      "sha256": "f0eb80672ea837d2564722250a8281b88be80b5318f9fe64cd3c91ff21b4ef47",
-      "bytes": 1504666
+      "sha256": "374686f7ef1b64ab73e651bd27067add5e05fc0389768a568915fc7b1544d9cd",
+      "bytes": 1506907
     },
     "national.json": {
-      "sha256": "9a28bb75a61d7833d820b090001fba44f5df0c888749194b318c6c7aa338166a",
+      "sha256": "c9f293156c42c4c0ad48cc7bf73a3a85db16e9ca4413affcec4ef1e309a9627b",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "61a15ad2ff768e1bdfd671974adaf890d68a6a08fde8796fe6a593b873a70f35",
-      "bytes": 117932
+      "sha256": "8a62ab4a2c18a24a421192f03933f64be7c15d9cd00cdd75db559e192ed8efec",
+      "bytes": 117885
     },
     "industrial.json": {
-      "sha256": "8c8669e93978d2d36dfceea0351c9bc3120134ebea05ca2e74fbf6903819e68d",
+      "sha256": "a23b959d075bfdb8e3318b15d28882558bccc34f71b0892326b8a4e25b48672e",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "801b7092f918432aeb1ea31c66db258b8ac37363e66a212d212089175489298d",
+      "sha256": "405b84ef26813d277d962feae4282a9da59b50a7330ebb887e14e93601393bcb",
       "bytes": 116117
     },
     "regional-boundaries.json": {
@@ -167,27 +167,27 @@
       "bytes": 12968
     },
     "district-meta.json": {
-      "sha256": "2dc002e06a41c2f4c67c09f740db9a86fb5abc89a638c5175754ee164e16316b",
-      "bytes": 580
+      "sha256": "59dafa498cd80ba3ef8ce6002db17eeb3a0aea978a7c064ffafd23a8542cffde",
+      "bytes": 584
     },
     "freshness.json": {
-      "sha256": "2fa1403d9c9a1a848c11b4f4406deb13d8607a3b60dfcf72e8123665d7de53bc",
-      "bytes": 133515
+      "sha256": "c771b5ecf4920d36883155f25105a3effef37f76538e592bb946fd809c81bf06",
+      "bytes": 134616
     },
     "stat-revisions.json": {
-      "sha256": "efe47597eec896649dfda7e0c91dfe0ce6e4e44a190a75a824a74f0a9f251ee5",
-      "bytes": 1242
+      "sha256": "c27e2f58c563b8ceb066550f46c3825d2c5445239a2b9e60b21ec0808206474d",
+      "bytes": 1471
     },
     "consistency.json": {
-      "sha256": "42eb0cb8967c6f94bab797e128e5102a57764a251ebc7fc2f94024a9beebb0c7",
-      "bytes": 257217
+      "sha256": "f5054946380f0b40363dc65c5f4a862f48c4595c24802cf4ffcfa3d73d849bbf",
+      "bytes": 258346
     },
     "finance-workbooks.json": {
-      "sha256": "7e3fe2c3ff88767629c3cf5ceaf91056d6a50ee04b2922677787e9841fe69d3c",
-      "bytes": 195902
+      "sha256": "2150c55eacc8f101c5a02c11c3156cdd920e23d8cde34c1be4d76b16ccb53834",
+      "bytes": 287508
     },
     "rosstat-workbooks.json": {
-      "sha256": "027212923e69b136112fd78d6175fa2df527f73d5146153c5d857607e1f1635b",
+      "sha256": "9dbff93e9d681764357da4d85123371c1493fac63d75454b9cdd48ba942cdd18",
       "bytes": 1436
     },
     "regional-data/GRP_95b8dd2585.json": {
