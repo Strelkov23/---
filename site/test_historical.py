@@ -125,6 +125,40 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(historical.select_mirror(rows,"transport"),[])
         self.assertEqual(historical.REGIONAL_ZIPS["agriculture"],"13")
         self.assertEqual(historical.REGIONAL_ZIPS["innovation"],"18")
+
+    def test_new_regional_sections(self):
+        examples=[
+            ("living","03","Среднедушевые денежные доходы населения"),
+            ("capital","09","Степень износа основных фондов"),
+            ("ict","17","Удельный вес домашних хозяйств, имеющих доступ к интернету"),
+            ("prices","20","Индекс потребительских цен"),
+            ("foreign_trade","21","Экспорт товаров"),
+        ]
+        for section,number,title in examples:
+            with self.subTest(section=section):
+                self.assertEqual(historical.REGIONAL_ZIPS[section],number)
+                self.assertTrue(historical.mirror_url(section).endswith("data_"+number+"_socio_economic_102_v20260313.zip"))
+                f=io.BytesIO()
+                with zipfile.ZipFile(f,"w") as z:
+                    z.writestr("data.csv","region;year;value;indicator;unit;indicator_id\nМосква;2024;10;"+title+";%;X1\nМосква;2024;20;Иной показатель;%;X2\n")
+                rows=historical.mirror_rows(f.getvalue(),section,selected=True)
+                self.assertEqual([r["title"] for r in rows],[title])
+                self.assertEqual(rows[0]["value"],10)
+    def test_mirror_schema_diagnostics(self):
+        def archive(name,body):
+            f=io.BytesIO()
+            with zipfile.ZipFile(f,"w") as z:z.writestr(name,body)
+            return f.getvalue()
+        with self.assertRaisesRegex(ValueError,"отсутствуют CSV"):
+            historical.mirror_rows(archive("readme.txt","readme"),"agriculture",True)
+        with self.assertRaisesRegex(ValueError,"mystery"):
+            historical.mirror_rows(archive("bad.csv","mystery;field\n1;2\n"),"agriculture",True)
+        with self.assertRaisesRegex(ValueError,"Повтор заголовка"):
+            historical.mirror_rows(archive("bad.csv","region;year; year;value;indicator;unit\nМосква;2024;2024;1;Тест;руб.\n"),"agriculture",True)
+        with self.assertRaisesRegex(ValueError,"число полей"):
+            historical.mirror_rows(archive("bad.csv","region;year;value;indicator;unit\nМосква;2024;10;Тест;руб.;extra\n"),"grp",True)
+        with self.assertRaisesRegex(ValueError,"нет наблюдений выбранных"):
+            historical.mirror_rows(archive("data.csv","region;year;value;indicator;unit\nМосква;2024;1;Иной показатель;руб.\n"),"agriculture",True)
     def test_observed_vrp_layout(self):
         b=openpyxl.Workbook()
         for i,header in enumerate(("Валовой региональный продукт по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(в текущих  ценах; миллионов рублей)","Валовой региональный продукт на душу населения по субъектам Российской Федерации в 2016-2024 гг.1)2)\n(рублей)","Индексы физического объема валового регионального продукта в 2017-2024 гг.\n(в постоянных ценах; в процентах к предыдущему году)")):
