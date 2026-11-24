@@ -19,6 +19,7 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=site python3 - <<'PY'
           import regional_manufacturing as m
+          import regional_industry_extra as x
           from urllib.request import Request,urlopen
           from pathlib import Path
           import hashlib,json
@@ -34,6 +35,12 @@ jobs:
           assert counts["regional_manufacturing_suppressed"]==112
           # Only the temporary runner checkout receives the validated file. Nothing is pushed.
           p=Path("history/published/regional-manufacturing.json");p.write_text(json.dumps(d,ensure_ascii=False),encoding="utf-8")
+          e={**x.empty("2026-11-25"),"rows":x.parse(raw),"sha256":sha,"checked":"2026-11-25","success":"2026-11-25","status":"Импортировано"}
+          counts=x.quality(e)
+          print("MINING_ENERGY",json.dumps(counts,ensure_ascii=False))
+          assert counts["regional_mining_energy_rows"]==1920
+          assert counts["regional_mining_energy_groups"]==10
+          Path("history/published/regional-mining-energy.json").write_text(json.dumps(e,ensure_ascii=False),encoding="utf-8")
           PY
       - name: Build using real archive and saved database
         run: |
@@ -45,7 +52,7 @@ jobs:
           else exit 1; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2 playwright==1.51.0
-          python3 -m unittest test_regional_manufacturing.py
+          python3 -m unittest test_regional_manufacturing.py test_regional_industry_extra.py
           node test-regional-manufacturing.js
           ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
           git rev-parse HEAD > public/source-version.txt
@@ -72,4 +79,6 @@ jobs:
             monitor/public/quality.json
             monitor/public/regional-manufacturing.json
             monitor/public/regional-manufacturing.csv
+            monitor/public/regional-mining-energy.json
+            monitor/public/regional-mining-energy.csv
           if-no-files-found: ignore
