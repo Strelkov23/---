@@ -199,6 +199,14 @@ def sync(db, stamp, refresh):
         except Exception as err:
             with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,str(err)[:180]))
 
+def reclassify(db):
+    rows = db.execute("select doi,title,topics from literature").fetchall()
+    updates=[]
+    for doi,title,old in rows:
+        new=' · '.join(k for k,pat in TOPICS.items() if re.search(pat,title or '',re.I)) or 'Прочие экономические исследования'
+        if new!=old:updates.append((new,doi))
+    with db:db.executemany("update literature set topics=? where doi=?",updates)
+
 def doi_url(doi):
     return "https://doi.org/" + quote(doi, safe="/")
 
