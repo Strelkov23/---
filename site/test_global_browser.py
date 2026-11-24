@@ -185,7 +185,7 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==28
+        assert page.locator("main .portal-grid article").count()==29
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
@@ -219,6 +219,28 @@ with sync_playwright() as p:
         assert page.locator('#composite-chart svg').count()==1
         assert c["weights"]==[0.5,0.5] and len(c["components"])==2
         assert abs(next(x for x in c["rows"] if x["period"]=="2020")["selected"]-100)<1e-9
+        page.goto("http://localhost:8765/report-builder.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#report-count').textContent.includes('Найдено')")
+        page.locator("#report-query").fill("NY.GDP.MKTP.KD")
+        page.locator("#report-series").select_option("wdi:NY.GDP.MKTP.KD")
+        page.locator("#report-add").click()
+        page.locator("#report-confirm").check()
+        page.locator("#report-run").click()
+        page.wait_for_function("document.querySelector('#report-status').textContent.includes('Доклад сформирован')")
+        assert page.locator("#report-preview .report-series").count()==1
+        assert page.locator("#report-preview tbody tr").count()==5
+        assert page.locator("#report-preview svg").count()==1
+        with page.expect_download() as d:
+            page.locator("#report-json").click()
+        report=json.loads(d.value.path().read_text())
+        assert report["series"][0]["summary"]["expected"]==5
+        assert report["data_fingerprint"]==manifest["data_fingerprint"]
+        with page.expect_download() as d:
+            page.locator("#report-html").click()
+        html=d.value.path().read_text()
+        assert "<svg" in html and "<script" not in html and "SHA-256" in html
+        page.locator("#report-end").fill("2023")
+        assert page.locator("#report-json").is_disabled()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
