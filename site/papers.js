@@ -4,6 +4,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
  const tags=['РИНЦ','ВАК','ВАК К1','ВАК К2','ВАК К3','RSCI','Scopus','Web of Science','DOAJ','EconLit','RePEc','Белый список 1','Белый список 2','Белый список 3','Белый список 4'];
  const labels={ok:'HTTP-проверка успешна',missing:'DOI не найден',restricted:'Доступ ограничен',error:'Ошибка HTTP / сети',unchecked:'Не проверено'};
  const norm=s=>String(s??'').toLowerCase().replaceAll('ё','е');
+ const exactDoi=value=>{
+  let s=String(value||'').trim().replace(/^doi:\s*/i,'').replace(/^https?:\/\/(?:dx\.)?doi\.org\//i,'');
+  try{s=decodeURIComponent(s)}catch{}
+  return /^10\.\d{4,9}\/\S+$/.test(s)?s.toLowerCase():'';
+ };
  const doiURL=d=>/^10\.\d{4,9}\/\S+$/.test(d||'')?'https://doi.org/'+d.split('/').map(encodeURIComponent).join('/'):'';
  function valid(v){try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
  function link(title,url){const a=node('a',title);a.href=valid(url);a.target='_blank';a.rel='noopener noreferrer';return a}
@@ -18,21 +23,39 @@ document.addEventListener('DOMContentLoaded',async()=>{
   for(const [label,n] of [['Статей',records.length],['Журналов',new Set(records.map(r=>r.journal)).size],['Проверено ссылок',records.filter(r=>state(r)!=='unchecked').length],['Требуют внимания',records.filter(r=>['missing','restricted','error'].includes(state(r))).length]]){
    const box=node('div','');box.className='metric';box.append(node('b',fmt(n)),node('span',label));$('paper-metrics').append(box)
   }
-  for(const [id,values] of [['journal',records.map(r=>r.journal)],['theme',records.flatMap(themes)]]){
+  for(const [id,values] of [['journal',[...records.map(r=>r.journal),...Object.keys(reg)]],['theme',records.flatMap(themes)]]){
    for(const v of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru')))$(id).add(new Option(v,v))
   }
   for(const tag of tags)$('index').add(new Option(tag+' ('+records.filter(r=>(meta(r).tags||[]).includes(tag)).length+')',tag));
   $('index').add(new Option('Статус не подтверждён','unknown'));restore(ids);
+  const overview=$('index-overview');
+  const groups=[['Российские перечни и базы',['РИНЦ','RSCI','ВАК','ВАК К1','ВАК К2','ВАК К3','Белый список 1','Белый список 2','Белый список 3','Белый список 4']],['Международные базы',['Scopus','Web of Science','DOAJ','EconLit','RePEc']]];
+  for(const [heading,items] of groups){
+   const panel=node('article','');panel.append(node('h3',heading));
+   for(const tag of items){
+    const count=records.filter(r=>(meta(r).tags||[]).includes(tag)).length;
+    const n=Object.values(reg).filter(m=>(m.tags||[]).includes(tag)).length;
+    const row=node('div',''),btn=node('button',tag+' — '+fmt(count)+' статей'),bar=node('meter','');
+    btn.type='button';btn.setAttribute('aria-pressed','false');btn.dataset.index=tag;
+    btn.style.cssText='text-align:left;width:100%;margin-top:.4rem';
+    btn.onclick=()=>{$('index').value=tag;limit=30;draw();$('paper-filters').scrollIntoView({block:'start'})};
+    bar.min=0;bar.max=Math.max(1,records.length);bar.value=count;bar.setAttribute('aria-label',tag+': '+count+' из '+records.length+' статей');
+    row.append(btn,bar,node('small',' '+fmt(n)+' журналов в реестре'));panel.append(row)
+   }
+   overview.append(panel)
+  }
   let limit=30,selected=[];
   function draw(){
-   const words=norm($('term').value).trim().split(/\s+/).filter(Boolean).map(stem);
+   const exact=exactDoi($('term').value);const words=norm($('term').value).trim().split(/\s+/).filter(Boolean).map(w=>/[\d/@.]/.test(w)?w:stem(w));
    const from=Number($('from').value)||1991,to=Number($('to').value)||2100,idx=$('index').value,ls=$('link-state').value;
    selected=records.filter(r=>{
     const y=Number(String(r.published||'').slice(0,4)),marks=meta(r).tags||[];
-    return y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w))
+    return y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
    });
    selected.sort((a,b)=>$('order').value==='title'?a.title.localeCompare(b.title,'ru'):$('order').value==='old'?String(a.published).localeCompare(String(b.published)):String(b.published).localeCompare(String(a.published)));
    $('found').textContent=from>to?'Начальный год позже конечного':'Найдено статей: '+fmt(selected.length);
+   for(const b of overview.querySelectorAll('button[data-index]'))b.setAttribute('aria-pressed',String(b.dataset.index===idx));
+   $('index-explanation').textContent=idx?'Выбранная категория: '+(idx==='unknown'?'Статус не подтверждён':idx)+' · '+fmt(selected.length)+' статей с учётом всех фильтров.':'Выберите категорию или используйте фильтры ниже.';
    $('papers').replaceChildren();
    if(!selected.length)$('papers').append(node('p','Нет совпадений. Измените фильтры. Отсутствие результатов не означает отсутствия статей в научной базе.'));
    for(const r of selected.slice(0,limit)){
@@ -40,7 +63,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     heading.append(doi?link(r.title,doi):node('span',r.title));
     card.append(node('small',[r.published,r.journal,m.issn?'ISSN '+m.issn:''].filter(Boolean).join(' · ')),heading,node('p',r.authors||'Авторы не указаны'),node('p','Индексация журнала: '+(m.tags?.join(' · ')||'Не подтверждена')),node('small',themes(r).join(' · ')+(r.doi?' · DOI '+r.doi:'')));
     const access=node('p','');
-    links(access,[['DOI',doi],['Страница издателя',c.status==='ok'&&c.final!==doi?c.final:''],['Метаданные Crossref',doi?'https://api.crossref.org/works/'+doi.slice('https://doi.org/'.length):''],['Сайт журнала',m.site],['Поиск по названию','https://search.crossref.org/?q='+encodeURIComponent(r.title)]]);
+    links(access,[['DOI',doi],['Страница издателя',c.status==='ok'&&c.final!==doi?c.final:''],['Метаданные Crossref',doi?'https://api.crossref.org/works/'+doi.slice('https://doi.org/'.length):''],['Сайт журнала',m.site],['Поиск по названию','https://search.crossref.org/?q='+encodeURIComponent(r.title)],['Поиск в Google Scholar','https://scholar.google.com/scholar?q='+encodeURIComponent(r.title)],['Поиск в КиберЛенинке','https://cyberleninka.ru/search?q='+encodeURIComponent(r.title)]]);
     card.append(access,node('small','Ссылка: '+(labels[state(r)]||'Не проверено')+(c.checked?' · '+c.checked.slice(0,10):'')+(c.detail?' · '+c.detail:'')));
     $('papers').append(card)
    }
