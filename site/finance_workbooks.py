@@ -91,6 +91,93 @@ def sync(db,stamp,refresh,files):
     for y,u,c,s,status,sha,rows in db.execute("select year,url,checked,success,status,sha,rows from finance_workbooks order by year desc"):
         result.append(dict(year=y,url=u,checked=c,success=s,status=status,sha256=sha,rows=json.loads(rows)))
     return dict(schema=1,built=stamp,years=result)
+# Explicit crosswalk of the abbreviated 2023–2025 documentary labels to
+# hashes of full official labels observed in the imported workbooks.
+# Never use row position, numeric similarity or fuzzy matching.
+CROSSWALK={
+    "10":("654ca1eb343388c4",),
+    "11":("6f69094bddea7dcd",),
+    "12":("3d49347f7ede97b8",),
+    "13":("36de537a907a9225",),
+    "14":("4d28c294418d8c9e",),
+    "15":("a204876f568ba574",),
+    "16":("2d5fd63310cf26e3",),
+    "17":("8de5a8114eec26a8",),
+    "18":("8629b90c51341e99",),
+    "19":("847a43d15723754a",),
+    "20":("439247f1f8893b2e",),
+    "21":("67185cd58dc7a403",),
+    "22":("1c239f7403fdfd96",),
+    "23":("cd2c3aba6277ae33",),
+    "24":("ddd34d6f1164a3ed",),
+    "25":("09d37cedfdc58042",),
+    "26":("06bc3feddc2dc414",),
+    "27":("5231922f436e5d67","34ddd4d772366280",),
+    "28":("bbbe4fe018f98a46",),
+    "29":("896106f6628d36ca",),
+    "30":("111b517e966f4215",),
+    "32":("81d7edc2bdd3284e",),
+    "45":("4b44faec4a42cbac",),
+    "46":("474c0970c686f11b",),
+    "47":("6a12908f5635aa52",),
+    "50":("e69001f696542e17",),
+    "51":("10b18269000bbfa0",),
+    "53":("41620a874fa9df67",),
+    "72":("bc66f9b9fbab711f",),
+    "total":("4c42b211a12403e1",),
+    "A":("b06df494625be9c1",),
+    "01":("6cd8295f90bf9181",),
+    "02":("7d7f6b960c8672fd",),
+    "03":("e3187cba52b4cbb3",),
+    "B":("09cede93af666133",),
+    "05":("5a5f98e1b250f78a",),
+    "06":("b97e15642fb76875",),
+    "07":("4689d0c4bbbc8b4e",),
+    "08":("1346ba14a6f4c765",),
+    "C":("19f8d2b402f914dc",),
+    "D":("e63eda46063bf9a4",),
+    "35.1":("3d570164ca083896",),
+    "35.2":("bb4263f8831c90f3",),
+    "35.3":("1f759c8e323a7ed6",),
+    "E":("e7352bf95abc0ded",),
+    "F":("5dcc6e1eb6d99b59",),
+    "G":("057fc5f0fbc10fb6",),
+    "I":("c769a515a6a0d22c",),
+    "H":("9b36d778447584e5",),
+    "49.1":("bc3dc919b2c65560",),
+    "49.2":("6a3665a0b658d948",),
+    "49.3":("51cfa901e9372ab2",),
+    "49.4":("f82bf503eb60567e",),
+    "49.5":("7d30db98c4f2c60a",),
+    "J":("2b628520153643e2",),
+    "K":("fe67e0bb5d636a79",),
+    "L":("5781f6f47dd2f8e1",),
+    "O":("ea0224006880388a",),
+    "P":("830ae51a4798c2ce",),
+    "Q":("f45caf52e3d7d808",),
+    "R":("df027b9d1c86bf8c",),
+}
+RECONCILIATION_LABELS={"exact_numeric":"Числовое совпадение","same_sign":"Совпадает отрицательный знак (числа нет)","different":"Расхождение","missing":"Нет сопоставимых данных","ambiguous":"Неоднозначное соответствие"}
+def reconcile(manual,workbooks):
+    from collections import Counter,defaultdict
+    official=defaultdict(list)
+    for batch in workbooks:
+        for r in batch["rows"]:official[(r["year"],r["code"],r["metric"])].append(r)
+    rows=[]
+    for x in manual:
+        candidates=[r for code in CROSSWALK.get(x["code"],()) for r in official.get((x["year"],code,x["metric"]),[])]
+        y=candidates[0] if len(candidates)==1 else None
+        state="ambiguous" if len(candidates)>1 else "missing"
+        if y is not None:
+            if x["sign"]==y["sign"]=="numeric":
+                state="exact_numeric" if x["value"]==y["value"] else "different"
+            elif x["sign"]==y["sign"]=="negative_unspecified":
+                state="same_sign"
+            elif "missing" not in (x["sign"],y["sign"]):
+                number=x["value"] if x["sign"]=="numeric" else y["value"]
+                state="missing" if number is not None and number<0 else "different"
+        rows.append(dict(year=x["year"],code=x["code"],metric=x["metric"],manual_title=x["title"],official_title=y["title"] if y else None,manual_value=x["value"],official_value=y["value"] if y else None,manual_sign=x["sign"],official_sign=y["sign"] if y else None,state=state,manual_source=x.get("replica") or x.get("source"),official_source=y["source"] if y else None,official_sheet=y["sheet"] if y else None,official_row=y["row"] if y else None,official_column=y["column"] if y else None))
+    return dict(method="Точное соответствие по проверенному словарю полных наименований, год и показатель. Числовые значения сравниваются без допуска; отр сравнивается отдельно. Не независимый аудит.",rows=rows,counts=dict(Counter(r["state"] for r in rows)))
 def quality(d):
     if d.get("schema")!=1:raise ValueError("schema")
     years=set();count=0
@@ -105,8 +192,16 @@ def quality(d):
             keys.add(key)
             if (r["sign"]=="numeric")!=(type(r["value"]) in (float,int) and math.isfinite(r["value"])):raise ValueError("bad value")
         count+=len(rows)
-    return dict(finance_workbook_years=sum(bool(x["rows"]) for x in d["years"]),finance_workbook_observations=count)
+    counts=dict(finance_workbook_years=sum(bool(x["rows"]) for x in d["years"]),finance_workbook_observations=count)
+    if "reconciliation" in d:
+        import finance_data
+        expected=reconcile(finance_data.records(),d["years"])
+        if d["reconciliation"]!=expected:raise ValueError("Сверка рентабельности не воспроизводится")
+        counts.update({"finance_reconciliation_"+k:v for k,v in expected["counts"].items()})
+    return counts
 def publish(page,out,d):
+    import finance_data
+    d=dict(d,reconciliation=reconcile(finance_data.records(),d["years"]))
     quality(d)
     (out/"finance-workbooks.json").write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     fields=["year","title","metric","value","sign","raw","source","sheet","row","column"]
@@ -114,6 +209,22 @@ def publish(page,out,d):
         w=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore");w.writeheader()
         for b in d["years"]:w.writerows(b["rows"])
     body="<h1>Автоматический импорт рентабельности ФНС</h1><p>Отдельный набор оригинальных таблиц, не замена ручной транскрипции. Отрицательные величины без числа не преобразуются в ноль.</p><p><a href='finance.html'>Ручной документальный набор</a> · <a href='finance-workbooks.csv'>CSV</a> · <a href='finance-workbooks.json'>JSON</a></p>"
+    reconciliation=d["reconciliation"]
+    fields=["year","code","metric","manual_title","official_title","manual_value","official_value","manual_sign","official_sign","state","manual_source","official_source","official_sheet","official_row","official_column"]
+    with (out/"finance-reconciliation.csv").open("w",encoding="utf-8-sig",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(reconciliation["rows"])
+    body+="<section><h2>Сверка с документальным набором 2023–2025</h2><p>"+escape(reconciliation["method"])+"</p><p><a href='finance-reconciliation.csv'>Скачать полный протокол сверки CSV</a></p><ul>"
+    for k,title in RECONCILIATION_LABELS.items():
+        body+="<li>"+escape(title)+": "+str(reconciliation["counts"].get(k,0))+"</li>"
+    body+="</ul>"
+    issues=[r for r in reconciliation["rows"] if r["state"] not in ("exact_numeric","same_sign")]
+    if issues:
+        body+="<details><summary>Несовпадения и пробелы (до 30 строк)</summary><div class='table-scroll'><table><tr><th>Год</th><th>Вид деятельности</th><th>Показатель</th><th>Ручное значение</th><th>Оригинал</th><th>Состояние</th></tr>"
+        for x in issues[:30]:
+            def displayed(v,sign):return "отр" if sign=="negative_unspecified" else "—" if v is None else str(v)
+            body+="<tr>"+"".join("<td>"+escape(str(v))+"</td>" for v in (x["year"],x["manual_title"],"Продажи" if x["metric"]=="sales" else "Активы",displayed(x["manual_value"],x["manual_sign"]),displayed(x["official_value"],x["official_sign"]),RECONCILIATION_LABELS[x["state"]]))+"</tr>"
+        body+="</table></div></details>"
+    body+="</section>"
     if not d["years"]:body+="<p>Пока нет попыток импорта.</p>"
     for b in d["years"]:
         body+="<section><h2>"+str(b["year"])+"</h2><p>"+escape(b["status"])+" · наблюдений: "+str(len(b["rows"]))+" · последний успех: "+escape(str(b["success"] or "—"))+"</p>"
