@@ -822,6 +822,7 @@ def publish(db,stamp,out,refresh):
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         if (r["indicator"],r["source"]) in mixed_units:key+="_u"+hashlib.sha256(r["unit"].encode()).hexdigest()[:8]
         title=rm.legacy_title(r["indicator"],r["source"],r["title"])
+        title=rx.legacy_title(r["indicator"],r["source"],title)
         group=series.setdefault(key,dict(title=title,unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))
         if group["unit"]!=r["unit"] or group["source"]!=r["source"]:raise ValueError("Несовместимые исторические ряды")
         group["values"].append({k:r[k] for k in ("region","year","value","sheet","row","column","note","seen")})
