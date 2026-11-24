@@ -39,15 +39,19 @@ FIELDS={"indicator_code","indicator_name","subsection","object_name","object_lev
 def old_ids():
     # Preserve historical series IDs. Labels are proved by hash of the original four fields.
     return {"R_"+hashlib.sha256((CODE+"|"+TITLE+"|"+UNIT+"|"+alias).encode()).hexdigest()[:16]:LABELS[ident]["title"] for alias,ident in LOOKUP.items()}
+LEGACY_LABELS=old_ids()
 def legacy_title(indicator,source,original):
     if source!=SOURCE:return original
-    title=old_ids().get(indicator)
+    title=LEGACY_LABELS.get(indicator)
     return TITLE+" · "+title if title else original
 def number(raw):
     s=str(raw or "").strip().replace("\u00a0","").replace(" ","").replace(",",".")
     if s in ("","…","...","-","–","—","х","Х","x","X","н/д"):return None
     try:v=Decimal(s)
     except InvalidOperation:raise ValueError("Неизвестное числовое обозначение: "+s[:60])
+    # The downloaded edition uses -77777777.0 for suppressed observations.
+    # The marker is retained verbatim in raw_value and never treated as negative output.
+    if v==Decimal("-77777777"):return None
     if not v.is_finite() or v<0:raise ValueError("Некорректная отгрузка")
     n=float(v)
     if not math.isfinite(n):raise ValueError("Число вне диапазона")
@@ -102,7 +106,7 @@ def quality(d,previous=None):
             national=[r for r in rows if r["year"]==y and r["level"]=="Страна"]
             if len(national)!=len(LABELS) or {r["group"] for r in national}!=set(LABELS) or any(r["region"]!="Российская Федерация" or r["value"] is None for r in national):raise ValueError("Итог РФ не воспроизводится")
             if next(r for r in national if r["group"]=="total")["value"]<=0:raise ValueError("Нулевой итог РФ")
-    return dict(regional_manufacturing_groups=len(LABELS)-1,regional_manufacturing_rows=len(rows),regional_manufacturing_numeric=sum(r["value"] is not None for r in rows),regional_manufacturing_years=len({r["year"] for r in rows}))
+    return dict(regional_manufacturing_groups=len(LABELS)-1,regional_manufacturing_rows=len(rows),regional_manufacturing_numeric=sum(r["value"] is not None for r in rows),regional_manufacturing_suppressed=sum(str(r["raw_value"]).strip() in ("-77777777","-77777777.0") for r in rows),regional_manufacturing_years=len({r["year"] for r in rows}))
 def publish(out,previous,stamp,refresh):
     import historical
     d=empty(stamp);old=None
