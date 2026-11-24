@@ -455,6 +455,15 @@ with sync_playwright() as p:
             if len({r["year"] for r in manufacturing["rows"]})>=2:
                 assert page.locator("#rm-change-table tbody tr").count()==14
                 assert "Изменение доли" in page.locator("#rm-change-table").inner_text()
+                with page.expect_download() as delta:
+                    page.locator("#rm-change-export").click()
+                assert delta.value.suggested_filename=="regional-industry-change-RU-MOS-C-2022-2024.csv"
+                import csv
+                with open(delta.value.path(),encoding="utf-8-sig",newline="") as f:
+                    rows=list(csv.reader(f,delimiter=";"))
+                assert len(rows)==15
+                assert len({len(r) for r in rows})==1
+                assert "SHA-256 ZIP" in rows[0]
             page.locator("#rm-group").select_option("chemical")
             assert "фармацевтика" in page.locator("#rm-status").inner_text()
             with page.expect_download() as rm:
