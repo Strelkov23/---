@@ -185,7 +185,7 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==27
+        assert page.locator("main .portal-grid article").count()==28
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
@@ -205,6 +205,19 @@ with sync_playwright() as p:
         assert any(x["period"]==report["parameters"]["base"] and x["value"]==100 for x in report["rows"])
         page.locator("#builder-method").select_option("mean")
         assert page.locator("#builder-json").is_disabled()
+        page.wait_for_function("document.querySelector('#composite-status').textContent.includes('Параметры изменены')")
+        selects=page.locator("#composite-components fieldset select").all()
+        selects[0].select_option("wdi:NE.EXP.GNFS.ZS")
+        selects[2].select_option("wdi:NE.IMP.GNFS.ZS")
+        page.locator("#composite-base").fill("2020")
+        page.locator("#composite-confirm").check()
+        page.locator("#composite-run").click()
+        page.wait_for_function("document.querySelector('#composite-status').textContent.includes('Рассчитано')")
+        with page.expect_download() as d:
+            page.locator("#composite-json").click()
+        c=json.loads(d.value.path().read_text())
+        assert c["weights"]==[0.5,0.5] and len(c["components"])==2
+        assert abs(next(x for x in c["rows"] if x["period"]=="2020")["selected"]-100)<1e-9
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

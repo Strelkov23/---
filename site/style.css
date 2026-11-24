@@ -126,3 +126,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #repro-fingerprint,#repro-source,#repro-version,#repro-result,#repro-status{overflow-wrap:anywhere}#repro-file{width:100%;max-width:100%;min-width:0}
 
 .builder-control{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%;margin:.6rem 0}.builder-control select,.builder-control input{min-width:0;width:100%;max-width:100%}#builder-chart svg{display:block;width:100%;max-width:950px;height:auto}#builder-table table{min-width:620px}#builder-passport,#builder-formula{overflow-wrap:anywhere}
+
+#composite-components{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1rem}#composite-components fieldset{min-width:0;max-width:100%;overflow-wrap:anywhere}#composite-result table{min-width:900px}#composite-status{overflow-wrap:anywhere}
