@@ -47,3 +47,5 @@
 @media(max-width:520px){.site-header{padding:.75rem .85rem}.primary-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.25rem}.primary-nav a{justify-content:flex-start;padding:.45rem .5rem;font-size:.88rem}.portal-grid{grid-template-columns:1fr}.section-nav{padding:.65rem}.section-nav>div a{font-size:.86rem}.site-brand{font-size:1.1rem}}
 
 #monthly-summary{font-size:.9rem;color:#43625e}#monthly td:first-child{white-space:nowrap}#monthly-more{margin-right:.4rem}
+
+#papers article button[aria-pressed=true]{background:#dbece7;font-weight:bold}#paper-selection{font-weight:600}#paper-filters label{flex:1 1 175px}
