@@ -220,6 +220,14 @@ with sync_playwright() as p:
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0
             assert page.locator("#geo-map g[role=button]").count()<=8
+            page.locator("#geo-region").select_option("RU-MOW")
+            page.locator("#geo-detail .geo-profile summary").click()
+            page.wait_for_function("document.querySelector('#geo-detail .geo-profile [role=status]').textContent.startsWith('Доступно:')",timeout=30000)
+            assert page.locator("#geo-detail .geo-profile tbody tr").count()==15
+            assert "ошибок загрузки" not in page.locator("#geo-detail .geo-profile [role=status]").inner_text()
+            with page.expect_download() as profile:
+                page.locator("#geo-detail .geo-profile button").click()
+            assert profile.value.suggested_filename.startswith("regional-profile-")
         page.goto("http://localhost:8765/news-map.html",wait_until="load")
         page.wait_for_function("document.querySelector('#news-geo-status').textContent.startsWith('Период до')",timeout=30000)
         assert page.locator("#news-geo-map svg").count()==1

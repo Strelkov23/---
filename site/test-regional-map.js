@@ -21,3 +21,9 @@ assert.equal(M.displayName('RU-TYU','Tyumen'),'Тюменская область
 assert.equal(M.key('RU-TYU'),null);
 assert.equal(M.displayName('RU-MOW','Moscow'),'Москва');
 assert.equal(M.displayName('XX','Original'),'Original');
+
+const sample=values=>({out:new Map(values.map(r=>[r.region,r]))}),observations=[{region:'москва',year:2022,value:10},{region:'москва',year:2024,value:15},{region:'томская область',year:2023,value:20}];
+assert.equal(M.profileObservation(observations,'москва',2023,sample).value,10);
+assert.equal(M.profileObservation(observations,'москва',2024,sample).value,15);
+assert.equal(M.profileObservation(observations,'москва',2021,sample),null);
+assert.equal(M.profileObservation(observations,null,2024,sample),null);

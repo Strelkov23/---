@@ -40,7 +40,13 @@ const RegionalMap=(()=>{
   if(name)return name[0].toUpperCase()+name.slice(1);
   return typeof original==='string'&&original.trim()?original:'Контур без названия';
  }
- return {key,project,rings,classes,bin,theme,isGrowth,growthBin,displayName,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ function profileObservation(values,key,year,sample){
+  if(!key||!Number.isInteger(year))return null;
+  const years=[...new Set(values.map(r=>r.year).filter(y=>Number.isInteger(y)&&y<=year))].sort((a,b)=>b-a);
+  for(const y of years){const r=sample(values.filter(v=>v.year===y)).out.get(key);if(r)return r}
+  return null
+ }
+ return {key,project,rings,classes,bin,theme,isGrowth,growthBin,displayName,profileObservation,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -53,6 +59,54 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const colors=['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953'];
  const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers'),regionPick=$('geo-region');
  let chosenRegion=saved.get('geo-region')||'';
+ const profileEnabled=Boolean($('geo-region')),profileCache=new Map();
+ let profileManifest;
+ async function mapLoad(file){
+  if(!profileEnabled)return load(file);
+  if(!profileManifest)profileManifest=load('data-manifest.json').then(Provenance.validateManifest);
+  return (await Provenance.get(await profileManifest,file,root)).data
+ }
+ function profileFile(file){
+  if(!profileCache.has(file))profileCache.set(file,mapLoad(file).catch(e=>{profileCache.delete(file);throw e}));
+  return profileCache.get(file)
+ }
+ const profileCodes=[
+  ['Экономика','GRP_95b8dd2585'],['Экономика','GRP_PC_95b8dd2585'],['Экономика','GRP_VOLUME_95b8dd2585'],
+  ['Промышленность','R_347ab451705a6d33_031d7fe105'],['Промышленность','R_425e9fbbe745e4e6_031d7fe105'],['Промышленность','R_5f09b90031e93f90_031d7fe105'],['Промышленность','R_c4e8751efbd23309_031d7fe105'],
+  ['Инвестиции','R_88230ed30f2f2738_bf6a5a3983'],['Инвестиции','R_66b96177c45a01ad_bf6a5a3983'],
+  ['Труд','R_65254a01945743d3_1db3db8e79'],['Труд','R_a4138d558584b81a_1db3db8e79'],
+  ['Бюджет','R_77976ed27f49b4fd_28f4b5b380'],['Бюджет','R_8728bc736516e87c_28f4b5b380'],
+  ['Население','R_f39e59bbabc208f3_4c391d1044'],['Население','HH_CONS_PC_95b8dd2585']
+ ];
+ function addProfile(f,Y){
+  if(!profileEnabled)return;
+  const section=node('details','');section.className='geo-profile';section.append(node('summary','Экономическое досье региона · 15 показателей'));
+  const info=node('p','Показаны наблюдения за выбранный год или последнее доступное значение не позднее этого года. Разные годы не сопоставляются автоматически.');
+  const body=node('div',''),status=node('p','Раскройте досье для загрузки.');status.setAttribute('role','status');section.append(info,status,body);details.append(section);
+  let loaded=false,busy=false;
+  section.ontoggle=async()=>{
+   if(!section.open||loaded||busy)return;
+   if(!f.key){status.textContent='Нет однозначного статистического соответствия для этого контура.';return}
+   busy=true;status.textContent='Загрузка проверенных рядов…';
+   try{
+    const jobs=profileCodes.map(async([group,code])=>{
+     const m=catalog.find(s=>s.code===code);if(!m)return {group,code,error:'Ряд отсутствует'};
+     try{const data=await profileFile(m.file),r=RegionalMap.profileObservation(data.values,f.key,Y,RegionalStats.sample);
+      return {group,code,title:m.title,unit:m.unit,source:data.source,kind:m.kind,r}
+     }catch(e){return {group,code,title:m.title,unit:m.unit,error:'Не удалось проверить ряд'}}
+    });
+    const results=await Promise.all(jobs);if(!section.isConnected)return;
+    const table=node('table',''),thead=table.createTHead().insertRow(),tbody=table.createTBody();
+    for(const v of ['Раздел','Показатель','Значение','Год','Источник'])thead.append(node('th',v));
+    for(const v of results){const tr=tbody.insertRow();tr.insertCell().textContent=v.group;tr.insertCell().textContent=v.title||v.code;tr.insertCell().textContent=v.error||(!v.r?'Нет наблюдения':fmtValue(v.r.value)+' '+v.unit);tr.insertCell().textContent=v.r?String(v.r.year)+(v.r.year!==Y?' (ранее)':''):'—';const cell=tr.insertCell();if(v.source&&/^https?:\/\//i.test(v.source))cell.append(link('Источник',v.source));else cell.textContent='—'}
+    const exportButton=node('button','Скачать досье CSV');exportButton.type='button';
+    exportButton.onclick=()=>csv('regional-profile-'+chosenRegion+'-'+Y+'.csv',[['Регион','Выбранный год','Раздел','Код','Показатель','Год наблюдения','Значение','Единица','Источник','Метод получения','Статус'],...results.map(v=>[f.r?.region||RegionalMap.displayName(f.f.properties.iso_3166_2,f.f.properties.name),Y,v.group,v.code,v.title,v.r?.year,v.r?.value??'',v.unit,v.source,v.kind,v.error||(!v.r?'Нет наблюдения':v.r.year===Y?'Выбранный год':'Более ранний год')])]);
+    const found=results.filter(v=>v.r).length,failed=results.filter(v=>v.error).length;
+    status.textContent='Доступно: '+found+' из '+results.length+' · за выбранный год: '+results.filter(v=>v.r?.year===Y).length+(failed?' · ошибок загрузки: '+failed:'');
+    body.replaceChildren(table,exportButton);loaded=failed===0;
+   }finally{busy=false}
+  }
+ }
  const activeFields=[...fields,...['geo-theme','geo-scale','geo-markers','geo-region'].filter(id=>$(id))];
  function draw(){
   if(!geo||!series)return;
@@ -82,7 +136,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
   const select=f=>{const p=f.f.properties,r=f.r;chosenRegion=p.iso_3166_2||'';if(regionPick)regionPick.value=chosenRegion;for(const e of svg.querySelectorAll('[data-region]')){if(e.dataset.region===chosenRegion)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
     if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}
-    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}save(activeFields)};
+    if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1)addProfile(f,Y);save(activeFields)};
   for(const f of polygons){
    const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
    if(!d)continue;
@@ -133,12 +187,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
   const m=catalog.find(s=>s.code===pick.value);if(!m)return;
   status.textContent='Загрузка ряда…';
-  try{const data=await load(m.file);if(token!==seq)return;series={...data,code:m.code};const ys=[...new Set(data.values.map(r=>r.year))].sort((a,b)=>b-a);year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.'}}
+  try{const data=await mapLoad(m.file);if(token!==seq)return;series={...data,code:m.code};const ys=[...new Set(data.values.map(r=>r.year))].sort((a,b)=>b-a);year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.'}}
  }
  try{
-  meta=await load('regional-boundaries.json');
+  meta=await mapLoad('regional-boundaries.json');
   if(!['ok','cached'].includes(meta.status)){status.textContent='Файл границ пока недоступен; используйте тепловые карты и территориальные таблицы.';source.append(link('Документация источника',meta.documentation),node('p',meta.error||''));return}
-  [geo,catalog]=await Promise.all([load('regional-boundaries.geojson'),load('historical.json').then(x=>x.series.filter(s=>s.regions>=3))]);
+  [geo,catalog]=await Promise.all([mapLoad('regional-boundaries.geojson'),mapLoad('historical.json').then(x=>x.series.filter(s=>s.regions>=3))]);
   function populate(preferred){
    const subset=catalog.filter(s=>!themePick||themePick.value==='all'||RegionalMap.theme(s.code)===themePick.value);
    pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.kind,s.code)));
