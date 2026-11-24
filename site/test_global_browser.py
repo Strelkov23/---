@@ -185,7 +185,7 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==33
+        assert page.locator("main .portal-grid article").count()==34
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
@@ -290,6 +290,22 @@ with sync_playwright() as p:
         with page.expect_download() as d:
             page.locator("#fbs-export").click()
         assert d.value.suggested_filename=="food-scenario.csv"
+        page.goto("http://localhost:8765/electricity.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#electric-run').disabled")
+        assert page.locator("#electric-table tbody tr").count()>=2
+        page.locator("#electric-run").click()
+        assert "сальдо: 0" in page.locator("#electric-result").inner_text()
+        page.locator("#electric-c").fill("5")
+        page.locator("#electric-run").click()
+        assert "дополнительная выработка:" in page.locator("#electric-result").inner_text()
+        with page.expect_download() as d:
+            page.locator("#electric-export").click()
+        assert d.value.suggested_filename=="electricity-scenario.csv"
+        page.locator("#electric-scope").select_option("ues")
+        assert "264,9" in page.locator("#electric-table tbody").inner_text()
+        page.goto("http://localhost:8765/data-registry.html?id=electricity%3Aues.capacity",wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
+        assert "ГВт" in page.locator("#registry-list article").inner_text()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow

@@ -81,6 +81,15 @@ def make(out):
             if not vals:continue
             first,last=bounds(r["year"] for r in vals)
             add("fbs",code+"."+key,items[0]["title"]+" — "+title,"тыс. т","годовая","Россия",len(vals),first,last,items[0]["source"],fbs["checked"],fbs["success"],fbs["status"],"auto" if fbs["mode"]=="official_archive" else "manual","food-balance.html","food-balance.json","Оценки FAOSTAT; флаги и примечания в файле. Режим: "+fbs["mode"],"FBS")
+    elec=load(out,"electricity.json")
+    for code,title in elec["scopes"].items():
+        items=[r for r in elec["rows"] if r["scope"]==code]
+        for key,label in elec["labels"].items():
+            first,last=bounds(r["year"] for r in items)
+            # A series can contain documentary and direct years. Do not attribute the last
+            # successful check to every observation, or use a year-specific URL as the whole archive.
+            direct=all(r["mode"]=="direct" for r in items)
+            add("electricity",code+"."+key,title+" — "+label,elec["units"][key],"годовая",title,len(items),first,last,"https://www.so-ups.ru/functioning/ups/",None,None,"Прямой импорт всех лет" if direct else "Документальные или смешанные годы; см. источник каждой записи","auto" if direct else "manual","electricity.html","electricity.json","Год обозначает период выработки/потребления или конец года для мощности; охват: "+title+"; "+elec["notes"],"Охваты СО ЕЭС")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])
