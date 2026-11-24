@@ -47,6 +47,12 @@ def publish(page,out):
         for r in read(out,'industry'):
             if old.get(r['period'])!=r['value']:
                 lines.append(f'Индекс промышленного производства, {r["period"]}: {old.get(r["period"],"нет значения")} → {r["value"]}% к тому же месяцу годом ранее')
+        latest_series=read(out,'compare')
+        for code,oldseries in previous.items():
+            current_values=latest_series.get(code,{}).get('values',{})
+            for year,val in oldseries.get('values',{}).items():
+                if year not in current_values:
+                    lines.append(f'{oldseries["title"]}, {year}: {val} → отсутствует в текущем наборе')
     else:lines.append('Первый снимок. Он станет базой следующего сравнения.')
     lines.append(f'Источники со сбоем: {len(read(out,"status")["failures"])}')
     journal=([{'time':stamp,'lines':lines}]+journal)[:90]

@@ -8,6 +8,7 @@ import monitor as m
 import industry
 import indicators
 import literature
+import cbr_data
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -19,7 +20,12 @@ def write(name, data):
     (out / name).write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
 
 def page(name, body):
-    (out / name).write_text(Path("shell.html").read_text().replace("<!--BODY-->",body))
+    import re
+    from html import unescape
+    match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
+    title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
+    shell=Path("shell.html").read_text()
+    (out / name).write_text(shell.replace("<!--TITLE-->",escape(title)).replace("<!--BODY-->",body),encoding="utf-8")
 
 with m.connect() as db:
     articles = [dict(r) for r in db.execute("""select a.title,a.url,a.published,a.seen,a.source,
@@ -51,11 +57,21 @@ with m.connect() as db:
         where rn=1 order by year""")]
     comparison = {code: dict(title=meta[1], unit=meta[2], values={}) for code, meta in indicators.META.items()}
     for r in latest:
-        if r["code"] in comparison and int(r["year"]) >= 1991:
+        if r["code"] in comparison and int(r["year"]) >= 1991 and r["value"] is not None:
             comparison[r["code"]]["values"][r["year"]] = r["value"]
     write("compare.json", comparison)
     indicators.publish(page,out,latest,checks)
-    write("stats.json",{"series":m.SERIES,"values":[r for r in latest if r["code"] in m.SERIES]})
+    checks_by_url={r["url"]:r for r in checks}
+    withdrawn={}
+    for r in latest:
+        if r["value"] is None and int(r["year"])>=1991:withdrawn.setdefault(r["code"],[]).append(int(r["year"]))
+    catalog={}
+    for code,meta in indicators.META.items():
+        url=f"https://api.worldbank.org/v2/country/RUS/indicator/{code}?format=json&per_page=200"
+        c=checks_by_url.get(url,{})
+        catalog[code]={"theme":meta[0],"title":meta[1],"unit":meta[2],"agency":meta[3],"source":url,"checked":c.get("checked"),"success":c.get("success"),"status":c.get("status","Ожидается загрузка"),"withdrawn":withdrawn.get(code,[])}
+    write("catalog.json",catalog)
+    write("stats.json",{"series":m.SERIES,"values":[r for r in latest if r["code"] in m.SERIES and r["value"] is not None]})
     literature.sync(db,m.now(),"--refresh" in sys.argv)
     literature.reclassify(db)
     papers=[dict(r) for r in db.execute("select * from literature order by published desc,title,doi")]
@@ -67,15 +83,17 @@ with m.connect() as db:
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
     failures.extend(r["journal"]+" · "+r["status"] for r in journal_checks if r["status"]!="Проверено")
     failures.extend("Правовой портал "+d["day"] for d in days if d["error"])
-    industry_error = industry.collect(db,m.now())
+    industry_error = industry.collect(db,m.now()) if "--refresh" in sys.argv else ""
     if industry_error:
         failures.append("Месячная промышленность · " + industry_error)
+    db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
     months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
     write("industry.json", months)
+    cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
-for name in ["desk.html","compare.html"]:
+for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html"]:
     page(name,Path(name).read_text())
-for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv"]:
+for f in ["desk.js","compare.js","papers.js","sectors.json","style.css","public.js","model-check.py","model-input.csv","research.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text())
 

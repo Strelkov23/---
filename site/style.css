@@ -15,3 +15,5 @@
  #brief .print-note {display:block;white-space:pre-wrap}
  #brief article {break-inside:avoid}
 }
+
+#snapshot-notice{padding:.8rem 1rem;border:1px solid #b7a46b;background:#fff8e4;margin:0 0 1rem;overflow-wrap:anywhere}.atlas-table,#month-list,#stat-list{overflow-x:auto;max-width:100%}#scenario-input input{width:7em}#stat-list td:first-child{min-width:200px}#stat-list td:last-child{min-width:150px}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #b18a54;outline-offset:2px}header strong a{color:inherit}#stat-list small{display:block}#quality-status{overflow-wrap:anywhere}#diag-list details{overflow:auto}

@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     el('brief-models').replaceChildren();
     for(const [key,s] of Object.entries(scenarios)){
       const box=node('article',''),link=node('a','Параметры сценария');
-      link.href=s.url;
+      if(/^https?:\/\//i.test(s.url||''))link.href=s.url;
       box.append(node('h3',s.name+' · '+s.percent+'%'),...s.steps.map(t=>node('p',t)),link);
       const remove=node('button','Убрать расчёт');
       remove.onclick=()=>{delete scenarios[key];try{localStorage.setItem('economics-brief-models',JSON.stringify(scenarios))}catch{el('note-status').textContent='Не удалось сохранить изменение'}renderBrief()};
@@ -90,5 +90,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   el('desk-filter').onsubmit = e => e.preventDefault();
   el('desk-more').onclick = () => {limit+=25;render()};
   el('desk-export').onclick = () => csv('research-collection.csv',[['Название','Тип','Источник','Дата','Авторы','Темы','Ссылка'],...Array.from(basket.values(),r=>[r.title,r.type,r.source,r.date,r.authors,r.topics,r.url])]);
+  function downloadProject(){
+    const payload={schema:1,exported:new Date().toISOString(),version:version||null,items:[...basket.values()],note:note.value,scenarios};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'})),a=node('a','');a.href=url;a.download='economic-research-project.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
+  }
+  el('project-backup').onclick=downloadProject;
+  el('project-restore').onchange=async()=>{
+    const file=el('project-restore').files[0];if(!file)return;
+    try{
+      if(file.size>10_000_000)throw Error('Слишком большой файл');
+      const p=JSON.parse(await file.text());
+      if(p.schema!==1||!Array.isArray(p.items)||typeof p.note!=='string'||!p.scenarios||typeof p.scenarios!=='object'||Array.isArray(p.scenarios))throw Error('Некорректная структура');
+      const safe=new Map(),safeScenarios=Object.create(null);
+      for(const x of p.items){
+        if(!x||typeof x.title!=='string'||typeof x.url!=='string'||!/^https?:\/\//i.test(x.url))throw Error('Некорректная ссылка');
+        const r={title:x.title,url:x.url,date:String(x.date||''),type:String(x.type||''),source:String(x.source||''),topics:String(x.topics||''),authors:String(x.authors||'')};safe.set(r.url,r)
+      }
+      for(const [k,x] of Object.entries(p.scenarios)){
+        if(!x||typeof x.name!=='string'||typeof x.url!=='string'||!/^https?:\/\//i.test(x.url)||!Array.isArray(x.steps)||x.steps.some(t=>typeof t!=='string'))throw Error('Некорректный сценарий');
+        safeScenarios[k]={name:x.name,url:x.url,percent:Number(x.percent)||0,steps:x.steps}
+      }
+      if(!window.confirm('Заменить текущую подборку, заметку и расчёты содержимым файла?'))return;
+      basket=safe;scenarios=safeScenarios;note.value=p.note;
+      try{
+        localStorage.setItem(storageKey,JSON.stringify([...basket.values()]));localStorage.setItem('economics-brief-models',JSON.stringify(scenarios));localStorage.setItem('economics-brief-note',note.value);persistent=true
+      }catch{persistent=false}
+      render();el('project-status').textContent=persistent?'Копия восстановлена':'Копия открыта, но постоянное сохранение недоступно';
+    }catch(e){el('project-status').textContent='Не удалось восстановить копию: '+e.message}
+    finally{el('project-restore').value=''}
+  };
   render();
 });

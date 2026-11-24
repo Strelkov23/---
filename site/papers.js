@@ -44,11 +44,20 @@ document.addEventListener('DOMContentLoaded',async()=>{
     card.append(access,node('small','Ссылка: '+(labels[state(r)]||'Не проверено')+(c.checked?' · '+c.checked.slice(0,10):'')+(c.detail?' · '+c.detail:'')));
     $('papers').append(card)
    }
-   $('next').hidden=selected.length<=limit;$('references').disabled=!selected.length;save(ids)
+   $('next').hidden=selected.length<=limit;for(const id of ['references','bibtex','ris','gost'])$(id).disabled=!selected.length;save(ids)
   }
   $('paper-filters').oninput=()=>{limit=30;draw()};$('paper-filters').onsubmit=e=>e.preventDefault();$('paper-filters').onreset=()=>setTimeout(()=>{limit=30;draw()},0);
   $('next').onclick=()=>{limit+=40;draw()};
   $('references').onclick=()=>csv('economics-bibliography.csv',[['Авторы','Название','Дата публикации','Журнал','ISSN','Индексация журнала','Дата проверки журнала','Источники классификации','Темы','DOI','Ссылка','Статус ссылки','Дата проверки ссылки'],...selected.map(r=>[r.authors,r.title,r.published,r.journal,meta(r).issn,(meta(r).tags||[]).join(' · '),meta(r).verified,(meta(r).sources||[]).join(' | '),r.topics,r.doi,doiURL(r.doi),labels[state(r)],check(r).checked])]);
+  function exportText(filename,content){const url=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'})),a=node('a','');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+  const clean=v=>String(v??'').replace(/[\r\n]+/g,' ').trim();
+  const bib=v=>clean(v).replace(/\\/g,'/').replace(/[{}]/g,'').replace(/[%&#_$]/g,m=>'\\'+m);
+  $('bibtex').onclick=()=>exportText('references.bib',selected.map((r,i)=>{
+    const fields={title:r.title,author:clean(r.authors).split(/,\s*/).join(' and '),journal:r.journal,year:clean(r.published).slice(0,4),doi:r.doi,url:doiURL(r.doi)};
+    return '@article{econ'+i+',\n'+Object.entries(fields).filter(([,v])=>v).map(([k,v])=>'  '+k+' = {'+bib(v)+'}').join(',\n')+'\n}';
+  }).join('\n\n'));
+  $('ris').onclick=()=>exportText('references.ris',selected.map(r=>['TY  - JOUR','TI  - '+clean(r.title),...clean(r.authors).split(/,\s*/).filter(Boolean).map(v=>'AU  - '+v),'JO  - '+clean(r.journal),'PY  - '+clean(r.published).slice(0,4),'DO  - '+clean(r.doi),'UR  - '+doiURL(r.doi),'ER  - '].join('\r\n')).join('\r\n\r\n'));
+  $('gost').onclick=()=>exportText('references.txt','Рабочий список литературы (проверьте недостающие том, номер и страницы перед оформлением по ГОСТ).\n\n'+selected.map((r,i)=>(i+1)+'. '+[clean(r.authors),clean(r.title)].filter(Boolean).join('. ')+' // '+clean(r.journal)+'. — '+clean(r.published).slice(0,4)+'. — DOI: '+clean(r.doi)+'. — URL: '+doiURL(r.doi)).join('\n'));
   const byJournal=new Map((data.checks||[]).map(r=>[r.journal,r]));
   for(const journal of [...new Set([...Object.keys(reg),...records.map(r=>r.journal),...byJournal.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'))){
    const m=reg[journal]||{},j=byJournal.get(journal)||{},card=node('article','');
