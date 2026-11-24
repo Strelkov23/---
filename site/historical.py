@@ -8,6 +8,8 @@ from urllib.parse import urljoin,urlsplit,unquote
 from urllib.request import Request,urlopen
 from datetime import date
 from collections import defaultdict
+import emiss_archive
+import regional_seed
 
 SOURCES=[
  ("regions","Росстат · Социально-экономические показатели субъектов","https://rosstat.gov.ru/folder/210/document/47652"),
@@ -216,7 +218,11 @@ def publish(db,stamp,out,refresh):
             if not prev or prev[0]!=r["value"]:
                 accepted.append((*key,r["value"],stamp,url,json.dumps(r,ensure_ascii=False)))
         with db:db.executemany("insert or ignore into hist_values values(?,?,?,?,?,?,?,?)",accepted)
-        return len(grouped)
+        return sum(1 for rr in grouped.values() if len(set(r["value"] for r in rr))==1)
+    # Stable published bulletin, kept as its own dated edition (also available offline).
+    seed=list(regional_seed.rows())
+    n=store(seed,regional_seed.SOURCE,regional_seed.TITLE,"Росстат · опубликованный бюллетень, текстовая транскрипция")
+    sources.append(dict(code="nw_bulletin_2026q1",title=regional_seed.TITLE,url=regional_seed.SOURCE,checked=None,success=None,status="Транскрипция опубликованных таблиц: "+str(n)+" наблюдений; повторная доступность PDF не подтверждена",files=[]))
     if refresh:
         # At most one official workbook for each concept per run; no guessing of columns.
         for code,title,pat,unit,exclude in SPECS:
@@ -238,6 +244,16 @@ def publish(db,stamp,out,refresh):
                 n=store(rows,f["url"],"Федеральный бюджет","Казначейство · прямой импорт")
                 sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=stamp,status="Ключей: "+str(n),files=[]))
             except Exception as e:sources.append(dict(code="budget_import",title="Годовое исполнение бюджета",url=f["url"],checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
+        # EMISS publisher-coded historical archives: preserve every dimension and cite the primary portal.
+        for code,(title,agency,unit) in emiss_archive.SPECS.items():
+            url=emiss_archive.resource(code)
+            try:
+                raw,_=get(url,18_000_000)
+                rows=emiss_archive.parse(raw,code,numeric,year)
+                n=store(rows,url,title,agency+" · ЕМИСС, архив НЦСЭД (CC BY)")
+                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=stamp,status="Ключей: "+str(n),files=[dict(url=url,title="CSV (архив НЦСЭД)",format="csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
+            except Exception as e:
+                sources.append(dict(code="emiss_"+code,title=title,url=emiss_archive.primary(code),checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]))
         # One bounded independent processed archive per update; rotate sections.
         section=list(REGIONAL_ZIPS)[date.fromisoformat(stamp[:10]).toordinal()%len(REGIONAL_ZIPS)]
         url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
@@ -247,7 +263,7 @@ def publish(db,stamp,out,refresh):
         except Exception as e:sources.append(dict(code="mirror_"+section,title="Архив регионов: "+section,url=url,checked=stamp,success=None,status="Ошибка: "+str(e)[:160],files=[]))
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
-    for row in db.execute("""select payload from (select payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year"""):
+    for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
         r=json.loads(row[0])
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
         group=series.setdefault(key,dict(title=r["title"],unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))

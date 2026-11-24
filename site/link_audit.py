@@ -24,7 +24,7 @@ class Page(HTMLParser):
 
 # Only known public publishers and official sources are contacted automatically.
 # All other external addresses are still inventoried.
-TRUSTED=("gov.ru","pravo.gov.ru","cbr.ru","rosstat.gov.ru","worldbank.org","imf.org","oecd.org","un.org","unido.org","rbc.ru","tass.ru","interfax.ru","kommersant.ru","vedomosti.ru","ria.ru","1prime.ru","rg.ru","economy.gov.ru","minfin.gov.ru","nalog.gov.ru","hse.ru","rcsi.science","1economic.ru","vopreco.ru","econorus.org","economyofregion.ru","questionset.ru","asnap.ru","crossref.org","e-library.ru","elibrary.ru","scopus.com","clarivate.com","cyberleninka.ru","issn.org","doaj.org","repec.org","github.com","github.io","consultant.ru","rosspetsmash.ru","fedstat.ru","roskazna.gov.ru","customs.gov.ru")
+TRUSTED=("gov.ru","pravo.gov.ru","cbr.ru","rosstat.gov.ru","worldbank.org","imf.org","oecd.org","un.org","unido.org","rbc.ru","tass.ru","interfax.ru","kommersant.ru","vedomosti.ru","ria.ru","1prime.ru","rg.ru","economy.gov.ru","minfin.gov.ru","nalog.gov.ru","hse.ru","rcsi.science","1economic.ru","vopreco.ru","econorus.org","economyofregion.ru","questionset.ru","asnap.ru","crossref.org","e-library.ru","elibrary.ru","scopus.com","clarivate.com","cyberleninka.ru","issn.org","doaj.org","repec.org","github.com","github.io","consultant.ru","rosspetsmash.ru","fedstat.ru","roskazna.gov.ru","customs.gov.ru","repository.nsedc.ru","storage.yandexcloud.net","tochno.st")
 def trusted(url):
     try:
         p=urlsplit(url)
@@ -77,6 +77,11 @@ def publish(page,out,connect,stamp,refresh):
     page("links.html",'<h1>Проверка ссылок</h1><a href="links.json">Отчёт</a>')
     (out/"links.json").write_text("{}",encoding="utf-8")
     internal,external=scan(out)
+    priority=set(external)
+    if (out/'industry.json').exists():
+        for r in json.loads((out/'industry.json').read_text()):
+            priority.update(u for u in (r.get('url'),r.get('alternative_url')) if u)
+    external.update(priority)
     with connect() as db:
         db.execute("create table if not exists site_links(url text primary key,status text,detail text,checked text)")
         external.update(r[0] for r in db.execute("select distinct url from articles where url is not null") if r[0])
@@ -92,7 +97,11 @@ def publish(page,out,connect,stamp,refresh):
         external.discard("")
         old={r[0]:(r[1],r[2],r[3]) for r in db.execute("select url,status,detail,checked from site_links")}
         if refresh:
-            pending=sorted((u for u in external if trusted(u)),key=lambda u:(u in old,old.get(u,("","",""))[2],u))[:60]
+            rank=lambda u:(u in old,old.get(u,("","",""))[2],u)
+            # Visible official statistics links have their own allocation; large archives still rotate.
+            first=sorted((u for u in priority if trusted(u)),key=rank)[:25]
+            picked=set(first)
+            pending=first+sorted((u for u in external if trusted(u) and u not in picked),key=rank)[:60-len(first)]
             with ThreadPoolExecutor(max_workers=8) as pool:
                 results=[(*r,stamp) for r in pool.map(http_check,pending)]
             db.executemany("insert or replace into site_links values(?,?,?,?)",results)
@@ -111,6 +120,6 @@ def publish(page,out,connect,stamp,refresh):
     errors=[(u,*old[u]) for u in sorted(external) if u in old and old[u][0]!="ok"]
     body+='<h2>Последние проблемные адреса</h2><p>Показано до 200. Полный перечень проверенных ссылок — в JSON.</p><p><a href="links.json" download>Скачать отчёт JSON</a></p><table><thead><tr><th>Адрес</th><th>Результат</th><th>Проверка</th></tr></thead><tbody>'
     for u,s,d,t in sorted(errors,key=lambda x:x[3],reverse=True)[:200]:
-        body+='<tr><td>'+escape(u)+'</td><td>'+escape(labels.get(s,s)+' · '+d)+'</td><td>'+escape(t)+'</td></tr>'
+        body+='<tr><td>'+('<a href="'+escape(u,quote=True)+'" target="_blank" rel="noopener noreferrer">'+escape(u)+'</a>' if trusted(u) else escape(u))+'</td><td>'+escape(labels.get(s,s)+' · '+d)+'</td><td>'+escape(t)+'</td></tr>'
     page("links.html",body+"</tbody></table>")
     (out/"links.json").write_text(json.dumps({"built":stamp,"internal_errors":internal,"external_totals":dict(totals),"external":[{"url":u,"status":old.get(u,("unchecked","",""))[0],"detail":old.get(u,("","",""))[1],"checked":old.get(u,("","",""))[2],"eligible":trusted(u)} for u in sorted(external)]},ensure_ascii=False),encoding="utf-8")
