@@ -35,7 +35,7 @@ function chartTools(host, title, unit, years, series) {
       label(86,536+30*j,s.name,20);
     });
     label(35,610,'Источник: Всемирный банк, World Development Indicators · '+series.map(s=>s.code).join(' / '),18);
-    label(35,640,'Данные: data.worldbank.org · Экономический монитор',17);
+    label(35,640,'Версия: '+(typeof version!=='undefined'&&version?version:'не определена')+' · '+new Date().toISOString().slice(0,10),14);
     return new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
   }
   async function png(){
@@ -55,7 +55,7 @@ function chartTools(host, title, unit, years, series) {
     await navigator.clipboard.writeText(rows.map(r=>r.join('\t')).join('\n'));status.textContent='Таблица скопирована для вставки в Excel или Word.'});
   toolbar.append(status);host.append(toolbar);
 }
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',async()=>{
  const payload=document.getElementById('figure-data');
- if(payload){const d=JSON.parse(payload.textContent);chartTools(payload.parentElement,d.name,d.unit,d.years,[d])}
+ if(payload){if(!version){try{const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}catch{}}const d=JSON.parse(payload.textContent);chartTools(payload.parentElement,d.name,d.unit,d.years,[d])}
 });
