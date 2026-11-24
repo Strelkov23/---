@@ -124,6 +124,8 @@ def collect(out,stamp):
         add(ident,"География",title,r.get("documentation") or r.get("source"),r,year,archive=True,available=r["status"] in ("ok","cached"),policy="Фиксированный исторический набор; актуальность не предполагается",href=href)
     r=read("regional-boundaries.json")
     add("adm1","География","Границы субъектов Natural Earth",r.get("documentation"),dict(r,success=r.get("downloaded")),policy="Проверка при смене календарного месяца; не юридический реестр",href="economic-map.html")
+    p=read("industrial-parks.json")
+    add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,p.get("success"),days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html")
     r=read("sme-regions.json")
     add("sme","Предприятия","Агрегаты реестра МСП ФНС",r.get("documentation"),dict(r,success=r.get("downloaded")),r.get("period"),policy="Ожидаемый месячный срез на 10-е; проверка при сборке",href="facility-map.html#sme-map-section")
     return dict(schema=1,built=stamp,rows=result,policy="Даты следующей проверки — расчётные сроки внутреннего процесса, не календарь публикаций ведомств. При задержке сборки могут сдвигаться.")
