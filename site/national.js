@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    for(let i=0;i<=4;i++){const val=low+(high-low)*i/4;shape('line',{x1:85,x2:680,y1:y(val),y2:y(val),stroke:'#b9c8c8'});if(high!==low||i===0)shape('text',{x:78,y:y(val)+4,'text-anchor':'end','font-size':12,fill:'currentColor'},f(val))}
    let path='';values.forEach((v,i)=>{if(!Number.isFinite(v))return;path+=(i&&Number.isFinite(values[i-1])?'L':'M')+x(i)+' '+y(v)+' ';const c=shape('circle',{cx:x(i),cy:y(v),r:2.8,fill:'#006c69'});const t=document.createElementNS(svg.namespaceURI,'title');t.textContent=periods[i]+' · '+f(v)+' '+s.unit;c.append(t)});
    shape('path',{d:path,fill:'none',stroke:'#006c69','stroke-width':2});
-   periods.forEach((p,i)=>{if(i===0||i===periods.length-1||i%Math.max(1,Math.ceil(periods.length/6))===0&&i<periods.length-2)shape('text',{x:x(i),y:203,'font-size':11,'text-anchor':i===0?'start':i===periods.length-1?'end':'middle',fill:'currentColor'},p)});
+   chartTickIndices(periods.length,5).forEach(i=>shape('text',{x:x(i),y:203,'font-size':11,'text-anchor':i===0?'start':i===periods.length-1?'end':'middle',fill:'currentColor'},periods[i]));
    host.append(svg,node('p','Пропуски внутри периода: '+(periods.length-rows.length)+'. Источник: Банк России (инфляция — Росстат / Банк России).'));
    chartTools(host,s.title,s.unit,periods,[{name:s.title,code,values}],{source:'Банк России',url:s.source,monthly:true});
    const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
