@@ -156,3 +156,25 @@ jobs:
             curl --silent --show-error --max-time 15 --location --output /tmp/public-check --write-out '%{http_code}\n' "https://strelkov23.github.io/---/$route" || true
             if test "$route" = version.txt; then head -c 100 /tmp/public-check || true; echo; fi
           done
+
+      - name: Inspect official industrial workbooks
+        if: github.head_ref == 'stage-03-industry-atlas'
+        working-directory: monitor
+        run: |
+          python3 - <<'PY'
+          import historical as h,openpyxl,io
+          from concurrent.futures import ThreadPoolExecutor
+          names=['Ind_god_2020-2025.xlsx','ind_prom_okved.xlsx','otgruz_god_2025.xlsx','Proizvodstvo_god_2017-2024.xlsx','Proizvodstvo_god_2025.xlsx','ind_baza_2023.xlsx']
+          def probe(name):
+              try:
+                  raw,_=h.get('https://www.rosstat.gov.ru/storage/mediabank/'+name,35000000)
+                  w=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                  lines=[f'FILE {name} {len(raw)}']
+                  for s in list(w)[:3]:
+                      lines.append(f'SHEET {s.title!r} {s.max_row} {s.max_column}')
+                      for i,r in enumerate(s.iter_rows(values_only=True,max_row=14,max_col=20),1):lines.append(f'ROW {i} {r!r}'[:1600])
+                  w.close()
+                  print('\n'.join(lines),flush=True)
+              except Exception as e:print(name,type(e).__name__,str(e),flush=True)
+          with ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(probe,names))
+          PY
