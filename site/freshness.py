@@ -97,6 +97,8 @@ def collect(out,stamp):
     cmp=read("compare.json")
     for k,r in read("catalog.json").items():
         add("wdi-"+k,"Всемирный банк",r["title"],r["source"],r,latest(cmp.get(k,{}).get("values",{})),policy="Ротация годовых рядов; точный день не назначен",href="statistics.html")
+    rm=read("regional-manufacturing.json")
+    add("regional-manufacturing","Промышленность","Региональная отраслевая структура отгрузки",rm["source"],rm,latest(r["year"] for r in rm["rows"] if r["value"] is not None),days=30,policy="Фиксированный выпуск v20260313; повтор после ошибки через 2 суток",archive=True,available=bool(rm["rows"]),href="regional-manufacturing.html")
     law=read("federal-budget.json")
     add("federal-law","Государственные финансы","Федеральный бюджет · итоговые законы",law.get("source"),dict(status="Документальный снимок; сверка текстовых копий "+law["transcribed"]),latest(r["year"] for r in law["rows"]),archive=True,available=bool(law["rows"]),policy="Фиксированные итоговые законы; новые годы требуют документальной проверки",href="federal-budget.html")
     hist=read("historical.json")
