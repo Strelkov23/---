@@ -452,6 +452,9 @@ with sync_playwright() as p:
             assert page.locator("#rm-map svg path[data-region]").count()>70
             assert page.locator("#rm-table tbody tr").count()>65
             assert "Московская" in page.locator("#rm-detail").inner_text()
+            if len({r["year"] for r in manufacturing["rows"]})>=2:
+                assert page.locator("#rm-change-table tbody tr").count()==14
+                assert "Изменение доли" in page.locator("#rm-change-table").inner_text()
             page.locator("#rm-group").select_option("chemical")
             assert "фармацевтика" in page.locator("#rm-status").inner_text()
             with page.expect_download() as rm:
@@ -466,7 +469,7 @@ with sync_playwright() as p:
             assert page.locator("#rm-group option").count()==6
             assert "раздел B" in page.locator("#rm-status").inner_text()
             assert "Итог раздела B" in page.locator("#rm-table").inner_text()
-            assert page.locator("#rm-detail tbody tr").count()==6
+            assert page.locator("#rm-detail > .table-scroll").first.locator("tbody tr").count()==6
             with page.expect_download() as rm:
                 page.locator("#rm-export").click()
             assert rm.value.suggested_filename=="regional-manufacturing-coal-2024.csv"
@@ -475,7 +478,7 @@ with sync_playwright() as p:
             page.locator("#rm-group").select_option("heat")
             assert "раздел D" in page.locator("#rm-status").inner_text()
             assert "Итог раздела D" in page.locator("#rm-table").inner_text()
-            assert page.locator("#rm-detail tbody tr").count()==4
+            assert page.locator("#rm-detail > .table-scroll").first.locator("tbody tr").count()==4
         elif not manufacturing["rows"]:
             page.wait_for_function("document.querySelector('#rm-status').textContent.startsWith('Нет загруженных наблюдений')",timeout=30000)
             assert page.locator("#rm-export").is_disabled()
