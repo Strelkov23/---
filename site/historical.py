@@ -593,10 +593,15 @@ def publish(db,stamp,out,refresh):
         s["retry_policy"]=f"После успеха: {sd} суток; после ошибки: {fd} суток; очередь ограничена."
     # Publish bounded sets grouped by indicator and source, never merge across providers.
     series={}
+    # Legacy series IDs remain stable unless a source actually publishes more than
+    # one unit for the same indicator. Such editions must never share one label.
+    mixed_units=set(db.execute("select indicator,source from hist_values group by indicator,source having count(distinct unit)>1"))
     for row in db.execute("""select payload from (select indicator,region,year,unit,source,payload,row_number() over(partition by indicator,region,year,unit,source order by seen desc) rn from hist_values) where rn=1 order by indicator,region,year,unit,source"""):
         r=json.loads(row[0])
         key=r["indicator"]+"_"+hashlib.sha256(r["source"].encode()).hexdigest()[:10]
+        if (r["indicator"],r["source"]) in mixed_units:key+="_u"+hashlib.sha256(r["unit"].encode()).hexdigest()[:8]
         group=series.setdefault(key,dict(title=r["title"],unit=r["unit"],kind=r["kind"],source=r["source"],values=[]))
+        if group["unit"]!=r["unit"] or group["source"]!=r["source"]:raise ValueError("Несовместимые исторические ряды")
         group["values"].append({k:r[k] for k in ("region","year","value","sheet","row","column","note","seen")})
     # Split into independent data files to avoid giant initial download.
     folder=out/"regional-data";folder.mkdir(exist_ok=True)
