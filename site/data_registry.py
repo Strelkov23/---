@@ -30,6 +30,11 @@ def make(out):
             lengths={len(str(p)) for p in periods if p}
             freq={4:"годовая",7:"месячная",10:"даты наблюдений"}.get(next(iter(lengths)),"иная") if len(lengths)==1 else "см. исходный ряд"
             add(group,code,m["title"],m["unit"],freq,"Россия",len(vals),first,last,m["source"],m.get("checked"),m.get("success"),m.get("status"),"auto","national.html",filename,m.get("definition",""))
+    law=load(out,"federal-budget.json")
+    for k,title in law["metrics"].items():
+        vals=[r for r in law["rows"] if k in r["values"]]
+        first,last=bounds(r["year"] for r in vals)
+        add("budget_law",k,title,law["unit"],"годовая",law["scope"],len(vals),first,last,law["source"],None,None,"Документальный снимок "+law["transcribed"],"manual","federal-budget.html","federal-budget.json",law["note"],"Статья 1 годового закона")
     hist=load(out,"historical.json")
     # Source catalogue checks may have a different URL than the underlying file.
     # Do not assign a check from a similar title or a parent site.
@@ -61,6 +66,19 @@ def make(out):
     for (code,metric),items in grouped.items():
         vals=[r for r in items if r["value"] is not None];first,last=bounds(r["year"] for r in vals)
         add("finance",code+"."+metric,items[0]["title"]+" — "+fin["metrics"][metric]["title"],"%","годовая","Россия",len(vals),first,last,fin["source"],None,None,fin["status"],"manual","finance.html","finance-data.json","Отрицательные значения без величины исключены из числового ряда, сохранены в исходном наборе; "+items[0]["level"],"ОКВЭД2; локальный идентификатор")
+    original=load(out,"finance-workbooks.json")
+    # Keep full source label hashes separate, including punctuation changes.
+    # Every observation carries its own original workbook URL and cell.
+    source="https://www.nalog.gov.ru/rn77/taxation/reference_work/conception_vnp/"
+    grouped=defaultdict(list)
+    for batch in original["years"]:
+        for r in batch["rows"]:grouped[(r["code"],r["metric"])].append((r,batch))
+    for (code,metric),items in grouped.items():
+        vals=[(r,b) for r,b in items if r["sign"]=="numeric"]
+        first,last=bounds(r["year"] for r,b in vals)
+        lastrow,lastbatch=max(items,key=lambda item:item[0]["year"])
+        status="По отдельным годовым файлам; числовых значений "+str(len(vals))+" из "+str(len(items))+" позиций. Последний годовой файл: "+lastbatch["status"]
+        add("finance_original",code+"."+metric,lastrow["title"]+" — "+fin["metrics"][metric]["title"],"%","годовая","Россия",len(vals),first,last,source,lastbatch.get("checked"),lastbatch.get("success"),status,"auto","finance-workbooks.html","finance-workbooks.json","Оригинальные XLS/XLSX ФНС; идентификатор — хеш полного названия, без объединения разных редакций названия. Неуказанные отрицательные значения не считаются нулями. Даты относятся к файлу последнего года; см. данные каждой строки.","ОКВЭД2; наименование источника")
     state=load(out,"financial-state.json")
     for code,title in state["labels"].items():
         items=state["debt"];first,last=bounds(x["period"] for x in items)
