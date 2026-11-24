@@ -185,7 +185,7 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
-        assert page.locator("main .portal-grid article").count()==29
+        assert page.locator("main .portal-grid article").count()==31
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
@@ -261,6 +261,10 @@ with sync_playwright() as p:
         page.locator("#results-query").fill("Добыча угля")
         assert page.locator("#results-table tbody tr").count()==1
         assert "178,6" in page.locator("#results-table tbody tr").inner_text()
+        page.goto("http://localhost:8765/data-registry.html?id=debt%3Apayable",wait_until="load")
+        page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
+        assert page.locator("#registry-list article").count()==1
+        assert "Кредиторская" in page.locator("#registry-list article").inner_text()
         assert not errors,errors
         overflow=page.evaluate("""() => ({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll("main *")].filter(e=>!e.closest(".table-scroll")&&e.getBoundingClientRect().right>document.documentElement.clientWidth+3).slice(0,20).map(e=>[e.tagName,e.id,e.className?.baseVal||e.className,Math.round(e.getBoundingClientRect().right)])})""")
         assert overflow["scroll"]<=overflow["width"]+3,overflow
