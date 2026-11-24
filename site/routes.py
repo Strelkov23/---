@@ -9,7 +9,8 @@ ROUTES={
  "statistics":"statistics.html","national":"national.html","industrial":"industrial.html","sector-passports":"sector-passports.html","historical":"historical.html","regions":"historical.html","budget":"historical.html#hist-sources","history":"historical.html","diagnostics":"diagnostics.html",
  "scenario":"scenario.html","methodology":"methodology.html","directory":"directory.html",
  "links":"links.html","updates":"updates.html","indicators":"indicators.html",
- "brief":"desk.html#brief","watch":"index.html#archive"
+ "brief":"desk.html#brief","watch":"index.html#archive",
+ "monitoring":"monitoring.html","data-centre":"data-centre.html","sectors":"sectors.html","analysis-centre":"analysis-centre.html","research-centre":"research-centre.html","quality-centre":"quality-centre.html"
 }
 def publish(out):
     for old,target in ROUTES.items():
