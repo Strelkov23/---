@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -71,4 +72,16 @@ jobs:
                               if re.search(r"добавленн|структур|отгруженн|производств[ао] текстиль|производств[ао] химич|производств[ао] одежд|производств[ао] лекарствен|производств[ао] метал|производств[ао] пищев",key[0],re.I):
                                   print("CONCEPT",json.dumps([key,n,examples[key]],ensure_ascii=False))
               except Exception as e:print("ARCHIVE ERROR",filename,type(e).__name__,str(e))
+          PY
+      - name: Validate exact manufacturing parser on real archive
+        run: |
+          PYTHONPATH=site python3 - <<'PY'
+          import regional_manufacturing as m
+          from urllib.request import Request,urlopen
+          from collections import Counter
+          import hashlib,json
+          with urlopen(Request(m.SOURCE,headers={"User-Agent":"Mozilla/5.0"}),timeout=30) as f:
+              raw=f.read(35000001)
+          rows=m.parse(raw)
+          print("MANUFACTURING",json.dumps({"sha256":hashlib.sha256(raw).hexdigest(),"years":sorted({r["year"] for r in rows}),"count":len(rows),"numeric":sum(r["value"] is not None for r in rows),"groups":dict(Counter(r["group"] for r in rows))},ensure_ascii=False))
           PY
