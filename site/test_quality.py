@@ -5,6 +5,7 @@ from pathlib import Path
 import quality_gate as q
 import food_balance as f
 import electricity_balance as e
+import facility_data as fd
 import sqlite3
 
 class QualityTests(unittest.TestCase):
@@ -32,6 +33,7 @@ class QualityTests(unittest.TestCase):
             "regional-boundaries.json":{"status":"unavailable"},
         }
         for name,value in self.data.items():self.put(name,value)
+        fd.publish(self.out,self.prev,"2026-11-24",False)
         with sqlite3.connect(":memory:") as db:
             f.publish(lambda *args:None,self.out,f.sync(db,"2026-11-24T00:00:00+00:00",False))
             e.publish(self.out,e.sync(db,"2026-11-24T00:00:00+00:00",False))
@@ -61,6 +63,11 @@ class QualityTests(unittest.TestCase):
         p=self.out/"electricity-balance.csv"
         with p.open("a",encoding="utf-8") as fh:fh.write("2024,"+e.G+",1,TWh,"+e.SOURCE+",abc\n")
         self.assertTrue(any("Energy JSON/CSV mismatch" in x for x in self.report()["errors"]))
+    def test_facility_bad_metadata(self):
+        data=json.loads((self.out/"facility-energy.json").read_text())
+        data["release"]="unknown"
+        self.put("facility-energy.json",data)
+        self.assertTrue(any("Производственные площадки" in x for x in self.report()["errors"]))
     def test_missing(self):
         (self.out/"cbr.json").unlink()
         self.assertTrue(self.report()["errors"])

@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -86,6 +86,9 @@ def check(out,previous,stamp):
             count=regional_geo.validate(raw)
             if count!=geo.get("features") or hashlib.sha256(raw).hexdigest()!=geo.get("sha256"):raise ValueError("Контрольная сумма или число границ не совпадает")
             counts["geographic_features"]=count
+            if geo.get("inventory")!=regional_geo.inventory(raw):raise ValueError("Инвентаризация геометрии не совпадает")
+            counts["geographic_unique_codes"]=len(geo["inventory"]["unique_codes"])
+            counts["geographic_unmatched_contours"]=geo["inventory"]["unmatched_contours"]
             hashes["regional-boundaries.geojson"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
         except (OSError,ValueError,KeyError,TypeError) as e:issues.append("География: "+str(e))
     else:warnings.append("Географические границы недоступны: "+str(geo.get("error","нет файла")))
@@ -127,6 +130,14 @@ def check(out,previous,stamp):
         hashes["electricity-balance.csv"]={"sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("Энергетика: "+str(e))
+    try:
+        import facility_data
+        old_file=previous/"facility-energy.json"
+        old=json.loads(old_file.read_text(encoding="utf-8")) if old_file.is_file() else None
+        fc,fw=facility_data.quality(data["facility-energy.json"],old)
+        counts.update(fc);warnings.extend(fw)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("Производственные площадки: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

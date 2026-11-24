@@ -206,6 +206,7 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/search.html?q=инвестиции",wait_until="load")
         page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
         assert page.locator("#site-search-results section").count()==4
+        assert "недоступных наборов" not in page.locator("#site-search-status").inner_text()
         page.locator("#site-search-scope").select_option("tools")
         page.wait_for_function("document.querySelectorAll('#site-search-results section').length===1")
         assert page.locator("#site-search-results article a").count()>0

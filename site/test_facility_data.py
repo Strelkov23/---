@@ -18,4 +18,14 @@ class FacilityTest(unittest.TestCase):
         with self.assertRaises(ValueError):f.parse(archive("RUS,Example,A,10,55,80,Gas,Example,,\nRUS,Example,A,10,55,80,Gas,Example,,\n"))
     def test_bad(self):
         with self.assertRaises(ValueError):f.parse(archive("RUS,Example,A,10,nan,80,Gas,Example,,\n"))
+    def test_quality(self):
+        rows=[dict(id=str(i),name="Example",latitude=55.1,longitude=80.2,capacity_mw=10,generation={}) for i in range(100)]
+        data=dict(schema=1,release=f.RELEASE,source=f.SOURCE,license=f.LICENSE,status="ok",sha256="a"*64,rows=rows)
+        counts,warnings=f.quality(data)
+        self.assertEqual(counts["facility_records"],100)
+        self.assertEqual(counts["facility_reported_generation_records"],0)
+        self.assertTrue(any("нет наблюдаемой" in w for w in warnings))
+        with self.assertRaises(ValueError):f.quality(dict(data,rows=rows[1:]))
+        with self.assertRaises(ValueError):f.quality(dict(data,rows=[dict(rows[0],latitude=55.123),*rows[1:]]))
+        with self.assertRaises(ValueError):f.quality(dict(data,rows=[dict(rows[0],id="new"),*rows[1:]]),data)
 if __name__=="__main__":unittest.main()
