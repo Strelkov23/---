@@ -90,8 +90,9 @@ def publish(page,out,stamp):
         if not rows:body+="<p>Нет наблюдений для проверки.</p>"
         else:
             ordered=sorted(rows,key=lambda r:(r["status"]=="согласовано",r["period"]),reverse=False)
-            body+="<details><summary>Показать таблицу (до 30 строк; полный CSV выше)</summary><table><tr><th>Период</th><th>Первое</th><th>Второе</th><th>Разность</th><th>Результат</th></tr>"
-            for r in ordered[:30]:body+="<tr>"+"".join("<td>"+escape(fmt(r[k]))+"</td>" for k in ("period","first","second","delta","status"))+"</tr>"
-            body+="</table></details>"
+            first,second=("Минфин","Казначейство") if key.startswith("budget_") else ("Первое","Второе")
+            body+="<details><summary>Показать таблицу (до 30 строк; полный CSV выше)</summary><div style='overflow-x:auto'><table><tr><th>Период</th><th>"+first+"</th><th>"+second+"</th><th>Разность</th><th>Результат</th><th>Примечание</th></tr>"
+            for r in ordered[:30]:body+="<tr>"+"".join("<td>"+escape(fmt(r[k]))+"</td>" for k in ("period","first","second","delta","status"))+"<td style='min-width:14rem;overflow-wrap:anywhere'>"+escape(r["note"])+"</td></tr>"
+            body+="</table></div></details>"
         body+="</section>"
     page("consistency.html",body)
