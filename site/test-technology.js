@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),T=require('./technology.js'),fs=require('node:fs'),path=require('node:path');
+const m={names:['A','B'],A:[[.2,.3],[.1,.2]],domestic:[.3,.5],imported:[.2,.1],residual:[.5,.4],demand:[100000,100000],output:[200000,200000],compatible:true};
+const p={material:[0,0],imported:[0,0],productivity:[0,0],demand:[10,10],hours:[100,200]},lim={budget:10,importLimit:1e6,spare:100,laborCap:1e9,priority:[1,1]};
+const near=(a,b)=>assert.ok(Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(b)),a+' != '+b);
+let r=T.calculate(m,p);near(r.base.totalOutput,r.changed.totalOutput);near(r.base.basket,100);near(r.changed.totalLabor,r.base.totalLabor);
+r=T.calculate(m,{...p,material:[20,20],imported:[10,10],productivity:[100,100]});
+assert.ok(r.changed.totalOutput<r.base.totalOutput&&r.changed.totalImports<r.base.totalImports&&r.changed.totalLabor<r.base.totalLabor*.5);
+let a=T.allocate(m,p,lim);near(a.score,10);near(a.dual.find(x=>x.id==='budget').shadow,1);
+near(a.dual.find(x=>x.id==='budget').finiteGain,.1);
+a=T.allocate(m,p,{...lim,laborCap:0});near(a.score,0);
+assert.throws(()=>T.calculate(m,{...p,material:[100,0]}));
+const real=JSON.parse(fs.readFileSync(path.join(__dirname,'public','price-data.json'),'utf8')),n=real.names.length;
+const rp={material:Array(n).fill(10),imported:Array(n).fill(5),productivity:Array(n).fill(15),demand:Array(n).fill(3),hours:Array(n).fill(1000)},rl={budget:1000,importLimit:100,spare:5,laborCap:500000,priority:Array.from({length:n},(_,i)=>1+i%3)};
+const cases=[];
+for(const params of [rp,{...rp,hours:null}])for(const changed of [false,true]){const z=T.allocate(real,params,rl,changed);cases.push(z.reference);assert.ok(z.dual.every(x=>x.slack>=-1e-5*Math.max(1,x.limit)))}
+const f=T.frontier(real,rp,rl);assert.equal(f.rows.length,6);near(f.rows[0].limit,0);near(f.rows.at(-1).limit,rl.importLimit);
+near(f.rows.at(-1).changed,T.allocate(real,rp,rl,true).score);
+assert.equal(T.frontier(real,rp,{...rl,importLimit:0}).rows.length,1);
+const b=T.frontier(real,rp,rl,'budget');near(b.rows[0].base,0);near(b.rows.at(-1).limit,rl.budget);
+const h=T.frontier(real,rp,rl,'laborCap');near(h.rows[0].changed,0);
+assert.throws(()=>T.frontier(real,{...rp,hours:null},rl,'laborCap'));
+r=T.calculate(real,rp);assert.ok(r.changed.totalOutput<r.base.totalOutput&&r.changed.totalImports<r.base.totalImports&&r.changed.totalLabor<r.base.totalLabor);
+if(process.argv.includes('--reference'))process.stdout.write(JSON.stringify(cases));else console.log('Technology: balance, resource savings, shadow estimates and 4 real LPs passed');

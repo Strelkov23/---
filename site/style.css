@@ -105,3 +105,7 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #labor-broad table,#labor-regional table,#dyn-calibration-multipliers table{min-width:660px}#labor-chart{margin:1rem 0}#dyn-calibration-status{overflow-wrap:anywhere}
 
 #price-controls table,#price-results table,#price-labor-controls table,#price-labor-results table{min-width:650px}#price-controls input,#price-labor-controls input{width:9em}.price-negative{background:#a24724}#price-chart{margin:1rem 0}
+
+#tech-controls table,#tech-summary table,#tech-detail table,#tech-alloc table,#tech-dual table{min-width:720px}#tech-controls input{width:7em}#tech-chart{margin:1rem 0}
+
+#tech-frontier table{min-width:850px}#tech-frontier-chart svg{width:100%;height:auto;max-width:900px}#tech-frontier-chart{margin:1rem 0}

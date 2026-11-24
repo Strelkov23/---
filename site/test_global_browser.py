@@ -86,6 +86,25 @@ with sync_playwright() as p:
         assert page.locator("#price-labor-results tbody tr").count()==19
         page.locator("#price-labor-controls input").first.fill("1200")
         assert "привязка к файлу снята" in page.locator("#price-hour-file-status").inner_text()
+        page.goto("http://localhost:8765/technology.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#tech-status').textContent.includes('Параметры изменены')")
+        page.locator("#tech-example").click()
+        page.locator("#tech-run").click()
+        page.wait_for_function("document.querySelector('#tech-status').textContent.includes('Рассчитано 19')")
+        assert page.locator("#tech-detail tbody tr").count()==19
+        assert page.locator("#tech-alloc tbody tr").count()==2
+        assert page.locator("#tech-dual tbody tr").count()==21
+        assert page.locator("#tech-frontier tbody tr").count()==6
+        assert page.locator("#tech-frontier-chart svg").count()==1
+        with page.expect_download() as d:
+            page.locator("#tech-csv").click()
+        assert d.value.suggested_filename=="technology-scenario.csv"
+        page.locator("#tech-budget").fill("500")
+        assert page.locator("#tech-csv").is_disabled()
+        page.locator("#tech-axis").select_option("budget")
+        page.locator("#tech-run").click()
+        page.wait_for_function("document.querySelector('#tech-status').textContent.includes('Рассчитано 19')")
+        assert page.locator("#tech-frontier tbody tr").count()==6
         assert not errors,errors
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth+3")
         page.close()
