@@ -107,7 +107,13 @@ def check(out,previous,stamp):
     counts["sector_linked_series"]=len({r["id"] for p in profiles for r in p["rows"]})
     source_ids=set(compare)|{s["id"] for s in ind["series"]}|set(nat)
     if len({p["id"] for p in profiles})!=len(profiles):issues.append("Паспорта: повторяющиеся идентификаторы")
+    import sector_passports
+    counts["sector_finance_linked_observations"]=len({(r["year"],r["code"],r["metric"]) for p in profiles for r in p.get("finance",[])})
     for p in profiles:
+        if "finance" in p:
+            try:
+                if p["finance"]!=sector_passports.finance_rows(p["id"],data["finance-workbooks.json"]):raise ValueError("Показатели не воспроизводятся из оригинала ФНС")
+            except (ValueError,KeyError,TypeError) as e:issues.append("Паспорт ФНС "+p["id"]+": "+str(e))
         if len({r["id"] for r in p["rows"]})!=len(p["rows"]):issues.append("Паспорта: дубликаты в "+p["id"])
         for r in p["rows"]:
             if r["id"] not in source_ids or not http_url(r["source"]) or not (out/r["href"].split("?",1)[0]).is_file() or (r["count"] and not finite(r["value"])) or (not r["count"] and r["value"] is not None):
