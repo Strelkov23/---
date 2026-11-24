@@ -32,11 +32,15 @@ SOURCES=[
 ]
 REGIONAL_ZIPS={
  "population":"01","labor":"02","grp":"08","investment":"10","industry":"12","finance":"19",
- "enterprises":"11","agriculture":"13","construction":"14","trade":"15","transport":"16","innovation":"18"
+ "enterprises":"11","agriculture":"13","construction":"14","trade":"15","transport":"16","innovation":"18",
+ "farming":"farming","manufacturing":"industry"
 }
 MIRROR="https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/"
 MIRROR_PAGE="https://tochno.st/datasets/regions_collection"
 PRIMARY="https://rosstat.gov.ru/folder/210/document/13204"
+def mirror_url(section):
+    n=REGIONAL_ZIPS[section]
+    return MIRROR+"data_"+n+("_socio_economic" if n.isdigit() else "")+"_102_v20260313.zip"
 def norm(v):return " ".join(str(v if v is not None else "").lower().replace("ё","е").split())
 def allowed(url):
     try:
@@ -259,6 +263,8 @@ INDUSTRY_ACTIVITY=[
  r"металлургическ[а-я]+\s+производств[ао]",
  r"производств[ао]\s+(?:машин и оборудования|автотранспортных средств|прочих транспортных средств|электрического оборудования|компьютеров,? электронных)",
  r"обеспечени[ея]\s+электрической энергией|производств[ао]\s+и распределени[ея]\s+электроэнергии"]
+MIRROR_PRIORITY["farming"]=MIRROR_PRIORITY["agriculture"]+[r"^продукция сельского хозяйства",r"^валовой сбор зерна",r"^поголовье крупного рогатого скота"]
+MIRROR_PRIORITY["manufacturing"]=MIRROR_PRIORITY["industry"]
 def select_mirror(rows,section,limit=4):
     by=defaultdict(list)
     for r in rows:by[r["indicator"]].append(r)
@@ -268,10 +274,10 @@ def select_mirror(rows,section,limit=4):
         if candidates:
             # Prefer the largest complete historical series, not the first arbitrary CSV row.
             picked.append(max(candidates,key=lambda item:(len(item[1]),item[1][0]["unit"]=="млн руб.",item[0]))[0])
-    if not picked and section not in {'enterprises','agriculture','construction','trade','transport','innovation'}:
+    if not picked and section not in {'enterprises','agriculture','construction','trade','transport','innovation','farming','manufacturing'}:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
-    if section=='industry':
+    if section in ('industry','manufacturing'):
         used=set(picked[:limit])
         for pat in INDUSTRY_ACTIVITY:
             candidates=[(k,v) for k,v in by.items() if k not in used and re.search(pat,norm(v[0]['title'])) and re.search(r'^индекс|^объем отгруженных',norm(v[0]['title']))]
@@ -318,7 +324,7 @@ def mirror_rows(raw,section,selected=False):
                             unit="млн руб."
                         else:continue
                     # For new large sections retain only indicators selected by the declared concepts.
-                    if selected and section in {'enterprises','agriculture','construction','trade','transport','innovation'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
+                    if selected and section in {'enterprises','agriculture','construction','trade','transport','innovation','farming'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
@@ -445,7 +451,7 @@ def publish(db,stamp,out,refresh):
         sections=choose_sections(db,stamp)
         for section in sections:
             code="mirror_"+section
-            url=MIRROR+"data_"+REGIONAL_ZIPS[section]+"_socio_economic_102_v20260313.zip"
+            url=mirror_url(section)
             try:
                 raw,_=get(url,35_000_000);n=store(mirror_rows(raw,section,selected=True),url,section,"Росстат · обработка «Если быть точным», CC BY 4.0")
                 if not n:raise ValueError("Нет однозначных наблюдений")
@@ -477,7 +483,7 @@ def publish(db,stamp,out,refresh):
         code="mirror_"+section
         if code in present:continue
         row=db.execute("select checked,success,status from hist_sources where code=?",(code,)).fetchone()
-        url=MIRROR+"data_"+number+"_socio_economic_102_v20260313.zip"
+        url=mirror_url(section)
         sources.append(dict(code=code,title="Архив регионов: "+section,url=url,checked=row[0] if row else None,success=row[1] if row else None,status=row[2] if row else "Ожидается загрузка",files=[]))
     for s in sources:
         code=s["code"]

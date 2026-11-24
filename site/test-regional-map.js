@@ -46,3 +46,6 @@ assert.deepEqual(M.trend({year:2024,value:103},null,'%',true),{type:'index',delt
 assert.equal(M.trend({year:2024,value:100},{year:2022,value:80},'руб.'),null);
 assert.equal(M.trend({year:2024,value:100},null,'руб.'),null);
 assert.equal(M.trend({year:2024,value:5},{year:2023,value:0},'руб.').type,'absolute');
+
+assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_farming_102_v20260313.zip','Валовой сбор зерна'),'agriculture');
+assert.equal(M.industryTheme('Индексы производства: производство химических веществ','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_industry_102_v20260313.zip'),'chemical');

@@ -31,7 +31,7 @@ const RegionalMap=(()=>{
  ['machinery','Машиностроение','МАШ',/производств[ао]\s+(?:машин и оборудования|автотранспортных средств|прочих транспортных средств|электрического оборудования|компьютеров,? электронных)/iu],
  ['energy','Энергетика','ЭН',/обеспечени[ея]\s+электрической энергией|производств[ао]\s+и распределени[ея]\s+электроэнергии/iu]];
  function industryTheme(title,source){
-  if(!/\/data_12_socio_economic_102_v20260313\.zip$/.test(String(source)))return null;
+  if(!/\/data_(?:12_socio_economic|industry)_102_v20260313\.zip$/.test(String(source)))return null;
   const t=String(title||'').toLowerCase().replaceAll('ё','е');
   const matches=industryThemes.filter(x=>x[3].test(t));return matches.length===1?matches[0][0]:null
  }
@@ -62,10 +62,11 @@ const RegionalMap=(()=>{
  }
  function theme(code,source='',title=''){
  const sub=industryTheme(title,source);if(sub)return sub;
+ if(/\/data_farming_102_v20260313\.zip$/.test(String(source)))return 'agriculture';
  const section=String(source).match(/\/data_(11|13|14|15|16|18)_socio_economic_102_v20260313\.zip$/)?.[1];
  if(section)return {'11':'enterprises','13':'agriculture','14':'construction','15':'trade','16':'transport','18':'innovation'}[section];
  if(/^(GRP_|NW_GRP_|R_024d9416ea6f54dc_|R_7e8fd799d1d06897_|R_f54f02504bfb051e_)/.test(code))return 'economy';
- if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code)||/\/data_12_socio_economic_102_v20260313\.zip$/.test(source))return 'industry';
+ if(/^R_(347ab451705a6d33|425e9fbbe745e4e6|5f09b90031e93f90|c4e8751efbd23309)_/.test(code)||/\/data_(?:12_socio_economic|industry)_102_v20260313\.zip$/.test(source))return 'industry';
  if(/^R_(66b96177c45a01ad|6887143295c72599|88230ed30f2f2738|90575f546cc99ce3)_/.test(code))return 'investment';
  if(/^R_(65254a01945743d3|a4138d558584b81a|b8ff4db9a1b3092e|e8fd80380742955e)_/.test(code))return 'labor';
  if(/^R_(510509d40d0cb785|77976ed27f49b4fd|8728bc736516e87c|b7f9afa8b1ac06d9)_/.test(code))return 'budget';

@@ -12,7 +12,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const manifest=await Provenance.validateManifest(await load('data-manifest.json')),get=async n=>(await Provenance.get(manifest,n,root)).data,meta=await get('district-meta.json');
   if(!['ok','cached'].includes(meta.status)){status.textContent='Историческая геометрия недоступна: '+(meta.error||'нет загруженного файла');return}
   const geo=await get('district-boundaries.json'),features=geo.features;
-  status.textContent='2017 год · единиц ADM2: '+features.length+' · источник: geoBoundaries · '+(meta.status==='cached'?'проверенный архив':'загруженный архив');
+  status.textContent='2017 год · контуров: '+features.length+' из '+meta.expected_units+' заявленных · неполный исторический слой · geoBoundaries · '+(meta.status==='cached'?'проверенный архив':'загруженный архив');
   const polys=features.map(f=>({f,rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
   for(const f of polys)for(const r of f.rings)for(const [a,b] of r){xmin=Math.min(xmin,a);xmax=Math.max(xmax,a);ymin=Math.min(ymin,b);ymax=Math.max(ymax,b)}
@@ -23,7 +23,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   function txt(xx,yy,t,size=14){return shape('text',{x:xx,y:yy,'font-size':size,fill:'#173e52'},t)}
   let chosen=null;
   function select(f){if(chosen)paths.get(chosen)?.removeAttribute('data-selected');chosen=f.properties.shapeID;paths.get(chosen)?.setAttribute('data-selected','');detail.textContent=f.properties.shapeName+' · ID источника: '+chosen+' · 2017 год';}
-  shape('rect',{width:w,height:h,fill:'#fff'});txt(25,32,'Административные районы · 2017',22);txt(25,55,'Исторический справочный слой, не современный юридический реестр.');
+  shape('rect',{width:w,height:h,fill:'#fff'});txt(25,32,'Административные районы · 2017',22);txt(25,55,'Неполный исторический слой: 2327 из 2328 заявленных единиц; не юридический реестр.');
   for(const {f,rings} of polys){const d=rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' '),p=shape('path',{d,fill:'#e7efeb',stroke:'#617676','stroke-width':.45,'fill-rule':'evenodd','data-id':f.properties.shapeID});shape('title',{},f.properties.shapeName,p);paths.set(f.properties.shapeID,p);p.onclick=()=>select(f)}
   txt(25,600,'Выберите район нажатием или через поиск по названию.');txt(25,625,'geoBoundaries / OpenStreetMap, Wambacher · ODbL 1.0',13);
   const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap);
