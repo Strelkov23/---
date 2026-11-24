@@ -1,5 +1,5 @@
 const Freshness=(()=>{
- const labels={ok:'Успешная загрузка',cached:'Сохранённые данные / сбой',overdue:'Просрочена проверка',waiting:'Ожидается загрузка',unavailable:'Недоступно',archive:'Исторический архив'};
+ const labels={ok:'Успешная загрузка',cached:'Сохранённые данные / сбой',partial:'Частичный импорт',overdue:'Просрочена проверка',waiting:'Ожидается загрузка',unavailable:'Недоступно',archive:'Исторический архив'};
  function filter(rows,group,state,q){const term=String(q||'').toLowerCase().trim();return rows.filter(r=>(!group||r.group===group)&&(!state||r.state===state)&&(!term||[r.title,r.url,r.status].join(' ').toLowerCase().includes(term)))}
  return {labels,filter}
 })();
@@ -7,7 +7,7 @@ if(typeof module!=='undefined')module.exports=Freshness;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),form=$('fresh-form');if(!form)return;
  const group=$('fresh-group'),state=$('fresh-state'),q=$('fresh-query'),status=$('fresh-status'),host=$('fresh-table'),summary=$('fresh-summary'),more=$('fresh-more'),exp=$('fresh-export');
- const date=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—',priority={unavailable:0,cached:1,overdue:2,waiting:3,ok:4,archive:5};
+ const date=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—',priority={unavailable:0,cached:1,partial:2,overdue:3,waiting:4,ok:5,archive:6};
  let limit=30,selected=[];
  try{
   const m=await Provenance.validateManifest(await load('data-manifest.json')),data=(await Provenance.get(m,'freshness.json',root)).data;
