@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),E=require('./energy-output.js');
+assert.equal(E.group('05.10.10.100'),'coal');
+assert.equal(E.group('35.11.100'),null);
+assert.equal(E.group('35.12.10'),null);
+assert.equal(E.previous('2025-01'),'2024-12');
+assert.equal(E.previous('2025'),'2024');
+const s={"id":"a","code":"06.10.10","kind":"Натуральный выпуск","classification":"ОКПД2 (код источника)","frequency":"месячная","values":[{"period":"2025-01","value":0},{"period":"2025-02","value":10},{"period":"2025-04","value":20}]};
+assert.equal(E.selectRows([s],'месячная','2025-02','')[0].growth,null);
+assert.equal(E.selectRows([s],'месячная','2025-02','')[0].delta,10);
+assert.equal(E.selectRows([s],'месячная','2025-04','')[0].delta,null);
+assert.equal(E.selectRows([s],'месячная','2025-03','')[0].value,null);
+assert.equal(E.selectRows([{...s,kind:'Отгрузка'}],'месячная','2025-02','').length,0);
+assert.equal(E.selectRows([s],'годовая','2025','').length,0);
+assert.equal(E.selectRows([s],'месячная','2025-02','coal').length,0);
+console.log('Energy output filters, periods and missing values passed');
