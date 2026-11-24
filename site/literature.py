@@ -225,13 +225,7 @@ def sync(db, stamp, refresh):
                     doi=(item.get('DOI') or '').strip().lower()
                     if not re.fullmatch(r'10\.\d{4,9}/\S+',doi):continue
                     entries.append((doi,journal,when,title,authors,topics))
-                    meta=metadata(item)
-                    previous=db.execute('select payload from literature_meta where doi=?',(doi,)).fetchone()
-                    if previous:
-                        old=json.loads(previous[0])
-                        for key in meta:
-                            if meta[key] in ('',None) and old.get(key) not in ('',None):meta[key]=old[key]
-                    details.append((doi,json.dumps(meta,ensure_ascii=False),stamp))
+                    details.append((doi,json.dumps(metadata(item),ensure_ascii=False),stamp))
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
