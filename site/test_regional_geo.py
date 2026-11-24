@@ -5,6 +5,10 @@ class GeoTests(unittest.TestCase):
         return {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"Test","iso_3166_2":"RU-"+str(i)},"geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}} for i in range(83)]}
     def test_valid(self):
         self.assertEqual(g.validate(json.dumps(self.fixture()).encode()),83)
+    def test_unnamed_feature(self):
+        data=self.fixture()
+        data["features"][0]["properties"].pop("name")
+        self.assertEqual(g.validate(json.dumps(data).encode()),83)
     def test_invalid(self):
         data=self.fixture()
         data["features"][0]["geometry"]["coordinates"][0][0][0]=181
