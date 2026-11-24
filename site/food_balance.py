@@ -34,12 +34,15 @@ def parse(raw):
         if len(candidates)!=1 or candidates[0].file_size>900_000_000:raise ValueError("Unexpected FAOSTAT archive layout")
         with z.open(candidates[0]) as f:
             reader=csv.DictReader(io.TextIOWrapper(f,encoding="utf-8-sig",errors="strict",newline=""))
-            required={"Area","Item Code","Element Code","Year","Unit","Value","Flag"}
+            required={"Area","Element Code","Year","Unit","Value","Flag"}
             if not required<=set(reader.fieldnames or []):raise ValueError("FAOSTAT schema changed")
+            item_field="Item Code (FBS)" if "Item Code (FBS)" in reader.fieldnames else "Item Code"
+            if item_field not in reader.fieldnames:raise ValueError("Missing FBS item code")
             for r in reader:
-                if r["Area"]!="Russian Federation" or r["Item Code"] not in ITEMS or r["Element Code"] not in ELEMENTS:continue
+                code=r[item_field].removeprefix("S")
+                if r["Area"]!="Russian Federation" or code not in ITEMS or r["Element Code"] not in ELEMENTS:continue
                 if r["Unit"]!="1000 t":raise ValueError("Unexpected unit "+r["Unit"])
-                y=int(r["Year"]);c=r["Item Code"];k=ELEMENTS[r["Element Code"]]
+                y=int(r["Year"]);c=code;k=ELEMENTS[r["Element Code"]]
                 if y<2010 or y>datetime.now(timezone.utc).year:raise ValueError("Unexpected year")
                 if not r["Value"].strip():continue
                 v=float(r["Value"])

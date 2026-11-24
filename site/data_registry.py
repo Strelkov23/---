@@ -72,6 +72,15 @@ def make(out):
         for key,title in costs["labels"].items():
             first,last=bounds(r["year"] for r in items)
             add("cost",code+"."+key,items[0]["title"]+" — "+title,"%","годовая","Россия",len(items),first,last,costs["source"],None,None,costs["verification"],"manual","cost-structure.html","cost-structure.json",costs["coverage"],"ОКВЭД2")
+    fbs=load(out,"food-balance.json")
+    grouped=defaultdict(list)
+    for r in fbs["rows"]:grouped[r["code"]].append(r)
+    for code,items in grouped.items():
+        for key,title in fbs["labels"].items():
+            vals=[r for r in items if key in r["values"]]
+            if not vals:continue
+            first,last=bounds(r["year"] for r in vals)
+            add("fbs",code+"."+key,items[0]["title"]+" — "+title,"тыс. т","годовая","Россия",len(vals),first,last,items[0]["source"],fbs["checked"],fbs["success"],fbs["status"],"auto" if fbs["mode"]=="official_archive" else "manual","food-balance.html","food-balance.json","Оценки FAOSTAT; флаги и примечания в файле. Режим: "+fbs["mode"],"FBS")
     f=load(out,"forecast.json")
     for s in f["series"]:
         first,last=bounds(r["target"] for r in s["results"])

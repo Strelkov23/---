@@ -14,6 +14,7 @@ const DataRegistry=(()=>{
   else if(r.group==='regional')result=d.values.map(v=>row(v.year,v.value,r.source,v.region,v.seen,[v.note,v.sheet?'Лист '+v.sheet:'',v.row?'Строка '+v.row:'',v.column?'Столбец '+v.column:''].filter(Boolean).join('; ')));
   else if(r.group==='industry'){const s=d.series.find(x=>x.id===r.code);if(!s)throw Error('Промышленный ряд не найден');result=s.values.map(v=>row(v.period,v.value,s.source,r.territory,v.seen,[v.note,s.sheet?'Лист '+s.sheet:'',v.row?'Строка '+v.row:'',v.column?'Столбец '+v.column:''].filter(Boolean).join('; ')))}
   else if(['capital','capacity'].includes(r.group)){const field=r.code.slice(r.code.lastIndexOf('.')+1),code=r.code.slice(0,r.code.lastIndexOf('.'));result=d[r.group==='capital'?'assets':'capacity'].filter(v=>v.code===code).map(v=>row(v.year,v[field],v.source,r.territory,null,[v.tables||v.table,v.pages||v.page,v.coverage,v.note].filter(Boolean).join('; ')))}
+  else if(r.group==='fbs'){const [code,key]=r.code.split('.');result=d.rows.filter(v=>v.code===code).map(v=>row(v.year,v.values[key],v.source,r.territory,null,'FAOSTAT; флаг '+(v.flags[key]||'—')+'; '+(v.notes[key]||'')+'; '+d.mode))}
   else if(r.group==='cost'){const [code,key]=r.code.split('.');result=d.rows.filter(v=>v.code===code).map(v=>row(v.year,v[key],v.source,r.territory,null,'Таблица '+v.table+', стр. '+v.page+'; доля всех затрат'))}
   else if(r.group==='debt')result=d.debt.map(v=>row(v.period,v[r.code],v.source,r.territory,null,'Конец месяца; таблица '+v.table+'; '+d.coverage));
   else if(r.group==='finance'){const pos=r.code.lastIndexOf('.'),code=r.code.slice(0,pos),metric=r.code.slice(pos+1);result=d.rows.filter(v=>v.code===code&&v.metric===metric).map(v=>row(v.year,v.value,v.replica,r.territory,null,'ФНС; '+v.sign+'; '+v.level))}
@@ -28,7 +29,7 @@ const DataRegistry=(()=>{
 if(typeof module!=='undefined')module.exports=DataRegistry;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);if(!$('registry-form'))return;
- const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',cost:'Структура затрат',debt:'Задолженность организаций',finance:'Финансы организаций',forecast:'Прогнозные расчёты'};
+ const labels={wdi:'Международная статистика России (WDI)',national:'Российские макроэкономические данные',cbr:'Банк России: дополнительные ряды',regional:'Региональные и исторические ряды',industry:'Промышленная статистика',capital:'Основные фонды',capacity:'Загрузка мощностей',fbs:'Продовольственные балансы FAOSTAT',cost:'Структура затрат',debt:'Задолженность организаций',finance:'Финансы организаций',forecast:'Прогнозные расчёты'};
  const modes={auto:'Автоматический сборщик',manual:'Ручной снимок',derived:'Расчётный ряд'};
  const key='economic-registry-selection-v1';let saved=new Set(),storage=true;
  try{const v=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(v))saved=new Set(v.filter(x=>typeof x==='string'))}catch(e){storage=false}

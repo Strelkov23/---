@@ -17,3 +17,25 @@ class FoodTests(unittest.TestCase):
                 self.assertEqual(d["mode"],"official_archive")
                 self.assertEqual(d["archive_sha256"],"abc")
                 self.assertIn("Ошибка",d["status"])
+
+    def test_parse(self):
+        import io,csv,zipfile
+        def make(field,duplicate=False):
+            text=io.StringIO()
+            writer=csv.writer(text)
+            writer.writerow(["Area",field,"Element Code","Year","Unit","Value","Flag","Note"])
+            for code in f.ITEMS:
+                for year in range(2019,2024):
+                    for elem in ("5511","5611","5911","5072","5301"):
+                        row=["Russian Federation",("S"+code if field.endswith("(FBS)") else code),elem,year,"1000 t",100 if elem=="5511" or elem=="5301" else 0,"E","test"]
+                        writer.writerow(row)
+            if duplicate:writer.writerow(row)
+            raw=io.BytesIO()
+            with zipfile.ZipFile(raw,"w") as z:z.writestr("FoodBalanceSheets_E_All_Data_(Normalized).csv",text.getvalue())
+            return raw.getvalue()
+        for field in ("Item Code","Item Code (FBS)"):
+            data=f.parse(make(field))
+            self.assertEqual(len(data),35)
+            self.assertEqual(data[0]["values"]["production"],100)
+            self.assertEqual(data[0]["flags"]["production"],"E")
+        with self.assertRaises(ValueError):f.parse(make("Item Code (FBS)",True))
