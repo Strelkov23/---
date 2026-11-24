@@ -52,7 +52,7 @@ jobs:
           print("TYPES",json.dumps(dict(Counter(r["type"] for r in rows)),ensure_ascii=False))
           print("REGIONS",json.dumps(dict(Counter(r["region"] for r in rows)),ensure_ascii=False))
           PY
-      - name: Verify independent certificate list
+      - name: Verify independent certificate list with exact number formats
         run: |
           PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=site python3 - <<'PY'
           import industrial_parks as p, park_certificates as c
