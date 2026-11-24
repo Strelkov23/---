@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -56,6 +56,13 @@ def check(out,previous,stamp):
         if len({r["date"] for r in rows})!=len(rows) or any(not finite(r["value"]) for r in rows):
             issues.append("cbr: некорректные наблюдения "+code)
         if not rows:warnings.append("Банк России: нет наблюдений "+code)
+    nat=data["national.json"]
+    counts["national_series"]=len(nat)
+    counts["national_observations"]=sum(len(s["values"]) for s in nat.values())
+    for code,s in nat.items():
+        rows=s["values"]
+        if len({r["period"] for r in rows})!=len(rows) or any(not finite(r["value"]) or not http_url(r["source"]) for r in rows):issues.append("national: некорректные наблюдения "+code)
+        if not rows:warnings.append("Российская статистика: нет наблюдений "+code)
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
