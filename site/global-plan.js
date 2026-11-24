@@ -14,7 +14,7 @@ const GlobalPlan=(()=>{
   const periods=Array.from({length:T},(_,t)=>{
    const shock=p.growth.map(g=>(1+g/100)**(t+1)-1);
    const demand=m.demand.map((v,i)=>v*shock[i]/1000),required=m.effects.map(row=>sum(row.map((v,i)=>v*shock[i]/1000))),imports=sum(m.imports.map((v,i)=>v*shock[i]/1000));
-   return {demand,required,imports,totalDemand:sum(demand)};
+   return {demand,required,imports,laborNeed:dynamic.laborNeed(required,p.labor,t+1),laborUpper:dynamic.laborUpper(required,p.labor,t+1),totalDemand:sum(demand)};
   });
   // Variables a_t and u_{s,i}=I_{s,i}/B; final-period investment cannot affect the objective.
   const size=T+(T-1)*n,index=(s,i)=>T+s*n+i;
@@ -23,7 +23,7 @@ const GlobalPlan=(()=>{
   const row=()=>Array(size).fill(0);
   for(let t=0;t<T;t++){
    const r=row();r[t]=1;const imp=periods[t].imports;
-   add(r,imp>0?Math.min(1,p.importLimit/imp):1,'fraction/import:'+t);
+   add(r,Math.min(periods[t].laborUpper,imp>0?Math.min(1,p.importLimit/imp):1),'fraction/import/labor:'+t);
    for(let i=0;i<n;i++){
     const R=periods[t].required[i];if(R===0)continue;
     const scale=Math.max(1,R,spare[i],B/k),c=row();c[t]=R/scale;
@@ -49,15 +49,15 @@ const GlobalPlan=(()=>{
    const cap=q.required.map((v,i)=>v>0?available[i]/v:Infinity);
    const importRatio=q.imports>0?p.importLimit/q.imports:Infinity;
    // For terminal-only objective, earlier feasible output can exceed the LP's arbitrary earlier alpha.
-   const alpha=Math.max(0,Math.min(1,importRatio,...cap));
+   const alpha=Math.max(0,Math.min(1,importRatio,q.laborUpper,...cap));
    const invested=sum(plan[t]),realized=q.required.map(v=>v*alpha),actualDemand=q.totalDemand*alpha;
    const next=extra.map((v,i)=>retention*v+plan[t][i]/k);
    const groups=m.names.map((name,i)=>({name,required:q.required[i],available:available[i],realized:realized[i],investment:plan[t][i],extra:extra[i],nextExtra:next[i]}));
    const violation=Math.max(0,invested-B,q.imports*alpha-p.importLimit,...groups.map(g=>g.realized-g.available));
    maxViolation=Math.max(maxViolation,violation);
-   if(invested>B+1e-7*Math.max(1,B)||q.imports*alpha>p.importLimit+1e-7*Math.max(1,p.importLimit)||groups.some(g=>g.realized>g.available+1e-7*Math.max(1,g.available))||!finite(actualDemand))throw Error('Reconstructed plan is infeasible');
+   if(invested>B+1e-7*Math.max(1,B)||q.imports*alpha>p.importLimit+1e-7*Math.max(1,p.importLimit)||groups.some(g=>g.realized>g.available+1e-7*Math.max(1,g.available))||p.labor&&q.laborNeed*alpha>p.labor.cap+1e-7*Math.max(1,p.labor.cap)||!finite(actualDemand))throw Error('Reconstructed plan is infeasible');
    if(q.totalDemand>0&&lp.x[t]>alpha+1e-6)throw Error('LP fraction exceeds reconstructed feasible output');
-   rows.push({year:t+1,alpha,demand:q.totalDemand,actualDemand,required:sum(q.required),realized:sum(realized),imports:q.imports*alpha,investment:invested,unusedInvestment:Math.max(0,B-invested),binding:[...(q.imports>0&&alpha<1-1e-8&&Math.abs(importRatio-alpha)<1e-7?['Импорт']:[]),...m.names.filter((_,i)=>q.required[i]>0&&alpha<1-1e-8&&Math.abs(cap[i]-alpha)<1e-7)],groups});
+   rows.push({year:t+1,alpha,demand:q.totalDemand,actualDemand,required:sum(q.required),realized:sum(realized),imports:q.imports*alpha,labor:q.laborNeed===null?null:q.laborNeed*alpha,investment:invested,unusedInvestment:Math.max(0,B-invested),binding:[...(q.imports>0&&alpha<1-1e-8&&Math.abs(importRatio-alpha)<1e-7?['Импорт']:[]),...(q.laborNeed>0&&alpha<1-1e-8&&Math.abs(q.laborUpper-alpha)<1e-7?['Трудовые ресурсы']:[]),...m.names.filter((_,i)=>q.required[i]>0&&alpha<1-1e-8&&Math.abs(cap[i]-alpha)<1e-7)],groups});
    extra=next;
   }
   const score=objective==='terminal'?rows.at(-1).actualDemand:sum(rows.map(r=>r.actualDemand));
@@ -84,12 +84,12 @@ const GlobalPlan=(()=>{
    answer=r;button.disabled=false;select.disabled=false;download.disabled=false;
    status.textContent='Оптимум проверен: '+r.variables+' переменных, '+r.constraints+' ограничений; '+r.iterations+' итераций. Условные расчёты, не прогноз.';
    for(const [label,value] of [['Значение цели, млрд ₽',fmt(r.score)],['Двойственная верхняя граница, млрд ₽',fmt(r.upper)],['Абсолютный разрыв двойственности, млрд ₽',fmt(r.dualityGap)],['Допуск проверки цели, млрд ₽',fmt(r.tolerance)]]){const d=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');d.className='metric';b.textContent=value;s.textContent=label;d.append(b,s);metrics.append(d)}
-   table(results,['Период','Доля спроса, %','Реализуемый конечный спрос, млрд ₽','Прирост валового выпуска, млрд ₽','Импорт, млрд ₽','Инвестиции, млрд ₽','Неисп. лимит, млрд ₽','Связывающие ограничения'],r.rows.map(x=>[x.year,...[100*x.alpha,x.actualDemand,x.realized,x.imports,x.investment,x.unusedInvestment].map(fmt),x.binding.join('; ')||'—']));
+   table(results,['Период','Доля спроса, %','Реализуемый конечный спрос, млрд ₽','Прирост валового выпуска, млрд ₽','Импорт, млрд ₽','Доп. человеко-лет','Инвестиции, млрд ₽','Неисп. лимит, млрд ₽','Связывающие ограничения'],r.rows.map(x=>[x.year,...[100*x.alpha,x.actualDemand,x.realized,x.imports,x.labor,x.investment,x.unusedInvestment].map(fmt),x.binding.join('; ')||'—']));
    table(comparison,['Стратегия','Значение выбранной цели, млрд ₽','Спрос в последнем периоде, млрд ₽','Инвестиции до последнего выпуска, млрд ₽'],r.variants.map(v=>[v.label,...[v.score,v.terminal,v.investment].map(fmt)]));
    select.replaceChildren(...r.rows.map(x=>new Option('Период '+x.year,String(x.year))));select.value=String(r.rows.at(-1).year);detail();
    for(const v of r.variants){const d=document.createElement('div'),text=document.createElement('p'),track=document.createElement('div'),fill=document.createElement('div');d.className='dyn-bars';text.textContent=v.label+': '+fmt(v.score)+' млрд ₽';track.className='budget-bar-track';fill.className='budget-bar-fill';fill.style.width=(r.score>0?Math.min(100,v.score/r.score*100):0)+'%';track.append(fill);d.append(text,track);chart.append(d)}
    if(typeof chartTools==='function')chartTools(chart,'Доля реализуемого спроса по стратегиям','%',r.rows.map(x=>x.year),r.variants.map(v=>({name:v.label,code:v.id,values:v.fractions.map(a=>a*100)})),{periodLabel:'Условный период',territory:'Россия · условные периоды от базы 2021',source:'Росстат, баланс 2021; условные параметры, не прогноз',url:'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'});
-   download.onclick=()=>csv('global-investment-plan.csv',[['Модель','Условный баланс 2021, млрд руб.'],['Цель',r.objective],['Версия',typeof version!=='undefined'?version:''],...Object.entries(p).filter(([k])=>k!=='growth'),['Группа','Рост спроса, %'],...m.names.map((n,i)=>[n,p.growth[i]]),['Значение цели',r.score],['Двойственная граница',r.upper],['Разрыв двойственности',r.dualityGap],['Допуск цели',r.tolerance],['Макс. нарушение ограничений, млрд руб.',r.maxViolation],['Период','Группа','Требуемый прирост','Доступный прирост','Реализуемый прирост','Инвестиции','Доп. мощность','Мощность следующего периода'],...r.rows.flatMap(x=>x.groups.map(g=>[x.year,g.name,g.required,g.available,g.realized,g.investment,g.extra,g.nextExtra])),['Стратегия','Цель','Спрос в последнем периоде','Инвестиции до последнего выпуска'],...r.variants.map(v=>[v.label,v.score,v.terminal,v.investment])]);
+   download.onclick=()=>csv('global-investment-plan.csv',[['Модель','Условный баланс 2021, млрд руб.'],['Цель',r.objective],['Версия',typeof version!=='undefined'?version:''],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['Значение цели',r.score],['Двойственная граница',r.upper],['Разрыв двойственности',r.dualityGap],['Допуск цели',r.tolerance],['Макс. нарушение денежных ограничений, млрд руб.',r.maxViolation],['Период','Доля спроса','Импорт, млрд руб.','Доп. человеко-лет','Инвестиции, млрд руб.'],...r.rows.map(x=>[x.year,x.alpha,x.imports,x.labor,x.investment]),['Период','Группа','Требуемый прирост','Доступный прирост','Реализуемый прирост','Инвестиции','Доп. мощность','Мощность следующего периода'],...r.rows.flatMap(x=>x.groups.map(g=>[x.year,g.name,g.required,g.available,g.realized,g.investment,g.extra,g.nextExtra])),['Стратегия','Цель','Спрос в последнем периоде','Инвестиции до последнего выпуска'],...r.variants.map(v=>[v.label,v.score,v.terminal,v.investment])]);
   }
   button.addEventListener('click',()=>{
    if(!params)return;clear();const token=serial,p={...params,growth:[...params.growth]},goal=objective.value;button.disabled=true;status.textContent='Решение линейной задачи…';

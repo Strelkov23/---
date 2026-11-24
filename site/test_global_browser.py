@@ -26,6 +26,14 @@ with sync_playwright() as p:
         page.locator("#dyn-years").fill("3")
         assert page.locator("#global-csv").is_disabled()
         assert page.locator("#global-results tbody tr").count()==0
+        page.locator("#dyn-laborEnabled").check()
+        assert page.locator("#global-run").is_disabled()
+        page.locator("#dyn-laborCap").fill("100000")
+        for field in page.locator("#dyn-controls tbody input[aria-label^='Человеко-лет']").all():field.fill("100")
+        assert not page.locator("#global-run").is_disabled()
+        page.locator("#global-run").click()
+        page.wait_for_function("document.querySelector('#global-status').textContent.includes('Оптимум проверен')",timeout=60000)
+        assert page.locator("#global-results tbody tr").count()==3
         assert not errors,errors
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth+3")
         page.close()

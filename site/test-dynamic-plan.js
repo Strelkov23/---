@@ -40,3 +40,11 @@ const asym={...m,output:[100000,300000],demand:[100000,200000],effects:[[100000,
 const aa=d.compare(asym,{...p,years:2,spare:0,investment:5});
 assert.ok(aa[2].rows[1].alpha>=aa[0].rows[1].alpha-1e-8&&aa[2].rows[1].alpha>=aa[1].rows[1].alpha-1e-8);
 console.log('Dynamic plan tests passed');
+
+const labor={cap:100,productivity:0,intensity:[10,20]};
+const lr=d.calculate(m,{...p,spare:100,labor,allocation:"maximin"});
+near(lr[0].requiredLabor,150);near(lr[0].actualLabor,100);near(lr[0].alpha,2/3);assert.ok(lr[0].laborBinding);
+assert.ok(lr.every(x=>x.actualLabor<=100+1e-8));
+near(d.laborNeed([10,10],{...labor,productivity:10},1),300/1.1);
+assert.throws(()=>d.calculate(m,{...p,labor:{...labor,intensity:[10]}}));
+assert.throws(()=>d.calculate(m,{...p,labor:{...labor,intensity:[10,NaN]}}));
