@@ -2,7 +2,14 @@ const ParkCatalogue=(()=>{
  const norm=s=>String(s||'').toLowerCase().replaceAll('ё','е').trim();
  function filter(rows,type,badge,q,region=''){return rows.filter(r=>(!region||r.region===region)&&(!type||(type==='unknown'?r.type===null:r.type===type))&&(!badge||(badge==='yes')===r.card_certified)&&(!norm(q)||norm(r.name).includes(norm(q))))}
  function counts(rows,all){const m=new Map(all.map(r=>[r.region,0]));for(const r of rows)m.set(r.region,(m.get(r.region)||0)+1);return [...m].map(([region,value])=>({region,value}))}
- return {filter,counts}
+ // Exact aliases observed in the AIP catalogue only. If two publisher groups
+ // map to the same territory the common sampler rejects both; no summing.
+ const aliases={'Чукотский АО':'Чукотский автономный округ','Ямало-Ненецкий АО':'Ямало-Ненецкий автономный округ','ХМАО':'Ханты-Мансийский автономный округ','Республика Удмуртская':'Удмуртская Республика'};
+ function mapSample(rows,sample){
+  const result=sample(rows.map(r=>({...r,sourceRegion:r.region,region:aliases[r.region]||r.region})));
+  return {...result,out:new Map([...result.out].map(([k,r])=>[k,{...r,region:r.sourceRegion}]))}
+ }
+ return {filter,counts,mapSample}
 })();
 if(typeof module!=='undefined')module.exports=ParkCatalogue;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -17,10 +24,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   $('park-source').append(node('p',data.note),node('p','Состояние: '+data.status+' · проверка: '+(data.checked||'—')+' · успешное получение: '+(data.success||'—')+' · SHA-256 HTML: '+(data.sha256||'—')+(data.error?' · '+data.error:'')));
   if(!data.rows.length){status.textContent='Каталог ещё не загружен; отсутствие записей не означает отсутствие площадок.';return}
   const geo=(await Provenance.get(manifest,'regional-boundaries.geojson',root)).data;
-  const all=data.rows,regions=[...new Set(all.map(r=>r.region))].sort((a,b)=>a.localeCompare(b,'ru')),allCounts=ParkCatalogue.counts(all,all),mapped=RegionalStats.sample(allCounts);
+  const all=data.rows,regions=[...new Set(all.map(r=>r.region))].sort((a,b)=>a.localeCompare(b,'ru')),allCounts=ParkCatalogue.counts(all,all),mapped=ParkCatalogue.mapSample(allCounts,RegionalStats.sample);
   region.replaceChildren(new Option('Все регионы каталога',''),...regions.map(r=>new Option(r,r)));
   restore(ids);
-  const iso=new URLSearchParams(location.search).get('park-iso');if(iso&&!region.value){const selected=mapped.out.get(RegionalMap.key(iso));if(selected)region.value=selected.region}
+  const params=new URLSearchParams(location.search),iso=params.get('park-iso');
+  if(iso&&!params.has('park-region')){
+   const selected=mapped.out.get(RegionalMap.key(iso));region.value=selected?.region||'';
+   if(!selected)$('park-source').append(node('p','Для переданного кода '+iso+' нет однозначного регионального соответствия. Показан общий каталог; выберите исходную группу вручную.'));
+  }
   const geometries=geo.features.map(f=>({key:(f.properties?.name||'').trim()?RegionalMap.key(f.properties?.iso_3166_2):null,name:RegionalMap.displayName(f.properties?.iso_3166_2,f.properties?.name||''),rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(...p)).filter(Boolean)).filter(r=>r.length>=4)}));
   const multiplicity=new Map();for(const f of geometries)if(f.key)multiplicity.set(f.key,(multiplicity.get(f.key)||0)+1);
   let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;
@@ -35,12 +46,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    $('park-table').replaceChildren(t);$('park-selection').textContent='Показано '+Math.min(limit,shown.length)+' из '+shown.length+' карточек';$('park-more').hidden=shown.length<=limit;$('park-export').disabled=!shown.length;
   }
   function draw(){
-   const filtered=ParkCatalogue.filter(all,type.value,badge.value,query.value),rank=ParkCatalogue.counts(filtered,all),sample=RegionalStats.sample(rank);
+   const filtered=ParkCatalogue.filter(all,type.value,badge.value,query.value),rank=ParkCatalogue.counts(filtered,all),sample=ParkCatalogue.mapSample(rank,RegionalStats.sample);
    shown=ParkCatalogue.filter(all,type.value,badge.value,query.value,region.value);limit=30;
    status.textContent='Каталог: '+all.length+' карточек · '+regions.length+' региональных групп · выборка: '+shown.length;
    const metrics=$('park-metrics');metrics.replaceChildren();
    const joinable=geometries.filter(f=>f.key&&multiplicity.get(f.key)===1&&sample.out.has(f.key));
-   for(const [label,value] of [['Карточки выборки',shown.length],['Метки АИП',shown.filter(r=>r.card_certified).length],['Неоднозначные названия',shown.filter(r=>r.ambiguous_name).length],['Сопоставленные контуры',joinable.length]]){const item=node('div','');item.className='metric';item.append(node('b',n(value)),node('span',label));metrics.append(item)}
+   for(const [label,value] of [['Карточки выборки',shown.length],['Метки АИП',shown.filter(r=>r.card_certified).length],['Неоднозначные названия',shown.filter(r=>r.ambiguous_name).length],['Сопоставленные контуры',joinable.length],['Группы без однозначного контура',regions.length-joinable.length]]){const item=node('div','');item.className='metric';item.append(node('b',n(value)),node('span',label));metrics.append(item)}
    host.replaceChildren();const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('width',w);svg.setAttribute('height',h);svg.setAttribute('role','img');svg.setAttribute('aria-label','Число карточек каталога по регионам');
    shape(svg,'rect',{width:w,height:h,fill:'#fff'});const palette=RegionalMap.palette('enterprises'),thresholds=RegionalMap.classes(joinable.map(f=>sample.out.get(f.key).value));
    for(const f of geometries){const r=f.key&&multiplicity.get(f.key)===1?sample.out.get(f.key):null,bin=RegionalMap.bin(r?.value,thresholds),d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(2)+' '+Y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');if(!d)continue;
@@ -49,8 +60,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const wrap=node('div','');wrap.className='regional-figure-scroll';wrap.append(svg);host.append(wrap);
    const legend=node('div','');legend.className='legend';const labels=thresholds.length===1?[n(thresholds[0])]:thresholds.slice(1).map((v,i)=>(i?' > ':'')+thresholds[i].toLocaleString('ru',{maximumFractionDigits:1})+' — '+v.toLocaleString('ru',{maximumFractionDigits:1}));
    for(const [i,label] of [...labels,'Нет сопоставления'].entries()){const span=node('span',''),sw=node('b','');sw.style.cssText='display:inline-block;width:1rem;height:1rem;border:1px solid #516970;background:'+(i===labels.length?'#ddd':palette[i]);span.append(sw,document.createTextNode(' '+label));legend.append(span)}host.append(legend);
-   const t=makeTable(['Регион каталога','Карточки по фильтрам']),b=t.createTBody();
-   for(const r of rank.sort((a,b)=>b.value-a.value||a.region.localeCompare(b.region,'ru'))){const tr=b.insertRow(),btn=node('button',r.region);btn.type='button';btn.onclick=()=>{region.value=r.region;draw()};tr.insertCell().append(btn);tr.insertCell().textContent=n(r.value)}
+   const t=makeTable(['Регион каталога','Карточки по фильтрам','Привязка к карте']),b=t.createTBody();
+   const matchedNames=new Set(joinable.map(f=>sample.out.get(f.key).region));
+   for(const r of rank.sort((a,b)=>b.value-a.value||a.region.localeCompare(b.region,'ru'))){const tr=b.insertRow(),btn=node('button',r.region);btn.type='button';btn.onclick=()=>{region.value=r.region;draw()};tr.insertCell().append(btn);tr.insertCell().textContent=n(r.value);tr.insertCell().textContent=matchedNames.has(r.region)?'Однозначно':'Не подтверждена / неоднозначна'}
    $('park-regional-table').replaceChildren(t);list();save(ids);
    $('park-export').onclick=()=>csv('industrial-park-catalogue.csv',[['Номер карточки','Регион','Название','Тип территории','Метка сертификации АИП','Неоднозначное название','Карточка','Источник','Дата загрузки','SHA-256 HTML','SHA-256 JSON','Отпечаток манифеста','Ограничение'],...shown.map(r=>[r.record,r.region,r.name,r.type,r.card_certified,r.ambiguous_name,r.url,data.source,data.success,data.sha256,sha256,manifest.data_fingerprint,data.note])]);
   }
