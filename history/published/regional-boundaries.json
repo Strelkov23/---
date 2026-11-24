@@ -3,7 +3,7 @@
   "documentation": "https://maps.pispace.eu/data/russia/",
   "license": "Public domain (Natural Earth; distributed by PiSpace Maps)",
   "checked": "2026-11-24T15:27:32+00:00",
-  "status": "ok",
+  "status": "cached",
   "downloaded": "2026-11-24T15:27:32+00:00",
   "features": 86,
   "sha256": "b1c32477d1aa7973e449e9fead6f73565b870acfaa4b856b6764be8ced33436f"

@@ -1,11 +1,8 @@
 {
-  "built": "2026-11-24T15:29:11+00:00",
+  "built": "2026-11-24T15:37:55+00:00",
   "errors": [],
   "warnings": [
-    "https://www.kommersant.ru/rss/section-economics.xml",
-    "Вопросы экономики · HTTP Error 429: Too Many Requests",
     "Экономический журнал ВШЭ · HTTP Error 429: Too Many Requests",
-    "Экономика региона · HTTP Error 429: Too Many Requests",
     "Вопросы теоретической экономики · HTTP Error 429: Too Many Requests",
     "Экономика сельскохозяйственных и перерабатывающих предприятий · HTTP Error 429: Too Many Requests",
     "Экономика высокотехнологичных производств · HTTP Error 429: Too Many Requests",
@@ -13,6 +10,8 @@
     "Проблемы прогнозирования · HTTP Error 429: Too Many Requests",
     "Пространственная экономика · HTTP Error 429: Too Many Requests",
     "Пространственная и региональная экономика · HTTP Error 429: Too Many Requests",
+    "Вопросы инновационной экономики · HTTP Error 429: Too Many Requests",
+    "Информатизация в цифровой экономике · HTTP Error 429: Too Many Requests",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -28,7 +27,7 @@
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: 58441.csv.gz: HTTP Error 404: Not Found; 58441.parquet: HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 7590,
+    "archive": 7596,
     "papers": 8166,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -50,12 +49,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "fa31dec1746113b2a9d0c03c161f46bc427f34572fae372b45a20b56b28de81b",
-      "bytes": 3681646
+      "sha256": "ef4ec72f9119e0bb0d7a5f68d6d3ae7aa1f729e320cc0c4c95fc929235baeca7",
+      "bytes": 3683574
     },
     "literature.json": {
-      "sha256": "159351d142362de9719c3b4399c90f6fa7d30891b3c8644fb2e93da4d9e9d044",
-      "bytes": 3558459
+      "sha256": "fb6b191a94039f087115126e0faaf7c1260e71d210dceb56736cd701cf9b65f0",
+      "bytes": 3881758
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -70,11 +69,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "b8984485b6d851fea15c7f29a435d8798187ee24dd0b77b1a44359d0a6fa2e9e",
+      "sha256": "e88895981e6c3a5e09e6dd58abcf16e7ae7adcb89673d741c58a37f2a22fb1ac",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "6a22447306255a3d5608b81b690772b458dd2dcdbaf53f085733273adf93ab26",
+      "sha256": "7d3dd8f88c2a435849b17a8d5a82e5288a2de06da7913b95f8f5601e30ac95c3",
       "bytes": 55538
     },
     "sectors.json": {
@@ -82,32 +81,32 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "39658d29b2f06509bb754c1e21a83f827271d48b3479b0be4b73fc0c8755089a",
-      "bytes": 35717
+      "sha256": "fb1d6db46484179d3a2aa97f5722e42af84713f9688dc9fbf3f4b9841e3876c9",
+      "bytes": 35667
     },
     "links.json": {
-      "sha256": "cf81fb665cbf29c8cef3c3a0db62d7ba8be2de821ec0fff5a3cfe16f6aee30fb",
-      "bytes": 1407383
+      "sha256": "9c509455470d82f4b06977952fd5333953a47eed807d8f2506507a56dbb1cc6a",
+      "bytes": 1409717
     },
     "national.json": {
-      "sha256": "3a7e0e078f26442a667c9fa231f45cb4f23f9d9f357a8d7c28d94ed11e0e950c",
+      "sha256": "93de722b55dea1cdcffa82410b499fab408e049021cf5650bd7e584d84ad61fe",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "9023c404871e98d60f8cb7b8b52806f0c89281ea5e67d16c3a53a92cd0296380",
+      "sha256": "6e86ccdb3c5e1b42fbe9cc4da8a0717928631b16baf4d0cdc15afadde483b1a9",
       "bytes": 79758
     },
     "industrial.json": {
-      "sha256": "cc42f6e307b0fd18bda0cd085b0814bcd7eb30dac010fd0e893c18464a582b55",
+      "sha256": "8c0f67e985f111766c71950e899d43888a53e7d23425a1d1b5959bbdc5a1e44f",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "4cb7075f6196d9f0a3dce3dc2709b14987821770764cc476a0b29f8b59f49512",
+      "sha256": "b7f55ecd52b1309eb07cc7c46ddfe8294a46aabfb87eac5f3ac236ff4eadba2c",
       "bytes": 116117
     },
     "regional-boundaries.json": {
-      "sha256": "dd99d21f8c53eff5545d2b43235e62374f0be26f2aa0a7f8a2d28c545c63a5c3",
-      "bytes": 432
+      "sha256": "3e0a823031129c349888b0d87cdbd8cac66202b34b1b9d57c5cbb697f982bcd0",
+      "bytes": 436
     },
     "regional-data/GRP_95b8dd2585.json": {
       "sha256": "ccbc83d5b6c318f7d9365b9347f249fc6a2e592854afc8baf1d414b484a8e05a",
