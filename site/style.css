@@ -19,3 +19,5 @@
 #snapshot-notice{padding:.8rem 1rem;border:1px solid #b7a46b;background:#fff8e4;margin:0 0 1rem;overflow-wrap:anywhere}.atlas-table,#month-list,#stat-list{overflow-x:auto;max-width:100%}#scenario-input input{width:7em}#stat-list td:first-child{min-width:200px}#stat-list td:last-child{min-width:150px}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #b18a54;outline-offset:2px}header strong a{color:inherit}#stat-list small{display:block}#quality-status{overflow-wrap:anywhere}#diag-list details{overflow:auto}
 
 .regional-figure-scroll{max-width:100%;overflow-x:auto;background:#fff;border:1px solid #cfdcdb;margin:.9rem 0}.regional-figure-scroll svg{display:block;min-width:760px;width:100%;height:auto}.regional-figure-scroll svg text{font-family:Arial,sans-serif}#hist-rank-visual,#hist-heat-visual{margin:1.5rem 0}
+
+.sp-chart{background:white;padding:1rem;border:1px solid #cfdcdb;margin:1rem 0}.sp-chart svg{width:100%;height:auto;display:block}.sp-chart h3{overflow-wrap:anywhere}#sp-highlights strong{font-size:1.7rem}#sp-highlights article{min-width:0;overflow-wrap:anywhere}#sp-chart-series{max-width:100%;width:100%}
