@@ -43,6 +43,8 @@ class QualityTests(unittest.TestCase):
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
+        import regional_manufacturing
+        self.put("regional-manufacturing.json",regional_manufacturing.empty("2026-11-24"))
         import federal_budget
         federal_budget.publish(lambda *args:None,self.out,"2026-11-25")
         self.put("consistency.json",cs.create(self.data["national.json"],self.data["cbr.json"],json.loads((self.out/"sme-regions.json").read_text()),"2026-11-24",cs.budget_observations(self.out)))
