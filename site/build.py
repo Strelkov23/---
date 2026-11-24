@@ -18,6 +18,7 @@ import navigation
 import regional_geo
 import programmes
 import budget_diagnostics
+import programme_evidence
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -130,6 +131,7 @@ for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","sty
 page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navigation.cards()))
 navigation.publish(page)
 budget_diagnostics.publish(page,out)
+programme_evidence.publish(page,out,m.now())
 
 import atlas
 atlas.publish(page, out)
