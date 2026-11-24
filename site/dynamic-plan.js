@@ -107,13 +107,13 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const fields=m.names.map(name=>{const e=document.createElement('input');e.type='number';e.min=0;e.max=20;e.step=.1;e.value=3;e.setAttribute('aria-label','Годовой прирост спроса: '+name);return e});
   const laborFields=m.names.map(name=>{const e=document.createElement('input');e.type='number';e.min=0;e.max=1000000;e.step='any';e.placeholder='Не задано';e.disabled=true;e.setAttribute('aria-label','Человеко-лет на млрд ₽: '+name);return e});
   table(controls,['Группа продукции','Годовой прирост целевого спроса, %','Доп. человеко-лет на млрд ₽ выпуска в базе (гипотеза)'],m.names.map((n,i)=>[n,fields[i],laborFields[i]]));
-  let rows=[],calibration=null;
+  let rows=[],calibration=null,calibrationToken=0;
   const calibrationStatus=$('dyn-calibration-status'),calibrationTable=$('dyn-calibration-multipliers');
   const calibrationFile=$('dyn-calibration-file');
   calibrationFile.addEventListener('change',async()=>{
-   const file=calibrationFile.files?.[0];calibrationFile.value='';if(!file)return;
-   try{if(file.size>200000)throw Error('Файл слишком большой');const parsed=LaborCalibration.parse(await file.text(),m);calibration=parsed;laborFields.forEach((e,i)=>e.value=String(parsed[i].intensity));$('dyn-laborEnabled').checked=true;draw();calibrationStatus.textContent='Импортировано '+parsed.length+' коэффициентов из пользовательского файла. Проверьте источники; задайте лимит человеко-лет.'}
-   catch(e){calibrationStatus.textContent='Файл не принят: '+e.message+'; прежние параметры сохранены.'}
+   const file=calibrationFile.files?.[0],token=++calibrationToken;calibrationFile.value='';if(!file)return;
+   try{if(file.size>200000)throw Error('Файл слишком большой');const parsed=LaborCalibration.parse(await file.text(),m);if(token!==calibrationToken)return;calibration=parsed;laborFields.forEach((e,i)=>e.value=String(parsed[i].intensity));$('dyn-laborEnabled').checked=true;draw();calibrationStatus.textContent='Импортировано '+parsed.length+' коэффициентов из пользовательского файла. Проверьте источники; задайте лимит человеко-лет.'}
+   catch(e){if(token!==calibrationToken)return;calibrationStatus.textContent='Файл не принят: '+e.message+'; прежние параметры сохранены.'}
   });
   const global=typeof GlobalPlan!=='undefined'?GlobalPlan.mount(m):null;
   function showDetail(){const r=rows.find(r=>r.year===Number(select.value));if(!r){detail.replaceChildren();return}table(detail,['Группа','Требуемый прирост выпуска','Доступный прирост','Реализуемый прирост','Прямой целевой спрос','Инвестиции для следующего года','Доп. мощность следующего года','Ограничение'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.demand,g.invest,g.nextExtra].map(fmtNum),g.binding?'Связывает сценарий':'—']))}
@@ -144,8 +144,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    compareDownload.disabled=false;compareDownload.onclick=()=>csv('dynamic-strategies.csv',[['Версия',typeof version!=='undefined'?version:''],['Источник','Баланс 2021; пользовательские допущения'],...DynamicPlan.paramRows(p),['Группа','Годовой прирост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['Стратегия','Период','Доля, %','Реализуемый выпуск, млрд ₽','Инвестиции, млрд ₽','Доля следующего периода, %','Локальный максимум следующего периода, %'],...variants.flatMap(v=>v.rows.map(r=>[v.label,r.year,r.alpha*100,r.realized,r.investment,r.nextAlpha*100,r.nextUpper*100])),['Параметр чувствительности','Исходное значение','Проверяемое значение','Изменён','Доля в конце, %','Отклонение, п.п.','Прирост выпуска, млрд ₽'],...tests.map(t=>[t.label,t.base,t.value,t.changed,t.alpha*100,t.deltaPP,t.realized])]);
    download.disabled=false;download.onclick=()=>csv('dynamic-capacity-scenario.csv',[['Модель','Баланс 2021; условные периоды; млрд руб.'],['Версия',typeof version!=='undefined'?version:''],...DynamicPlan.paramRows(p),['Группа','Годовой прирост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['Период','Группа','Целевой спрос','Реализуемый спрос','Требуемый выпуск','Доступный выпуск','Реализуемый выпуск','Накопленная доп. мощность','Инвестиции','Доп. мощность следующего периода','Доля сценария','Промежуточный импорт всего','Доп. человеко-лет всего'],...rows.flatMap(r=>r.groups.map(g=>[r.year,g.name,g.demand,g.actualDemand,g.required,g.available,g.realized,g.extra,g.invest,g.nextExtra,r.alpha,r.actualImport,r.actualLabor]))]);
   }
-  form.addEventListener('input',draw);controls.addEventListener('input',draw);form.addEventListener('submit',e=>e.preventDefault());select.addEventListener('change',showDetail);
+  form.addEventListener('input',draw);controls.addEventListener('input',()=>{calibrationToken++;draw()});form.addEventListener('submit',e=>e.preventDefault());select.addEventListener('change',showDetail);
   $('dyn-apply').onclick=()=>{const v=$('dyn-uniform');if(v.validity.valid&&Number.isFinite(v.valueAsNumber)){fields.forEach(e=>e.value=v.value);draw()}};
-  $('dyn-reset').onclick=()=>{form.reset();calibration=null;calibrationStatus.textContent='';fields.forEach(e=>e.value=3);laborFields.forEach(e=>e.value='');draw()};draw();
+  $('dyn-reset').onclick=()=>{form.reset();calibrationToken++;calibration=null;calibrationStatus.textContent='';fields.forEach(e=>e.value=3);laborFields.forEach(e=>e.value='');draw()};draw();
  }catch(e){status.textContent='Не удалось загрузить исходный баланс.';console.error(e)}
 });

@@ -47,6 +47,9 @@ jobs:
           report=json.loads((p/'quality.json').read_text())
           assert not report['errors'], report['errors']
           assert report['files']['compare.json']['sha256']
+          labor=json.loads((p/'labor-data.json').read_text())
+          print('Labor data coverage:',len(labor['broad']),len(labor['regional']),labor['coverage'])
+          assert len(labor['broad'])>0 and len(labor['regional'])>0
           PY
       - name: Verify horizon optimizer in desktop and mobile browsers
         working-directory: monitor/public

@@ -2,8 +2,6 @@
 import csv
 import json
 import math
-import hashlib
-from html import escape
 from pathlib import Path
 
 SECTORS=[
