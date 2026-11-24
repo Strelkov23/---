@@ -39,6 +39,28 @@ def publish(page, out):
         writer = csv.writer(f,delimiter=';')
         writer.writerow(['Группа','ОКПД 2','Продукт','Выпуск, млн руб.','Конечный спрос, млн руб.','Полный выпуск, руб./руб.','Импортные затраты, руб./руб.','Источник 2021'])
         writer.writerows(exports)
+    dependency_rows=[]
+    dependency_data=[]
+    for i,name in enumerate(sectors["names"]):
+        flows=[r[i] for r in sectors["flows"]]
+        total=sum(flows)
+        if total<=0 or any(v<0 for v in flows):
+            hhi=top3=top1=None
+        else:
+            shares=sorted((v/total for v in flows),reverse=True)
+            hhi=sum(v*v for v in shares);top3=sum(shares[:3]);top1=shares[0]
+        largest=max(range(len(flows)),key=lambda j:flows[j]) if total>0 else None
+        supplier=sectors["names"][largest] if largest is not None else ""
+        demand=sectors["demand"][i]
+        multiplier=sum(r[i] for r in sectors["effects"])/demand if demand>0 else None
+        import_effect=sectors["imports"][i]/demand if demand>0 else None
+        show=lambda v,digits=2:number(v,digits) if v is not None else "—"
+        dependency_rows.append([f'<a href="sector-{i+1}.html">{escape(name)}</a>',show(total/1000),escape(supplier),show(top1*100 if top1 is not None else None),show(top3*100 if top3 is not None else None),show(hhi,4),show(multiplier,4),show(import_effect,4)])
+        dependency_data.append([name,total,supplier,top1,top3,hhi,multiplier,import_effect,SOURCE])
+    with (out/"supplier-dependencies.csv").open("w",encoding="utf-8-sig",newline="") as f:
+        writer=csv.writer(f,delimiter=";")
+        writer.writerow(["Группа покупателя","Отечественные промежуточные поставки, млн руб.","Крупнейшая группа поставщика","Доля крупнейшей группы, 0–1","Доля трёх групп, 0–1","HHI, 0–1","Полный выпуск на рубль спроса","Импортные затраты на рубль спроса","Источник"])
+        writer.writerows(dependency_data)
     for g,name in enumerate(sectors['names'],1):
         i=g-1
         rows=groups[g]
@@ -57,4 +79,4 @@ def publish(page, out):
         body+='<h2>Крупнейшие потребители промежуточной продукции</h2>'+table(['Группа покупателя','Поставки, млрд ₽'],[(f'<a href="sector-{j+1}.html">{escape(sectors["names"][j])}</a>',number(v/1000)) for j,v in buyers])
         body+='<p>Это промежуточные потоки, а не конечные продажи; данные относятся только к 2021 году. <a href="scenario.html">Проверить многовариантный сценарий</a> · <a href="statistics.html">Актуальные годовые показатели</a> · <a href="sector-passports.html">Тематические паспорта отраслей</a>.</p>'
         page(url,body)
-    page('atlas.html','<h1>Отраслевой атлас России</h1><p>Баланс за 2021 год в ценах базового периода. Выберите отрасль, чтобы увидеть её продукты, поставщиков и потребность в импортных ресурсах.</p><p><a href="sector-passports.html">Тематические паспорта и актуальные показатели</a> · <a href="industrial.html">Индексы по ОКВЭД2, отгрузка и натуральный выпуск</a> · <a href="machinery.html">Разбор рынка сельхозтехники</a> · <a href="product-balance.csv" download>Скачать данные по 113 продуктам</a></p>'+table(['Отрасль','Продуктовых позиций','Валовой выпуск, млрд ₽','Конечный спрос, млрд ₽'],directory))
+    page('atlas.html','<h1>Отраслевой атлас России</h1><p>Баланс за 2021 год в ценах базового периода. Выберите отрасль, чтобы увидеть её продукты, поставщиков и потребность в импортных ресурсах.</p><p><a href="sector-passports.html">Тематические паспорта и актуальные показатели</a> · <a href="industrial.html">Индексы по ОКВЭД2, отгрузка и натуральный выпуск</a> · <a href="machinery.html">Разбор рынка сельхозтехники</a> · <a href="product-balance.csv" download>Скачать данные по 113 продуктам</a></p>'+table(['Отрасль','Продуктовых позиций','Валовой выпуск, млрд ₽','Конечный спрос, млрд ₽'],directory)+'<section id="supplier-dependencies"><h2>Концентрация отечественных поставок</h2><p>HHI = сумма квадратов долей 19 групп поставщиков в отечественных промежуточных закупках группы-покупателя. Внутригрупповые потоки включены. Это концентрация продуктовых групп, не фирм, и не оценка риска остановки. Мультипликаторы — на рубль пропорционального изменения конечного спроса группы в балансе 2021 года. Импортные затраты включают прямой и косвенный эффект, а не долю импортных товаров в выпуске.</p>'+table(['Группа покупателя','Поставки, млрд ₽','Крупнейшая группа','Доля крупнейшей, %','Три крупнейшие, %','HHI','Полный выпуск, ₽/₽','Импортные затраты, ₽/₽'],dependency_rows)+'<p><a href="supplier-dependencies.csv" download>Скачать расчёты CSV</a> · <a href="scenario.html#chain-stress">Стресс-тест цепочек</a> · <a href="methodology.html#chain-stress-method">Методика</a></p></section>')
