@@ -49,7 +49,7 @@ function chartTools(host,title,unit,years,series,options={}){
   const source=options.source||'Всемирный банк, World Development Indicators';
   const url=typeof options.url==='string'?options.url:'';
   const snapshot=()=>typeof version!=='undefined'&&version?version:'не определена';
-  const period=options.monthly?'Месяц':'Год';
+  const period=options.periodLabel||(options.monthly?'Месяц':'Год');
   const palette=['#006c69','#a24724','#365e95','#775395','#806315','#246d39'];
   const dashes=['none','9 5','3 4','12 4 3 4','5 3','2 5'];
   function vector(){
