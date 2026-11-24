@@ -30,3 +30,9 @@ class TestRosstat(unittest.TestCase):
     def test_catalog(self):
         f=[dict(url="https://rosstat.gov.ru/a.xlsx",title="Степень износа основных фондов"),dict(url="https://example.org/a.xlsx",title="Степень износа основных фондов")]
         self.assertEqual(w.candidates("capital",f),f[:1])
+
+    def test_observed_capacity_filename_and_scope(self):
+        valid=dict(url="https://www.rosstat.gov.ru/storage/mediabank/Urov_motsh_2017-2024.xlsx",title="Urov_motsh_2017-2024.xlsx")
+        national=dict(url="https://rosstat.gov.ru/b.xlsx",title="Использование мощности без субъектов малого предпринимательства")
+        regional=dict(url="https://rosstat.gov.ru/c.xlsx",title="Использование мощности по субъектам Российской Федерации")
+        self.assertEqual(w.candidates("capacity",[valid,national,regional]),[valid,national])
