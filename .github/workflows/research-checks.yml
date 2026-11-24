@@ -33,7 +33,7 @@ jobs:
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
+          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','health-projects.json','health-projects.csv','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
