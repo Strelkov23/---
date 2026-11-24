@@ -244,6 +244,34 @@ class HistoricalTests(unittest.TestCase):
             self.assertEqual(len(catalog["series"]),2)
             historical.publish(db,"2026-11-25T00:00:00+00:00",out,False)
             self.assertEqual(db.execute("select count(*) from hist_values").fetchone()[0],52)
+    def test_failed_import_visible_offline(self):
+        import tempfile,sqlite3,json
+        with tempfile.TemporaryDirectory() as folder, sqlite3.connect(":memory:") as db:
+            out=Path(folder)
+            historical.publish(db,"2026-11-24T00:00:00+00:00",out,False)
+            url="https://roskazna.gov.ru/old-report.xlsx"
+            code=historical.budget_import_code(url)
+            historical.import_status(db,code,"Годовой отчёт",url,"2026-11-24","Ошибка TLS",False)
+            historical.publish(db,"2026-11-25T00:00:00+00:00",out,False)
+            rows=json.loads((out/"historical.json").read_text())["sources"]
+            report=next(s for s in rows if s["code"]==code)
+            self.assertEqual(report["url"],url)
+            self.assertEqual(report["status"],"Ошибка TLS")
+            self.assertIsNone(report["success"])
+            self.assertEqual(report["files"],[])
+    def test_historical_series_separate_units(self):
+        import tempfile,sqlite3,json
+        with tempfile.TemporaryDirectory() as folder, sqlite3.connect(":memory:") as db:
+            out=Path(folder);stamp="2026-11-24T00:00:00+00:00"
+            historical.publish(db,stamp,out,False)
+            url="https://rosstat.gov.ru/sample.xlsx"
+            for y,unit,value in [(2023,"руб.",100),(2024,"млн руб.",2)]:
+                row=dict(indicator="TEST",title="Test",region="Москва",year=y,unit=unit,value=value,seen=stamp,source=url,kind="test",sheet="test",row=1,column=2,note="")
+                db.execute("insert into hist_values values(?,?,?,?,?,?,?,?)",("TEST","Москва",y,unit,value,stamp,url,json.dumps(row)))
+            historical.publish(db,"2026-11-25T00:00:00+00:00",out,False)
+            series=[s for s in json.loads((out/"historical.json").read_text())["series"] if s["code"].startswith("TEST_")]
+            self.assertEqual(len(series),2)
+            self.assertEqual({(s["unit"],s["count"]) for s in series},{("руб.",1),("млн руб.",1)})
     def test_industry_bulletin(self):
         import industry
         body="Индекс промышленного производства составил: – в январе-июле 2026 г. по сравнению с январем-июлем 2025 г. – 100,1%; – в июле 2026 г. по сравнению с июлем 2025 г. – 100,4%, по сравнению с июнем 2026 г. – 101,4%. Индексы промышленного производства"
