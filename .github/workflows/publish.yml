@@ -26,7 +26,7 @@ jobs:
         run: |
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/
-          mkdir -p history
+          mkdir -p history monitor/data
           if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
@@ -93,7 +93,22 @@ jobs:
           mv history/monitor.db.gz.tmp history/monitor.db.gz
           rm history/monitor.db
           git add -A history
-          if ! git diff --cached --quiet; then git commit -m 'Update economic archive'; git push; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update economic archive'
+            # A code-only merge while the refresh runs must not invalidate the archive commit.
+            # If history itself changed concurrently, stop rather than overwrite observations.
+            pushed=0
+            for attempt in 1 2 3; do
+              if git push origin HEAD:main; then pushed=1; break; fi
+              git fetch origin main
+              if git diff --name-only HEAD^ origin/main -- history/ | grep -q .; then
+                echo 'Archive changed concurrently; refusing to overwrite it' >&2
+                exit 1
+              fi
+              git rebase origin/main
+            done
+            test "$pushed" = 1
+          fi
           git rev-parse HEAD > monitor/public/version.txt
           echo "version=$(cat monitor/public/version.txt)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
