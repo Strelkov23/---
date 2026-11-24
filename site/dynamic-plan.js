@@ -33,7 +33,7 @@ const DynamicPlan=(()=>{
  function paramRows(p){
   return [...Object.entries(p).filter(([k])=>!['growth','labor'].includes(k)),
    ['Трудовое ограничение',p.labor?'включено':'выключено'],
-   ...(p.labor?[['Лимит дополнительных человеко-лет',p.labor.cap],['Рост производительности, % за период',p.labor.productivity]]:[])];
+   ...(p.labor?[['Лимит дополнительных человеко-лет',p.labor.cap],['Рост производительности, % за период',p.labor.productivity],...(p.labor.sources||[]).map((source,i)=>['Источник коэффициента группы '+(i+1),source])]:[])];
  }
  function calculate(m,p){
   const n=m.names.length;
@@ -107,14 +107,24 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const fields=m.names.map(name=>{const e=document.createElement('input');e.type='number';e.min=0;e.max=20;e.step=.1;e.value=3;e.setAttribute('aria-label','Годовой прирост спроса: '+name);return e});
   const laborFields=m.names.map(name=>{const e=document.createElement('input');e.type='number';e.min=0;e.max=1000000;e.step='any';e.placeholder='Не задано';e.disabled=true;e.setAttribute('aria-label','Человеко-лет на млрд ₽: '+name);return e});
   table(controls,['Группа продукции','Годовой прирост целевого спроса, %','Доп. человеко-лет на млрд ₽ выпуска в базе (гипотеза)'],m.names.map((n,i)=>[n,fields[i],laborFields[i]]));
-  let rows=[];
+  let rows=[],calibration=null;
+  const calibrationStatus=$('dyn-calibration-status'),calibrationTable=$('dyn-calibration-multipliers');
+  const calibrationFile=$('dyn-calibration-file');
+  calibrationFile.addEventListener('change',async()=>{
+   const file=calibrationFile.files?.[0];calibrationFile.value='';if(!file)return;
+   try{if(file.size>200000)throw Error('Файл слишком большой');const parsed=LaborCalibration.parse(await file.text(),m);calibration=parsed;laborFields.forEach((e,i)=>e.value=String(parsed[i].intensity));$('dyn-laborEnabled').checked=true;draw();calibrationStatus.textContent='Импортировано '+parsed.length+' коэффициентов из пользовательского файла. Проверьте источники; задайте лимит человеко-лет.'}
+   catch(e){calibrationStatus.textContent='Файл не принят: '+e.message+'; прежние параметры сохранены.'}
+  });
   const global=typeof GlobalPlan!=='undefined'?GlobalPlan.mount(m):null;
   function showDetail(){const r=rows.find(r=>r.year===Number(select.value));if(!r){detail.replaceChildren();return}table(detail,['Группа','Требуемый прирост выпуска','Доступный прирост','Реализуемый прирост','Прямой целевой спрос','Инвестиции для следующего года','Доп. мощность следующего года','Ограничение'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.demand,g.invest,g.nextExtra].map(fmtNum),g.binding?'Связывает сценарий':'—']))}
   function draw(){
    for(const e of [metrics,out,detail,chart,alternatives,sensitivityHost,compareChart])e.replaceChildren();download.disabled=true;compareDownload.disabled=true;rows=[];if(global)global.setParams(null);
    const p=Object.fromEntries(['years','spare','investment','capitalRatio','depreciation','importLimit'].map(k=>[k,$('dyn-'+k).valueAsNumber]));p.growth=fields.map(e=>e.valueAsNumber);p.allocation=$('dyn-allocation').value;
+   calibrationTable.replaceChildren();
+   if(calibration&&laborFields.some((e,i)=>Number(e.value)!==calibration[i].intensity||e.value==='')){calibration=null;calibrationStatus.textContent='Коэффициенты изменены вручную; исходная привязка к файлу снята.'}
    const laborOn=$('dyn-laborEnabled').checked;for(const e of [...laborFields,$('dyn-laborCap'),$('dyn-laborProductivity')]){e.disabled=!laborOn;e.required=laborOn}
-   p.labor=laborOn?{cap:$('dyn-laborCap').valueAsNumber,productivity:$('dyn-laborProductivity').valueAsNumber,intensity:laborFields.map(e=>e.valueAsNumber)}:null;
+   p.labor=laborOn?{cap:$('dyn-laborCap').valueAsNumber,productivity:$('dyn-laborProductivity').valueAsNumber,intensity:laborFields.map(e=>e.valueAsNumber),sources:calibration?calibration.map(r=>r.source):null}:null;
+   if(laborOn&&p.labor.intensity.every(v=>Number.isFinite(v)&&v>=0&&v<=1e6)){const mult=LaborCalibration.multipliers(m,p.labor.intensity);table(calibrationTable,['Группа конечного спроса','Полная потребность, человеко-лет / млрд ₽ спроса в оценке 2021'],mult.map(r=>[r.name,fmtNum(r.perBillion)]))}
    try{if([...form.querySelectorAll('input'),...fields,...laborFields].some(e=>!e.validity.valid))throw Error('Invalid controls');rows=DynamicPlan.calculate(m,p)}catch(e){status.textContent='Проверьте параметры: '+e.message;return}
    if(global)global.setParams(p);
    const last=rows.at(-1);status.textContent='Рассчитано периодов: '+rows.length+' · условный сценарий в ценах баланса 2021 года, млрд ₽.';
@@ -136,6 +146,6 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   form.addEventListener('input',draw);controls.addEventListener('input',draw);form.addEventListener('submit',e=>e.preventDefault());select.addEventListener('change',showDetail);
   $('dyn-apply').onclick=()=>{const v=$('dyn-uniform');if(v.validity.valid&&Number.isFinite(v.valueAsNumber)){fields.forEach(e=>e.value=v.value);draw()}};
-  $('dyn-reset').onclick=()=>{form.reset();fields.forEach(e=>e.value=3);laborFields.forEach(e=>e.value='');draw()};draw();
+  $('dyn-reset').onclick=()=>{form.reset();calibration=null;calibrationStatus.textContent='';fields.forEach(e=>e.value=3);laborFields.forEach(e=>e.value='');draw()};draw();
  }catch(e){status.textContent='Не удалось загрузить исходный баланс.';console.error(e)}
 });

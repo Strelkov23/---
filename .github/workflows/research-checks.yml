@@ -25,11 +25,12 @@ jobs:
           cd monitor
           python3 -m compileall -q .
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
+          python3 -m unittest test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
           for script in *.js; do node --check "$script"; done
           node test-dynamic-plan.js
           node test-resource-plan.js
           node test-global-plan.js
+          node test-labor-calibration.js
           python3 -m pip install scipy==1.15.3
           python3 test_global_reference.py
           rm -rf public
@@ -38,7 +39,7 @@ jobs:
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','health-projects.json','health-projects.csv','budget-diagnostics.html','budget-diagnostics.json','budget-diagnostics.csv','programme-evidence.html','programme-evidence.json','programme-evidence.csv','programme-evidence.md','dynamic-plan.js','global-plan.js','global-plan-worker.js','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
+          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','health-projects.json','health-projects.csv','budget-diagnostics.html','budget-diagnostics.json','budget-diagnostics.csv','programme-evidence.html','programme-evidence.json','programme-evidence.csv','programme-evidence.md','dynamic-plan.js','global-plan.js','global-plan-worker.js','labor.html','labor-data.json','labor-broad.csv','labor-regional.csv','labor-coefficients-template.csv','labor-data.js','labor-calibration.js','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
