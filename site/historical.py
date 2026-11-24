@@ -366,6 +366,8 @@ def parse_minfin_annual(raw):
         if not re.search(r"краткая информация об исполнении федерального бюджета",header) or not re.search(r"млрд\.?\s*руб",header):raise ValueError("Не совпадает понятие или единица")
         columns=[(j,year(v)) for j,v in enumerate(rows[2]) if year(v)]
         if len(columns)<5 or any(b!=a+1 for a,b in zip([y for _,y in columns],[y for _,y in columns][1:])):raise ValueError("Неоднозначные годы")
+        columns=[(j,y) for j,y in columns if y<date.today().year]
+        if not columns:raise ValueError("Нет завершённых календарных лет")
         patterns={"MINFIN_REV":r"^доходы,?\s*всего$","MINFIN_EXP":r"^расходы,?\s*всего$","MINFIN_BAL":r"^дефицит\s*\([-−–]\)\s*/\s*профицит\s*\(\+\)$"}
         indexes={}
         for i,row in enumerate(rows[3:],4):
@@ -385,6 +387,27 @@ def parse_minfin_annual(raw):
                 result.append(dict(indicator=k,title=labels[k],region="Российская Федерация",year=y,value=vals[k],unit="млрд руб.",sheet=s.title,row=i,column=j+1,note="Минфин, годовое приложение 3.1. Доходы − расходы = сальдо; допуск 0,2 млрд руб. Не форма 0503117."))
         return result
     finally:book.close()
+def budget_report_year(header):
+    """Use dates from the report itself, never the filename alone."""
+    dates=set()
+    for d,m,y in re.findall(r"\b(\d{2})[./-](\d{2})[./-](20\d{2})\b",header):
+        dates.add((int(y),int(m),int(d)))
+    for y,m,d in re.findall(r"\b(20\d{2})-(\d{2})-(\d{2})\b",header):
+        dates.add((int(y),int(m),int(d)))
+    if len(dates)!=1:return None
+    y,m,d=next(iter(dates))
+    return y-1 if m==d==1 and 2000<=y<=date.today().year else None
+
+def budget_rubles(header):
+    # Never relabel scaled amounts as rubles. OKEI 383 is rubles.
+    if re.search(r"(?:тыс(?:\.|яч\w*)?|млн\.?|миллион\w*|млрд\.?|миллиард\w*|трлн\.?)\s*руб",header):return False
+    return bool(re.search(r"\bруб(?:\.|\b|л[ьяеи]\b|лей\b)|оке[ий]\s*[:—-]?\s*383\b",header))
+
+def check_xlsx_size(blob,limit=80_000_000):
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        if sum(x.file_size for x in z.infolist())>limit or len(z.infolist())>2000:
+            raise ValueError("Превышен размер распакованной книги")
+
 def parse_budget(raw,filename=""):
     """Annual actual federal budget totals from 0503117 only.
     Require year-end date, rubles, single actual-execution column, balance identity.
@@ -393,19 +416,20 @@ def parse_budget(raw,filename=""):
     import openpyxl
     result=[]
     def workbook(blob,member):
+        check_xlsx_size(blob)
         book=openpyxl.load_workbook(io.BytesIO(blob),read_only=True,data_only=True)
         try:
             for sheet in book:
-                rows=list(sheet.iter_rows(values_only=True,max_row=min(sheet.max_row or 3000,3000),max_col=min(sheet.max_column or 35,35)))
+                if not sheet.max_row or not sheet.max_column or sheet.max_row>10000 or sheet.max_column>80:continue
+                rows=list(sheet.iter_rows(values_only=True))
                 header=" ".join(norm(x) for row in rows[:20] for x in row if x is not None)
-                if "0503117" not in header+" "+member or not re.search(r"рубл|оке[ий]\s*383",header):continue
+                if "0503117" not in header+" "+member or not budget_rubles(header):continue
                 if "федеральн" not in header or "бюджет" not in header:continue
-                dates=re.findall(r"\b01[./]01[./](20[0-2]\d)\b",header+" "+member)
-                if len(set(dates))!=1:continue
-                yr=int(dates[0])-1
+                yr=budget_report_year(header)
+                if yr is None:continue
                 cols=set(j for row in rows[:25] for j,v in enumerate(row) if norm(v) in ("исполнено","исполнено всего","исполнение"))
                 if len(cols)!=1:continue
-                col=next(iter(cols));vals={}
+                col=next(iter(cols));vals={};conflicts=set()
                 labels={"доходы бюджета - всего":"BUD_REV","доходы бюджета всего":"BUD_REV","доходы - всего":"BUD_REV","расходы бюджета - всего":"BUD_EXP","расходы бюджета всего":"BUD_EXP","расходы - всего":"BUD_EXP","результат исполнения бюджета":"BUD_BAL"}
                 for i,row in enumerate(rows):
                     for x in row[:col]:
@@ -413,9 +437,9 @@ def parse_budget(raw,filename=""):
                         if label not in labels:continue
                         key=labels[label];v=numeric(row[col]) if col<len(row) else None
                         if v is None:continue
-                        if key in vals and vals[key][0]!=v:vals[key]=(None,i+1)
-                        else:vals[key]=(v,i+1)
-                if any(k not in vals or vals[k][0] is None for k in ("BUD_REV","BUD_EXP","BUD_BAL")):continue
+                        if key in vals and vals[key][0]!=v:conflicts.add(key)
+                        elif key not in vals:vals[key]=(v,i+1)
+                if conflicts or any(k not in vals for k in ("BUD_REV","BUD_EXP","BUD_BAL")):continue
                 rev,exp,bal=[vals[k][0] for k in ("BUD_REV","BUD_EXP","BUD_BAL")]
                 if rev<0 or exp<0 or abs(rev-exp-bal)>max(1,abs(rev)*1e-9):continue
                 for k,title in (("BUD_REV","Федеральный бюджет: исполненные доходы"),("BUD_EXP","Федеральный бюджет: исполненные расходы"),("BUD_BAL","Федеральный бюджет: сальдо исполнения")):
@@ -423,8 +447,10 @@ def parse_budget(raw,filename=""):
         finally:book.close()
     if filename.lower().endswith(".zip"):
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
-            for item in z.infolist():
-                if item.filename.lower().endswith(".xlsx") and "0503117" in item.filename and item.file_size<25_000_000:workbook(z.read(item),item.filename)
+            members=[item for item in z.infolist() if item.filename.lower().endswith(".xlsx") and "0503117" in item.filename]
+            if len(members)>30 or sum(item.file_size for item in members)>100_000_000 or any(item.file_size>25_000_000 for item in members):
+                raise ValueError("Превышен лимит годовых книг в архиве")
+            for item in members:workbook(z.read(item),item.filename)
     else:workbook(raw,filename)
     return result
 
@@ -509,7 +535,7 @@ def publish(db,stamp,out,refresh):
                 if not n:raise ValueError("Нет однозначных наблюдений")
                 sources.append(import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ключей: "+str(n),True,[dict(url=url,title="Файл архива НЦСЭД",format="parquet" if url.endswith(".parquet") else "csv.gz"),dict(url=emiss_archive.card(code),title="Паспорт архива НЦСЭД",format="html")]))
             except Exception as e:
-                failed=import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ошибка: "+str(e)[:250],False)
+                failed=import_status(db,"emiss_"+code,title,emiss_archive.primary(code),stamp,"Ошибка: "+str(e)[:900],False)
                 if not failed["files"]:failed["files"]=[dict(url=emiss_archive.card(code),title="Карточка архива НЦСЭД",format="html")]
                 sources.append(failed)
         # Bounded fair queue: retry failures after two days; refresh fixed editions monthly.
