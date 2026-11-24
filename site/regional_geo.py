@@ -56,4 +56,5 @@ def publish(out,previous,stamp,refresh):
         except Exception as e:
             meta.update(checked=stamp,error=str(e)[:200],status="cached" if raw else "unavailable")
     if raw is not None:target.write_bytes(raw)
+    elif target.exists():target.unlink()
     meta_path.write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
