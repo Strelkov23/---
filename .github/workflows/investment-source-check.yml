@@ -118,3 +118,16 @@ jobs:
                   finally:b.close()
               except Exception as e:print(label,"UNAVAILABLE",type(e).__name__,str(e),flush=True)
           PY
+
+      - name: Verify Krasnodar official registry
+        working-directory: site
+        run: |
+          python3 -m unittest -v test_krasnodar_projects.py
+          python3 - <<'PY'
+          import krasnodar_projects as k
+          from datetime import date
+          from collections import Counter
+          day,url=k.discover(k.fetch(k.SOURCE),date.today())
+          rows=k.parse(k.fetch(url),url,day)
+          print("KRASNODAR_PARSED",day,len(rows),len({r["sector"] for r in rows}),len({r["municipality"] for r in rows}),flush=True)
+          PY

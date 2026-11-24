@@ -170,7 +170,7 @@ def render(d):
     e=lambda v:escape(str(v if v is not None and v!="" else "—"),quote=True)
     rows=d["rows"];counts=quality(d)
     status={"ok":"Загружено","cached":"Сохраненная редакция","unavailable":"Источник недоступен","not_loaded":"Ожидается загрузка"}[d["status"]]
-    body='<section class="mast"><p class="kicker">Инвестиции · Амурская область</p><h1>Инвестиционные проекты Амурской области</h1><p>'+e(NOTE)+'</p><p><a href="investment-projects.html">Региональные реестры: Бурятия</a> · <a href="'+SOURCE+'">Официальный портал</a> · <a href="economic-map.html">Экономическая карта</a> · <a href="methodology.html#amur-projects-method">Методика</a></p></section>'
+    body='<section class="mast"><p class="kicker">Инвестиции · Амурская область</p><h1>Инвестиционные проекты Амурской области</h1><p>'+e(NOTE)+'</p><p><a href="investment-projects.html">Региональные реестры: Бурятия</a> · <a href="krasnodar-projects.html">Краснодарский край</a> · <a href="'+SOURCE+'">Официальный портал</a> · <a href="economic-map.html">Экономическая карта</a> · <a href="methodology.html#amur-projects-method">Методика</a></p></section>'
     body+='<section><h2>Охват и актуальность</h2><p>'+status+' · Редакция: '+e(d["edition"])+' · Проверка: '+e(d["checked"])+' · Последняя успешная загрузка: '+e(d["success"])+'</p>'
     if d.get("error"):body+='<p role="status">'+e(d["error"])+'</p>'
     body+='<p>Записей: '+str(len(rows))+' · Отраслевых категорий: '+str(counts["amur_project_sectors"])+' · Муниципальных наименований: '+str(counts["amur_project_municipalities"])+' · Числовая стоимость: '+str(counts["amur_project_cost_records"])+' · Числовые рабочие места: '+str(counts["amur_project_jobs_records"])+'</p>'
