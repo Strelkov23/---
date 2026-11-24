@@ -76,7 +76,7 @@ jobs:
           print("QUALITY",json.dumps(q,ensure_ascii=False))
           assert not q["errors"],q["errors"]
           PY
-      - name: Browser integration against real data including reproducible two-period CSV
+      - name: Browser integration against real data including expanded regional dossiers and reproducible exports
         run: |
           cd monitor/public
           python3 -m http.server 8765 > /tmp/layout-http.log 2>&1 &
