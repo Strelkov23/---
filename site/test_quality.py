@@ -78,6 +78,20 @@ class QualityTests(unittest.TestCase):
         data["release"]="unknown"
         self.put("facility-energy.json",data)
         self.assertTrue(any("Производственные площадки" in x for x in self.report()["errors"]))
+    def test_historical_catalogue_metadata(self):
+        (self.out/"regional-data").mkdir()
+        meta=dict(title="Показатель",unit="руб.",kind="test",source="https://example.org/data.xlsx")
+        rows=[dict(region="Москва",year=2024,value=100)]
+        file="regional-data/TEST.json"
+        self.put(file,dict(meta,values=rows))
+        series=dict(meta,code="TEST",file=file,count=1,regions=1,first=2024,last=2024)
+        self.put("historical.json",dict(series=[series],sources=[]))
+        self.assertFalse(any("Исторический ряд" in x for x in self.report()["errors"]))
+        self.put(file,dict(meta,unit="млн руб.",values=rows))
+        self.assertTrue(any("Метаданные ряда" in x for x in self.report()["errors"]))
+        self.put(file,dict(meta,values=rows))
+        self.put("historical.json",dict(series=[dict(series,last=2025)],sources=[]))
+        self.assertTrue(any("Охват ряда" in x for x in self.report()["errors"]))
     def test_missing(self):
         (self.out/"cbr.json").unlink()
         self.assertTrue(self.report()["errors"])
