@@ -81,6 +81,7 @@ with m.connect() as db:
     literature.sync(db,m.now(),"--refresh" in sys.argv)
     literature.reclassify(db)
     papers=[dict(r) for r in db.execute("select * from literature order by published desc,title,doi")]
+    literature.enrich(db,papers)
     journal_counts=Counter(r["journal"] for r in papers)
     journal_checks=[dict(r,journal=literature.JOURNALS.get(r["issn"],r["issn"]),count=journal_counts[literature.JOURNALS.get(r["issn"],r["issn"])]) for r in db.execute("select * from journal_checks")]
     write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))

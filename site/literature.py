@@ -137,6 +137,14 @@ REGISTRY = {
  }
 }
 
+JOURNALS.update({"1994-5124":"Экономическая политика","0868-6351":"Проблемы прогнозирования","1815-9834":"Пространственная экономика","2949-320X":"Пространственная и региональная экономика"})
+REGISTRY.update({
+ "1994-5124":{"tags":["РИНЦ","ВАК","Scopus","Web of Science","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/5902/","sources":["https://journalrank.rcsi.science/ru/record-sources/details/5902/","https://journalrank.rcsi.science/ru/record-sources/levels/5902/","https://asnap.ru/journals/ab62935bb8e0"],"white_history":{"2023":2,"2025":1},"note":"Категория ВАК К1–К3 не присваивается без отдельного подтверждения."},
+ "0868-6351":{"tags":["РИНЦ","ВАК","ВАК К1","Белый список 1"],"site":"https://ecfor.ru/nauchnye-izdaniya/problemy-prognozirovaniya/o-zhurnale/","sources":["https://ecfor.ru/nauchnye-izdaniya/problemy-prognozirovaniya/o-zhurnale/","https://journalrank.rcsi.science/ru/record-sources/levels/29867/","https://asnap.ru/journals/b21145eaa78d"],"white_history":{"2023":2,"2025":1},"note":"Русское издание не отождествляется с англоязычной переводной версией."},
+ "1815-9834":{"tags":["РИНЦ","ВАК","ВАК К1","Scopus","DOAJ","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/28619/","sources":["https://journalrank.rcsi.science/ru/record-sources/details/28619/","https://journalrank.rcsi.science/ru/record-sources/levels/28619/","https://asnap.ru/journals/6d42a078ef7a"],"white_history":{"2023":1,"2025":1}},
+ "2949-320X":{"tags":["РИНЦ"],"site":"https://1economic.ru/journals/pre","sources":["https://1economic.ru/journals/pre","https://1economic.ru/journals/pre/publication"],"note":"Другие категории не подтверждены."}
+})
+
 def registry():
     return {JOURNALS[issn]:dict(meta,issn=issn,verified='2026-11-24') for issn,meta in REGISTRY.items()}
 
@@ -161,24 +169,37 @@ TOPICS={
 def tidy(text):
     return ' '.join(unescape(re.sub('<[^>]*>',' ',text)).split())
 
+def metadata(item):
+    def string(key):
+        v=item.get(key)
+        return tidy(v) if isinstance(v,str) else ""
+    count=item.get("is-referenced-by-count")
+    return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None)
+
 def sync(db, stamp, refresh):
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
+    db.execute("create table if not exists literature_meta(doi text primary key,payload text,checked text)")
+    db.execute("create table if not exists literature_meta_checks(issn text primary key,success text)")
+    # Backfill one previously imported journal per refresh; existing DOI records are not erased.
+    backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
     for issn,journal in JOURNALS.items():
         if not refresh: continue
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
         start='1991-01-01'
         filters=['type:journal-article','from-pub-date:'+start]
-        if last and last[0]:
+        full=not(last and last[0]) or issn==backfill
+        if not full:
             filters.append('from-index-date:'+str(date.fromisoformat(last[0][:10])-timedelta(days=2)))
         cursor='*'
         try:
             while True:
-                args=urlencode(dict(filter=','.join(filters),rows=300,cursor=cursor,select='DOI,title,author,published'))
+                args=urlencode(dict(filter=','.join(filters),rows=300,cursor=cursor,select='DOI,title,author,published,volume,issue,page,article-number,language,is-referenced-by-count'))
                 url=f'https://api.crossref.org/journals/{issn}/works?{args}'
                 with urlopen(Request(url,headers={'User-Agent':'EconomicsMonitor/1.0 (https://strelkov23.github.io/---/)'}),timeout=40) as resp:
                     batch=json.load(resp)['message']
                 entries=[]
+                details=[]
                 for item in batch['items']:
                     titles=item.get('title') or []
                     if not titles:continue
@@ -191,13 +212,24 @@ def sync(db, stamp, refresh):
                     doi=(item.get('DOI') or '').strip().lower()
                     if not re.fullmatch(r'10\.\d{4,9}/\S+',doi):continue
                     entries.append((doi,journal,when,title,authors,topics))
-                with db:db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
+                    details.append((doi,json.dumps(metadata(item),ensure_ascii=False),stamp))
+                with db:
+                    db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
+                    db.executemany("insert or replace into literature_meta values(?,?,?)",details)
                 if len(batch['items'])<300:break
                 cursor=batch.get('next-cursor')
                 if not cursor:raise ValueError("Crossref cursor missing")
-            with db:db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
+            with db:
+                db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
+                if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
         except Exception as err:
             with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,str(err)[:180]))
+
+def enrich(db, papers):
+    lookup={r[0]:dict(json.loads(r[1]),metadata_checked=r[2]) for r in db.execute("select doi,payload,checked from literature_meta")}
+    for paper in papers:
+        paper.update(lookup.get(paper["doi"],{}))
+    return papers
 
 def reclassify(db):
     rows = db.execute("select doi,title,topics from literature").fetchall()
