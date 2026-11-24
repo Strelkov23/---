@@ -49,3 +49,11 @@ assert.equal(M.trend({year:2024,value:5},{year:2023,value:0},'руб.').type,'ab
 
 assert.equal(M.theme('new','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_farming_102_v20260313.zip','Валовой сбор зерна'),'agriculture');
 assert.equal(M.industryTheme('Индексы производства: производство химических веществ','https://storage.yandexcloud.net/tochno-st-catalog/Rosstat/data_regions_collection_102_v20260313/data_industry_102_v20260313.zip'),'chemical');
+
+const cat=[{code:'x',source:industrySource,title:'Индексы производства: производство химических веществ',last:2024,regions:96},{code:'GRP_PC_95b8dd2585',last:2023,regions:95}];
+assert.deepEqual(M.coverage(cat,'chemical'),{count:1,latest:2024,maxRegions:96});
+assert.deepEqual(M.coverage(cat,'light'),{count:0,latest:null,maxRegions:null});
+assert.equal(M.coverage(cat,'industry').count,1);
+assert.equal(M.coverage(cat,'all').count,2);
+assert.equal(M.isGrowth('new','Индексы производства','В процентах к предыдущему году'),true);
+assert.equal(M.isGrowth('new','Доля организаций','%'),false);

@@ -221,6 +221,11 @@ with sync_playwright() as p:
             page.locator("#geo-theme").select_option("industry")
             page.wait_for_function("document.querySelector('#geo-status').textContent.startsWith('Год:')")
             assert page.locator("#geo-map svg").count()==1
+            assert page.locator("#geo-coverage-current progress").count()==1
+            assert page.locator("#geo-coverage-list button").count()==18
+            page.locator("#geo-coverage summary").click()
+            assert page.locator("#geo-coverage-list button").first.is_visible()
+            page.locator("#geo-coverage summary").click()
             page.locator("#geo-scale").select_option("growth")
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0
