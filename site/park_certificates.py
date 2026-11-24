@@ -18,7 +18,7 @@ def parse(raw):
         cells=list(node.find("certification-table__td"))
         if len(cells)!=5:raise ValueError("Expected five certificate fields")
         number,name,region,period,protocol=map(without_labels,cells)
-        m=re.fullmatch(r"№\s*(\d+)\s*АИП",number,re.I)
+        m=re.fullmatch(r"(?:№\s*)?(\d+)\s*АИП",number,re.I)
         if not m or not name or not region or not protocol:raise ValueError("Unknown certificate identity")
         number=m[1]
         if number in seen:raise ValueError("Duplicate certificate")
@@ -27,7 +27,7 @@ def parse(raw):
         if len(dates)!=2:raise ValueError("Unknown date range: "+period)
         start,end=(datetime.strptime(d,"%d.%m.%Y").date().isoformat() for d in dates)
         if start>end:raise ValueError("Invalid certificate dates")
-        links=[n for n in cells[1].children if isinstance(n,p.Node) and n.tag=="a"]
+        links=[n for n in cells[1].find("link") if n.tag=="a"]+ [n for n in cells[1].children if isinstance(n,p.Node) and n.tag=="a" and not n.has("link")]
         url=p.safe_link(links[0].attrs.get("href")) if len(links)==1 else None
         rows.append(dict(number=number,name=name,region=region,start=start,end=end,protocol=protocol,url=url,record=len(rows)+1))
     if not 1<=len(rows)<=1000:raise ValueError("Missing certificate list")
