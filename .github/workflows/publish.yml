@@ -23,7 +23,9 @@ jobs:
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
-          python3 -m unittest test_catalogue.py
+          python3 -m unittest test_catalogue.py test_research.py
+          python3 -m compileall -q .
+          for script in *.js; do node --check "$script"; done
           python3 build.py --refresh
           git rev-parse HEAD > public/version.txt
           python3 -c "import sqlite3; s=sqlite3.connect('data/monitor.db'); d=sqlite3.connect('../history/monitor.db'); s.backup(d); d.close(); s.close()"
@@ -42,6 +44,10 @@ jobs:
           google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/desk.html?words=инвестиц' > /tmp/desk.html
           google-chrome --headless --no-sandbox --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/compare.html?begin=2010&finish=2020' > /tmp/pair.html
           python3 -c "from pathlib import Path; assert 'В подборку</button>' in Path('/tmp/desk.html').read_text(); s=Path('/tmp/pair.html').read_text(); assert 'Совместных наблюдений: 11' in s and s.count('<svg') == 2"
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/statistics.html' > /tmp/statistics-dom.html
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/diagnostics.html' > /tmp/diagnostics-dom.html
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/scenario.html' > /tmp/scenario-dom.html
+          python3 -c "from pathlib import Path; import json; assert len(json.loads(Path('catalog.json').read_text())) >= 100; assert 'Показателей: ' in Path('/tmp/statistics-dom.html').read_text(); assert 'Рассчитано наблюдений:' in Path('/tmp/diagnostics-dom.html').read_text(); assert 'Групп выше условного предела:' in Path('/tmp/scenario-dom.html').read_text()"
       - name: Save updated history
         run: |
           git config user.name 'github-actions[bot]'
