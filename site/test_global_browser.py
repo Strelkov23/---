@@ -442,6 +442,26 @@ with sync_playwright() as p:
             assert page.locator("#sp-finance-export").is_disabled()
         page.locator("#sp-sector").select_option("light")
         assert "Лёгкая промышленность" in page.locator("#sp-scope").inner_text()
+        page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
+        parks=json.loads(Path("industrial-parks.json").read_text())
+        if parks["rows"]:
+            page.wait_for_function("document.querySelector('#park-status').textContent.startsWith('Каталог:')",timeout=30000)
+            assert page.locator("#park-map svg").count()==1
+            assert page.locator("#park-region").input_value()=="Московская область"
+            assert page.locator("#park-regional-table tbody tr").count()==len({r["region"] for r in parks["rows"]})
+            page.locator("#park-region").select_option("")
+            page.locator("#park-type").select_option("Гринфилд")
+            count=sum(r["type"]=="Гринфилд" for r in parks["rows"])
+            assert "выборка: "+str(count) in page.locator("#park-status").inner_text()
+            if count:
+                with page.expect_download() as park:
+                    page.locator("#park-export").click()
+                assert park.value.suggested_filename=="industrial-park-catalogue.csv"
+            page.locator("#park-query").fill("unlikely name 123456789")
+            assert page.locator("#park-export").is_disabled()
+        else:
+            page.wait_for_function("document.querySelector('#park-status').textContent.startsWith('Каталог ещё не загружен')",timeout=30000)
+            assert page.locator("#park-export").is_disabled()
         page.goto("http://localhost:8765/regional-manufacturing.html?rm-group=light&rm-year=2024&rm-region=RU-MOS",wait_until="load")
         manufacturing=json.loads(Path("regional-manufacturing.json").read_text())
         if manufacturing["rows"]:
