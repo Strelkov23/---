@@ -146,6 +146,15 @@ jobs:
           # Source and archived data revisions are distinct. The archive commit must contain exactly the published manifest.
           cmp /tmp/economic-source-revision monitor/public/source-version.txt
           git show HEAD:history/published/data-manifest.json | cmp - monitor/public/data-manifest.json
+          python3 - <<'PY'
+          import json,hashlib,subprocess
+          from pathlib import Path
+          manifest=json.loads(Path('monitor/public/data-manifest.json').read_text())
+          for name,entry in manifest['files'].items():
+              data=subprocess.check_output(['git','show','HEAD:history/published/'+name])
+              assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'],name
+          print('Exact archived files verified:',len(manifest['files']))
+          PY
           git rev-parse HEAD > monitor/public/version.txt
           echo "version=$(cat monitor/public/version.txt)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
