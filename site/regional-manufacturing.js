@@ -137,14 +137,20 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const sectionYears=years.filter(y=>combined.rows.some(r=>r.year===y&&groups.find(g=>g.id===r.group)?.section===group.section)).sort((a,b)=>a-b);
     if(sectionYears.length>=2){
      const start=sectionYears[0],end=sectionYears.at(-1),t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+     const comparisonRows=[];
      for(const label of ['Группа','Отгрузка '+start+', млн руб.','Отгрузка '+end+', млн руб.','Изменение в текущих ценах, %','Изменение доли, п. п.','Изменение локализации'])h.append(node('th',label));
      for(const g of groups.filter(g=>g.section===group.section)){
       const a=ManufacturingAtlas.calculate(combined,g.id,start,RegionalStats.sample).rows.get(chosen.key),b=ManufacturingAtlas.calculate(combined,g.id,end,RegionalStats.sample).rows.get(chosen.key),change=ManufacturingAtlas.changeBetween(a,b);
       const tr=body.insertRow();tr.insertCell().textContent=g.title;
       for(const v of [a?.value,b?.value,change?.nominalChange,change?.shareDelta,change?.localizationDelta])tr.insertCell().textContent=number(v);
+      comparisonRows.push([chosen.name,chosen.code,g.section,g.id,g.title,g.okved,start,end,a?.region,b?.region,a?.okato,b?.okato,a?.oktmo,b?.oktmo,a?.value,b?.value,a?.total,b?.total,a?.share,b?.share,a?.localization,b?.localization,a?.national,b?.national,a?.nationalTotal,b?.nationalTotal,change?.valueDelta,change?.nominalChange,change?.shareDelta,change?.localizationDelta,a?.edition,b?.edition,a?.sheet,b?.sheet,a?.row,b?.row,a?.totalRow,b?.totalRow,a?.nationalRow,b?.nationalRow,a?.nationalTotalRow,b?.nationalTotalRow,a?.raw_value,b?.raw_value,selected.data.source,selected.data.sha256,selected.sha256,manifest.data_fingerprint]);
      }
      const wrap=node('div','');wrap.className='table-scroll';wrap.append(t);wrap.id='rm-change-table';
      detail.append(node('h3','Изменение структуры: '+start+'–'+end+' гг.'),node('p','Это два отдельных наблюдения. Изменение отгрузки в текущих ценах не является индексом физического объёма; промежуточные годы не восстановлены. При несовпадении территориального кода или отсутствии значения изменение не рассчитывается.'),wrap);
+     const download=node('button','Скачать сравнение структуры CSV');download.id='rm-change-export';download.type='button';
+     download.onclick=()=>csv('regional-industry-change-'+chosen.code+'-'+group.section+'-'+start+'-'+end+'.csv',[
+      ['Регион','ISO геометрии','Раздел ОКВЭД2','Группа','Наименование','Классы ОКВЭД2','Начальный год','Конечный год','Территория источника (начало)','Территория источника (конец)','ОКАТО (начало)','ОКАТО (конец)','ОКТМО (начало)','ОКТМО (конец)','Отгрузка начало, млн руб.','Отгрузка конец, млн руб.','Итог раздела начало, млн руб.','Итог раздела конец, млн руб.','Доля начало, %','Доля конец, %','Локализация начало','Локализация конец','Отгрузка РФ начало, млн руб.','Отгрузка РФ конец, млн руб.','Итог раздела РФ начало, млн руб.','Итог раздела РФ конец, млн руб.','Изменение отгрузки, млн руб.','Номинальное изменение, %','Изменение доли, п. п.','Изменение локализации','Издание начало','Издание конец','Файл начало','Файл конец','Строка начало','Строка конец','Строка итога начало','Строка итога конец','Строка РФ начало','Строка РФ конец','Строка итога РФ начало','Строка итога РФ конец','Исходное значение начало','Исходное значение конец','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...comparisonRows]);
+     detail.append(download);
     }
    }else detail.append(node('p','Выберите регион на карте или в списке, чтобы открыть его отраслевое досье.'));
    const chart=$('rm-rank-chart');chart.replaceChildren();if(known.length){
