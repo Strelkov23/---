@@ -1,0 +1,42 @@
+name: Atlas source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/atlas-source-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install openpyxl==3.1.5
+      - name: Check original Rosstat workbook layout
+        run: |
+          python3 - <<'PY'
+          from urllib.request import urlopen, Request
+          import io, hashlib, openpyxl, json
+          urls=["https://rosstat.gov.ru/storage/mediabank/VRP_OKVED2_s_2016.xlsx","https://www.rosstat.gov.ru/storage/mediabank/VRP_OKVED2_s_2016.xlsx"]
+          for url in urls:
+              try:
+                  with urlopen(Request(url,headers={"User-Agent":"EconomicMonitor/1.0 (public statistical research)"}),timeout=25) as resp:
+                      raw=resp.read(15000001)
+                  if len(raw)>15000000:raise ValueError("oversized")
+                  book=openpyxl.load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
+                  print("SOURCE",url,"SHA256",hashlib.sha256(raw).hexdigest(),"BYTES",len(raw))
+                  for ws in book:
+                      print("SHEET",ws.title,ws.max_row,ws.max_column)
+                      for i,row in enumerate(ws.iter_rows(min_row=1,max_row=min(ws.max_row,36),max_col=min(ws.max_column,32),values_only=True),1):
+                          print(i,json.dumps([(j+1,str(v)[:350]) for j,v in enumerate(row) if v is not None],ensure_ascii=False))
+                      for i,row in enumerate(ws.iter_rows(min_row=max(1,ws.max_row-12),max_row=ws.max_row,max_col=min(ws.max_column,32),values_only=True),max(1,ws.max_row-12)):
+                          print(i,json.dumps([(j+1,str(v)[:350]) for j,v in enumerate(row) if v is not None],ensure_ascii=False))
+                  book.close()
+                  break
+              except Exception as e:
+                  print("FAILED",url,type(e).__name__,str(e))
+          else:raise SystemExit("Neither official workbook was available")
+          PY
