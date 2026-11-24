@@ -8,6 +8,7 @@ import monitor as m
 import industry
 import indicators
 import literature
+import cbr_data
 
 out = Path("public")
 out.mkdir(exist_ok=True)
@@ -88,6 +89,7 @@ with m.connect() as db:
     db.execute("create table if not exists industry_month(period text,value real,url text,seen text,primary key(period,value,url))")
     months = [dict(r) for r in db.execute("select period,value,url from (select *,row_number() over(partition by period order by seen desc,rowid desc) rn from industry_month) where rn=1 order by period")]
     write("industry.json", months)
+    cbr_data.publish(db,m.now(),out,"--refresh" in sys.argv)
     write("status.json",dict(built=m.now(),failures=failures,checks=checks,days=days,news=news))
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html"]:
     page(name,Path(name).read_text())
