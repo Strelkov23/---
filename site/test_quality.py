@@ -22,6 +22,7 @@ class QualityTests(unittest.TestCase):
             "sectors.json":{},
             "status.json":{"days":[],"failures":[]},
             "links.json":{},
+            "national.json":{},
         }
         for name,value in self.data.items():self.put(name,value)
     def put(self,name,value):
