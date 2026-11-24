@@ -46,6 +46,12 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(rows[0]["region"],"Москва")
         self.assertIn("45000000",rows[0]["note"])
         self.assertIn("Регионы России 2024",rows[0]["note"])
+    def test_budget_mixed_units(self):
+        f=io.BytesIO()
+        with zipfile.ZipFile(f,"w") as z:z.writestr("data.csv","indicator_code;indicator_name;object_name;object_level;year;indicator_value;indicator_unit\nB1;Доходы консолидированных бюджетов субъектов РФ;Российская Федерация;Страна;2020;100;Миллионов рублей; для значений в целом по России: млрд руб\n".replace("100;Миллионов рублей; для значений в целом по России: млрд руб","100;\"Миллионов рублей; для значений в целом по России: млрд руб\"")+"B1;Доходы консолидированных бюджетов субъектов РФ;Москва;Регион;2020;10;\"Миллионов рублей; для значений в целом по России: млрд руб\"\n")
+        rows=historical.mirror_rows(f.getvalue(),"finance",selected=True)
+        self.assertEqual({(r["region"],r["unit"],r["value"]) for r in rows},{("Российская Федерация","млрд руб.",100),("Москва","млн руб.",10)})
+        self.assertEqual(len({r["indicator"] for r in rows}),2)
     def test_budget(self):
         b=openpyxl.Workbook();s=b.active
         s.append(["Отчет об исполнении федерального бюджета 0503117 на 01.01.2025, рубли"])
