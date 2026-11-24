@@ -105,6 +105,17 @@ with sync_playwright() as p:
         page.locator("#tech-run").click()
         page.wait_for_function("document.querySelector('#tech-status').textContent.includes('Рассчитано 19')")
         assert page.locator("#tech-frontier tbody tr").count()==6
+        page.goto("http://localhost:8765/forecast.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#forecast-status').textContent.includes('Рассчитано')")
+        assert page.locator("#forecast-methods tbody tr").count()==4
+        assert page.locator("#forecast-holdout tbody tr").count()==5
+        page.locator("#forecast-series").select_option("INDUSTRY_YOY")
+        page.locator("#forecast-horizon").select_option("6")
+        assert page.locator("#forecast-methods tbody tr").count()==5
+        assert page.locator("#forecast-chart svg").count()>=1
+        with page.expect_download() as d:
+            page.locator("#forecast-export").click()
+        assert d.value.suggested_filename=="forecast-selected.csv"
         assert not errors,errors
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth+3")
         page.close()

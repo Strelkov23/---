@@ -25,7 +25,7 @@ jobs:
           cd monitor
           python3 -m compileall -q .
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
-          python3 -m unittest test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
+          python3 -m unittest test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
           for script in *.js; do node --check "$script"; done
           node test-dynamic-plan.js
           node test-resource-plan.js
@@ -43,7 +43,7 @@ jobs:
           import json
           from pathlib import Path
           p=Path('public')
-          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','health-projects.json','health-projects.csv','budget-diagnostics.html','budget-diagnostics.json','budget-diagnostics.csv','programme-evidence.html','programme-evidence.json','programme-evidence.csv','programme-evidence.md','dynamic-plan.js','global-plan.js','global-plan-worker.js','labor.html','labor-data.json','labor-broad.csv','labor-regional.csv','labor-coefficients-template.csv','labor-data.js','labor-calibration.js','prices.html','price-data.json','price-coefficients.csv','labor-hours-template.csv','price-model.js','technology.html','technology.js','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
+          for f in ('programmes.html','programmes.json','programmes.csv','programmes.js','national-goals.json','national-goals.csv','annual-goals.json','annual-goals.csv','programme-budget.json','programme-budget.csv','health-projects.json','health-projects.csv','budget-diagnostics.html','budget-diagnostics.json','budget-diagnostics.csv','programme-evidence.html','programme-evidence.json','programme-evidence.csv','programme-evidence.md','dynamic-plan.js','global-plan.js','global-plan-worker.js','labor.html','labor-data.json','labor-broad.csv','labor-regional.csv','labor-coefficients-template.csv','labor-data.js','labor-calibration.js','prices.html','price-data.json','price-coefficients.csv','labor-hours-template.csv','price-model.js','technology.html','technology.js','forecast.html','forecast.js','forecast.json','forecast.csv','forecast-backtests.csv','statistics.html','diagnostics.html','scenario.html','methodology.html','catalog.json','cbr.json','links.json','quality.json','research.js','national.html','national.json','national.js','404.html','archive/index.html','historical.html','historical.json','historical.js','regions/index.html','sector-passports.html','sector-passports.json','sector-passports.js','sector-passports/index.html'):
               assert (p/f).is_file(),f
           assert len(json.loads((p/'catalog.json').read_text())) >= 100
           errors=json.loads((p/'links.json').read_text())['internal_errors']
@@ -54,6 +54,10 @@ jobs:
           labor=json.loads((p/'labor-data.json').read_text())
           print('Labor data coverage:',len(labor['broad']),len(labor['regional']),labor['coverage'])
           assert len(labor['broad'])>0 and len(labor['regional'])>0
+          forecast=json.loads((p/'forecast.json').read_text())
+          assert len(forecast['series'])==13
+          print('Forecast coverage:',[(s['code'],len(s['results']),s['last']) for s in forecast['series']])
+          assert all(s['results'] for s in forecast['series'])
           PY
       - name: Verify horizon optimizer in desktop and mobile browsers
         working-directory: monitor/public
