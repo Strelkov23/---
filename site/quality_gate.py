@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -154,6 +154,11 @@ def check(out,previous,stamp):
         counts.update(dc);warnings.extend(dw)
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:
         issues.append("ADM2: "+str(e))
+    try:
+        import freshness
+        counts.update({"freshness_"+k:v for k,v in freshness.quality(data["freshness.json"]).items()})
+    except (ValueError,KeyError,TypeError,AttributeError) as e:
+        issues.append("Контроль обновлений: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])

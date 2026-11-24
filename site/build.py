@@ -79,7 +79,7 @@ with m.connect() as db:
     for source,count in news.most_common():
         last = max(r["published"] or "" for r in articles if r["source"]==source)
         table += f"<tr><td>{escape(source)}</td><td>{count}</td><td>{escape(last)}</td></tr>"
-    page("sources.html",sources+table+"</table>")
+    page("sources.html",'<p><a href="freshness.html">Календарь и контроль обновлений всех наборов</a></p>'+sources+table+"</table>")
     latest=[dict(r) for r in db.execute("""select code,year,value,seen from
         (select *,row_number() over(partition by code,year order by seen desc) rn from annual)
         where rn=1 order by year""")]
@@ -147,7 +147,7 @@ sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.
 district_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 for name in ["desk.html","compare.html","statistics.html","diagnostics.html","scenario.html","methodology.html","national.html","historical.html","economic-map.html","news-map.html","facility-map.html","district-map.html","search.html","glossary.html","industrial.html","sector-passports.html","prices.html","technology.html","forecast.html","index-builder.html","report-builder.html"]:
     page(name,Path(name).read_text())
-for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","interface.js","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","finance-data.js","financial-state.js","cost-structure.js","food-balance.js","data-registry.js","index-builder.js","composite-index.js","report-builder.js","provenance.js","reproducibility.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","news-map.js","facility-map.js","sme-map.js","district-map.js","site-search.js","industrial.js","energy-output.js","electricity-balance.js","sector-passports.js"]:
+for f in ["programmes.js","desk.js","compare.js","papers.js","sectors.json","style.css","interface.js","layout.js","public.js","model-check.py","model-input.csv","research.js","macro-diagnostics.js","chain-stress.js","reproduction-plan.js","resource-plan.js","dynamic-plan.js","labor-data.js","labor-calibration.js","price-model.js","technology.js","forecast.js","capital-data.js","finance-data.js","financial-state.js","cost-structure.js","food-balance.js","data-registry.js","index-builder.js","composite-index.js","report-builder.js","provenance.js","reproducibility.js","global-plan.js","global-plan-worker.js","national.js","historical.js","regional-disparities.js","regional-map.js","news-map.js","facility-map.js","sme-map.js","district-map.js","freshness.js","site-search.js","industrial.js","energy-output.js","electricity-balance.js","sector-passports.js"]:
     shutil.copy(f,out/f)
 page("index.html",Path("home.html").read_text().replace("<!--DIRECTORY-->",navigation.cards()))
 navigation.publish(page)
@@ -177,6 +177,8 @@ bulletin.publish(page,out)
 shutil.copy('chart-export.js',out)
 
 method_passports.publish(page,out)
+import freshness
+freshness.publish(page,out,m.now())
 provenance.publish(page,out,m.now())
 routes.publish(out)
 

@@ -397,6 +397,14 @@ with sync_playwright() as p:
             with page.expect_download() as metal:
                 page.locator("#metal-export").click()
             assert metal.value.suggested_filename.startswith("metal-output-")
+        page.goto("http://localhost:8765/freshness.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#fresh-status').textContent.startsWith('Срез контроля:')",timeout=30000)
+        assert page.locator("#fresh-table tbody tr").count()>0
+        page.locator("#fresh-group").select_option("Всемирный банк")
+        assert page.locator("#fresh-table tbody tr").count()>0
+        with page.expect_download() as fresh:
+            page.locator("#fresh-export").click()
+        assert fresh.value.suggested_filename=="source-freshness.csv"
         page.goto("http://localhost:8765/food-balance.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#fbs-run').disabled")
         assert not errors,errors
