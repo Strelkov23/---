@@ -24,7 +24,8 @@ jobs:
           mkdir -p history
           if test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
-          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py
+          python3 -m pip install openpyxl==3.1.5
+          python3 -m unittest test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           rm -rf public
@@ -53,6 +54,9 @@ jobs:
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/national.html' > /tmp/national-dom.html
           python3 -c "from pathlib import Path; import json; p=Path('.'); assert len(json.loads((p/'national.json').read_text())) == 13; assert 'Наблюдений:' in Path('/tmp/national-dom.html').read_text()"
           for route in index.html papers.html statistics.html national.html methodology.html links.html diagnostics.html scenario.html atlas.html directory.html laws.html compare.html desk.html week.html 404.html archive/ stats/ model/ papers/; do curl --fail --silent "http://localhost:8765/$route" > /dev/null; done
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=8000 --dump-dom 'http://localhost:8765/historical.html' > /tmp/historical-dom.html
+          python3 -c "from pathlib import Path; s=Path('/tmp/historical-dom.html').read_text(); assert 'обнаруженных официальных файлов' in s and 'Казначейство' in s and 'ЕМИСС' in s"
+          for route in historical.html historical/ regions/ history/ budget/ historical.json; do curl --fail --silent "http://localhost:8765/$route" > /dev/null; done
       - name: Retain validation reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -70,6 +74,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           mkdir -p history/published
           cp monitor/public/*.json history/published/
+          mkdir -p history/published/regional-data
+          cp -a monitor/public/regional-data/. history/published/regional-data/
           git add history/monitor.db history/published
           if ! git diff --cached --quiet; then git commit -m 'Update economic archive'; git push; fi
           git rev-parse HEAD > monitor/public/version.txt
