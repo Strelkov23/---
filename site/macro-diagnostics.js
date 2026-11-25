@@ -38,7 +38,30 @@ const MacroDiagnostics=(()=>{
  function regionalSummary(rows,year,sample,stats){
   const s=sample(rows.filter(r=>r.year===year));return {statistics:stats([...s.out.values()].map(r=>r.value)),excluded:s.excluded,ambiguous:s.ambiguous};
  }
- return {rules,compute,value,formula,snapshot,capacitySummary,regionalSummary};
+ function median(values){
+  if(!values.length)return null;
+  const a=[...values].sort((x,y)=>x-y),mid=Math.floor(a.length/2);return a.length%2?a[mid]:(a[mid-1]+a[mid])/2;
+ }
+ function changeSignals(rows,from,to,window=10,threshold=3.5,minHistory=5){
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from>to||!Number.isInteger(window)||window<minHistory||!Number.isInteger(minHistory)||minHistory<3||!Number.isFinite(threshold)||threshold<=0)throw Error('Некорректное окно сигнала');
+  const by=new Map(),duplicates=new Set();
+  for(const r of rows){if(!Number.isInteger(r.year)||!Number.isFinite(r.value))continue;if(by.has(r.year)||duplicates.has(r.year)){by.delete(r.year);duplicates.add(r.year)}else by.set(r.year,r.value)}
+  const changes=new Map();
+  for(const [y,v] of by)if(by.has(y-1)){const d=v-by.get(y-1);if(Number.isFinite(d))changes.set(y,d)}
+  const out=[];
+  for(let y=from;y<=to;y++){
+   const current=by.get(y)??null,previous=by.get(y-1)??null,delta=changes.get(y)??null,history=[];
+   for(let k=y-window;k<y;k++)if(changes.has(k))history.push({year:k,delta:changes.get(k)});
+   const med=median(history.map(x=>x.delta)),mad=med===null?null:median(history.map(x=>Math.abs(x.delta-med)));
+   const scale=mad===null?null:1.4826*mad;
+   const enough=history.length>=minHistory;
+   const score=delta!==null&&enough&&scale>0?(delta-med)/scale:null,validScore=Number.isFinite(score)?score:null;
+   const status=delta===null?'missing':!enough?'short':scale===0?'constant':validScore===null?'unavailable':Math.abs(validScore)>=threshold?'signal':'ordinary';
+   out.push({year:y,current,previous,delta,history,median:med,mad,score:validScore,status});
+  }
+  return out;
+ }
+ return {rules,compute,value,formula,snapshot,capacitySummary,regionalSummary,changeSignals};
 })();
 if(typeof module!=='undefined')module.exports=MacroDiagnostics;
 
@@ -125,12 +148,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   for(const r of snapshot){const sources=[catalog?.data[r.a]?.source,catalog?.data[r.b]?.source].filter(Boolean).join(' | ')||'WDI: '+r.a+' / '+r.b;add('Макроэкономика',r.title,y,r.current?.value,r.unit,r.current?'одна пара':'нет пары',sources,macro.sha256,r.note)}
   for(const [i,e] of regionData.entries()){
    const meta=regionMeta[i],title=i===0?'ВРП на душу населения: разброс регионов':'Безработица: разброс регионов',s=e?MacroDiagnostics.regionalSummary(e.data.values,y,RegionalStats.sample,RegionalStats.stats):null,v=s?.statistics;
-   card(title,String(y),v?f(v.p90)+' / '+f(v.p10):'Нет данных',v?'P90 / P10 — два уровня в исходных единицах. '+v.n+' непересекающихся территорий.':'Нет проверенной выборки за выбранный год.','historical.html#regional-disparities');
+   card(title,String(y),v?f(v.p90)+' / '+f(v.p10):'Нет данных',v?'P90 / P10 — два уровня; '+meta.unit+'. '+v.n+' непересекающихся территорий.':'Нет проверенной выборки за выбранный год.','historical.html#regional-disparities');
    if(e)for(const [k,label] of [['median','Медиана'],['p10','P10'],['p90','P90'],['ratio','P90 / P10']])add('Регионы',meta.title+' · '+label,y,v?.[k],k==='ratio'?'раз':meta.unit,v?.n??0,meta.source,e.sha256,'Невзвешенная выборка; исключено '+s.excluded+', неоднозначных территорий '+s.ambiguous);
   }
   const c=capital?MacroDiagnostics.capacitySummary(capital.data.capacity,y):null;
   card('Высокая загрузка мощностей',String(y),c?.valid?c.high+' / '+c.valid:'Нет данных','Продукты с использованием среднегодовой мощности ≥90%; не доля всей промышленности.','capital.html');
-  if(c)for(const [label,value] of [['Загрузка не менее 90%',c.valid?c.high:null],['Загрузка менее 50%',c.valid?c.low:null]])add('Мощности',label,y,value,'продуктов',c.valid,'Росстат · документальный снимок capital-data.json',capital.sha256,'Числовых позиций '+c.valid+' из '+c.total+'; пороги описательные');
+  if(c)for(const [label,value] of [['Загрузка не менее 90%',c.valid?c.high:null],['Загрузка менее 50%',c.valid?c.low:null]])add('Мощности',label,y,value,'продуктов',c.valid,capital.data.source||'Росстат · документальный снимок capital-data.json',capital.sha256,'Числовых позиций '+c.valid+' из '+c.total+'; пороги описательные');
   let concentrated=null,eligible=0;
   if(balance){const d=balance.data;if(Array.isArray(d.names)&&Array.isArray(d.flows)&&d.flows.length===d.names.length&&d.flows.every(r=>r.length===d.names.length&&r.every(Number.isFinite))){
    const top=d.names.map((_,i)=>{const vals=d.flows.map(r=>r[i]),total=vals.reduce((a,b)=>a+b,0);return total>0&&vals.every(v=>v>=0)?Math.max(...vals)/total:null}).filter(Number.isFinite);eligible=top.length;concentrated=eligible?top.filter(v=>v>=.5).length:null;
@@ -144,4 +167,45 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   exp.disabled=!rows.length;exp.onclick=()=>csv('economic-diagnostic-overview-'+y+'.csv',[['Направление','Показатель','Год','Значение','Единица','Охват','Источник','SHA-256 JSON','Ограничение','Отпечаток манифеста'],...rows]);
  }
  year.onchange=draw;draw();
+ const sigHost=$('diag-signals-table'),sigChart=$('diag-signals-chart'),sigDetail=$('diag-signals-detail'),sigStatus=$('diag-signals-status'),sigRule=$('diag-signals-rule'),sigYear=$('diag-signals-year'),sigWindow=$('diag-signals-window'),sigThreshold=$('diag-signals-threshold'),sigOnly=$('diag-signals-only'),sigCsv=$('diag-signals-csv');
+ if(!macro){sigStatus.textContent='Нет проверенного файла WDI; расчёт сигналов недоступен.';return}
+ sigRule.replaceChildren(new Option('Все 13 диагностик',''),...MacroDiagnostics.rules.map(r=>new Option(r.title,r.id)));
+ sigYear.replaceChildren(...ys.map(y=>new Option(String(y),String(y))));if(common)sigYear.value=String(common);
+ const labels={missing:'Нет соседней пары',short:'Недостаточно истории',constant:'Нулевой MAD; оценка не определена',unavailable:'Оценка не определена',signal:'Необычное изменение',ordinary:'В пределах порога'};
+ const series=MacroDiagnostics.rules.map(r=>({rule:r,rows:MacroDiagnostics.compute(r,macro.data,1991,2100)}));
+ const signed=v=>Number.isFinite(v)?(v>0?'+':'')+f(v):'—';
+ function renderSignals(){
+  sigHost.replaceChildren();sigChart.replaceChildren();sigDetail.replaceChildren();sigCsv.disabled=true;
+  const y=Number(sigYear.value),window=Number(sigWindow.value),threshold=Number(sigThreshold.value);
+  if(!Number.isInteger(y)||!ys.includes(y))return;
+  const list=series.filter(x=>!sigRule.value||x.rule.id===sigRule.value).map(x=>({...x,point:MacroDiagnostics.changeSignals(x.rows,y,y,window,threshold)[0]}));
+  const ordered=[...list].sort((a,b)=>(Number.isFinite(b.point.score)?Math.abs(b.point.score):-1)-(Number.isFinite(a.point.score)?Math.abs(a.point.score):-1)||a.rule.title.localeCompare(b.rule.title,'ru'));
+  const shown=ordered.filter(x=>!sigOnly.checked||x.point.status==='signal');
+  sigStatus.textContent='Год '+y+' · сигналов '+list.filter(x=>x.point.status==='signal').length+' из '+list.filter(x=>Number.isFinite(x.point.score)).length+' оценённых · без оценки '+list.filter(x=>!Number.isFinite(x.point.score)).length+' · окно '+window+' лет, минимум 5 изменений · порог |z| ≥ '+threshold+'. Это повод проверить исходные данные, не прогноз.';
+  const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+  for(const label of ['Диагностика','Изменение за год','Единица изменения','Медиана истории','MAD','Число изменений','Оценка z','Статус']){const th=node('th',label);th.scope='col';h.append(th)}
+  const deltaUnit=r=>r.unit==='%'?'п. п.':r.unit;
+  function showHistory(x){
+   sigDetail.replaceChildren(node('h4',x.rule.title+' · '+y),node('p',x.rule.note),node('p','Значения: '+f(x.point.previous)+' → '+f(x.point.current)+' '+x.rule.unit+'; изменение '+signed(x.point.delta)+' '+deltaUnit(x.rule)+'.'));
+   const table=node('table',''),header=table.createTHead().insertRow(),b=table.createTBody();
+   for(const label of ['Год изменения','Изменение ('+deltaUnit(x.rule)+')']){const th=node('th',label);th.scope='col';header.append(th)}
+   for(const row of x.point.history){const tr=b.insertRow();tr.insertCell().textContent=row.year;tr.insertCell().textContent=signed(row.delta)}
+   const tr=b.insertRow();tr.insertCell().textContent=y+' (оцениваемый)';tr.insertCell().textContent=signed(x.point.delta);
+   const wrap=node('div','');wrap.className='table-scroll';wrap.append(table);sigDetail.append(wrap);
+   const url=new URL('compare.html',location.href);url.searchParams.set('left',x.rule.a);url.searchParams.set('right',x.rule.b);url.searchParams.set('begin',Math.max(1991,y-window-1));url.searchParams.set('finish',y);sigDetail.append(link('Проверить исходные ряды',url.href));
+  }
+  for(const x of shown){const r=x.rule,v=x.point,tr=body.insertRow(),btn=node('button',r.title);btn.type='button';btn.className='rm-region-link';btn.onclick=()=>showHistory(x);tr.insertCell().append(btn);for(const text of [signed(v.delta),deltaUnit(r),f(v.median),f(v.mad),v.history.length,signed(v.score),labels[v.status]])tr.insertCell().textContent=text;tr.dataset.signalStatus=v.status}
+  sigHost.append(t);
+  const numeric=shown.filter(x=>Number.isFinite(x.point.score)),max=Math.max(threshold,...numeric.map(x=>Math.abs(x.point.score)));
+  const bars=node('div','');bars.className='stress-signed-bars';
+  for(const x of numeric){const row=node('div','');row.className='stress-signed-row';const track=node('div','');track.className='stress-signed-track';const bar=node('div','');bar.className='stress-signed-fill';bar.dataset.sign=x.point.score<0?'negative':'positive';bar.style.width=(50*Math.abs(x.point.score)/max)+'%';track.append(bar);
+   for(const sign of [-1,1]){const marker=node('span','');marker.className='diag-signal-threshold';marker.style.left=(50+sign*50*threshold/max)+'%';track.append(marker)}
+   row.append(node('span',x.rule.title),track,node('strong',signed(x.point.score)));bars.append(row)}
+  if(numeric.length)sigChart.append(node('p','Стандартизированные отклонения. Отметки на шкале — ±'+threshold+'.'),bars);else sigChart.append(node('p','Нет числовых оценок в выбранной выборке.'));
+  if(shown.length)showHistory(shown[0]);
+  sigCsv.disabled=!shown.length;
+  sigCsv.onclick=()=>csv('economic-change-signals-'+y+'.csv',[['Код','Диагностика','Год','Текущее значение','Предыдущее значение','Изменение','Единица изменения','Окно лет','Порог','Число изменений','Медиана','MAD','Оценка z','Статус','Год истории','Изменение истории','Код A','Код B','SHA-256 JSON','Отпечаток манифеста','Ограничение'],...shown.flatMap(({rule:r,point:v})=>(v.history.length?v.history:[{}]).map(k=>[r.id,r.title,y,v.current,v.previous,v.delta,deltaUnit(r),window,threshold,v.history.length,v.median,v.mad,v.score,labels[v.status],k.year,k.delta,r.a,r.b,macro.sha256,m.data_fingerprint,r.note]))]);
+ }
+ for(const el of [sigRule,sigYear,sigWindow,sigThreshold,sigOnly])el.onchange=renderSignals;
+ renderSignals();
 });

@@ -31,6 +31,13 @@ with sync_playwright() as p:
         with page.expect_download() as overview:
             page.locator("#diag-overview-export").click()
         assert overview.value.suggested_filename.startswith("economic-diagnostic-overview-")
+        page.wait_for_function("document.querySelectorAll('#diag-signals-table tbody tr').length===13",timeout=30000)
+        page.locator("#diag-signals-rule").select_option("manufacturing")
+        assert page.locator("#diag-signals-table tbody tr").count()==1
+        with page.expect_download() as signal:
+            page.locator("#diag-signals-csv").click()
+        assert signal.value.suggested_filename.startswith("economic-change-signals-")
+        page.locator("#diag-signals-rule").select_option("")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
