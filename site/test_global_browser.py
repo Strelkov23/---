@@ -134,6 +134,25 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-register.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pr-series option').length>0",timeout=45000)
+        page.locator("#pr-name").fill("Проверка плана")
+        page.locator("#pr-note").fill("Сценарное допущение")
+        year=int(page.locator("#pr-base").input_value())
+        page.locator("#pr-end-year").fill(str(year+2))
+        page.locator("#pr-end-value").fill("5")
+        page.locator("#pr-save").click()
+        assert page.locator("#pr-result tbody tr").count()==2
+        page.locator("#pr-revise").click()
+        page.locator("#pr-end-value").fill("6")
+        page.locator("#pr-save").click()
+        assert page.locator("#pr-pick option").count()==2
+        with page.expect_download() as plan:
+            page.locator("#pr-csv").click()
+        with open(plan.value.path(),encoding="utf-8-sig",newline="") as f:
+            plan_rows=list(csv.reader(f,delimiter=";"))
+        assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/territorial-plan.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#tp-controls tbody input').length>0",timeout=45000)
         page.locator("#tp-target").fill("0")

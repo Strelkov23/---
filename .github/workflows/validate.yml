@@ -1,7 +1,7 @@
 name: Economic code checks
 on:
   push:
-    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon, stage-d-cost-decomposition, stage-d-territorial, stage-d-final-acceptance]
+    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon, stage-d-cost-decomposition, stage-d-territorial, stage-d-final-acceptance, stage-e-plan-register]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:
@@ -55,6 +55,7 @@ jobs:
           node test-reproduction-plan.js
           node test-resource-plan.js
           node test-plan-feasibility.js
+          node test-plan-register.js
           node test-horizon-feasibility.js
           node test-dynamic-plan.js
           node test-global-plan.js
