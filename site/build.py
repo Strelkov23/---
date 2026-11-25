@@ -250,6 +250,8 @@ data_registry.publish(page,out,m.now())
 
 import atlas
 atlas.publish(page, out)
+import balance_audit
+balance_audit.publish(page,out)
 page('machinery.html',Path('machinery.html').read_text())
 
 import bulletin
