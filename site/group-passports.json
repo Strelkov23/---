@@ -3260,6 +3260,769 @@
           ]
         }
       ]
+    },
+    {
+      "id": "yandex",
+      "name": "Яндекс",
+      "sector": "Цифровые платформы и IT",
+      "role": "Поисковые и рекламные сервисы, электронная коммерция, транспортные и облачные технологии.",
+      "source": "https://ir.yandex.ru/financial-releases?report=q4&year=2025",
+      "section": "Релиз от 17.02.2026: ключевые показатели бизнеса, консолидированные результаты, сокращённые баланс и ОДДС",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Неаудированный годовой релиз, суммы округлены до 0,1 млрд руб. Скорректированная EBITDA и прибыль не являются показателями МСФО; возможны округлительные расхождения частей баланса. До проверки полного комплекта отчётности исключён из автоматического межгруппового сопоставления.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1094.6"
+            },
+            {
+              "year": 2025,
+              "value": "1441.1"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "51.5"
+            },
+            {
+              "year": 2025,
+              "value": "173.6"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Чистая прибыль",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "11.5"
+            },
+            {
+              "year": 2025,
+              "value": "79.6"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_ebitda",
+          "label": "Скорректированная EBITDA",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "188.6"
+            },
+            {
+              "year": 2025,
+              "value": "280.8"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_profit",
+          "label": "Скорректированная чистая прибыль",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "100.9"
+            },
+            {
+              "year": 2025,
+              "value": "141.4"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1098.7"
+            },
+            {
+              "year": 2025,
+              "value": "1368.3"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Собственный капитал",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "293.8"
+            },
+            {
+              "year": 2025,
+              "value": "351.2"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "804.9"
+            },
+            {
+              "year": 2025,
+              "value": "1017.1"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "230.1"
+            },
+            {
+              "year": 2025,
+              "value": "331.2"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Оборотные активы",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "506.7"
+            },
+            {
+              "year": 2025,
+              "value": "589.2"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_assets",
+          "label": "Внеоборотные активы",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "592"
+            },
+            {
+              "year": 2025,
+              "value": "779.1"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Краткосрочные обязательства",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "611.6"
+            },
+            {
+              "year": 2025,
+              "value": "722.6"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_liabilities",
+          "label": "Долгосрочные обязательства",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "193.3"
+            },
+            {
+              "year": 2025,
+              "value": "294.6"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты (как в таблице релиза)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "211.6"
+            },
+            {
+              "year": 2025,
+              "value": "250.2"
+            }
+          ]
+        },
+        {
+          "id": "inventories",
+          "label": "Запасы",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "30.9"
+            },
+            {
+              "year": 2025,
+              "value": "33.2"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый операционный денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "203.2"
+            },
+            {
+              "year": 2025,
+              "value": "282.3"
+            }
+          ]
+        },
+        {
+          "id": "investment_cash_flow",
+          "label": "Чистый инвестиционный денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-140"
+            },
+            {
+              "year": 2025,
+              "value": "-174.5"
+            }
+          ]
+        },
+        {
+          "id": "financing_cash_flow",
+          "label": "Чистый финансовый денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "64"
+            },
+            {
+              "year": 2025,
+              "value": "-58.9"
+            }
+          ]
+        },
+        {
+          "id": "ppe_intangible_purchases",
+          "label": "Приобретение основных и нематериальных активов (отток)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-124.6"
+            },
+            {
+              "year": 2025,
+              "value": "-145.9"
+            }
+          ]
+        },
+        {
+          "id": "dividends_paid",
+          "label": "Выплаченные дивиденды (отток)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-29.2"
+            },
+            {
+              "year": 2025,
+              "value": "-60.5"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_ebitda_margin",
+          "label": "Рентабельность скорректированной EBITDA",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "17.2"
+            },
+            {
+              "year": 2025,
+              "value": "19.5"
+            }
+          ]
+        },
+        {
+          "id": "staff_core",
+          "label": "Основной персонал на конец года",
+          "unit": "тыс. чел.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "28.992"
+            },
+            {
+              "year": 2025,
+              "value": "31.537"
+            }
+          ]
+        },
+        {
+          "id": "staff_total",
+          "label": "Общий персонал на конец года",
+          "unit": "тыс. чел.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "96.552"
+            },
+            {
+              "year": 2025,
+              "value": "95.024"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ozon",
+      "name": "Ozon",
+      "sector": "Цифровые платформы и IT",
+      "role": "Электронная коммерция, логистика и финансовые сервисы.",
+      "source": "https://ir.ozon.com/ru/sth/ozon-obyavlyaet-finansovye-rezultaty-za-chetvertyy-kvartal-2025-goda-i-2025-god-18833bbf",
+      "section": "Годовой релиз за 2025 год: основные финансовые и операционные показатели, выручка, себестоимость, операционные расходы",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Неаудированный релиз; данные 2024 г. приведены в реклассифицированном виде по релизу 2025 г. GMV не выручка; скорректированная EBITDA не показатель МСФО. Число клиентов Финтеха и покупателей — операционные показатели, не складываются. До проверки аудированной отчётности исключён из автоматических межгрупповых сравнений.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка (2024 реклассифицирован)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "613324"
+            },
+            {
+              "year": 2025,
+              "value": "997989"
+            }
+          ]
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "99885"
+            },
+            {
+              "year": 2025,
+              "value": "230134"
+            }
+          ]
+        },
+        {
+          "id": "cost_of_sales",
+          "label": "Себестоимость (расход)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-513439"
+            },
+            {
+              "year": 2025,
+              "value": "-767855"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль / убыток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-9508"
+            },
+            {
+              "year": 2025,
+              "value": "71370"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль / убыток до налогообложения",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-55150"
+            },
+            {
+              "year": 2025,
+              "value": "6775"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль / убыток за год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-59442"
+            },
+            {
+              "year": 2025,
+              "value": "-938"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_ebitda",
+          "label": "Скорректированная EBITDA",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "40079"
+            },
+            {
+              "year": 2025,
+              "value": "156381"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый операционный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "286283"
+            },
+            {
+              "year": 2025,
+              "value": "503629"
+            }
+          ]
+        },
+        {
+          "id": "gmv",
+          "label": "GMV с учётом услуг (не выручка)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2874673"
+            },
+            {
+              "year": 2025,
+              "value": "4163088"
+            }
+          ]
+        },
+        {
+          "id": "services_revenue",
+          "label": "Выручка от услуг",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "366508"
+            },
+            {
+              "year": 2025,
+              "value": "611052"
+            }
+          ]
+        },
+        {
+          "id": "goods_sales_revenue",
+          "label": "Выручка от продажи товаров",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "195420"
+            },
+            {
+              "year": 2025,
+              "value": "262913"
+            }
+          ]
+        },
+        {
+          "id": "interest_revenue",
+          "label": "Процентная выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "51396"
+            },
+            {
+              "year": 2025,
+              "value": "124024"
+            }
+          ]
+        },
+        {
+          "id": "goods_cost",
+          "label": "Себестоимость товаров и связанные расходы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-182463"
+            },
+            {
+              "year": 2025,
+              "value": "-250341"
+            }
+          ]
+        },
+        {
+          "id": "marketplace_cost",
+          "label": "Себестоимость услуг маркетплейса",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-301130"
+            },
+            {
+              "year": 2025,
+              "value": "-431027"
+            }
+          ]
+        },
+        {
+          "id": "fintech_cost",
+          "label": "Себестоимость выручки Финтеха",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-29846"
+            },
+            {
+              "year": 2025,
+              "value": "-86487"
+            }
+          ]
+        },
+        {
+          "id": "operating_expenses",
+          "label": "Операционные расходы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-115656"
+            },
+            {
+              "year": 2025,
+              "value": "-158722"
+            }
+          ]
+        },
+        {
+          "id": "sales_marketing_expenses",
+          "label": "Продажи и маркетинг (расход)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-49289"
+            },
+            {
+              "year": 2025,
+              "value": "-59241"
+            }
+          ]
+        },
+        {
+          "id": "technology_content_expenses",
+          "label": "Технологии и контент (расход)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-39123"
+            },
+            {
+              "year": 2025,
+              "value": "-55609"
+            }
+          ]
+        },
+        {
+          "id": "administrative_expenses",
+          "label": "Общие и административные расходы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-21338"
+            },
+            {
+              "year": 2025,
+              "value": "-31799"
+            }
+          ]
+        },
+        {
+          "id": "fintech_credit_losses",
+          "label": "Ожидаемые кредитные убытки Финтеха",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-5906"
+            },
+            {
+              "year": 2025,
+              "value": "-12073"
+            }
+          ]
+        },
+        {
+          "id": "fire_net",
+          "label": "Убытки и страховые возмещения от пожара, нетто",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "6263"
+            },
+            {
+              "year": 2025,
+              "value": "-535"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_ebitda_gmv_share",
+          "label": "Скорректированная EBITDA / GMV с услугами",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1.4"
+            },
+            {
+              "year": 2025,
+              "value": "3.8"
+            }
+          ]
+        },
+        {
+          "id": "marketplace_gmv_share",
+          "label": "Доля маркетплейса в GMV",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "85.4"
+            },
+            {
+              "year": 2025,
+              "value": "83.8"
+            }
+          ]
+        },
+        {
+          "id": "orders",
+          "label": "Количество заказов",
+          "unit": "млн шт.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1471"
+            },
+            {
+              "year": 2025,
+              "value": "2481"
+            }
+          ]
+        },
+        {
+          "id": "active_buyers",
+          "label": "Активные покупатели",
+          "unit": "млн чел.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "56.5"
+            },
+            {
+              "year": 2025,
+              "value": "65.1"
+            }
+          ]
+        },
+        {
+          "id": "fintech_active_clients",
+          "label": "Активные клиенты Финтеха",
+          "unit": "млн чел.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "30.3"
+            },
+            {
+              "year": 2025,
+              "value": "41.7"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
