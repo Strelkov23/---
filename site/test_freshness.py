@@ -42,3 +42,21 @@ class FreshnessTests(unittest.TestCase):
         self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-25"),now),f.dt("2026-12-25"))
         self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-24"),now),f.dt("2026-12-02"))
         self.assertEqual(f.workbook_next(dict(checked="2026-11-25",success="2026-11-25",attempt_url="old",catalogue_url="new"),now),now)
+
+    def test_bank_progress(self):
+        old="2026-11-24T12:00:00+00:00";now="2026-11-25T13:00:00+00:00"
+        d=dict(checked=now,target_cohort=["1","2","3"],rows=[
+            dict(registration_number="1",verification="html"),
+            dict(registration_number="2",verification="documentary"),
+            dict(registration_number="9",verification="html")],
+            attempts={"1":dict(checked=old,error=None),"2":dict(checked=now,error="нет")})
+        r=f.bank_progress(d,True)
+        self.assertEqual(r["state"],"partial")
+        self.assertEqual(r["checked"],now)
+        self.assertEqual(r["success"],old)
+        self.assertIn("1 из 3",r["status"])
+        self.assertIsNone(f.bank_progress(dict(d,attempts={}),True)["success"])
+        self.assertEqual(f.bank_progress({})["state"],"waiting")
+        self.assertEqual(f.bank_progress(dict(checked=now,rows=[]))["state"],"unavailable")
+        self.assertEqual(f.bank_progress(dict(cohort=["1"],rows=[dict(registration_number="1")]))["state"],"ok")
+        self.assertEqual(f.iso(f.next_run(f.dt(now),f.dt(now).replace(hour=0,minute=0)+timedelta(days=1))),"2026-11-26T03:17:00+00:00")
