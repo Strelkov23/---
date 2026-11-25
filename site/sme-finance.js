@@ -18,7 +18,21 @@ const SmeFinance=(()=>{
   const known=rows.filter(r=>r.value!==null);
   return {total,matched,observations,coverage:total?100*observations/total:null,known:known.length,sum:known.length?known.reduce((a,r)=>a+BigInt(r.value),0n).toString():null};
  }
- return {compare,fmt,select,summary};
+ function graph(rows,limit=12){
+  if(!Number.isInteger(limit)||limit<1||limit>100)throw Error('Лимит графика');
+  const shown=rows.slice(0,limit),abs=n=>n<0n?-n:n;
+  const max=shown.reduce((a,r)=>r.value===null?a:abs(BigInt(r.value))>a?abs(BigInt(r.value)):a,0n);
+  const signed=shown.some(r=>r.value!==null&&BigInt(r.value)<0n);
+  return {signed,max:max.toString(),rows:shown.map(r=>{
+   const n=r.value===null?null:BigInt(r.value),width=n===null||max===0n?0:Number(abs(n)*1000000n/max)/10000*(signed?.5:1);
+   const zero=signed?50:0;
+   return {...r,width,left:n!==null&&n<0n?zero-width:zero,negative:n!==null&&n<0n,
+    observed:r.sme_total?100*r.observations/r.sme_total:null,
+    matchedMissing:r.sme_total?100*(r.matched-r.observations)/r.sme_total:null,
+    unmatched:r.sme_total?100*(r.sme_total-r.matched)/r.sme_total:null};
+  })};
+ }
+ return {compare,fmt,select,summary,graph};
 })();
 if(typeof module!=='undefined')module.exports=SmeFinance;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -37,12 +51,36 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
      const card=node('div','');card.className='metric';card.append(node('b',v),node('span',label));overview.append(card);
     }
    }
+   const chart=$('sme-finance-chart'),limit=$('sme-finance-chart-limit');
+   if(chart){
+    const g=SmeFinance.graph(rows,Number(limit?.value||12)),pct=v=>v===null?'—':v.toLocaleString('ru',{maximumFractionDigits:2})+' %';
+    chart.replaceChildren(node('p','На графике: '+g.rows.length+' из '+rows.length+' территорий в порядке выбранной сортировки. '+(g.signed?'Нулевая ось в центре. ':'')+'Масштаб сумм общий для показанных территорий.'));
+    if(!g.rows.length)chart.append(node('p','Нет данных для отображения.'));
+    for(const r of g.rows){
+     const item=node('div','');item.className='sme-finance-graph-row';
+     item.append(node('h4',names.get(r.region)||r.region));
+     const sum=node('div','');sum.className='sme-finance-graph-line';sum.append(node('span','Сумма'),node('strong',SmeFinance.fmt(r.value,metric.value)+' '+(r.value===null?'':unit)));
+     if(r.value!==null){
+      const track=node('div','');track.className='group-signed-track';track.setAttribute('aria-hidden','true');
+      const fill=node('div','');fill.className='group-signed-fill'+(r.negative?' negative':'');fill.style.left=r.left+'%';fill.style.width=r.width+'%';track.append(fill);
+      if(g.signed){const axis=node('div','');axis.className='group-signed-zero';axis.style.left='50%';track.append(axis)}
+      item.append(sum,track);
+     }else item.append(sum,node('p','Нет наблюдаемой суммы'));
+     const cover=node('div','');cover.className='sme-finance-graph-line';cover.append(node('span','Охват показателя'),node('strong',pct(r.observed)));item.append(cover);
+     if(r.observed!==null){
+      const stack=node('div','');stack.className='sme-finance-stack';stack.setAttribute('aria-hidden','true');
+      for(const [key,value] of [['observed',r.observed],['missing',r.matchedMissing],['unmatched',r.unmatched]]){const part=node('span','');part.className='sme-finance-'+key;part.style.flexBasis=value+'%';stack.append(part)}
+      item.append(stack,node('p','Есть показатель: '+r.observations.toLocaleString('ru')+' · Совпали без показателя: '+(r.matched-r.observations).toLocaleString('ru')+' · Не совпали: '+(r.sme_total-r.matched).toLocaleString('ru')));
+     }else item.append(node('p','Нет знаменателя для расчёта охвата.'));
+     chart.append(item);
+    }
+   }
    status.textContent='Финансовый год: '+d.financial_year+' · классификация: '+d.sme_edition+' · '+d.eligible_regions+' территорий в диагностике. Данные только по совпавшим ИНН; не итог отрасли.';
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
    for(const v of ['Регион','ЮЛ МСП','Совпали по ИНН','Есть показатель','Охват, %','Сумма, '+unit]){const th=node('th',v);th.scope='col';h.append(th)}
    for(const r of rows){const tr=b.insertRow();for(const v of [names.get(r.region)||r.region,r.sme_total.toLocaleString('ru'),r.matched.toLocaleString('ru'),r.observations.toLocaleString('ru'),r.coverage===null?'—':r.coverage.toLocaleString('ru',{maximumFractionDigits:2}),SmeFinance.fmt(r.value,metric.value)])tr.insertCell().textContent=v}
    table.replaceChildren(t);if(!rows.length)table.append(node('p','Нет территорий, соответствующих выбранному порогу охвата.'));exp.disabled=!rows.length;exp.onclick=()=>csv('sme-finance-'+cls.value+'.csv',[['Год финансов','Дата МСП','Тип кода','Класс','Регион','ЮЛ','Совпали','Есть показатель','Охват, %','Показатель','Сумма в копейках или людях','Отпечаток финансового индекса','SHA-256 МСП','SHA-256 сверки','Минимальный охват, %','Сортировка'],...rows.map(r=>[d.financial_year,d.sme_edition,kind.value,cls.value,r.region,r.sme_total,r.matched,r.observations,r.coverage,metric.value,r.value,d.financial_fingerprint,d.sme_archive_sha256,d.reference_sha256,min,sort])]);
   }
-  kind.disabled=cls.disabled=metric.disabled=false;kind.onchange=options;cls.onchange=metric.onchange=draw;for(const el of [threshold,order])if(el){el.disabled=false;el.onchange=draw;}options();
+  kind.disabled=cls.disabled=metric.disabled=false;kind.onchange=options;cls.onchange=metric.onchange=draw;for(const el of [threshold,order,$('sme-finance-chart-limit')])if(el){el.disabled=false;el.onchange=draw;}options();
  }catch(e){status.textContent='Диагностика недоступна: '+String(e.message||e)}
 });
