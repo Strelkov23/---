@@ -310,6 +310,15 @@ with sync_playwright() as p:
             coverage=list(csv.reader(f,delimiter=";"))
         assert len(coverage)==len(groups["groups"])+1
         assert len({len(r) for r in coverage})==1
+        page.wait_for_function("!document.querySelector('#group-level-export').disabled",timeout=30000)
+        page.locator("#group-level-metric").select_option("assets")
+        assert page.locator("#group-level-table tbody tr").count()==len(groups["groups"])
+        with page.expect_download() as level_csv:
+            page.locator("#group-level-export").click()
+        assert level_csv.value.suggested_filename.startswith("group-levels-assets-")
+        with open(level_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+            level_rows=list(csv.reader(f,delimiter=";"))
+        assert len(level_rows)==len(groups["groups"])+1 and len({len(r) for r in level_rows})==1
         page.locator("#group-cross-metric").select_option("equity_share")
         assert page.locator("#group-cross-table tbody tr").count()==len(groups["groups"])
         if any(g["id"]=="nlmk" for g in groups["groups"]):
