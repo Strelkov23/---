@@ -227,3 +227,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #diag-signals-table table{min-width:920px}#diag-signals-table td{overflow-wrap:anywhere}#diag-signals-table tr[data-signal-status=signal] td:last-child{background:#f2dfcd;color:#6d381d;font-weight:650}.diag-signal-threshold{position:absolute;top:-3px;height:20px;border-left:1px dashed #52696e;z-index:1}#diag-signals label{min-width:0;max-width:100%;grid-template-columns:minmax(0,1fr)}#diag-signals select{width:100%;min-width:0;max-width:100%}
 
 #gd-sig-table table{min-width:1020px}#gd-sig-table td{overflow-wrap:anywhere}#gd-sig-table tr[data-signal-status=signal] td:last-child{background:#f2dfcd;color:#6d381d;font-weight:650}#gd-signals select{width:100%;min-width:0;max-width:100%}#gd-signals label{min-width:0;max-width:100%}
+
+#gd-sig-map{max-width:100%;overflow-x:auto}#gd-sig-map svg{min-width:850px;max-width:none}#gd-sig-map path[role=button]{cursor:pointer}#gd-sig-map path[role=button]:hover,#gd-sig-map path[role=button]:focus-visible,#gd-sig-map path[data-selected]{stroke:#173e52;stroke-width:2.5;outline:none}

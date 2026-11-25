@@ -350,11 +350,16 @@ with sync_playwright() as p:
                 page.locator("#geo-compare-export").click()
             assert comparison.value.suggested_filename.startswith("regional-comparison-")
             page.locator("#geo-comparison summary").click()
-            page.locator("#geo-dashboard summary").click()
+            page.locator("#geo-dashboard > summary").click()
             page.wait_for_function("document.querySelector('#gd-status').textContent.startsWith('Год:')",timeout=45000)
             assert page.locator("#gd-table tbody tr").count()>70
             page.locator("#gd-signals summary").click()
             page.wait_for_function("document.querySelectorAll('#gd-sig-table tbody tr').length>70",timeout=30000)
+            page.wait_for_function("document.querySelectorAll('#gd-sig-map path[data-signal-category]').length>70",timeout=30000)
+            assert page.locator("#gd-sig-map path[data-signal-category=unmatched]").count()>0
+            with page.expect_download() as signalmap:
+                page.locator("#gd-sig-map-export").click()
+            assert signalmap.value.suggested_filename.endswith(".svg")
             page.locator("#gd-sig-query").fill("RU-MOW")
             assert page.locator("#gd-sig-table tbody tr").count()==1
             with page.expect_download() as regional_signal:
@@ -389,7 +394,7 @@ with sync_playwright() as p:
             with page.expect_download() as gd:
                 page.locator("#gd-export").click()
             assert gd.value.suggested_filename.startswith("regional-multivariate-")
-            page.locator("#geo-dashboard summary").click()
+            page.locator("#geo-dashboard > summary").click()
             page.locator("#geo-scale").select_option("growth")
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0

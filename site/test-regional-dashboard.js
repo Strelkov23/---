@@ -37,3 +37,6 @@ assert.equal(D.scope({note:'missing'}),null);
 const rel=D.regionalSignals({values:hist},opts.slice(0,1),2017,10,3.5,'relative',S.sample,M.assessChange)[0];
 assert.ok(Math.abs(rel.delta-100*(121/21-1))<1e-9);
 assert.equal(rel.history.length,5);
+
+assert.equal(D.signalClass({score:4,status:'signal'}),'above');assert.equal(D.signalClass({score:-4,status:'signal'}),'below');assert.equal(D.signalClass({score:1,status:'ordinary'}),'ordinary');assert.equal(D.signalClass({score:null}),'missing');
+const geo=['A','B','B','C','D'].map(iso_3166_2=>({properties:{iso_3166_2}}));const mapped=D.mapSignals(geo,[{key:'A',score:4,status:'signal'},{key:'B',score:-4,status:'signal'},{key:'C',score:null}],id=>id==='D'?null:id);assert.deepEqual(mapped.map(x=>x.category),['above','unmatched','unmatched','missing','unmatched']);

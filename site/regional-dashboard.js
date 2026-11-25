@@ -73,7 +73,16 @@ const RegionalDashboard=(()=>{
    return {...o,current,previous,delta,history,...assessment,reason};
   });
  }
- return {specs,matches,summarize,common,matrixRows,percentile,pair,scope,regionalSignals};
+ function signalClass(r){
+  return !Number.isFinite(r?.score)?'missing':r.status!=='signal'?'ordinary':r.score>0?'above':'below';
+ }
+ function mapSignals(features,rows,key){
+  const counts=new Map(),by=new Map(),duplicates=new Set();
+  for(const f of features){const id=key(f.properties?.iso_3166_2);if(id)counts.set(id,(counts.get(id)||0)+1)}
+  for(const r of rows){if(by.has(r.key)||duplicates.has(r.key)){by.delete(r.key);duplicates.add(r.key)}else by.set(r.key,r)}
+  return features.map(f=>{const id=key(f.properties?.iso_3166_2),eligible=!!id&&counts.get(id)===1,r=eligible?by.get(id)||null:null;return {feature:f,row:r,category:eligible?signalClass(r):'unmatched'}});
+ }
+ return {specs,matches,summarize,common,matrixRows,percentile,pair,scope,regionalSignals,signalClass,mapSignals};
 })();
 if(typeof module!=='undefined')module.exports=RegionalDashboard;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -107,6 +116,41 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    pairA.value='1';pairB.value='5';
    for(let i=0;i<picks.length;i++){picks[i].replaceChildren(new Option('Не выбран',''),...options.map(o=>new Option(o.name,optionId(o))));picks[i].value=['RU-MOW','RU-SVE',''][i]}
    const signalPanel=$('gd-signals'),sigPick=$('gd-sig-indicator'),sigYear=$('gd-sig-year'),sigWindow=$('gd-sig-window'),sigThreshold=$('gd-sig-threshold'),sigOnly=$('gd-sig-only'),sigQuery=$('gd-sig-query'),sigStatus=$('gd-sig-status'),sigTable=$('gd-sig-table'),sigDetail=$('gd-sig-detail'),sigCsv=$('gd-sig-csv');
+   const sigMap=$('gd-sig-map'),sigMapStatus=$('gd-sig-map-status'),sigMapFilter=$('gd-sig-map-filter'),sigMapExport=$('gd-sig-map-export');
+   let geoPromise=null,renderToken=0;
+   const colors={above:'#22769a',below:'#ad6439',ordinary:'#e0e8e9',missing:'#b9b9bd',unmatched:'#f3f1ed'};
+   async function drawSignalMap(rows,x,y,w,threshold,detail){
+    const token=++renderToken;sigMap.replaceChildren();sigMapExport.disabled=true;sigMapStatus.textContent='Проверка геометрии…';
+    try{
+     if(!geoPromise)geoPromise=Provenance.get(manifest,'regional-boundaries.geojson',root).then(({data})=>{
+      if(!Array.isArray(data.features))throw Error('Нет контуров');
+      const polygons=data.features.map(feature=>({feature,rings:RegionalMap.rings(feature.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
+      let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+      for(const x of polygons)for(const ring of x.rings)for(const [u,v] of ring){xmin=Math.min(xmin,u);xmax=Math.max(xmax,u);ymin=Math.min(ymin,v);ymax=Math.max(ymax,v)}
+      if(![xmin,xmax,ymin,ymax].every(Number.isFinite)||xmin===xmax||ymin===ymax)throw Error('Некорректная геометрия');
+      const scale=Math.min(1050/(xmax-xmin),475/(ymax-ymin)),X=v=>40+(1050-scale*(xmax-xmin))/2+(v-xmin)*scale,Y=v=>85+(475-scale*(ymax-ymin))/2+(v-ymin)*scale;
+      return polygons.map(p=>({feature:p.feature,d:p.rings.map(r=>r.map((v,i)=>(i?'L':'M')+X(v[0]).toFixed(2)+' '+Y(v[1]).toFixed(2)).join(' ')+' Z').join(' ')})).filter(p=>p.d);
+     }).catch(e=>{geoPromise=null;throw e});
+     const polygons=await geoPromise;if(token!==renderToken||!signalPanel.open)return;
+     const mapped=RegionalDashboard.mapSignals(polygons.map(p=>p.feature),rows,RegionalMap.key),filter=sigMapFilter.value,counts={above:0,below:0,ordinary:0,missing:0,unmatched:0};
+     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');for(const [k,v] of Object.entries({xmlns:ns,viewBox:'0 0 1130 630',width:1130,role:'group','aria-label':'Исторические отклонения регионов, '+y}))svg.setAttribute(k,v);
+     const add=(tag,attrs,text,parent=svg)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;parent.append(e);return e};
+     add('rect',{width:1130,height:630,fill:'#fff'});add('text',{x:25,y:28,'font-size':19,'font-weight':'bold',fill:'#173e52'},'Исторические отклонения · '+y);
+     chartFitLabel(add('text',{x:25,y:52,'font-size':14,fill:'#405960'},x.spec[2]+' · окно '+w+' лет · |z| ≥ '+threshold),1080);
+     add('text',{x:25,y:72,'font-size':12,fill:'#405960'},'Синий — выше исторической медианы; охра — ниже. Не оценка благополучия.');
+     for(const [i,item] of mapped.entries()){
+      counts[item.category]++;const {feature,row,category}=item,iso=feature.properties?.iso_3166_2||'',name=row?.name||RegionalMap.displayName(iso,feature.properties?.name),visible=filter==='all'||category===filter;
+      const el=add('path',{d:polygons[i].d,fill:visible?colors[category]:'#f3f1ed',stroke:'#667a81','stroke-width':.8,'fill-rule':'evenodd','data-signal-iso':iso,'data-signal-category':category,...(row?{tabindex:0,role:'button','aria-label':name+' · z: '+textNum(row.score)}:{})});
+      add('title',{},name+' · '+(row?'z: '+textNum(row.score)+' · изменение: '+textNum(row.delta):'Нет однозначного соответствия статистике'),el);
+      if(row){const choose=()=>{for(const p of svg.querySelectorAll('[data-selected]'))p.removeAttribute('data-selected');el.setAttribute('data-selected','');detail(row);sigDetail.scrollIntoView({block:'nearest'})};el.addEventListener('click',choose);el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}})}
+     }
+     const labels=[['above','Выше медианы'],['below','Ниже медианы'],['ordinary','В пределах порога'],['missing','Нет оценки'],['unmatched','Несопоставимый контур']];
+     labels.forEach(([key,label],i)=>{const px=25+i*218;add('rect',{x:px,y:585,width:16,height:16,fill:colors[key],stroke:'#667a81'});add('text',{x:px+22,y:598,'font-size':12,fill:'#173e52'},label+' ('+counts[key]+')')});
+     add('text',{x:25,y:620,'font-size':11,fill:'#405960'},'Справочные границы Natural Earth. Таблица включает также территории без однозначной геометрии.');
+     sigMap.append(svg);sigMapStatus.textContent='Контуров: '+mapped.length+' · выше медианы: '+counts.above+' · ниже: '+counts.below+' · обычные: '+counts.ordinary+' · без оценки: '+counts.missing+' · несопоставимые: '+counts.unmatched+'. Фильтр карты не меняет статистический расчёт.';
+     sigMapExport.disabled=false;sigMapExport.onclick=()=>{const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob),a=node('a','');a.href=url;a.download='regional-signals-'+x.spec[1]+'-'+y+'.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)};
+    }catch(e){if(token===renderToken)sigMapStatus.textContent='Карта недоступна: '+String(e.message||e)+'; используйте таблицу.'}
+   }
    sigPick.replaceChildren(...all.map((x,i)=>new Option(short[i]+(x.data?'':' (нет ряда)'),String(i))));sigPick.value='5';
    const signalLabels={missing:'Нет сопоставимого изменения',short:'Недостаточно истории',constant:'Нулевой MAD',unavailable:'Оценка отсутствует',signal:'Необычное изменение',ordinary:'В пределах порога'};
    function syncSignalYears(){
@@ -115,7 +159,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    }
    function drawSignals(){
     if(!signalPanel.open)return;
-    sigTable.replaceChildren();sigDetail.replaceChildren();sigCsv.disabled=true;
+    ++renderToken;sigMap.replaceChildren();sigMapExport.disabled=true;sigMapStatus.textContent='';sigTable.replaceChildren();sigDetail.replaceChildren();sigCsv.disabled=true;
     const i=Number(sigPick.value),x=all[i],y=Number(sigYear.value),w=Number(sigWindow.value),threshold=Number(sigThreshold.value),mode=[5,7].includes(i)?'points':'relative',unit=mode==='points'?'п. п.':'%',q=sigQuery.value.trim().toLocaleLowerCase('ru');
     if(!x?.data||!y){sigStatus.textContent='Нет проверенного ряда.';return}
     const rows=RegionalDashboard.regionalSignals(x.data,options,y,w,threshold,mode,RegionalStats.sample,MacroDiagnostics.assessChange);
@@ -134,10 +178,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
      for(const v of [textNum(r.previous?.value),textNum(r.current?.value),signed(r.delta),textNum(r.median),textNum(r.mad),r.history.length,signed(r.score),r.reason||signalLabels[r.status]])tr.insertCell().textContent=v;
      tr.dataset.signalStatus=r.status;
     }
-    sigTable.append(t);if(shown.length)detail(shown[0]);sigCsv.disabled=!shown.length;
+    sigTable.append(t);if(shown.length)detail(shown[0]);sigCsv.disabled=!shown.length;drawSignalMap(rows,x,y,w,threshold,detail);
     sigCsv.onclick=()=>csv('regional-change-signals-'+x.spec[1]+'-'+y+'.csv',[['Регион','ISO','Код','Год оценки','Единица ряда','Единица изменения','Окно','Порог','Оценка z','Медиана','MAD','Число изменений','Статус','Год пары','Предыдущее значение','Текущее значение','Изменение','Лист предыдущий','Строка предыдущая','Столбец предыдущий','Примечание предыдущее','Лист текущий','Строка текущая','Столбец текущий','Примечание текущее','Источник','SHA-256 JSON','Отпечаток манифеста'],...shown.flatMap(r=>[...r.history,{year:y,previous:r.previous,current:r.current,delta:r.delta}].map(k=>[r.name,r.iso,x.spec[1],y,x.spec[3],unit,w,threshold,r.score,r.median,r.mad,r.history.length,r.reason||signalLabels[r.status],k.year,k.previous?.value,k.current?.value,k.delta,k.previous?.sheet,k.previous?.row,k.previous?.column,k.previous?.note,k.current?.sheet,k.current?.row,k.current?.column,k.current?.note,x.meta.source,manifest.files[x.meta.file]?.sha256,manifest.data_fingerprint]))]);
    }
-   sigPick.onchange=syncSignalYears;for(const el of [sigYear,sigWindow,sigThreshold,sigOnly])el.onchange=drawSignals;sigQuery.oninput=drawSignals;signalPanel.addEventListener('toggle',()=>{if(signalPanel.open)syncSignalYears()});if(signalPanel.open)syncSignalYears();
+   sigPick.onchange=syncSignalYears;for(const el of [sigYear,sigWindow,sigThreshold,sigOnly,sigMapFilter])el.onchange=drawSignals;sigQuery.oninput=drawSignals;signalPanel.addEventListener('toggle',()=>{if(signalPanel.open)syncSignalYears()});if(signalPanel.open)syncSignalYears();
    function draw(){
     host.replaceChildren();exp.disabled=true;wide.disabled=true;
     const matrix=mode.value==='all',y=Number(year.value),selected=matrix?options:[...new Set(picks.map(p=>p.value).filter(Boolean))].map(id=>options.find(o=>optionId(o)===id)).filter(Boolean),keys=selected.map(o=>o.key);
