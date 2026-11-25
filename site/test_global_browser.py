@@ -12,6 +12,19 @@ with sync_playwright() as p:
         page=browser.new_page(viewport={"width":width,"height":844},accept_downloads=True)
         errors=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
+        page.goto("http://localhost:8765/index.html",wait_until="load")
+        assert page.locator(".route-grid article").count()==3
+        assert page.locator(".route-steps a").count()==12
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/analysis-centre.html",wait_until="load")
+        page.locator("#hub-query").fill("финансовая диагностика регионов")
+        assert page.locator("#hub-tools article:visible").count()==1
+        assert page.locator("#hub-tools article:visible a").get_attribute("href")=="historical.html#enterprise-diagnostics"
+        page.locator("#hub-query").fill("no_such_tool")
+        assert page.locator("#hub-tools article:visible").count()==0
+        page.locator("#hub-query").fill("")
+        assert page.locator("#hub-tools article:visible").count()>20
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.locator("#global-run").wait_for()
         page.wait_for_function("!document.querySelector('#global-run').disabled")

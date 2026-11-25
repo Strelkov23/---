@@ -21,6 +21,8 @@ class NavTests(unittest.TestCase):
         self.assertEqual(len(rows),len({r["href"] for r in rows}))
         self.assertIn("economic-map.html",{r["href"] for r in rows})
         self.assertIn("news-map.html",{r["href"] for r in rows})
+        for href in ("economic-map.html#geo-dashboard","historical.html#enterprise-diagnostics","regional-manufacturing.html#rm-concentration","regional-manufacturing.html#rm-structural-change"):
+            self.assertIn(href,{r["href"] for r in rows})
         self.assertIn('aria-current="page">Поиск',n.primary("search.html"))
     def test_guides(self):
         self.assertIn("glossary.html#scenario",n.guide("scenario.html"))
@@ -32,5 +34,7 @@ class NavTests(unittest.TestCase):
         self.assertEqual(len(pages),6)
         for key,label,_,items in n.GROUPS:
             self.assertIn("<h1>"+label+"</h1>",pages[key+".html"])
+            self.assertIn('id="hub-query"',pages[key+".html"])
+            self.assertIn('id="hub-tools"',pages[key+".html"])
             for href,_,_ in items:self.assertIn('href="'+href+'"',pages[key+".html"])
 if __name__=="__main__":unittest.main()

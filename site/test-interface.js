@@ -7,3 +7,5 @@ assert.equal(I.matches('Валовой региональный продукт �
 assert.equal(I.matches('Ёмкость','Модели','емкость','Модели'),true);
 assert.equal(I.matches('Ёмкость','Модели','емкость','Карты'),false);
 console.log('Interface mode and glossary tests passed');
+assert.deepEqual(I.filterTools(['Валовой региональный продукт','Региональные инвестиции','Труд'],'регион инвест'),[false,true,false]);
+assert.deepEqual(I.filterTools(['А','Б'],''),[true,true]);

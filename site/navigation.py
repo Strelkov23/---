@@ -36,6 +36,8 @@ GROUPS=(
   ("krasnodar-projects.html","Краснодарский край: проекты на сопровождении","Отдельный перечень проектов по отрасли и муниципалитету."),
   ("frp-snapshot.html","Фонд развития промышленности","Документальные показатели выданных займов и отдельно ожидаемые результаты проектов."),
   ("regional-manufacturing.html","Региональная специализация промышленности","Добыча, обработка и энергетика: объём отгрузки, доли внутри разделов и коэффициенты локализации."),
+  ("regional-manufacturing.html#rm-structural-change","Изменение отраслевой специализации","Сравнение двух лет по всем регионам, долям и локализации."),
+  ("regional-manufacturing.html#rm-concentration","Концентрация промышленности","HHI, эффективное число групп и график структуры отгрузки."),
   ("atlas.html","Межотраслевой атлас","113 продуктовых позиций и связи 19 групп баланса."),
   ("machinery.html","Сельскохозяйственная техника","Отдельный разбор машиностроения."),
   ("industrial.html","Натуральное производство","Детализация промышленного выпуска."),
@@ -47,6 +49,8 @@ GROUPS=(
   ("historical.html#hist-rank","Территориальные сравнения","Сопоставление значений по территориям за один год."),
   ("historical.html#regional-comparison","Сопоставление региональных показателей","Два ряда по общей территории и базовому году."),
   ("historical.html#regional-disparities","Межрегиональные диспропорции","Разброс, Джини территорий и корреляции."),
+  ("economic-map.html#geo-dashboard","Сравнение всех регионов","Восемь показателей, медианы, процентильная таблица и попарные связи."),
+  ("historical.html#enterprise-diagnostics","Финансовая диагностика регионов","Просроченная дебиторская и кредиторская задолженность организаций."),
   ("economic-map.html","Экономическая карта России","Сопоставление региональной статистики и справочных границ."),
   ("industrial.html#energy-output","Энергетические ресурсы","Натуральный выпуск, динамика по продуктам и источники."),
   ("industrial.html#electricity-balance","Баланс электроэнергии","Годовая выработка, чистый импорт, спрос и условный сценарий."),
@@ -113,7 +117,7 @@ def cards():
     return '<section class="section-directory" aria-label="Разделы портала"><h2>Выберите направление работы</h2><div class="portal-grid">'+''.join('<article><h3>'+a(g[0]+".html",g[1])+'</h3><p>'+escape(g[2])+'</p><p class="portal-quick">'+ ' · '.join(a(h,t) for h,t,_ in g[3][:2])+'</p></article>' for g in GROUPS)+'</div></section>'
 def publish(page):
     for key,label,desc,items in GROUPS:
-        body='<section class="mast"><p class="kicker">Экономический обзор · раздел</p><h1>'+escape(label)+'</h1><p>'+escape(desc)+'</p></section><section class="portal-grid">'+''.join('<article><h2>'+a(href,title)+'</h2><p>'+escape(note)+'</p></article>' for href,title,note in items)+'</section>'
+        body='<section class="mast"><p class="kicker">Экономический обзор · раздел</p><h1>'+escape(label)+'</h1><p>'+escape(desc)+'</p></section><section class="hub-filter"><label for="hub-query">Найти инструмент в разделе</label><input id="hub-query" type="search" placeholder="Название, показатель или задача" autocomplete="off"><p id="hub-status" role="status">Инструментов: '+str(len(items))+'</p></section><section class="portal-grid hub-grid" id="hub-tools">'+''.join('<article><h2>'+a(href,title)+'</h2><p>'+escape(note)+'</p></article>' for href,title,note in items)+'</section>'
         page(key+".html",body)
 
 def search_entries():

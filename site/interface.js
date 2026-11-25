@@ -3,7 +3,8 @@ const InterfaceMode=(()=>{
  function normalize(value){return value==='professional'?'professional':'simple'}
  function preference(url,stored){return normalize(url==='professional'||url==='simple'?url:stored)}
  function matches(text,category,q,c){const norm=x=>String(x??'').toLowerCase().replaceAll('ё','е').trim();return (!c||category===c)&&norm(q).split(/\s+/).filter(Boolean).every(w=>norm(text).includes(w))}
- return {normalize,preference,matches}
+ function filterTools(items,q){return items.map(text=>matches(text,'',q,''))}
+ return {normalize,preference,matches,filterTools}
 })();
 if(typeof module!=='undefined')module.exports=InterfaceMode;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{
@@ -16,6 +17,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
   if(remember){try{localStorage.setItem(key,m)}catch{}const u=new URL(location.href);u.searchParams.delete('view');history.replaceState(null,'',u)}
  }
  apply(mode);if(select)select.onchange=()=>apply(select.value,true);
+ const hub=document.getElementById('hub-query');
+ if(hub){
+  const cards=[...document.querySelectorAll('#hub-tools article')],status=document.getElementById('hub-status');
+  const update=()=>{const visible=InterfaceMode.filterTools(cards.map(c=>c.textContent),hub.value);cards.forEach((c,i)=>c.hidden=!visible[i]);status.textContent='Найдено инструментов: '+visible.filter(Boolean).length+' из '+cards.length};
+  hub.oninput=update;update();
+ }
  const form=document.getElementById('glossary-form');if(!form)return;
  const q=document.getElementById('glossary-query'),c=document.getElementById('glossary-category'),status=document.getElementById('glossary-status'),rows=[...document.querySelectorAll('#glossary-list article')];
  function filter(){let count=0;for(const r of rows){const show=InterfaceMode.matches(r.textContent,r.dataset.category,q.value,c.value);r.hidden=!show;if(show)count++}status.textContent='Найдено терминов: '+count+' из '+rows.length}
