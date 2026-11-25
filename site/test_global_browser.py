@@ -532,6 +532,24 @@ with sync_playwright() as p:
             with page.expect_download() as metal:
                 page.locator("#metal-export").click()
             assert metal.value.suggested_filename.startswith("metal-output-")
+        page.goto("http://localhost:8765/atlas.html#balance-matrix",wait_until="load")
+        page.wait_for_function("document.querySelector('#bm-status').textContent.startsWith('19 × 19')",timeout=30000)
+        assert page.locator("#bm-table td button").count()==361
+        page.locator("#bm-metric").select_option("inputs")
+        assert page.locator("#bm-log").is_disabled()
+        page.locator("#bm-self").uncheck()
+        assert page.locator("#bm-table button[data-band=missing]").count()>=19
+        page.locator("#bm-focus").select_option("0")
+        assert page.locator("#bm-table button[data-dim=true]").count()==324
+        page.locator("#bm-table td button").nth(1).click()
+        assert page.locator("#bm-detail .metric").count()==3
+        with page.expect_download() as matrix:
+            page.locator("#bm-export").click()
+        assert matrix.value.suggested_filename=="domestic-intermediate-matrix-2021.csv"
+        with open(matrix.value.path(),encoding="utf-8-sig",newline="") as f:
+            matrix_rows=list(csv.reader(f,delimiter=";"))
+        assert len(matrix_rows)==362 and len({len(r) for r in matrix_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/sector-passports.html?sp-sector=chemical",wait_until="load")
         page.wait_for_function("document.querySelector('#sp-status').textContent.startsWith('Показателей в выборке:')",timeout=30000)
         assert page.locator("#sp-sector").input_value()=="chemical"

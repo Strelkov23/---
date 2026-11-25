@@ -56,6 +56,7 @@ jobs:
           node test-stat-revisions.js
           node test-chain-stress.js
           node test-sector-chain.js
+          node test-balance-matrix.js
           node test-capacity-analysis.js
           node test-chart-layout.js
           node test-macro-diagnostics.js
