@@ -9,5 +9,11 @@ class Public(unittest.TestCase):
         d=dict(schema=1,status="diagnostic",note=p.NOTE,financial_year=2025,financial_fingerprint="a",financial_sources=[],sme_edition=m["edition"],sme_archive_sha256="b",reference_sha256="c",national_difference=5,quarantined=1,eligible_regions=1,counts=dict(financial_index=2,matched_sme=1,not_in_sme=1,included=1),declared=[row],reported=[copy.deepcopy(row)])
         self.assertEqual(p.quality(d,idx,m),{"sme_finance_matched":1,"sme_finance_cells":2})
         with self.assertRaises(ValueError):p.quality(d,{**idx,"fingerprint":"bad"},m)
+        d["profiles"]={"limit_per_metric":500,"rows":[{"inn":"7707083893","status":"matched","ogrn":"1027700132195","region":"77","declared":"01.11","dver":"2014","reported":None,"rver":None,"member":"part.xml","sha256":"d"*64,"accepted_ordinal":1}]}
+        self.assertEqual(p.quality(d,idx,m)["sme_finance_matched"],1)
+        bad=copy.deepcopy(d);bad["profiles"]["rows"][0]["region"]="99"
+        with self.assertRaises(ValueError):p.quality(bad,idx,m)
+        bad=copy.deepcopy(d);bad["profiles"]["rows"][0]["ogrn"]="0000000000001"
+        with self.assertRaises(ValueError):p.quality(bad,idx,m)
         d["reported"][0]["expense_sum"]="0"
         with self.assertRaises(ValueError):p.quality(d,idx,m)
