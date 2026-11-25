@@ -74,6 +74,45 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/diagnostics.html#diag-overview",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#diag-overview-cards article').length===6",timeout=45000)
         assert page.locator("#diag-overview-export").is_enabled()
+        page.wait_for_function("document.querySelectorAll('#dep-diag-table tbody tr').length===19",timeout=45000)
+        assert page.locator(".diag-jumps a").count()==8
+        assert page.locator("#dep-diag-detail tbody tr").count()==19
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,15).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
+        page.locator("#dep-diag-self").uncheck()
+        assert page.locator("#dep-diag-detail tbody tr").count()==18
+        with page.expect_download() as dep_pairs:
+            page.locator("#dep-diag-pair-export").click()
+        with open(dep_pairs.value.path(),encoding="utf-8-sig",newline="") as f:
+            pair_rows=list(csv.reader(f,delimiter=";"))
+        assert len(pair_rows)==19 and len({len(r) for r in pair_rows})==1
+        with page.expect_download() as dep_summary:
+            page.locator("#dep-diag-export").click()
+        with open(dep_summary.value.path(),encoding="utf-8-sig",newline="") as f:
+            dep_rows=list(csv.reader(f,delimiter=";"))
+        assert len(dep_rows)==20 and len({len(r) for r in dep_rows})==1
+        page.wait_for_function("!document.querySelector('#asset-diag-status').textContent.includes('Проверка архива')",timeout=45000)
+        assert page.locator("#asset-diag-table tbody tr").count()==19
+        with page.expect_download() as inv_assets:
+            page.locator("#asset-diag-export").click()
+        with open(inv_assets.value.path(),encoding="utf-8-sig",newline="") as f:
+            asset_rows=list(csv.reader(f,delimiter=";"))
+        assert len(asset_rows)==20 and len({len(r) for r in asset_rows})==1
+        page.wait_for_function("!document.querySelector('#inv-diag-status').textContent.includes('Проверка архива')",timeout=45000)
+        if page.locator("#inv-diag-export").is_enabled():
+            assert page.locator("#inv-diag-table tbody tr").count()>0
+            with page.expect_download() as inv_data:
+                page.locator("#inv-diag-export").click()
+            with open(inv_data.value.path(),encoding="utf-8-sig",newline="") as f:
+                investment_rows=list(csv.reader(f,delimiter=";"))
+            assert len(investment_rows)>1 and len({len(r) for r in investment_rows})==1
+            print("Investment acceptance:",page.locator("#inv-diag-status").inner_text(),flush=True)
+            assert any(row[5] not in ("","—") for row in investment_rows[1:]), "Нет принятых отношений инвестиций к ВРП"
+            page.locator("#inv-diag-query").fill("zzzz_no_region")
+            assert page.locator("#inv-diag-export").is_disabled()
+            page.locator("#inv-diag-query").fill("")
+        else:
+            assert "недоступны" in page.locator("#inv-diag-status").inner_text()
+            print("Investment source limitation:",page.locator("#inv-diag-status").inner_text(),flush=True)
         with page.expect_download() as overview:
             page.locator("#diag-overview-export").click()
         assert overview.value.suggested_filename.startswith("economic-diagnostic-overview-")
@@ -84,6 +123,16 @@ with sync_playwright() as p:
             page.locator("#diag-signals-csv").click()
         assert signal.value.suggested_filename.startswith("economic-change-signals-")
         page.locator("#diag-signals-rule").select_option("")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/diagnostic-backtest.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#db-configs tbody tr').length===9",timeout=30000)
+        assert page.locator("#db-grid tbody tr").count()==26
+        page.locator("#db-start").fill("2010")
+        assert page.locator("#db-grid tbody tr").count()==16
+        with page.expect_download() as backtest:
+            page.locator("#db-export").click()
+        assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
+        assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
@@ -178,6 +227,26 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#labor-status').textContent.includes('Наблюдений производительности:')")
         assert page.locator("#labor-broad tbody tr").count()>=1
         assert page.locator("#labor-regional tbody tr").count()>=1
+        assert page.locator("#labor-decomp-start option").count()>1
+        if page.locator("#labor-decomp-export").is_enabled():
+            assert page.locator("#labor-decomp-table tbody tr").count()==3
+            with page.expect_download() as labor_decomp:
+                page.locator("#labor-decomp-export").click()
+            with open(labor_decomp.value.path(),encoding="utf-8-sig",newline="") as f:
+                labor_rows=list(csv.reader(f,delimiter=";"))
+            assert len(labor_rows)==4 and len({len(r) for r in labor_rows})==1
+        else:
+            assert "Нет двух" in page.locator("#labor-decomp-status").inner_text()
+        assert "Выборка:" in page.locator("#labor-gap-status").inner_text()
+        page.locator("#labor-gap-query").fill("zzzz_no_region")
+        assert page.locator("#labor-gap-export").is_disabled()
+        page.locator("#labor-gap-query").fill("")
+        if page.locator("#labor-gap-table tbody tr").count():
+            with page.expect_download() as labor_gap:
+                page.locator("#labor-gap-export").click()
+            with open(labor_gap.value.path(),encoding="utf-8-sig",newline="") as f:
+                gap_rows=list(csv.reader(f,delimiter=";"))
+            assert len(gap_rows)>1 and len({len(r) for r in gap_rows})==1
         page.goto("http://localhost:8765/prices.html",wait_until="load")
         page.wait_for_function("document.querySelector('#price-status').textContent.includes('Баланс 2021 проверен')")
         assert page.locator("#price-results tbody tr").count()==19
@@ -255,6 +324,20 @@ with sync_playwright() as p:
         page.locator("#capacity-trend").select_option("machine-tools")
         assert "40,5" in page.locator("#capacity-trend-chart tbody tr").last.inner_text()
         assert page.locator("#capacity-table tbody tr").count()==72
+        assert page.locator("#cap-signal-table tbody tr").count()==72
+        assert "71 из 72" in page.locator("#cap-signal-status").inner_text()
+        page.locator("#cap-signal-filter").select_option("incomplete")
+        assert page.locator("#cap-signal-table tbody tr").count()==1
+        assert "Сгущённые" in page.locator("#cap-signal-table").inner_text()
+        with page.expect_download() as cap_signal:
+            page.locator("#cap-signal-export").click()
+        with open(cap_signal.value.path(),encoding="utf-8-sig",newline="") as f:
+            cap_signal_rows=list(csv.reader(f,delimiter=";"))
+        assert len(cap_signal_rows)==4 and len({len(r) for r in cap_signal_rows})==1
+        page.locator("#cap-signal-span").select_option("2")
+        assert page.locator("#cap-signal-export").is_disabled()
+        page.locator("#cap-signal-filter").select_option("")
+        assert page.locator("#cap-signal-table tbody tr").count()==72
         assert page.locator("#capacity-distribution progress").count()==5
         page.locator("#capacity-sort").select_option("low")
         vals=page.locator("#capacity-table tbody tr td:nth-child(3)").all_text_contents()
@@ -1063,6 +1146,23 @@ with sync_playwright() as p:
                 assert page.locator("#rm-delta-table tbody tr").count()>65
                 page.locator("#rm-delta-query").fill("RU-MOS")
                 assert page.locator("#rm-delta-table tbody tr").count()==1
+                assert page.locator("#rm-shift-share tbody tr").count()==1
+                page.locator("#rm-shift-share summary").click()
+                with page.expect_download() as ss_export:
+                    page.locator("#rm-shift-share-export").click()
+                with open(ss_export.value.path(),encoding="utf-8-sig",newline="") as f:
+                    ss_rows=list(csv.reader(f,delimiter=";"))
+                assert len(ss_rows)==2 and len(ss_rows[0])==len(ss_rows[1])
+                assert page.locator("#rm-signal-map svg path[data-region]").count()>65
+                page.locator("#rm-signal-threshold").select_option("20")
+                page.locator("#rm-signal-map path[data-region='RU-MOS']").evaluate("(el)=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))")
+                assert "Московская" in page.locator("#rm-signal-detail").inner_text()
+                with page.expect_download() as sig_export:
+                    page.locator("#rm-signal-export").click()
+                with open(sig_export.value.path(),encoding="utf-8-sig",newline="") as f:
+                    sig_rows=list(csv.reader(f,delimiter=";"))
+                assert len(sig_rows)>65 and len({len(r) for r in sig_rows})==1
+                assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
                 page.locator("#rm-delta-metric").select_option("localizationDelta")
                 with page.expect_download() as regional_delta:
                     page.locator("#rm-delta-export").click()

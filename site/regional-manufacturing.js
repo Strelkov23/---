@@ -26,7 +26,7 @@ const ManufacturingAtlas=(()=>{
    const editionOK=common&&r.edition===nat.edition&&r.version===nat.version;
    const localization=editionOK&&nationalShare!==null?quotient(regionalShare,nationalShare):null;
    const countryShare=editionOK?share(r.value,nat.value):null;
-   result.set(key,{...r,total:total?.value??null,totalRow:total?.row??null,share:regionalShare,localization,countryShare,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,nationalRow:nat?.row??null,nationalTotalRow:natTotal?.row??null})
+   result.set(key,{...r,editionOK:!!editionOK,total:total?.value??null,totalRow:total?.row??null,share:regionalShare,localization,countryShare,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,nationalRow:nat?.row??null,nationalTotalRow:natTotal?.row??null})
   }
   return {rows:result,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,excluded:checked.excluded,ambiguous:checked.ambiguous}
  }
@@ -36,12 +36,28 @@ const ManufacturingAtlas=(()=>{
   if(!a||!b||a.year>=b.year||a.group!==b.group||a.region!==b.region||a.level!==b.level||a.okato!==b.okato||a.oktmo!==b.oktmo||a.version!==b.version)return null;
   return {from:a.year,to:b.year,valueDelta:finite(a.value)&&finite(b.value)?b.value-a.value:null,nominalChange:finite(a.value)&&a.value>0&&finite(b.value)?100*(b.value/a.value-1):null,shareDelta:finite(a.share)&&finite(b.share)?b.share-a.share:null,localizationDelta:finite(a.localization)&&finite(b.localization)?b.localization-a.localization:null}
  }
+ // Static two-endpoint shift-share in nominal shipment values, within one OKVED section.
+ function shiftShare(a,b){
+  if(!changeBetween(a,b)||!a.editionOK||!b.editionOK||![a.value,b.value,a.total,b.total,a.national,b.national,a.nationalTotal,b.nationalTotal].every(finite)||a.national<=0||a.nationalTotal<=0||b.nationalTotal<=0||!finite(a.share)||!finite(b.share)||!finite(a.nationalShare)||!finite(b.nationalShare)||a.value>a.national||b.value>b.national)return null;
+  const sectionRate=b.nationalTotal/a.nationalTotal-1,industryRate=b.national/a.national-1;
+  const sectionEffect=a.value*sectionRate,industryEffect=a.value*(industryRate-sectionRate),regionalEffect=b.value-a.value*(1+industryRate),actual=b.value-a.value;
+  const residual=actual-sectionEffect-industryEffect-regionalEffect;
+  if(![sectionRate,industryRate,sectionEffect,industryEffect,regionalEffect,actual,residual].every(Number.isFinite)||Math.abs(residual)>1e-9*Math.max(1,Math.abs(actual),Math.abs(sectionEffect),Math.abs(industryEffect),Math.abs(regionalEffect)))return null;
+  return {sectionRate,industryRate,sectionEffect,industryEffect,regionalEffect,actual,residual};
+ }
+ // Growth-rate gap, not a causal effect or a statistical significance test.
+ function relativeSignal(row,threshold){
+  const base=row?.first?.value,ss=row?.shiftShare;
+  const score=Number.isFinite(base)&&base>0&&ss&&Number.isFinite(ss.regionalEffect)?100*ss.regionalEffect/base:null;
+  if(!Number.isFinite(score)||!Number.isFinite(threshold)||threshold<=0)return {score:null,bin:-1};
+  return {score,bin:score<=-2*threshold?0:score<=-threshold?1:score>=2*threshold?4:score>=threshold?3:2};
+ }
  function regionalChanges(data,group,start,end,territories,sample){
   if(!Number.isInteger(start)||!Number.isInteger(end)||start>=end)return [];
   const a=calculate(data,group,start,sample),b=calculate(data,group,end,sample);
   return territories.map(t=>{
    const first=a.rows.get(t.key)||null,last=b.rows.get(t.key)||null,delta=changeBetween(first,last);
-   return {...t,first,last,delta,status:!first||!last?'Нет пары наблюдений':!delta?'Несопоставимые территориальные коды или версии':'Пара проверена'};
+   return {...t,first,last,delta,shiftShare:shiftShare(first,last),status:!first||!last?'Нет пары наблюдений':!delta?'Несопоставимые территориальные коды или версии':'Пара проверена'};
   });
  }
  function orderChanges(rows,metric,direction='desc',query='',knownOnly=false){
@@ -115,7 +131,7 @@ const ManufacturingAtlas=(()=>{
  function profileFilter(rows,section='',mode='all'){
   return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
  }
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows,geographicConcentration}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows,geographicConcentration,shiftShare,relativeSignal}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -180,10 +196,33 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    endPick.value=available.includes(oldB)?String(oldB):String(available.at(-1)||'');
    startPick.disabled=endPick.disabled=available.length<2;
   }
+  let signalSignature='';
+  function drawSignalMap(all,group,start,end){
+   const threshold=Number($('rm-signal-threshold').value),signature=[group.id,start,end,threshold].join('|');
+   if(signature===signalSignature)return;
+   signalSignature=signature;
+   const data=all.map(r=>({...r,...ManufacturingAtlas.relativeSignal(r,threshold)}));
+   const by=new Map(data.map(r=>[r.key,r])),mappedRows=mapped.map(f=>by.get(f.key)).filter(Boolean);
+   const known=mappedRows.filter(r=>Number.isFinite(r.score)),nonmapped=data.filter(r=>!r.code&&Number.isFinite(r.score));
+   $('rm-signal-status').textContent=group.title+' · '+start+'–'+end+' · контуры с расчётом: '+known.length+' из '+mapped.length+' · ниже порога: '+known.filter(r=>r.bin<2).length+' · выше порога: '+known.filter(r=>r.bin>2).length+' · сопоставимые территории без отдельного контура: '+nonmapped.length+'.';
+   const detail=$('rm-signal-detail');detail.replaceChildren(node('p','Выберите территорию на карте для просмотра исходных темпов.'));
+   function choose(f){
+    const r=by.get(f.key),q=r?.shiftShare;detail.replaceChildren(node('h3',f.name+' · '+start+'–'+end));
+    if(!Number.isFinite(r?.score)){detail.append(node('p','Нет сопоставимого расчёта или начальная отгрузка равна нулю.'));return}
+    detail.append(node('p','Региональный темп: '+number(q.actual/r.first.value*100)+'% · общероссийский темп группы: '+number(q.industryRate*100)+'% · разрыв: '+number(r.score)+' п. п. · региональный остаток: '+number(q.regionalEffect)+' млн руб.'));
+    detail.append(link('Открыть отраслевое досье',current('regional-manufacturing.html',{'rm-group':group.id,'rm-year':end,'rm-region':f.code})));
+   }
+   renderMap(mappedRows,'score',group,{host:'rm-signal-map',label:'Разрыв номинальных темпов, п. п.',classify:r=>r?.bin??-1,palette:['#79482c','#d9a477','#e5e8e4','#83b8ca','#245d7e'],bins:['≤ −'+2*threshold,'> −'+2*threshold+' и ≤ −'+threshold,'от −'+threshold+' до +'+threshold+' (не включая)','≥ +'+threshold+' и < +'+2*threshold,'≥ +'+2*threshold],choose,format:v=>Number.isFinite(v)?number(v)+' п. п.':'Нет расчёта'});
+   const exp=$('rm-signal-export');exp.disabled=!data.length;
+   const src=bySection[group.section];
+   exp.onclick=()=>csv('regional-signal-'+group.id+'-'+start+'-'+end+'.csv',[
+    ['Регион','ISO','Группа','Раздел','Начало','Конец','Отгрузка региона начало','Отгрузка региона конец','Отгрузка группы РФ начало','Отгрузка группы РФ конец','Разрыв темпов, п. п.','Порог, п. п.','Класс (-1 нет расчёта; 0–4 по возрастанию)','Строка региона начало','Строка региона конец','Строка РФ начало','Строка РФ конец','Источник','SHA-256 JSON','Отпечаток манифеста'],...data.map(r=>[r.name,r.code,group.id,group.section,start,end,r.first?.value,r.last?.value,r.first?.national,r.last?.national,r.score,threshold,r.bin,r.first?.row,r.last?.row,r.first?.nationalRow,r.last?.nationalRow,src?.data.source,src?.sha256,manifest.data_fingerprint])]);
+  }
+  $('rm-signal-threshold').onchange=drawDelta;
   function drawDelta(){
-   deltaHost.replaceChildren();deltaChart.replaceChildren();deltaExport.disabled=true;
+   deltaHost.replaceChildren();$('rm-shift-share-host').replaceChildren();deltaChart.replaceChildren();deltaExport.disabled=true;
    const group=groups.find(g=>g.id===groupPick.value),start=Number(startPick.value),end=Number(endPick.value),metric=deltaMetric.value;
-   if(!group||startPick.disabled||!start||!end||start>=end){deltaStatus.textContent='Выберите два разных года: начальный должен быть раньше конечного.';return}
+   if(!group||startPick.disabled||!start||!end||start>=end){deltaStatus.textContent='Выберите два разных года: начальный должен быть раньше конечного.';$('rm-signal-map').replaceChildren();$('rm-signal-detail').replaceChildren();$('rm-signal-status').textContent='Нужны два сопоставимых года.';$('rm-signal-export').disabled=true;signalSignature='';return}
    const all=ManufacturingAtlas.regionalChanges(combined,group.id,start,end,deltaTerritories,RegionalStats.sample);
    const known=all.filter(r=>Number.isFinite(r.delta?.[metric])),rows=ManufacturingAtlas.orderChanges(all,metric,deltaOrder.value,deltaQuery.value,deltaKnown.checked);
    const pos=known.filter(r=>r.delta[metric]>0).length,neg=known.filter(r=>r.delta[metric]<0).length;
@@ -195,6 +234,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     for(const v of [number(a?.value),number(b?.value),number(a?.share),number(b?.share),signed(d?.shareDelta),number(a?.localization),number(b?.localization),signed(d?.localizationDelta),signed(d?.nominalChange),signed(d?.valueDelta),r.status])tr.insertCell().textContent=v;
    }
    deltaHost.append(t);
+   const shift=node('details','');shift.id='rm-shift-share';shift.append(node('summary','Разложение изменения отгрузки (shift-share)'));
+   const usable=rows.filter(r=>r.shiftShare);
+   shift.append(node('p','Доступно: '+usable.length+' из '+rows.length+' показанных территорий. Все компоненты — млн руб. в текущих ценах; остаток региона не является оценкой конкурентоспособности или причинного эффекта.'));
+   const st=node('table',''),sh=st.createTHead().insertRow(),sb=st.createTBody();
+   for(const label of ['Территория','Темп раздела РФ, %','Темп группы РФ, %','Компонент раздела РФ','Отраслевой компонент','Региональный остаток','Изменение отгрузки','Невязка']){const th=node('th',label);th.scope='col';sh.append(th)}
+   for(const r of rows){const q=r.shiftShare,tr=sb.insertRow();tr.insertCell().textContent=r.name;for(const v of [q?q.sectionRate*100:null,q?q.industryRate*100:null,q?.sectionEffect,q?.industryEffect,q?.regionalEffect,q?.actual,q?.residual])tr.insertCell().textContent=number(v)}
+   const sw=node('div','');sw.className='table-scroll';sw.append(st);shift.append(sw);
+   const sx=node('button','Скачать разложение и исходные значения CSV');sx.type='button';sx.id='rm-shift-share-export';sx.disabled=!rows.length;
+   sx.onclick=()=>csv('regional-shift-share-'+group.id+'-'+start+'-'+end+'.csv',[
+    ['Регион','ISO','Группа','Раздел','Начало','Конец','Отгрузка региона начало','Отгрузка региона конец','Отгрузка группы РФ начало','Отгрузка группы РФ конец','Отгрузка раздела РФ начало','Отгрузка раздела РФ конец','Темп раздела (доля)','Темп группы (доля)','Компонент раздела','Отраслевой компонент','Региональный остаток','Изменение','Невязка','Статус','Издание начало','Издание конец','Строка региона начало','Строка региона конец','Строка группы РФ начало','Строка группы РФ конец','Строка раздела РФ начало','Строка раздела РФ конец','Источник','SHA-256 JSON','Отпечаток манифеста'],...rows.map(r=>{const a=r.first,b=r.last,q=r.shiftShare,src=bySection[group.section];return [r.name,r.code,group.id,group.section,start,end,a?.value,b?.value,a?.national,b?.national,a?.nationalTotal,b?.nationalTotal,q?.sectionRate,q?.industryRate,q?.sectionEffect,q?.industryEffect,q?.regionalEffect,q?.actual,q?.residual,q?'Расчёт принят':'Нет сопоставимых данных или допустимой базы',a?.edition,b?.edition,a?.row,b?.row,a?.nationalRow,b?.nationalRow,a?.nationalTotalRow,b?.nationalTotalRow,src?.data.source,src?.sha256,manifest.data_fingerprint]})]);
+   shift.append(sx,link('Методика shift-share','methodology.html#regional-shift-share-method'));$('rm-shift-share-host').append(shift);
+   drawSignalMap(all,group,start,end);
    const numeric=rows.filter(r=>Number.isFinite(r.delta?.[metric]));
    const descending=[...numeric].sort((a,b)=>b.delta[metric]-a.delta[metric]);
    const extremes=[...new Set([...descending.filter(r=>r.delta[metric]>0).slice(0,6),...descending.filter(r=>r.delta[metric]<0).slice(-6)])];
@@ -304,29 +355,29 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   geoGroup.onchange=drawGeoConcentration;
   const shape=(svg,tag,attrs,label)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;svg.append(e);return e};
-  function renderMap(items,metric,group){
-   const host=$('rm-map');host.replaceChildren();
+  function renderMap(items,metric,group,options=null){
+   const host=$(options?.host||'rm-map');host.replaceChildren();
    const coords=features.flatMap(f=>f.rings.flat());if(!coords.length)return;
    let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;for(const [a,b] of coords){xmin=Math.min(xmin,a);xmax=Math.max(xmax,a);ymin=Math.min(ymin,b);ymax=Math.max(ymax,b)}
    if(xmax<=xmin||ymax<=ymin)return;
    const w=1120,h=620,scale=Math.min(1040/(xmax-xmin),530/(ymax-ymin));
    const x=v=>40+(1040-scale*(xmax-xmin))/2+(v-xmin)*scale,y=v=>45+(530-scale*(ymax-ymin))/2+(v-ymin)*scale;
-   const svg=document.createElementNS(ns,'svg');for(const [k,v] of Object.entries({viewBox:'0 0 '+w+' '+h,width:w,height:h,role:'img','aria-label':group.title+' — '+metricLabels[metric]}))svg.setAttribute(k,v);
+   const svg=document.createElementNS(ns,'svg');for(const [k,v] of Object.entries({viewBox:'0 0 '+w+' '+h,width:w,height:h,role:'img','aria-label':group.title+' — '+(options?.label||metricLabels[metric])}))svg.setAttribute(k,v);
    shape(svg,'rect',{width:w,height:h,fill:'#fff'});const by=new Map(items.map(r=>[r.key,r]));
    const thresholds=RegionalMap.classes(items.map(r=>r[metric]));
    const theme=group.section==='B'?'mining':group.section==='D'?'energy':RegionalMap.theme('MFG_'+group.id+'_atlas','',group.title);
-   const palette=metric==='localization'?['#b74e42','#f0b5a0','#dce8e2','#6eae9b','#176c60']:RegionalMap.palette(theme);
+   const palette=options?.palette|| (metric==='localization'?['#b74e42','#f0b5a0','#dce8e2','#6eae9b','#176c60']:RegionalMap.palette(theme));
    for(const f of features){
-    const row=counts.get(f.key)===1?by.get(f.key):null,v=row?.[metric],bin=metric==='localization'?ManufacturingAtlas.localizationBin(v):RegionalMap.bin(v,thresholds);
+    const row=counts.get(f.key)===1?by.get(f.key):null,v=row?.[metric],bin=options?options.classify(row):metric==='localization'?ManufacturingAtlas.localizationBin(v):RegionalMap.bin(v,thresholds);
     const d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' ');
     if(!d)continue;
-    const p=shape(svg,'path',{d,fill:bin<0?'#deded9':palette[Math.min(bin,palette.length-1)],stroke:select.value===f.code?'#101e26':'#52696e','stroke-width':select.value===f.code?2.5:.7,'fill-rule':'evenodd','data-region':f.code||'',role:'button',tabindex:f.key&&counts.get(f.key)===1?0:-1,'aria-label':f.name+': '+fmtMetric(v,metric)});
-    shape(p,'title',{},f.name+' · '+fmtMetric(v,metric));
-    if(f.key&&counts.get(f.key)===1){const choose=()=>{select.value=f.code;draw()};p.addEventListener('click',choose);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}})}
+    const p=shape(svg,'path',{d,fill:bin<0?'#deded9':palette[Math.min(bin,palette.length-1)],stroke:select.value===f.code?'#101e26':'#52696e','stroke-width':select.value===f.code?2.5:.7,'fill-rule':'evenodd','data-region':f.code||'',role:'button',tabindex:f.key&&counts.get(f.key)===1?0:-1,'aria-label':f.name+': '+(options?options.format(v):fmtMetric(v,metric))});
+    shape(p,'title',{},f.name+' · '+(options?options.format(v):fmtMetric(v,metric)));
+    if(f.key&&counts.get(f.key)===1){const choose=()=>{if(options)options.choose(f);else{select.value=f.code;draw()}};p.addEventListener('click',choose);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}})}
    }
    const scroll=node('div','');scroll.className='regional-figure-scroll';scroll.append(svg);host.append(scroll);
    const legend=node('div','');legend.className='legend';
-   const bins=metric==='localization'?['Менее 0,5','0,5–<1','1–<1,5','1,5–<2','2 и более']:thresholds.length===1?[number(thresholds[0])]:thresholds.slice(1).map((t,i)=>(i?' > ':'')+number(thresholds[i])+' — '+number(t));
+   const bins=options?.bins||(metric==='localization'?['Менее 0,5','0,5–<1','1–<1,5','1,5–<2','2 и более']:thresholds.length===1?[number(thresholds[0])]:thresholds.slice(1).map((t,i)=>(i?' > ':'')+number(thresholds[i])+' — '+number(t)));
    for(const [i,label] of [...bins,'Нет данных'].entries()){const span=node('span','');const sw=node('b','');sw.style.cssText='display:inline-block;width:1rem;height:1rem;border:1px solid #52696e;background:'+(i===bins.length?'#deded9':palette[i]);span.append(sw,document.createTextNode(' '+label));legend.append(span)}
    host.append(legend);
   }

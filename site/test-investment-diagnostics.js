@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),D=require('./investment-diagnostics.js'),R=require('./regional-disparities.js');
+const note='Издание: 2025 · Версия: 20260313 · Уровень территории: Регион · ОКТМО: 1 · ОКАТО: 2 · Код показателя: x';
+const r=(region,value,year=2023,n=note)=>({region,value,year,note:n});
+let d=D.regional([r('Москва',100),r('Томская область',20),r('Российская Федерация',999)],[r('Москва',200),r('Томская область',100)],[r('Москва',110)],2023,R.sample);
+assert.equal(d.n,2);assert.equal(d.median,35);assert.equal(d.rows.find(x=>x.name==='Москва').ratio,50);assert.equal(d.rows.find(x=>x.name==='Москва').growth,10);
+d=D.regional([r('Москва',0)],[r('Москва',100)],[],2023,R.sample);assert.equal(d.rows[0].ratio,0);assert.equal(d.rows[0].relative,null);
+d=D.regional([r('Москва',20)],[r('Москва',0)],[],2023,R.sample);assert.equal(d.rows[0].ratio,null);
+d=D.regional([r('Москва',20)],[r('Москва',100,2023,note.replace('ОКАТО: 2','ОКАТО: 3'))],[],2023,R.sample);assert.equal(d.rows[0].ratio,null);
+d=D.regional([r('Москва',20),r('г. Москва',20)],[r('Москва',100)],[],2023,R.sample);assert.equal(d.n,0);
+const a=[{code:'A',title:'A',year:2024,wear_pct:60,renewal_pct:3},{code:'B',title:'B',year:2024,wear_pct:60,renewal_pct:5},{code:'C',title:'C',year:2024,wear_pct:null,renewal_pct:0},{code:'TOTAL',title:'Total',year:2024,wear_pct:90,renewal_pct:0}];
+assert.deepEqual(D.assets(a,2024,50,5).map(r=>r.state),['both','wear','missing']);
+console.log('Investment diagnostics: exact identities, zero, gaps, thresholds and totals OK');

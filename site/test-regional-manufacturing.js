@@ -88,3 +88,21 @@ assert.equal(gc.coverage,80);assert.equal(gc.known,2);assert.equal(gc.missing,1)
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',101)]},'light',2024,S.sample).hhi,null);
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',50,{edition:'old'})]},'light',2024,S.sample).hhi,null);
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',30),r(a,'light',30)]},'light',2024,S.sample).ambiguous,1);
+
+// Shift-share reconciles two endpoint observations and retains true zero bases.
+const ss0={...base,editionOK:true,value:100,total:200,national:1000,nationalTotal:5000,nationalShare:20,share:50};
+const ss1={...ss0,year:2024,value:160,total:300,national:1300,nationalTotal:5500,nationalShare:1300/55,share:160/3};
+const ss=M.shiftShare(ss0,ss1);
+for(const [key,expected] of Object.entries({sectionEffect:10,industryEffect:20,regionalEffect:30,actual:60,residual:0}))assert.ok(Math.abs(ss[key]-expected)<1e-10,key);
+assert.equal(M.shiftShare(ss0,{...ss1,editionOK:false}),null);
+assert.equal(M.shiftShare(ss0,{...ss1,okato:'different'}),null);
+assert.equal(M.shiftShare({...ss0,national:0},ss1),null);
+assert.equal(M.shiftShare({...ss0,value:0,share:0},ss1).regionalEffect,160);
+assert.equal(M.shiftShare(ss0,{...ss1,value:null}),null);
+assert.equal(M.shiftShare(ss0,{...ss1,value:0,share:0,national:0,nationalShare:0}).actual,-100);
+assert.equal(M.shiftShare(ss0,{...ss1,value:1400}),null);
+console.log('Shift-share: reconciliation, territorial matching, zero and missing data OK');
+
+const signal=M.relativeSignal({first:ss0,shiftShare:ss},10);assert.ok(Math.abs(signal.score-30)<1e-9);assert.equal(signal.bin,4);
+for(const [score,bin] of [[-20,0],[-10,1],[-9,2],[0,2],[9,2],[10,3],[20,4]])assert.equal(M.relativeSignal({first:{value:100},shiftShare:{regionalEffect:score}},10).bin,bin);
+assert.deepEqual(M.relativeSignal({first:{value:0},shiftShare:ss},10),{score:null,bin:-1});assert.equal(M.relativeSignal({first:ss0,shiftShare:null},10).bin,-1);assert.equal(M.relativeSignal({first:ss0,shiftShare:ss},0).bin,-1);

@@ -344,3 +344,6 @@ main:has(.atlas-tools) .metric span{font-size:.85rem;color:#49646d}
 .map-viewport-hint{font-size:.82rem;line-height:1.45;color:#49646d;margin:.35rem 0 .55rem}
 @media(max-width:420px){.map-controls{gap:.4rem;padding:.45rem}.map-controls button{padding:.35rem .55rem}.map-controls span{margin-inline-start:0;flex:1 1 100%;font-size:.85rem}}
 @media print{.map-controls,.map-viewport-hint{display:none!important}}
+
+/* Diagnostic centre: intrinsic select width must not expand narrow screens. */
+main:has(#diag-overview) section,main:has(#diag-overview) label,main:has(#diag-overview) .metrics,main:has(#diag-overview) .table-scroll{min-width:0;max-width:100%}main:has(#diag-overview) label{grid-template-columns:minmax(0,1fr)}main:has(#diag-overview) select{display:block;min-width:0;width:100%;max-width:100%}main:has(#diag-overview) button{max-width:100%;white-space:normal;overflow-wrap:anywhere}#dep-diag-table table,#dep-diag-detail table,#inv-diag-table table,#asset-diag-table table{min-width:850px}#dep-diag-table td:first-child{min-width:175px}.diag-jumps{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem}.diag-jumps a{display:block;padding:.35rem .6rem;border:1px solid #b6c4bf;border-radius:.35rem;background:#fff;color:#18564f;font-size:.9rem;max-width:100%;overflow-wrap:anywhere}

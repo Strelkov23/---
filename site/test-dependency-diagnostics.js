@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict'),D=require('./dependency-diagnostics.js'),real=require('./sectors.json');
+const m={names:['A','B'],flows:[[10,30],[40,20]],effects:[[120,30],[40,100]],output:[200,200],demand:[100,100],imports:[20,5]};
+let d=D.diagnose(m,true,.6,.1);assert.equal(d[0].input.top.i,1);assert.equal(d[0].input.top.share,.8);assert.equal(d[0].output.top.share,.75);assert.equal(d[0].multiplier,1.6);assert.equal(d[0].importIntensity,.2);assert.equal(d[0].inFlag,true);assert.equal(d[0].outFlag,true);assert.equal(d[0].importFlag,true);assert.equal(d[1].importFlag,false);
+const p=D.pairs(m,d,0).find(r=>r.j===1);assert.equal(p.from,40);assert.equal(p.to,30);assert.equal(p.otherSales,40/60);assert.equal(p.otherPurchase,30/50);
+d=D.diagnose(m,false,.6,.1);assert.equal(d[0].input.top.share,1);assert.equal(d[0].multiplier,1.6);assert.equal(D.pairs(m,d,0).length,1);
+assert.equal(D.concentration([0,0]).valid,false);assert.equal(D.concentration([-1,2]).valid,false);assert.equal(D.diagnose({...m,demand:[0,100]},true,.6,.1)[0].importIntensity,null);
+const r=D.diagnose(real,true,.5,.1);assert.equal(r.length,19);assert.ok(r.some(x=>x.input.valid));assert.ok(r.some(x=>Number.isFinite(x.importIntensity)));assert.ok(r.every(x=>x.input.hhi===null||x.input.hhi>=0&&x.input.hhi<=1+1e-10));
+console.log('Dependency diagnostics: bidirectional denominators, missing values, scope and real balance OK');
