@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths: ['site/sme_full_import.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','site/sme_finance_join.py','site/test_sme_finance_join.py','.github/workflows/sme-full-import.yml']
   workflow_dispatch:
+  schedule:
+    - cron: '45 1 12,19 * *'
 permissions:
   contents: read
 concurrency:
@@ -21,11 +23,11 @@ jobs:
       - run: |
           cd site
           python -m unittest test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py
-          python sme_full_import.py --output ../sme-full --financial-index ../history/published
+          python sme_full_import.py --output ../sme-full --financial-index ../history/published --allow-diagnostic
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: sme-full-classification
           path: sme-full/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 45

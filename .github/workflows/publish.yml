@@ -6,6 +6,10 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows: ['FNS full SME classification']
+    branches: [main]
+    types: [completed]
 concurrency:
   group: economic-monitor
   cancel-in-progress: false
@@ -28,26 +32,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Restore diagnostic SME report (one-time bootstrap)
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: sme-full-classification
-          run-id: 45607586349
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /tmp/sme-matrix-source
-      - name: Restore finance linkage diagnostic
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: sme-full-classification
-          run-id: 45617353853
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /tmp/sme-finance-source
+      - name: Restore latest complete diagnostic SME artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/sme-source
+          # Only completed runs of our own workflow on main. Older runs may be expired.
+          ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sme-full-import.yml --branch main --status completed --limit 12 --json databaseId --jq '.[].databaseId') || ids=""
+          for id in $ids; do
+            folder=$(mktemp -d)
+            if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name sme-full-classification --dir "$folder" &&
+               test -s "$folder/classification.json" && test -s "$folder/finance-join.json"; then
+              cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
+              echo "Selected diagnostic artifact from run $id"
+              rm -rf "$folder"
+              break
+            fi
+            rm -rf "$folder"
+          done
+          if ! test -s /tmp/sme-source/classification.json; then
+            echo "No complete diagnostic artifact; use validated archived data when compatible."
+          fi
       - name: Restore archive and build
         env:
-          SME_FINANCE_REPORT: /tmp/sme-finance-source/finance-join.json
-          SME_MATRIX_REPORT: /tmp/sme-matrix-source/classification.json
+          SME_FINANCE_REPORT: /tmp/sme-source/finance-join.json
+          SME_MATRIX_REPORT: /tmp/sme-source/classification.json
         run: |
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/
