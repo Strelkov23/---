@@ -99,7 +99,7 @@ class JournalTests(unittest.TestCase):
 class PipelineTests(unittest.TestCase):
     def test_registry(self):
         import source_registry as sr
-        self.assertEqual(len(sr.passports()),7)
+        self.assertEqual(len(sr.passports()),9)
         self.assertEqual(sr.identify("https://www.cbr.ru/scripts/XML_dynamic.asp?date_req1=01%2F01%2F2025").id,"cbr_fx")
         self.assertEqual(sr.identify("https://data.nalog.ru/a.xlsx").id,"fns_finance")
         for url in ("https://www.cbr.ru/other","https://data.nalog.ru/a.exe","https://example.org/a.xlsx"):
@@ -120,7 +120,7 @@ class PipelineTests(unittest.TestCase):
             journal.flush();pipeline.flush()
             self.assertEqual(sj.quality(sj.collect(db,ContractTests.stamp))["transport_events"],1)
             d=sp.collect(db,ContractTests.stamp)
-            self.assertEqual(sp.quality(d),dict(pipeline_sources=7,pipeline_events=2,pipeline_rejected=1))
+            self.assertEqual(sp.quality(d),dict(pipeline_sources=9,pipeline_events=2,pipeline_rejected=1))
             self.assertEqual(d["events"][0]["reason"],"ValueError")
             self.assertIsNone(d["events"][0]["count"])
             journal.flush();pipeline.flush()
@@ -191,4 +191,27 @@ class StreamTests(unittest.TestCase):
             members,complete=sa.inventory_xml(z,strict=False,**options)
             self.assertFalse(complete);self.assertEqual(sa.read_member(z,members[0],10),b"valid")
             with self.assertRaises(ValueError):sa.read_member(z,members[0],2)
+class ApiContractTests(unittest.TestCase):
+    def test_api_registration(self):
+        import source_registry as sr
+        self.assertEqual(sr.identify("https://api.worldbank.org/v2/country/RUS/indicator/NY.GDP.MKTP.CD?format=json").id,"wdi_series")
+        self.assertEqual(sr.identify("https://api.worldbank.org/v2/indicator?source=2").id,"wdi_metadata")
+        with self.assertRaises(ValueError):sr.identify("https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD")
+    def test_api_payload(self):
+        import series
+        def payload(value):
+            return [{"pages":1,"total":1,"lastupdated":"2026-11-25"},[{"countryiso3code":"RUS","indicator":{"id":"X"},"date":"2025","value":value}]]
+        self.assertEqual(series.parse_response(payload(None),"X")[0],{"2025":None})
+        self.assertEqual(series.parse_response(payload(1),"X")[0],{"2025":1.0})
+        with self.assertRaises(ValueError):series.parse_response(payload(True),"X")
+        with self.assertRaises(ValueError):series.parse_response(payload(1),"Y")
+        bad=payload(2);bad[0]["pages"]=2
+        with self.assertRaises(ValueError):series.parse_response(bad,"X")
+    def test_wdi_exact_decimal_and_metadata(self):
+        raw=b'{"X":{"title":"GDP","unit":"USD","values":{"2025":1234567890.123456789}}}'
+        meta=json.dumps({"X":{"title":"GDP","unit":"USD","source":"https://api.worldbank.org/v2/country/RUS/indicator/X","checked":None,"success":None,"status":"archived"}}).encode()
+        rows=oc.wdi_rows(raw,meta);oc.validate_rows(rows)
+        self.assertEqual(rows[0]["value"],"1234567890.123456789")
+        with self.assertRaises(ValueError):oc.wdi_rows(raw,b'{}')
+        with self.assertRaises(ValueError):oc.wdi_rows(raw,meta.replace(b"USD",b"EUR"))
 if __name__=="__main__":unittest.main()

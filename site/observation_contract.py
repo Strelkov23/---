@@ -9,7 +9,7 @@ from html import escape
 from urllib.parse import urlsplit
 
 FILE="normalized-observations.json"
-NOTE="Пилот единого формата: опубликованные ряды ЦБ и документальные итоги федерального бюджета. Контрольные суммы относятся к входным файлам сайта, не к исходным файлам поставщика. Показатели цели, факты и документальные снимки не смешиваются."
+NOTE="Пилот единого формата: опубликованные ряды ЦБ, Всемирного банка и документальные итоги федерального бюджета. Контрольные суммы относятся к входным файлам сайта, не к исходным файлам поставщика. Показатели цели, факты и документальные снимки не смешиваются."
 MAX_BYTES=8_000_000
 MAX_ROWS=50000
 FIELDS=("dataset","series","title","territory","period","frequency","unit","value","kind","source","source_level","observed_at","published_at","checked_at","success_at","status")
@@ -27,11 +27,11 @@ def json_load(raw):
             d[k]=v
         return d
     def invalid(value):raise ValueError("Недопустимое число JSON: "+value)
-    return json.loads(raw,object_pairs_hook=unique,parse_constant=invalid)
+    return json.loads(raw,object_pairs_hook=unique,parse_constant=invalid,parse_float=Decimal)
 
 def decimal_value(v):
     if v is None:return None
-    if type(v) not in (str,int,float):raise ValueError("Нечисловое наблюдение")
+    if type(v) not in (str,int,float,Decimal):raise ValueError("Нечисловое наблюдение")
     try:
         if len(str(v))>80:raise ValueError("Слишком длинное число")
         n=Decimal(str(v))
@@ -101,12 +101,35 @@ def budget_csv(raw):
         rows.append(dict(dataset="budget_law",series=r["metric"],title=r["title"],territory="Федеральный бюджет РФ",period=r["year"],frequency="annual",unit="млрд руб.",value=decimal_value(r["value_billion_rub"]),kind="documentary",source=r["source"],source_level="documentary_copy",observed_at=None,published_at=None,checked_at=None,success_at=None,status=r["method"]+"; дата закона "+r["law_date"]+"; не дата публикации"))
     return rows
 
+def wdi_rows(compare_raw,catalog_raw):
+    compare=json_load(compare_raw);catalog=json_load(catalog_raw)
+    if set(compare)!=set(catalog):raise ValueError("Несовпадение каталога WDI и рядов")
+    rows=[]
+    for code,s in compare.items():
+        m=catalog[code]
+        if s["title"]!=m["title"] or s["unit"]!=m["unit"]:raise ValueError("Несовпадение метаданных WDI")
+        vals=s["values"]
+        if not isinstance(vals,dict):raise ValueError("Формат годового ряда WDI")
+        for period,value in vals.items():
+            if value is None:raise ValueError("Числовой ряд содержит пропуск")
+            rows.append(dict(dataset="wdi",series=code,title=m["title"],territory="Россия",period=period,frequency="annual",unit=m["unit"],value=decimal_value(value),kind="fact",source=m["source"],source_level="series",observed_at=None,published_at=None,checked_at=m.get("checked"),success_at=m.get("success"),status=m["status"]))
+    return rows
+
 def collect(out,stamp):
     specs=(("cbr.json","cbr",lambda raw:series_json(raw,"cbr","daily","date")),("national.json","national",lambda raw:series_json(raw,"national","monthly","period")),("federal-budget.csv","budget_law",budget_csv))
     rows=[];inputs=[]
     for filename,code,adapter in specs:
         raw=bounded(out/filename);items=adapter(raw);validate_rows(items)
         inputs.append(dict(file=filename,dataset=code,sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),observations=len(items),numeric=sum(r["value"] is not None for r in items),series=len({r["series"] for r in items}),scope="published_snapshot"))
+        rows.extend(items)
+    # Both inputs are fingerprinted. The catalogue is metadata only; counts
+    # are assigned to the value file, so observations are never counted twice.
+    paths=[out/"compare.json",out/"catalog.json"]
+    if any(p.exists() for p in paths):
+        if not all(p.is_file() for p in paths):raise ValueError("Неполный комплект WDI")
+        values,meta=map(bounded,paths);items=wdi_rows(values,meta);validate_rows(items)
+        for path,raw,part in ((paths[0],values,items),(paths[1],meta,[])):
+            inputs.append(dict(file=path.name,dataset="wdi",sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),observations=len(part),numeric=sum(r["value"] is not None for r in part),series=len({r["series"] for r in part}),scope="published_snapshot" if part else "published_metadata"))
         rows.extend(items)
     validate_rows(rows)
     rows.sort(key=lambda r:(r["dataset"],r["series"],r["territory"],r["period"]))
@@ -122,7 +145,7 @@ def render(d):
     body+='<section><h2>Проверенные входные наборы</h2><div class="table-scroll" tabindex="0"><table><thead><tr><th>Набор</th><th>Рядов</th><th>Наблюдений</th><th>Числовых</th><th>SHA-256 файла сайта</th></tr></thead><tbody>'
     for r in d["inputs"]:
         body+='<tr><td><a href="'+e(r["file"])+'">'+e(r["file"])+'</a></td>'+''.join('<td>'+e(r[k])+'</td>' for k in ("series","observations","numeric"))+'<td><code>'+e(r["sha256"])+'</code></td></tr>'
-    return body+'</tbody></table></div><p>Схема 1: идентификатор набора и ряда, территория, период, частота, единица, точная десятичная строка или null, вид наблюдения, источник, даты и статус. Даты импорта не означают даты публикации. Записи разных наборов не складываются. Пропуск не равен нулю.</p></section>'
+    return body+'</tbody></table></div><p>Схема 1: идентификатор набора и ряда, территория, период, частота, единица, точная десятичная строка или null, вид наблюдения, источник, даты и статус. Поле observed_at хранит время регистрации наблюдения в архиве, если оно доступно; период наблюдения — period. Даты импорта не означают даты публикации. WDI: только опубликованные числовые значения; отозванные значения отдельно в исходном каталоге. Записи разных наборов не складываются. Пропуск не равен нулю.</p></section>'
 
 def publish(page,out,stamp):
     d=collect(out,stamp);quality(d,out)

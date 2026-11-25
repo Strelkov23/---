@@ -33,6 +33,6 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(db.execute("select value from annual order by seen").fetchall(),[(1.0,),(None,)])
     def test_incomplete_api(self):
         payload=[{"pages":2,"total":2},[]]
-        with patch("series.urlopen",return_value=io.BytesIO(json.dumps(payload).encode())):
+        with patch("source_registry.fetch",return_value=type("Payload",(),{"raw":json.dumps(payload).encode()})()):
             self.assertIsNotNone(series.retrieve("X")[2])
 if __name__=="__main__":unittest.main()

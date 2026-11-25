@@ -12,28 +12,36 @@ SERIES = {
 }
 def api(code):
     return f"https://api.worldbank.org/v2/country/RUS/indicator/{code}?format=json&per_page=200"
+def parse_response(payload,code):
+    if not isinstance(payload,list) or len(payload)!=2 or not isinstance(payload[0],dict):
+        raise ValueError("Некорректный ответ API")
+    header,rows=payload
+    if not isinstance(rows,list) or not rows or int(header.get("pages",0))!=1 or len(rows)!=int(header.get("total",-1)):
+        raise ValueError("Неполный ответ API")
+    values={}
+    for r in rows:
+        if r.get("countryiso3code")!="RUS" or r.get("indicator",{}).get("id")!=code:
+            raise ValueError("Неверная страна или код")
+        year=str(r["date"])
+        if not year.isdigit() or len(year)!=4 or year in values or not 1900<=int(year)<=2100:raise ValueError("Неверный период")
+        val=r["value"]
+        if val is not None:
+            if isinstance(val,bool):raise ValueError("Логическое значение вместо числа")
+            val=float(val)
+            if not math.isfinite(val):raise ValueError("Нечисловое значение")
+        values[year]=val
+    return values,header.get("lastupdated","")
+
 def retrieve(code):
+    import source_registry,source_pipeline
+    from observation_contract import json_load
+    url=api(code)
     try:
-        with urlopen(Request(api(code),headers={"User-Agent":"EconomicsMonitor/2.0"}),timeout=18) as resp:
-            payload=json.load(resp)
-        if not isinstance(payload,list) or len(payload)!=2 or not isinstance(payload[0],dict):
-            raise ValueError("Некорректный ответ API")
-        header,rows=payload
-        if not isinstance(rows,list) or int(header.get("pages",0))!=1 or len(rows)!=int(header.get("total",-1)):
-            raise ValueError("Неполный ответ API")
-        values={}
-        for r in rows:
-            if r.get("countryiso3code")!="RUS" or r.get("indicator",{}).get("id")!=code:
-                raise ValueError("Неверная страна или код")
-            year=str(r["date"])
-            if not year.isdigit() or len(year)!=4 or year in values:raise ValueError("Неверный период")
-            val=r["value"]
-            if val is not None:
-                val=float(val)
-                if not math.isfinite(val):raise ValueError("Нечисловое значение")
-            values[year]=val
-        return code,values,None,header.get("lastupdated","")
+        values,updated=parse_response(json_load(source_registry.fetch(url).raw),code)
+        source_pipeline.record(url,code,"parse",len(values))
+        return code,values,None,updated
     except Exception as err:
+        source_pipeline.record(url,code,"parse",error=err)
         return code,None,"Ошибка: "+str(err)[:180],""
 
 def refresh(db,stamp):

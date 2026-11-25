@@ -10,10 +10,9 @@ def date(s):
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 def fetch(page):
     url=URL+"?"+urlencode(dict(source=2,format="json",per_page=500,page=page))
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.0"}),timeout=20) as f:
-        raw=f.read(8000001)
-    if len(raw)>8000000:raise ValueError("Metadata response too large")
-    return json.loads(raw)
+    from source_registry import fetch as registered_fetch
+    from observation_contract import json_load
+    return json_load(registered_fetch(url).raw)
 def collect(codes,request=None):
     if request is None:request=fetch
     found={};total_pages=None
@@ -40,7 +39,8 @@ def sync(db,codes,stamp,refresh,out):
     prev=db.execute("select checked,success,status from wdi_metadata_check where id=1").fetchone()
     if refresh and (not prev or date(stamp)-date(prev[0])>=timedelta(days=7)):
         try:
-            found=collect(set(codes))
+            from source_pipeline import parsed
+            found=parsed(URL,"WDI metadata",lambda:collect(set(codes)))
             with db:
                 for c,v in found.items():db.execute("insert or replace into wdi_metadata values(?,?,?)",(c,json.dumps(v,ensure_ascii=False),stamp))
                 db.execute("insert or replace into wdi_metadata_check values(1,?,?,?)",(stamp,stamp,"Получено паспортов: "+str(len(found))+" из "+str(len(codes))+"; отсутствующие не удаляются"))
