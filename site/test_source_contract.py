@@ -96,4 +96,50 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):st.download("https://www.cbr.ru/data",hosts={"www.cbr.ru"},max_bytes=2,opener=Client(FakeResponse(b"123")))
         self.assertIsNone(calls[1][1])
         self.assertIsInstance(calls[1][2],ValueError)
+class PipelineTests(unittest.TestCase):
+    def test_registry(self):
+        import source_registry as sr
+        self.assertEqual(len(sr.passports()),7)
+        self.assertEqual(sr.identify("https://www.cbr.ru/scripts/XML_dynamic.asp?date_req1=01%2F01%2F2025").id,"cbr_fx")
+        self.assertEqual(sr.identify("https://data.nalog.ru/a.xlsx").id,"fns_finance")
+        for url in ("https://www.cbr.ru/other","https://data.nalog.ru/a.exe","https://example.org/a.xlsx"):
+            with self.assertRaises(ValueError):sr.identify(url)
+    def test_buffers_during_import_transaction(self):
+        import sqlite3,source_journal as sj,source_pipeline as sp
+        with tempfile.TemporaryDirectory() as tmp:
+            db=Path(tmp)/"db";journal=sj.BufferedJournal(db);pipeline=sp.Buffer(db)
+            url="https://www.cbr.ru/hd_base/KeyRate/"
+            p=st.download(url,hosts={"www.cbr.ru"},max_bytes=8,opener=Client(FakeResponse(b"123",url=url)))
+            with sqlite3.connect(db) as writer:
+                writer.execute("create table fixture(v integer)")
+                writer.execute("insert into fixture values(1)")
+                journal(url,p,None)
+                pipeline.record(url,"KEY","commit",1)
+                pipeline.record(url,"KEY","commit",error=ValueError("bad batch"))
+                self.assertEqual(writer.execute("select count(*) from transport_events").fetchone()[0],0)
+            journal.flush();pipeline.flush()
+            self.assertEqual(sj.quality(sj.collect(db,ContractTests.stamp))["transport_events"],1)
+            d=sp.collect(db,ContractTests.stamp)
+            self.assertEqual(sp.quality(d),dict(pipeline_sources=7,pipeline_events=2,pipeline_rejected=1))
+            self.assertEqual(d["events"][0]["reason"],"ValueError")
+            self.assertIsNone(d["events"][0]["count"])
+            journal.flush();pipeline.flush()
+            self.assertEqual(sp.collect(db,ContractTests.stamp),d)
+    def test_parse_quarantine(self):
+        import source_pipeline as sp
+        with tempfile.TemporaryDirectory() as tmp:
+            db=Path(tmp)/"db";buf=sp.Buffer(db);sp.configure(buf)
+            self.addCleanup(sp.configure,None)
+            url="https://www.cbr.ru/hd_base/infl/"
+            self.assertEqual(sp.parsed(url,"HTML",lambda:{("CPI","2026-01"):4}),{("CPI","2026-01"):4})
+            with self.assertRaises(ValueError):sp.parsed(url,"HTML",lambda:{})
+            buf.flush()
+            d=sp.collect(db,ContractTests.stamp)
+            self.assertEqual(sp.quality(d)["pipeline_rejected"],1)
+            self.assertEqual(d["events"][1]["stage"],"parse")
+    def test_conflicting_cbr_rows(self):
+        import cbr_data
+        base='<ValCurs ID="R01235"><Record Date="01.01.2026"><Nominal>1</Nominal><Value>90</Value></Record>'
+        with self.assertRaises(ValueError):cbr_data.fx_rows((base+'<Record Date="01.01.2026"><Nominal>1</Nominal><Value>91</Value></Record></ValCurs>').encode(),"R01235")
+        with self.assertRaises(ValueError):cbr_data.fx_rows(base.replace(">90<",">nan<").encode()+b"</ValCurs>","R01235")
 if __name__=="__main__":unittest.main()

@@ -1,5 +1,6 @@
 """Separate official workbook imports; manual transcription is not overwritten."""
 import csv,io,json,math,re,hashlib
+import source_pipeline
 from datetime import datetime,timedelta,timezone
 from html import escape
 from urllib.parse import urlsplit
@@ -65,9 +66,9 @@ def parse(raw,year,url):
     if len(results)!=1:raise ValueError("Не найдена единственная однозначная годовая таблица")
     return results[0]
 def fetch(url):
-    from source_transport import download
+    from source_registry import fetch as registered_fetch
     if not valid_url(url):raise ValueError("Неподтверждённый URL")
-    return download(url,hosts={"data.nalog.ru"},max_bytes=MAX,path_check=lambda p:p.lower().endswith((".xls",".xlsx"))).raw
+    return registered_fetch(url).raw
 def observation_keys(rows):
     # Normalise only the explicitly verified punctuation variant; retain exact
     # original hashes and labels in the published data.
@@ -105,7 +106,9 @@ def sync(db,stamp,refresh,files):
                 with db:
                     db.execute("insert or ignore into finance_workbook_editions values(?,?,?,?,?)",(y,sha,u,stamp,payload))
                     db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,u,stamp,stamp,"Импортировано",sha,payload))
+                source_pipeline.record(u,str(y),"commit",len(rows))
             except Exception as e:
+                source_pipeline.record(u,str(y),"commit",error=e)
                 with db:db.execute("insert or replace into finance_workbooks values(?,?,?,?,?,?,?)",(y,r[1] if r and r[3] else u,stamp,r[3] if r else None,"Ошибка: "+str(e)[:240],r[5] if r else None,r[6] if r else "[]"))
     result=[]
     for y,u,c,s,status,sha,rows in db.execute("select year,url,checked,success,status,sha,rows from finance_workbooks order by year desc"):

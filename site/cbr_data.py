@@ -1,6 +1,8 @@
 """Official Bank of Russia observations, separate from annual WDI series."""
 import json
 import re
+import math
+import source_pipeline
 from datetime import date, datetime, timedelta
 from html import unescape
 from urllib.parse import urlencode
@@ -11,8 +13,8 @@ KEY_PAGE="https://www.cbr.ru/hd_base/KeyRate/"
 FX_PAGE="https://www.cbr.ru/development/sxml/"
 FX_URL="https://www.cbr.ru/scripts/XML_dynamic.asp"
 def get(url):
-    from source_transport import download
-    return download(url,hosts={"www.cbr.ru","cbr.ru"},max_bytes=6_000_000,timeout=15,path_check=lambda p:p.lower() in ("/hd_base/keyrate/","/scripts/xml_dynamic.asp")).raw
+    from source_registry import fetch
+    return fetch(url).raw
 
 def number(s):
     return float(s.replace("\u00a0","").replace(" ","").replace(",","."))
@@ -26,7 +28,9 @@ def key_rows(raw):
         try:
             day=datetime.strptime(cells[0],"%d.%m.%Y").date().isoformat()
             val=number(cells[1])
-            if 0<=val<=100:out[day]=val
+            if 0<=val<=100:
+                if day in out and out[day]!=val:raise RuntimeError("Противоречащие дубли ставки")
+                out[day]=val
         except ValueError:continue
     return out
 
@@ -38,8 +42,10 @@ def fx_rows(raw,code):
         d=datetime.strptime(r.attrib["Date"],"%d.%m.%Y").date().isoformat()
         nominal=number(r.findtext("Nominal") or "")
         val=number(r.findtext("Value") or "")
-        if nominal<=0 or val<=0:raise ValueError("Некорректный номинал или курс")
-        out[d]=val/nominal
+        if not all(math.isfinite(v) and v>0 for v in (nominal,val)):raise ValueError("Некорректный номинал или курс")
+        rate=val/nominal
+        if not math.isfinite(rate) or rate<=0 or d in out and out[d]!=rate:raise ValueError("Некорректный или противоречащий курс")
+        out[d]=rate
     return out
 
 def publish(db,stamp,out,refresh):
@@ -61,7 +67,9 @@ def publish(db,stamp,out,refresh):
                 with db:
                     db.executemany("insert or ignore into cbr_observations values(?,?,?,?)",[(code,d,v,stamp) for d,v in values.items() if old.get(d)!=v])
                     db.execute("insert or replace into cbr_checks values(?,?,?,?)",(code,stamp,stamp,"Получено: "+str(len(values))))
+                source_pipeline.record(url,code,"commit",len(values))
             except Exception as err:
+                source_pipeline.record(url,code,"commit",error=err)
                 with db:db.execute("insert into cbr_checks values(?,?,null,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,"Ошибка: "+str(err)[:180]))
         c=db.execute("select checked,success,status from cbr_checks where code=?",(code,)).fetchone()
         rows=[{"date":r[0],"value":r[1]} for r in db.execute("select day,value from (select day,value,row_number() over(partition by day order by seen desc) rn from cbr_observations where code=?) where rn=1 order by day",(code,))]

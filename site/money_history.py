@@ -100,5 +100,6 @@ def parse(raw):
     return data
 
 def fetch():
-    from source_transport import download
-    return parse(download(URL,hosts={"www.cbr.ru","cbr.ru"},max_bytes=16_000_000,timeout=25,path_check=lambda p:p=="/vfs/statistics/credit_statistics/monetary_agg.xlsx").raw)
+    from source_registry import fetch
+    from source_pipeline import parsed
+    return parsed(URL,"XLSX",lambda:parse(fetch(URL).raw))
