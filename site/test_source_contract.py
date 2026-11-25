@@ -64,4 +64,36 @@ class ContractTests(unittest.TestCase):
     def test_csv_shape(self):
         with self.assertRaises(ValueError):list(oc.csv_table(b"a,b\n1\n",["a","b"]))
         with self.assertRaises(ValueError):list(oc.csv_table(b"b,a\n1,2\n",["a","b"]))
+class JournalTests(unittest.TestCase):
+    def test_version_and_failure(self):
+        import source_journal as sj
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);db=root/"monitor.db";j=sj.Journal(db)
+            p=st.download("https://www.cbr.ru/data",hosts={"www.cbr.ru"},max_bytes=8,opener=Client(FakeResponse(b"123")))
+            j(p.requested_url,p,None);j(p.requested_url,p,None);j(p.requested_url,None,ValueError("response body"))
+            d=sj.collect(db,ContractTests.stamp)
+            self.assertEqual(sj.quality(d),dict(transport_events=3,transport_versions=1,transport_failed=1))
+            self.assertEqual(d["events"][0]["error"],"ValueError")
+            self.assertEqual(d["versions"][0]["sha"],p.sha256)
+            self.assertEqual(sj.collect(db,ContractTests.stamp),d)
+            d["events"][0]["bytes"]=0
+            with self.assertRaises(ValueError):sj.quality(d)
+    def test_opt_in_cache(self):
+        import source_journal as sj
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            with self.assertRaises(ValueError):sj.Journal(root/"db",root/"raw")
+            j=sj.Journal(root/"db",root/"raw",approved={"www.cbr.ru"})
+            p=st.download("https://www.cbr.ru/data",hosts={"www.cbr.ru"},max_bytes=8,opener=Client(FakeResponse(b"123")))
+            j(p.requested_url,p,None);j(p.requested_url,p,None)
+            self.assertEqual(list((root/"raw").iterdir()),[root/"raw"/p.sha256])
+            self.assertEqual((root/"raw"/p.sha256).read_bytes(),b"123")
+    def test_transport_callback(self):
+        calls=[];st.configure_journal(lambda *args:calls.append(args))
+        self.addCleanup(st.configure_journal,None)
+        p=st.download("https://www.cbr.ru/data",hosts={"www.cbr.ru"},max_bytes=8,opener=Client(FakeResponse(b"123")))
+        self.assertEqual(calls[0],(p.requested_url,p,None))
+        with self.assertRaises(ValueError):st.download("https://www.cbr.ru/data",hosts={"www.cbr.ru"},max_bytes=2,opener=Client(FakeResponse(b"123")))
+        self.assertIsNone(calls[1][1])
+        self.assertIsInstance(calls[1][2],ValueError)
 if __name__=="__main__":unittest.main()

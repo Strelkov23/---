@@ -416,6 +416,11 @@ def check(out,previous,stamp):
         if path.is_file():
             counts.update(oc.quality(oc.json_load(oc.bounded(path)),out))
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Единый формат наблюдений: "+str(e))
+    try:
+        import source_journal as sj
+        if (out/sj.FILE).is_file():
+            counts.update(sj.quality(json.loads((out/sj.FILE).read_text(encoding="utf-8"))))
+    except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Журнал источников: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)

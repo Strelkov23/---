@@ -32,7 +32,7 @@ class GuardedRedirect(HTTPRedirectHandler):
         if not self.allowed(newurl):raise ValueError("Перенаправление за пределы разрешённого источника")
         return super().redirect_request(req,fp,code,msg,headers,newurl)
 
-def download(url,*,hosts,max_bytes,timeout=20,path_check=None,opener=None):
+def _download(url,*,hosts,max_bytes,timeout=20,path_check=None,opener=None):
     if type(max_bytes) is not int or not 0<max_bytes<=100_000_000 or not 0<timeout<=60:
         raise ValueError("Некорректный лимит загрузки")
     allowed=lambda value:url_allowed(value,hosts,path_check)
@@ -49,3 +49,17 @@ def download(url,*,hosts,max_bytes,timeout=20,path_check=None,opener=None):
         raw=response.read(max_bytes+1)
         if not 0<len(raw)<=max_bytes or size is not None and len(raw)!=int(size):raise ValueError("Пустой, неполный или слишком большой источник")
         return Payload(raw,url,final,hashlib.sha256(raw).hexdigest(),response.headers.get_content_charset() or "utf-8",response.headers.get_content_type())
+
+# Configured once by the build. Keep the network layer independent of SQLite.
+_journal=None
+def configure_journal(callback):
+    global _journal
+    _journal=callback
+
+def download(url,**kwargs):
+    try:payload=_download(url,**kwargs)
+    except Exception as error:
+        if _journal is not None:_journal(url,None,error)
+        raise
+    if _journal is not None:_journal(url,payload,None)
+    return payload
