@@ -163,6 +163,8 @@ import bank_disclosure
 bank_disclosure.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
 company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_import.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+import company_names
+company_names.publish(out,Path("../history/published"))
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

@@ -36,3 +36,9 @@ assert.deepEqual(C.coverage(cov),{total:14,paired:8,incomeOnly:2,employmentOnly:
 assert.equal(C.coverage({...cov,mode:'pilot'}),null);
 assert.throws(()=>C.coverage({...cov,paired:11}));
 assert.throws(()=>C.coverage({...cov,year:2024}));
+
+assert.equal(C.normalizeName('ПАО «СБЕРБАНК»'),'сбербанк');
+assert.equal(C.normalizeName('ООО Ёлка-2026'),'ёлка 2026');
+assert.equal(C.namePath('сбербанк'),C.namePath('сбе'));
+assert.throws(()=>C.namePath('сб'));
+assert.deepEqual(C.nameMatches([['7707083893','ПАО Сбербанк'],['7707083893','Сбербанк'],['7704211201','Другой']],'сбе'),[['7707083893','ПАО Сбербанк']]);

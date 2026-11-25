@@ -70,7 +70,29 @@ const CompanyLookup=(()=>{
   const total=a.unique+b.unique-p;
   return {total,paired:p,incomeOnly:a.unique-p,employmentOnly:b.unique-p,income:a.unique,employment:b.unique};
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage};
+ function normalizeName(value){
+  const forms=new Set(['ооо','пао','ао','зао','оао','нко','фгуп','гуп','муп','ип','llc','jsc']);
+  const tokens=(String(value).replace(/[A-ZА-ЯЁ]/g,c=>c.toLowerCase()).match(/[а-яёa-z0-9]+/g)||[]);
+  while(tokens.length>1&&forms.has(tokens[0]))tokens.shift();
+  return tokens.join(' ');
+ }
+ function namePath(key){if(key.length<3)throw Error('Введите не менее трёх символов названия');let h=0;for(const c of key.slice(0,3))h=(h*31+c.charCodeAt(0))%256;return 'company-names/name-'+String(h).padStart(3,'0')+'.json.gz'}
+ function nameMatches(rows,key){
+  const result=new Map();
+  for(const [inn,name] of rows){if(!validInn(inn)||typeof name!=='string')throw Error('Некорректная запись имён');if(normalizeName(name).startsWith(key)&&!result.has(inn))result.set(inn,name)}
+  return [...result].sort((a,b)=>a[1].localeCompare(b[1],'ru')||a[0].localeCompare(b[0]));
+ }
+ async function searchNames(d,index,key,base='',fetcher=fetch){
+  const name=namePath(key),e=d.files[name];
+  if(d.status!=='ready'||index.status!=='ready'||d.year!==index.year||d.index_fingerprint!==index.fingerprint||!e||!Number.isSafeInteger(e.bytes)||e.bytes<1||e.bytes>8*1024*1024||!Number.isSafeInteger(e.count)||e.count<0||!/^[a-f0-9]{64}$/.test(e.sha256))throw Error('Индекс названий недоступен');
+  const response=await fetcher(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Блок названий недоступен');
+  const bytes=await response.arrayBuffer();
+  if(bytes.byteLength!==e.bytes||await Provenance.digest(bytes)!==e.sha256)throw Error('Контрольная сумма названий');
+  const rows=JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  if(!Array.isArray(rows)||rows.length!==e.count||rows.some(r=>!Array.isArray(r)||r.length!==2||namePath(normalizeName(r[1]))!==name))throw Error('Некорректный блок имён');
+  return nameMatches(rows,key);
+ }
+ return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage,normalizeName,namePath,nameMatches,searchNames};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -187,4 +209,32 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   $('company-coverage-table').replaceChildren(table);
   const btn=$('company-coverage-export');btn.disabled=false;btn.onclick=()=>csv('company-coverage-'+r.year+'.csv',[['Год','Объединение ИНН','Оба набора','Только финансы','Только занятость','Набор','Уникальных ИНН','Документов','Точных дублей','Конфликтующих ИНН','Обработано XML','Всего XML','URL ZIP','SHA-256 ZIP','Отпечаток манифеста'],...r.sources.map(x=>[r.year,v.total,v.paired,v.incomeOnly,v.employmentOnly,x.kind,x.unique,x.documents,x.exact_duplicates,x.conflicts,x.processed_members,x.xml_members,x.source,x.sha256,m.data_fingerprint])]);
  }catch(e){status.textContent='Охват не подтверждён: '+String(e.message||e)}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),form=$('company-name-form');if(!form)return;
+ const status=$('company-name-status'),out=$('company-name-results'),submit=$('company-name-submit'),input=$('company-name-query');
+ try{
+  const manifest=await Provenance.validateManifest(await load('data-manifest.json'));
+  const rank=(await Provenance.get(manifest,'company-rankings.json',root)).data;
+  const index=(await Provenance.get(manifest,'company-index.json',root)).data;
+  let names=null;try{names=(await Provenance.get(manifest,'company-names.json',root)).data}catch(e){}
+  const full=names?.status==='ready'&&index.status==='ready'&&names.index_fingerprint===index.fingerprint;
+  const rows=Object.values(rank.report?.rankings||{}).flatMap(x=>x.rows.flatMap(r=>[...new Set([r.income_name,r.employment_name,r.name].filter(Boolean))].map(n=>[r.inn,n])));
+  status.textContent=full?'Поиск по началу названия в полном финансовом индексе.':rows.length?'Поиск по началу названия только в опубликованных рейтингах. Полный индекс имён недоступен.':'Данные поиска пока отсутствуют.';
+  submit.disabled=!(full||rows.length);
+  form.onsubmit=async e=>{
+   e.preventDefault();out.replaceChildren();const key=CompanyLookup.normalizeName(input.value);
+   if(key.length<3){status.textContent='Введите не менее трёх символов названия.';return}
+   submit.disabled=true;status.textContent='Поиск…';
+   try{
+    const matches=full?await CompanyLookup.searchNames(names,index,key,root):CompanyLookup.nameMatches(rows,key);
+    status.textContent='Найдено '+matches.length+' уникальных ИНН · '+(full?'полный финансовый индекс':'только рейтинги')+'. Показано до 50; уточните название при необходимости.';
+    const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
+    for(const label of ['Наименование в источнике','ИНН','Действие']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const [inn,name] of matches.slice(0,50)){const tr=body.insertRow();tr.insertCell().textContent=name;tr.insertCell().textContent=inn;const a=node('a','Паспорт');const url=new URL(location.href);url.searchParams.set('inn',inn);url.hash='company-lookup';a.href=url.href;tr.insertCell().append(a)}
+    out.append(table);
+   }catch(e){status.textContent='Ошибка поиска: '+String(e.message||e)}finally{submit.disabled=false}
+  };
+ }catch(e){status.textContent='Поиск недоступен: '+String(e.message||e)}
 });

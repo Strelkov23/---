@@ -183,6 +183,9 @@ def check(out,previous,stamp):
         import company_index
         d=data["company-index.json"]
         counts.update(company_index.quality(d,out))
+        if (out/"company-names.json").is_file():
+            import company_names
+            counts.update(company_names.quality(json.loads((out/"company-names.json").read_text(encoding="utf-8")),out,d))
         if d["status"]=="ready":company_index.publishable(d,out,data["company-rankings.json"]["report"])
         else:warnings.append("ФНС: полный индекс не опубликован; поиск ограничен доступными рейтингами")
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Индекс организаций: "+str(e))
