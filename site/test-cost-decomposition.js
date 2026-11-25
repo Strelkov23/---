@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),D=require('./cost-decomposition.js'),fs=require('node:fs'),path=require('node:path');
+const m={names:['A','B'],A:[[.2,.3],[.1,.2]],imported:[.2,.1],residual:[.5,.4],demand:[100000,100000],output:[200000,200000],compatible:true};
+const p={material:[0,0],importIntensity:[0,0],importPrice:0,wage:[0,0],productivity:[0,0],wageShare:[40,50]};
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7*Math.max(1,Math.abs(b)),a+' != '+b);
+let r=D.calculate(m,p);near(r.basket.delta,0);assert.equal(r.cases,32);
+r=D.calculate(m,{...p,wage:[100,100]});assert.ok(r.basket.delta>0);near(r.basket.contributions[3],r.basket.delta);near(r.basket.contributions[4],0);
+r=D.calculate(m,{...p,productivity:[100,100]});assert.ok(r.basket.delta<0);near(r.basket.contributions[4],r.basket.delta);
+r=D.calculate(m,{...p,material:[20,10],importIntensity:[10,20],importPrice:30,wage:[20,30],productivity:[10,20]});near(r.basket.contributions.reduce((a,b)=>a+b,0),r.basket.delta);assert.ok(r.rows.every(x=>Math.abs(x.residual)<1e-7));assert.ok(r.basket.contributions[0]<0&&r.basket.contributions[2]>0&&r.basket.contributions[3]>0&&r.basket.contributions[4]<0);
+assert.throws(()=>D.calculate(m,{...p,wageShare:[null,10]}));
+const real=JSON.parse(fs.readFileSync(path.join(__dirname,'public','price-data.json'),'utf8')),n=real.names.length,arr=v=>Array(n).fill(v);
+r=D.calculate(real,{material:arr(5),importIntensity:arr(5),importPrice:10,wage:arr(10),productivity:arr(5),wageShare:arr(50)});assert.equal(r.rows.length,19);near(r.basket.residual,0);
+console.log('Cost decomposition: 32 counterfactuals, signed effects, exact reconciliation, real balance OK');

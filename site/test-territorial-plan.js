@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),T=require('./territorial-plan.js');
+const rows=[{key:'a',base:100,cap:10,weight:1},{key:'b',base:200,cap:20,weight:3}];
+let r=T.allocate(rows,30);assert.equal(r.feasible,true);assert.ok(Math.abs(r.rows[0].balanced-10)<1e-8);assert.ok(Math.abs(r.rows[1].balanced-20)<1e-8);assert.deepEqual(r.rows.map(v=>v.priority),[0,30]);
+r=T.allocate(rows,60);assert.equal(r.feasible,false);assert.equal(r.shortfall,10);assert.deepEqual(r.rows.map(v=>v.priority),[10,40]);
+r=T.allocate(rows,0);assert.equal(r.balanced.maxGrowth,0);assert.equal(r.priority.active,0);
+r=T.allocate([{...rows[0],cap:0},rows[1]],20);assert.equal(r.rows[0].balanced,0);assert.ok(Math.abs(r.rows[1].balanced-20)<1e-8);
+assert.throws(()=>T.allocate([rows[0],rows[0]],1));assert.throws(()=>T.allocate([{...rows[0],base:null}],1));
+const atlas={calculate:()=>({rows:new Map([['a',{region:'A',editionOK:true,value:100}],['b',{region:'B',editionOK:false,value:200}],['c',{region:'C',editionOK:true,value:null}]]),national:200,excluded:2,ambiguous:1})};
+r=T.prepare({},'x',2021,atlas,()=>{});assert.equal(r.total,100);assert.equal(r.coverage,50);assert.equal(r.rows.filter(v=>v.eligible).length,1);
+assert.throws(()=>T.prepare({},'x',2021,{calculate:()=>({rows:new Map([['a',{region:'A',editionOK:true,value:90}],['b',{region:'B',editionOK:true,value:90}]]),national:100})},()=>{}));
+console.log('Territorial planning: capped allocations, weighted optimum, missing observations, coverage and zero targets OK');

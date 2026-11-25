@@ -134,6 +134,117 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/territorial-plan.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#tp-controls tbody input').length>0",timeout=45000)
+        page.locator("#tp-target").fill("0")
+        page.locator("#tp-run").click()
+        assert "Цель допустима" in page.locator("#tp-status").inner_text()
+        assert page.locator("#tp-summary tbody tr").count()==2
+        with page.expect_download() as territorial:
+            page.locator("#tp-export").click()
+        with open(territorial.value.path(),encoding="utf-8-sig",newline="") as f:
+            territorial_rows=list(csv.reader(f,delimiter=";"))
+        assert len(territorial_rows)>1 and len({len(r) for r in territorial_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/cost-decomposition.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#cd-input tbody tr').length===19",timeout=45000)
+        page.locator("#cd-run").click()
+        assert page.locator("#cd-export").is_disabled()
+        page.locator("#cd-share").fill("50")
+        page.locator("#cd-apply").click()
+        page.locator("#cd-source").fill("Условный тест")
+        page.locator("#cd-import-price").fill("10")
+        page.locator("#cd-run").click()
+        assert page.locator("#cd-results tbody tr").count()==19
+        assert page.locator("#cd-basket tbody tr").count()==1
+        with page.expect_download() as cost:
+            page.locator("#cd-export").click()
+        with open(cost.value.path(),encoding="utf-8-sig",newline="") as f:
+            cost_rows=list(csv.reader(f,delimiter=";"))
+        assert len(cost_rows)==21 and len({len(r) for r in cost_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/horizon-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#hf-results tbody tr').length===5",timeout=45000)
+        page.locator("#hf-years").fill("3")
+        page.locator("#hf-lag").fill("2")
+        assert page.locator("#hf-export").is_disabled()
+        page.locator("#hf-run").click()
+        assert page.locator("#hf-results tbody tr").count()==3
+        page.locator("#hf-period").select_option("2")
+        assert page.locator("#hf-detail tbody tr").count()==19
+        with page.expect_download() as horizon:
+            page.locator("#hf-export").click()
+        with open(horizon.value.path(),encoding="utf-8-sig",newline="") as f:
+            horizon_rows=list(csv.reader(f,delimiter=";"))
+        assert len(horizon_rows)==58 and len({len(r) for r in horizon_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pf-input tbody tr').length===19",timeout=45000)
+        page.locator("#pf-budget").fill("0")
+        assert "недопустим" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-checks tbody tr").count()==40
+        with page.expect_download() as feasibility:
+            page.locator("#pf-export").click()
+        with open(feasibility.value.path(),encoding="utf-8-sig",newline="") as f:
+            feasibility_rows=list(csv.reader(f,delimiter=";"))
+        assert len(feasibility_rows)==60 and len({len(r) for r in feasibility_rows})==1
+        page.locator("#pf-add-resource").click()
+        assert "Заполните все поля" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-export").is_disabled()
+        card=page.locator(".pf-resource-card")
+        card.get_by_label("Название ресурса").fill("Электроэнергия")
+        card.get_by_label("Единица ресурса").fill("МВт·ч")
+        card.get_by_label("Источник или сценарное допущение").fill("Тестовое допущение")
+        card.get_by_label("Доступный дополнительный ресурс").fill("0")
+        for field in card.locator("tbody input").all(): field.fill("1")
+        assert "недопустим" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-checks tbody tr").count()==41
+        with page.expect_download() as package:
+            page.locator("#pf-resource-package").click()
+        package_path=package.value.path()
+        assert "МВт·ч" in page.locator("#pf-checks tbody tr").last.inner_text()
+        with page.expect_download() as natural:
+            page.locator("#pf-export").click()
+        with open(natural.value.path(),encoding="utf-8-sig",newline="") as f:
+            natural_rows=list(csv.reader(f,delimiter=";"))
+        assert len(natural_rows)==80 and len({len(r) for r in natural_rows})==1
+        assert sum(row[1]=="коэффициент ресурса" for row in natural_rows)==19
+        card.get_by_role("button",name="Удалить ресурс").click()
+        assert page.locator("#pf-checks tbody tr").count()==40
+        page.locator("#pf-labor-enabled").check()
+        assert page.locator("#pf-export").is_disabled()
+        page.locator("#pf-labor-file").set_input_files({"name":"invalid.csv","mimeType":"text/csv","buffer":b"invalid"})
+        page.wait_for_function("document.querySelector('#pf-labor-status').textContent.includes('отклонён')")
+        import io
+        template=Path("labor-coefficients-template.csv").read_text(encoding="utf-8-sig")
+        labor_rows=list(csv.reader(io.StringIO(template)))
+        for row in labor_rows[1:]:
+            row[4]="1000";row[5]="Эталон браузерной проверки"
+        buffer=io.StringIO();csv.writer(buffer).writerows(labor_rows)
+        page.locator("#pf-labor-file").set_input_files({"name":"labor.csv","mimeType":"text/csv","buffer":buffer.getvalue().encode()})
+        page.wait_for_function("document.querySelector('#pf-labor-status').textContent.includes('Принято 19')")
+        assert page.locator("#pf-checks tbody tr").count()==41
+        assert page.locator("#pf-labor-summary tbody tr").count()==19
+        assert "человеко-лет" in page.locator("#pf-checks tbody tr").last.inner_text()
+        with page.expect_download() as labor_export:
+            page.locator("#pf-export").click()
+        with open(labor_export.value.path(),encoding="utf-8-sig",newline="") as f:
+            labor_export_rows=list(csv.reader(f,delimiter=";"))
+        assert len(labor_export_rows)==80 and len({len(r) for r in labor_export_rows})==1
+        page.locator("#pf-labor-enabled").uncheck()
+        assert page.locator("#pf-checks tbody tr").count()==40
+        page.goto("http://localhost:8765/horizon-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#hf-results tbody tr').length===5",timeout=45000)
+        page.locator("#hf-resource-file").set_input_files(str(package_path))
+        page.wait_for_function("document.querySelector('#hf-resource-status').textContent.includes('Подключено ограничений: 1')")
+        page.locator("#hf-run").click()
+        assert page.locator("#hf-resource-results tbody tr").count()==5
+        assert page.locator("#hf-resource-export").is_enabled()
+        assert "0%" in page.locator("#hf-status").inner_text()
+        page.locator("#hf-resource-remove").click()
+        assert page.locator("#hf-resource-export").is_disabled()
+        page.locator("#hf-run").click()
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
         page.wait_for_function("document.querySelector('#stress-limit-chart svg')!==null",timeout=30000)
