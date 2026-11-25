@@ -91,6 +91,7 @@ jobs:
           node test-regional-map.js
           node test-regional-dashboard.js
           node test-regional-manufacturing.js
+          node test-territorial-plan.js
           node test-industrial-parks.js
           node test-park-certificates.js
           node test-news-map.js

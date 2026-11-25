@@ -134,6 +134,18 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/territorial-plan.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#tp-controls tbody input').length>0",timeout=45000)
+        page.locator("#tp-target").fill("0")
+        page.locator("#tp-run").click()
+        assert "Цель допустима" in page.locator("#tp-status").inner_text()
+        assert page.locator("#tp-summary tbody tr").count()==2
+        with page.expect_download() as territorial:
+            page.locator("#tp-export").click()
+        with open(territorial.value.path(),encoding="utf-8-sig",newline="") as f:
+            territorial_rows=list(csv.reader(f,delimiter=";"))
+        assert len(territorial_rows)>1 and len({len(r) for r in territorial_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/cost-decomposition.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#cd-input tbody tr').length===19",timeout=45000)
         page.locator("#cd-run").click()
