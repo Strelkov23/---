@@ -1,0 +1,33 @@
+name: Stage A adapter network acceptance
+on:
+  push:
+    branches: [stage-a-data-contract]
+    paths: ['site/source_acceptance.py','site/test_source_acceptance.py','.github/workflows/source-acceptance.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: stage-a-network-acceptance
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test and probe existing public adapters
+        run: |
+          python -m pip install openpyxl==3.1.5 xlrd==2.0.2
+          cd site
+          python -m unittest test_source_acceptance.py
+          python source_acceptance.py --archive ../history/published --output ../source-acceptance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-acceptance
+          path: source-acceptance.json
+          retention-days: 30
+          if-no-files-found: ignore
