@@ -124,6 +124,7 @@ jobs:
           node test-resource-plan.js
           node test-plan-feasibility.js
           node test-plan-register.js
+          node test-public-plan-fact.js
           node test-horizon-feasibility.js
           node test-dynamic-plan.js
           node test-global-plan.js

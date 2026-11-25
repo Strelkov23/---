@@ -134,6 +134,18 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/public-plan-fact.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#ppf-goals tbody tr').length>0",timeout=45000)
+        page.locator("#ppf-year").select_option("2025")
+        assert page.locator("#ppf-budget tbody tr").count()>0
+        page.locator("#ppf-basis").select_option("initial_law")
+        assert "Нет выбранного плана" in page.locator("#ppf-budget").inner_text()
+        with page.expect_download() as public_plan:
+            page.locator("#ppf-export").click()
+        with open(public_plan.value.path(),encoding="utf-8-sig",newline="") as f:
+            public_rows=list(csv.reader(f,delimiter=";"))
+        assert len(public_rows)>1 and len({len(r) for r in public_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/plan-register.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#pr-series option').length>0",timeout=45000)
         page.locator("#pr-name").fill("Проверка плана")

@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),P=require('./public-plan-fact.js');
+const g={id:'x',year:2025,plan:8,actual:7,direction:'le',plan_source:'s',plan_vintage:'v',actual_source:'f',favorable_gap:1};
+let r=P.goals({rows:[g,{...g,year:2026,actual:null,favorable_gap:null}]});assert.equal(r[0].favorable,1);assert.equal(r[0].status,'Цель достигнута');assert.equal(r[1].status,'Нет факта');assert.equal(r[1].delta,null);
+assert.equal(P.goals({rows:[{...g,direction:'ge',favorable_gap:-1} ]})[0].status,'Отклонение');
+assert.throws(()=>P.goals({rows:[g,g]}));assert.throws(()=>P.goals({rows:[{...g,favorable_gap:3}]}));
+const b={id:'x',year:2025,scope:'Бюджет',unit:'млн руб.',initial_law:null,amended_law:100,appropriation:120,actual:110};
+r=P.budgets({rows:[b]},'appropriation')[0];assert.equal(r.gap,-10);assert.equal(r.revision,20);assert.equal(r.cashGap,-10);assert.equal(r.net,10);
+r=P.budgets({rows:[b]},'initial_law')[0];assert.equal(r.gap,null);assert.equal(r.execution,null);assert.equal(r.status,'Нет выбранного плана');
+assert.equal(P.budgets({rows:[{...b,amended_law:0}]},'amended_law')[0].execution,null);
+assert.throws(()=>P.budgets({rows:[b,b]},'amended_law'));
+console.log('Public plan-fact: directional goals, missing facts, budget vintages and reconciliation OK');
