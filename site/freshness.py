@@ -171,6 +171,14 @@ def collect(out,stamp):
     if path.is_file():
         d=read(path.name)
         add("corporate-documentary","Предприятия","Корпоративные группы · документальные паспорта",None,dict(checked=d.get("checked"),status="Документальный снимок: "+str(len(d["groups"]))+" групп"),latest(o["year"] for g in d["groups"] for m in g["metrics"] for o in m["observations"]),archive=True,available=bool(d["groups"]),policy="Новые отчёты требуют документальной проверки; не автоматический импорт МСФО",href="company-atlas.html#group-passports")
+    path=out/"corporate-watch.json"
+    if path.is_file():
+        d=read(path.name)
+        for k,r in d["rows"].items():
+            labels={"waiting":"Ожидает проверки","baseline":"Получена первичная база метаданных","unchanged":"Общие HTTP-метаданные не изменились","changed":"Изменились HTTP-метаданные; требуется сверка","no_metadata":"Нет сопоставимых HTTP-метаданных","unavailable":"Источник недоступен"}
+            states={"waiting":"waiting","baseline":"ok","unchanged":"ok","changed":"partial","no_metadata":"partial","unavailable":"cached" if r["success"] else "unavailable"}
+            info=dict(checked=r["checked"],success=r["success"],status=labels[r["status"]]+(" · Сигнал изменения сохранён" if r["changed"] else ""),error=r["error"])
+            add("corp-watch-"+k,"Корпоративные документы",r["name"]+" · "+urlsplit(r["url"]).hostname,r["url"],info,None,days=7,failure_days=2,policy="До 6 ссылок в сутки; 7 суток после успеха, 2 после сбоя. Только метаданные известных документов, не дата финансовых данных.",href="company-atlas.html#group-passports",state_override=states[r["status"]])
     path=out/"company-index.json"
     if path.is_file():
         d=read(path.name);ready=d["status"]=="ready"
