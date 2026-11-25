@@ -1,0 +1,32 @@
+name: Bank queue counterfactual audit
+on:
+  push:
+    branches: [stage-f-bank-queue-audit]
+    paths: ['site/bank_form_queue.py','site/test_bank_form_queue.py','.github/workflows/bank-queue-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare queues on the retained snapshot without network access
+        run: |
+          cd site
+          python -m unittest test_bank_form_queue.py
+          python - <<'PY'
+          import json
+          import bank_form_queue as q
+          d=q.audit("../history/published","2026-11-26")
+          print("BANK_QUEUE_AUDIT",json.dumps(d,ensure_ascii=False))
+          assert d["target"]==299
+          assert d["distribution"]["3"]==14
+          assert d["independent"]["possible_complete"]==34
+          assert d["coordinated"]["possible_complete"]==39
+          assert d["independent"]["requests"]==d["coordinated"]["requests"]==[20,20,20]
+          PY

@@ -6,6 +6,7 @@ from urllib.parse import urlsplit,parse_qs
 from urllib.request import Request,urlopen
 from concurrent.futures import ThreadPoolExecutor
 from bank_registry import Tables,clean
+import bank_form_queue
 FILE="bank-capital.json"
 PERIOD="2026-01-01"
 ROOT="https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/"
@@ -66,18 +67,11 @@ def target_cohort(directory):
     """Current active ordinary banks registered by the historical report date."""
     full=directory["datasets"]["full"]["rows"]
     return sorted({r["registration_number"] for r in full if r["license_status"]=="Действующая" and r["kind"] is None and r["registered"] and r["registered"]<=PERIOD and re.fullmatch(r"\d{1,6}",r["registration_number"])},key=int)
-def plan(d,cohort,system,stamp):
-    today=date.fromisoformat(stamp[:10])
+def plan(d,cohort,system,stamp,counts=None):
     if d.get("expansion_day")==stamp[:10]:return []
     verified={r["registration_number"] for r in d["rows"] if r["verification"]=="html"}
-    attempts=d.get("attempts",{})
-    def due(reg):
-        last=attempts.get(reg,{}).get("checked")
-        return reg not in verified and (not last or today>=date.fromisoformat(last[:10])+timedelta(days=14))
-    # New candidates first within priority; avoid starvation from repeated unavailable sources.
-    priority=set(system)
-    return sorted((r for r in set(cohort)|priority|{r["registration_number"] for r in d["rows"]} if due(r)),key=lambda r:(r not in priority,r in attempts,attempts.get(r,{}).get("checked",""),int(r)))[:DAILY_LIMIT]
-def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
+    return bank_form_queue.plan(set(cohort)|set(system)|{r["registration_number"] for r in d["rows"]},verified,system,d.get("attempts",{}),stamp,counts,DAILY_LIMIT)
+def publish(out,previous,stamp,refresh,directory,fetcher=fetch,counts=None):
     d=json.loads(Path(__file__).with_name("bank-capital-seed.json").read_text(encoding="utf-8"));quality(d)
     try:
         old=json.loads((previous/FILE).read_text(encoding="utf-8"));quality(old)
@@ -85,7 +79,7 @@ def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
     except (OSError,ValueError,KeyError,TypeError):pass
     cohort=target_cohort(directory);system=[r["registration_number"] for r in directory["datasets"]["system"]["rows"]]
     d["target_cohort"]=cohort;d["cohort_edition"]=directory["datasets"]["full"]["edition"]
-    todo=plan(d,cohort,system,stamp) if refresh else []
+    todo=plan(d,cohort,system,stamp,counts) if refresh else []
     if todo:
         by={r["registration_number"]:r for r in d["rows"]}
         attempts=d.setdefault("attempts",{})
