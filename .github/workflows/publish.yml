@@ -17,6 +17,7 @@ jobs:
       version: ${{ steps.archive.outputs.version }}
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,7 +28,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Restore diagnostic SME report (one-time bootstrap)
+        if: ${{ hashFiles('history/published/sme-matrix.json') == '' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: sme-full-classification
+          run-id: 45607586349
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/sme-matrix-source
       - name: Restore archive and build
+        env:
+          SME_MATRIX_REPORT: /tmp/sme-matrix-source/classification.json
         run: |
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/
@@ -54,6 +66,7 @@ jobs:
           node test-company-lookup.js
           node test-group-passports.js
           node test-sme-map.js
+          node test-sme-matrix.js
           node test-enterprise-diagnostics.js
           node test-district-map.js
           node test-freshness.js

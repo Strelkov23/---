@@ -199,6 +199,12 @@ def check(out,previous,stamp):
         if d["status"]=="ready":company_index.publishable(d,out,data["company-rankings.json"]["report"])
         else:warnings.append("ФНС: полный индекс не опубликован; поиск ограничен доступными рейтингами")
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Индекс организаций: "+str(e))
+    if (out/"sme-matrix.json").is_file():
+        try:
+            import sme_matrix
+            sm=json.loads((out/"sme-matrix.json").read_text());counts.update(sme_matrix.quality(sm))
+            if sm["status"]=="diagnostic":warnings.append("МСП: диагностическая матрица, не официальный итог по ОКВЭД")
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Матрица МСП: "+str(e))
     try:
         import sme_regions
         old_file=previous/"sme-regions.json"
