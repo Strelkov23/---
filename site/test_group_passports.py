@@ -4,7 +4,7 @@ import group_passports as g
 class Groups(unittest.TestCase):
     def test_snapshot(self):
         d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
-        self.assertEqual(g.quality(d),{"group_passports":13,"group_observations":293})
+        self.assertEqual(g.quality(d),{"group_passports":14,"group_observations":341})
         for key,val in [("scope","legal_entity"),("standard","RAS"),("source","https://example.org/")]:
             bad=copy.deepcopy(d);bad["groups"][0][key]=val
             with self.assertRaises(ValueError):g.quality(bad)
@@ -35,4 +35,16 @@ class Groups(unittest.TestCase):
         self.assertEqual(len([m for m in x5["metrics"] if m.get("source")]),2)
         bad=copy.deepcopy(d);x=next(x for x in bad["groups"] if x["id"]=="x5")
         next(m for m in x["metrics"] if m.get("source"))["source"]="https://example.org/"
+        with self.assertRaises(ValueError):g.quality(bad)
+
+    def test_mmk_identities(self):
+        d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
+        mmk=next(x for x in d["groups"] if x["id"]=="mmk")
+        self.assertEqual(len(mmk["metrics"]),24)
+        for field in ("current_assets","noncurrent_liabilities","cost_of_sales","cash_fx"):
+            bad=copy.deepcopy(d);group=next(x for x in bad["groups"] if x["id"]=="mmk")
+            next(m for m in group["metrics"] if m["id"]==field)["observations"][0]["value"]="1"
+            with self.subTest(field=field),self.assertRaises(ValueError):g.quality(bad)
+        bad=copy.deepcopy(d);group=next(x for x in bad["groups"] if x["id"]=="mmk")
+        next(m for m in group["metrics"] if m["id"]=="cash_fx")["observations"].pop()
         with self.assertRaises(ValueError):g.quality(bad)
