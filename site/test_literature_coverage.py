@@ -14,3 +14,17 @@ class Coverage(unittest.TestCase):
             self.assertIn("literature-years.csv",p.render(d))
         lit["articles"].append(lit["articles"][0])
         with self.assertRaises(ValueError):p.collect(lit,"2026-11-26")
+
+    def test_search_links_and_topic_rows(self):
+        from urllib.parse import urlsplit,parse_qs
+        url=p.search_link("2025",journal="Журнал & экономика",metadata="complete")
+        q=parse_qs(urlsplit(url).query)
+        self.assertEqual(q["journal"],["Журнал & экономика"])
+        self.assertEqual(q["from"],["2025"])
+        self.assertEqual(q["paper-meta"],["complete"])
+        self.assertIsNone(p.search_link("unknown"))
+        d=p.collect(dict(registry={"Ж":{"issn":"1234-5678"}},articles=[dict(doi="10.1234/a",journal="Ж",published="2025",topics="Стратегическое планирование")]),"2026-11-26")
+        html=p.render(d)
+        self.assertIn("Тематические разрезы",html)
+        self.assertIn("100,0 %",html)
+        self.assertIn("catalogue-view=coverage",html)

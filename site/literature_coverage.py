@@ -4,6 +4,7 @@ from collections import Counter,defaultdict
 from html import escape
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 from literature import TOPICS
 FIELDS=("journal","issn","year","records","complete_bibliography","with_access_metadata")
 TOPIC_FIELDS=("topic","year","records","denominator")
@@ -41,14 +42,31 @@ def verify_csv(path,fields,rows):
     with path.open(encoding="utf-8-sig",newline="") as f:
         reader=csv.DictReader(f)
         if reader.fieldnames!=list(fields) or list(reader)!=[{k:csv_value(r[k]) for k in fields} for r in rows]:raise ValueError("CSV охвата")
+def search_link(year,journal=None,topic=None,metadata=None):
+    if year=="unknown":return None
+    params={"catalogue-view":"coverage","from":year,"to":year}
+    if journal:params["journal"]=journal
+    if topic:params["theme"]=topic
+    if metadata:params["paper-meta"]=metadata
+    return "papers.html?"+urlencode(params)
 def render(d):
     e=lambda v:escape(str(v),quote=True)
     body='<section id="literature-period-coverage"><h2>Охват каталога по годам и темам</h2><p>'+e(NOTE)+'</p><p><a href="literature-years.csv">CSV журналов и годов</a> · <a href="literature-topics.csv">CSV тем и годов</a></p><div class="table-scroll" tabindex="0" role="region" aria-label="Охват по годам"><table><thead><tr><th scope="col">Год</th><th scope="col">Записей</th></tr></thead><tbody>'
-    for y,n in d["years"].items():body+='<tr><td>'+e(("Год не определён" if y=="unknown" else y+" · будущий" if int(y)>int(d["as_of"][:4]) else y))+'</td><td>'+e(n)+'</td></tr>'
+    def link(label,url):return '<a href="'+e(url)+'">'+e(label)+'</a>' if url else e(label)
+    for y,n in d["years"].items():body+='<tr><td>'+e(("Год не определён" if y=="unknown" else y+" · будущий" if int(y)>int(d["as_of"][:4]) else y))+'</td><td>'+link(n,search_link(y))+'</td></tr>'
     body+='</tbody></table></div>'
     for name in sorted({r["journal"] for r in d["rows"]}):
         rs=[r for r in d["rows"] if r["journal"]==name]
         body+='<details><summary>'+e(name)+' · '+e(sum(r["records"] for r in rs))+' записей</summary><div class="table-scroll" tabindex="0" role="region" aria-label="'+e(name)+'"><table><thead><tr><th>Год</th><th>Статей</th><th>Полная библиография</th><th>Метаданные доступа</th></tr></thead><tbody>'
-        for r in rs:body+='<tr>'+''.join('<td>'+e(r[k])+'</td>' for k in ("year","records","complete_bibliography","with_access_metadata"))+'</tr>'
+        for r in rs:
+            y=r["year"];body+='<tr><td>'+e(y)+'</td><td>'+link(r["records"],search_link(y,journal=name))+'</td><td>'+link(r["complete_bibliography"],search_link(y,journal=name,metadata="complete"))+'</td><td>'+e(r["with_access_metadata"])+'</td></tr>'
+        body+='</tbody></table></div></details>'
+    body+='<h3>Тематические разрезы</h3><p>Доля — записи с данной темой / все записи соответствующего года. Темы могут пересекаться.</p>'
+    for topic in sorted({r["topic"] for r in d["topics"]}):
+        rs=[r for r in d["topics"] if r["topic"]==topic]
+        body+='<details><summary>'+e(topic)+'</summary><div class="table-scroll" tabindex="0" role="region" aria-label="'+e(topic)+'"><table><thead><tr><th scope="col">Год</th><th scope="col">Записей</th><th scope="col">Знаменатель</th><th scope="col">Доля</th></tr></thead><tbody>'
+        for r in rs:
+            share=f'{100*r["records"]/r["denominator"]:.1f}'.replace(".",",")+" %"
+            body+='<tr><td>'+e(r["year"])+'</td><td>'+link(r["records"],search_link(r["year"],topic=topic))+'</td><td>'+e(r["denominator"])+'</td><td>'+e(share)+'</td></tr>'
         body+='</tbody></table></div></details>'
     return body+'</section>'

@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }
   for(const tag of tags)$('index').add(new Option(tag+' ('+records.filter(r=>(meta(r).tags||[]).includes(tag)).length+')',tag));
   $('index').add(new Option('Статус не подтверждён','unknown'));restore(ids);
+  const params=new URLSearchParams(location.search);
+  if(params.get('catalogue-view')==='coverage'){
+   for(const id of ids)$(id).value=id==='order'?'new':'';
+   for(const id of ['journal','theme','paper-meta']){const v=params.get(id);if(v&&[...$(id).options].some(o=>o.value===v))$(id).value=v}
+   for(const id of ['from','to']){const v=params.get(id);if(v&&/^\d{4}$/.test(v)&&Number(v)>=1991&&Number(v)<=2100)$(id).value=v}
+  }
   const overview=$('index-overview');
   const groups=[['Российские перечни и базы',['РИНЦ','RSCI','ВАК','ВАК К1','ВАК К2','ВАК К3','Белый список 1','Белый список 2','Белый список 3','Белый список 4']],['Международные базы',['Scopus','Web of Science','DOAJ','EconLit','RePEc']]];
   for(const [heading,items] of groups){
@@ -59,7 +65,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const storageKey='economics-research-collection-v1';
   let basket=new Map(),persistent=true;
   try{for(const item of JSON.parse(localStorage.getItem(storageKey)||'[]'))if(item&&valid(item.url))basket.set(item.url,item)}catch{persistent=false}
-  const complete=r=>Boolean(r.volume&&r.issue&&(r.pages||r.article_number));
+  const complete=r=>Boolean(r.authors&&r.volume&&r.issue&&(r.pages||r.article_number));
   function item(r){return {title:r.title,url:doiURL(r.doi),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics||'',authors:r.authors||'',doi:r.doi||'',issn:meta(r).issn||'',volume:r.volume||'',issue:r.issue||'',pages:r.pages||'',article_number:r.article_number||'',metadata_checked:r.metadata_checked||'',archive_revision:version||''}}
   const projects=$('paper-project'),projectStatus=$('paper-project-status'),P=ResearchProjects;
   function projectList(){

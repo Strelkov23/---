@@ -1268,6 +1268,21 @@ with sync_playwright() as p:
             assert group.locator("[data-project-breakdown]:visible").count()>0
             assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/literature-quality.html",wait_until="load")
+        literature_quality=json.loads(Path("literature-quality.json").read_text())
+        coverage_links=page.locator('#literature-period-coverage a[href*="catalogue-view=coverage"]')
+        if literature_quality["coverage"]["rows"]:
+            assert coverage_links.count()>0
+            from urllib.parse import urlencode
+            first=next((r for r in literature_quality["coverage"]["rows"] if r["year"]!="unknown"),None)
+            if first:
+                query=urlencode({"catalogue-view":"coverage","journal":first["journal"],"from":first["year"],"to":first["year"]})
+                page.goto("http://localhost:8765/papers.html?"+query,wait_until="load")
+                page.wait_for_function("document.querySelector('#found').textContent.startsWith('Найдено статей:')",timeout=30000)
+                assert page.locator("#journal").input_value()==first["journal"]
+                assert page.locator("#from").input_value()==first["year"]
+                assert page.locator("#to").input_value()==first["year"]
+                assert int(''.join(c for c in page.locator("#found").inner_text() if c.isdigit()))==first["records"]
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
         if parks["rows"]:
