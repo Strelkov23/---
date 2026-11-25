@@ -206,6 +206,7 @@ jobs:
           assert a.get('group-status','').startswith('Документальный снимок'), a.get('group-status')
           assert a.get('group-cross-status','').startswith('Сопоставимых расчётов:'), a.get('group-cross-status')
           assert a.get('group-level-status','').startswith('Сопоставимые уровни:'), a.get('group-level-status')
+          assert a.get('group-observation-status','').startswith('Наблюдений:'), a.get('group-observation-status')
           paired=json.loads(Path('sme-finance.json').read_text())
           expected='Парные наблюдения' if paired.get('paired_sums_version')==1 else 'Парные суммы'
           assert a.get('sme-pair-status','').startswith(expected), a.get('sme-pair-status')
