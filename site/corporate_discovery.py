@@ -1,5 +1,5 @@
 """Discover candidate corporate reports from a small allowlist of official investor pages."""
-import json,re,hashlib
+import json,re
 from html.parser import HTMLParser
 from urllib.parse import urlsplit,urljoin,urldefrag,unquote,parse_qs
 from urllib.request import Request,build_opener,HTTPRedirectHandler
@@ -20,7 +20,8 @@ def allowed(group,url):
     except (ValueError,KeyError):return False
 class Redirect(HTTPRedirectHandler):
     def redirect_request(self,req,fp,code,msg,headers,newurl):
-        if urlsplit(newurl).hostname!=urlsplit(req.full_url).hostname or not newurl.startswith("https://"):raise ValueError("Другой хост")
+        u=urlsplit(newurl)
+        if u.hostname!=urlsplit(req.full_url).hostname or u.scheme!="https" or u.username or u.password or u.port not in (None,443):raise ValueError("Другой хост")
         return super().redirect_request(req,fp,code,msg,headers,newurl)
 class Links(HTMLParser):
     def __init__(self):
