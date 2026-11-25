@@ -10,6 +10,7 @@ FILE="bank-capital.json"
 PERIOD="2026-01-01"
 ROOT="https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/"
 MAX=2*1024*1024
+DAILY_LIMIT=20
 def url(reg,period=PERIOD):
     if not re.fullmatch(r"\d{1,6}",reg):raise ValueError("Номер банка")
     day=date.fromisoformat(period)
@@ -54,23 +55,52 @@ def quality(d):
         elif r["verification"]!="documentary" or r["sha256"] is not None:raise ValueError("Статус источника")
         ids.add(reg)
     if not ids:raise ValueError("Пустая выборка")
+    cohort=d.get("target_cohort",[])
+    if len(cohort)>5000 or len(cohort)!=len(set(cohort)) or any(not re.fullmatch(r"\d{1,6}",x) for x in cohort):raise ValueError("Целевая выборка")
+    if d.get("cohort_edition"):date.fromisoformat(d["cohort_edition"])
+    for reg,a in d.get("attempts",{}).items():
+        if not re.fullmatch(r"\d{1,6}",reg) or a["error"] is not None and not isinstance(a["error"],str):raise ValueError("Протокол попытки")
+        date.fromisoformat(a["checked"][:10])
     return {"bank_capital_records":len(ids),"bank_capital_html_verified":sum(r["verification"]=="html" for r in d["rows"])}
+def target_cohort(directory):
+    """Current active ordinary banks registered by the historical report date."""
+    full=directory["datasets"]["full"]["rows"]
+    return sorted({r["registration_number"] for r in full if r["license_status"]=="Действующая" and r["kind"] is None and r["registered"] and r["registered"]<=PERIOD and re.fullmatch(r"\d{1,6}",r["registration_number"])},key=int)
+def plan(d,cohort,system,stamp):
+    today=date.fromisoformat(stamp[:10])
+    if d.get("expansion_day")==stamp[:10]:return []
+    verified={r["registration_number"] for r in d["rows"] if r["verification"]=="html"}
+    attempts=d.get("attempts",{})
+    def due(reg):
+        last=attempts.get(reg,{}).get("checked")
+        return reg not in verified and (not last or today>=date.fromisoformat(last[:10])+timedelta(days=14))
+    # New candidates first within priority; avoid starvation from repeated unavailable sources.
+    priority=set(system)
+    return sorted((r for r in set(cohort)|priority|{r["registration_number"] for r in d["rows"]} if due(r)),key=lambda r:(r not in priority,r in attempts,attempts.get(r,{}).get("checked",""),int(r)))[:DAILY_LIMIT]
 def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
     d=json.loads(Path(__file__).with_name("bank-capital-seed.json").read_text(encoding="utf-8"));quality(d)
     try:
         old=json.loads((previous/FILE).read_text(encoding="utf-8"));quality(old)
         if {r["registration_number"] for r in d["rows"]}<={r["registration_number"] for r in old["rows"]}:d=old;d["status"]="cached"
     except (OSError,ValueError,KeyError,TypeError):pass
-    if refresh and (not d.get("last_attempt") or date.fromisoformat(stamp[:10])>=date.fromisoformat(d["last_attempt"][:10])+timedelta(days=7)):
+    cohort=target_cohort(directory);system=[r["registration_number"] for r in directory["datasets"]["system"]["rows"]]
+    d["target_cohort"]=cohort;d["cohort_edition"]=directory["datasets"]["full"]["edition"]
+    todo=plan(d,cohort,system,stamp) if refresh else []
+    if todo:
         by={r["registration_number"]:r for r in d["rows"]}
-        cohort=sorted(set(by)|{r["registration_number"] for r in directory["datasets"]["system"]["rows"]},key=int)
+        attempts=d.setdefault("attempts",{})
         def one(reg):
-            try:return reg,fetcher(reg),None
+            try:
+                r=fetcher(reg)
+                if r["registration_number"]!=reg or r["source"]!=url(reg) or r["verification"]!="html":raise ValueError("Не тот отчёт")
+                return reg,r,None
             except Exception as e:return reg,None,str(e)[:180]
-        with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(one,cohort))
-        errors=[]
+        with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(one,todo))
         for reg,r,e in results:
+            attempts[reg]=dict(checked=stamp,error=e)
             if r is not None:by[reg]=r
-            else:errors.append(dict(registration_number=reg,error=e))
-        d.update(rows=sorted(by.values(),key=lambda r:int(r["registration_number"])),status="partial" if errors else "ok",checked=stamp,last_attempt=stamp,errors=errors)
+        errors=[dict(registration_number=reg,error=a["error"]) for reg,a in sorted(attempts.items()) if a["error"] is not None and reg not in {r["registration_number"] for r in by.values() if r["verification"]=="html"}]
+        complete=set(cohort)<={r["registration_number"] for r in by.values() if r["verification"]=="html"}
+        d.update(rows=sorted(by.values(),key=lambda r:int(r["registration_number"])),status="ok" if complete else "partial",checked=stamp,last_attempt=stamp,expansion_day=stamp[:10],errors=errors)
+        print("BANK_CAPITAL_EXPANSION",json.dumps({"target":len(cohort),"attempted":len(todo),"verified":sum(r["verification"]=="html" for r in by.values()),"unavailable":len(errors)}),flush=True)
     quality(d);(out/FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8");return d
