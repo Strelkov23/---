@@ -13,8 +13,13 @@ const PlanFeasibility=(()=>{
   const b=[p.budget,p.importLimit,...m.output.map((v,i)=>v*p.capacity[i]/100000),...upper];
   const labels=['Лимит дополнительного конечного спроса','Лимит импортных промежуточных затрат',...m.names.map(v=>'Выпуск: '+v),...m.names.map(v=>'Верхний предел спроса: '+v)];
   const units=b.map(()=> 'млрд руб. (2021)'),sources=b.map(()=> 'Межотраслевой баланс 2021; пользовательский лимит');
-  const resources=p.resources??[];
-  if(!Array.isArray(resources)||resources.length>6)throw Error('Не более шести ресурсных ограничений');
+  const resources=[...(p.resources??[])];
+  if(!Array.isArray(p.resources??[])||resources.length>6)throw Error('Не более шести ресурсных ограничений');
+  const labor=p.labor??null;
+  if(labor){
+   if(!finite(labor.limit)||labor.limit<0||labor.limit>1e9||!finite(labor.productivity)||labor.productivity< -50||labor.productivity>100||!Array.isArray(labor.records)||labor.records.length!==n||labor.records.some((r,i)=>r.id!==i+1||r.name!==m.names[i]||r.year!==2021||r.output!==m.output[i]||!finite(r.fte)||r.fte<0||r.fte>1e9||typeof r.source!=='string'||!r.source.trim()||r.source.length>1000||/^[=+\-@]/.test(r.source.trim())||!finite(r.intensity)||r.intensity<0||Math.abs(r.intensity-r.fte/(r.output/1000))>1e-9*Math.max(1,r.intensity)))throw Error('Некорректная калибровка труда');
+   resources.push({name:'Труд (калиброванные FTE)',unit:'человеко-лет FTE',source:'CSV пользователя; изменение производительности '+labor.productivity+'%',limit:labor.limit,intensity:labor.records.map(r=>r.intensity/(1+labor.productivity/100)),labor:true});
+  }
   const seen=new Set(),resourceRows=[];
   for(const r of resources){
    if(typeof r.name!=='string'||!r.name.trim()||r.name.length>100||typeof r.unit!=='string'||!r.unit.trim()||r.unit.length>40||typeof r.source!=='string'||!r.source.trim()||r.source.length>300||!finite(r.limit)||r.limit<0||r.limit>1e12||!Array.isArray(r.intensity)||r.intensity.length!==n||r.intensity.some(v=>!finite(v)||v<0||v>1e9)||!r.intensity.some(v=>v>0))throw Error('Заполните паспорт и все коэффициенты ресурса; хотя бы один должен быть положительным');
@@ -57,6 +62,16 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   table($('pf-input'),['Группа','Минимум спроса, %','Максимум спроса, %','Предел выпуска, %','Вес цели'],m.names.map((v,i)=>[v,minimum[i],maximum[i],capacity[i],priority[i]]));
   const exp=$('pf-export'),budget=$('pf-budget'),importLimit=$('pf-import'),all=[budget,importLimit,...minimum,...maximum,...capacity,...priority];
   const resourceFields=[];
+  let laborRecords=null,laborRead=0;
+  const laborFile=$('pf-labor-file'),laborEnabled=$('pf-labor-enabled'),laborLimit=$('pf-labor-limit'),laborProd=$('pf-labor-productivity'),laborStatus=$('pf-labor-status');
+  laborFile.onchange=async()=>{
+   const token=++laborRead;laborRecords=null;laborStatus.textContent='Проверка файла…';draw();
+   const file=laborFile.files?.[0];if(!file){laborStatus.textContent='Файл не выбран.';draw();return}
+   try{if(file.size>200000)throw Error('Файл слишком большой');const rows=LaborCalibration.parse(await file.text(),m);if(!rows.some(r=>r.fte>0))throw Error('Все FTE равны нулю');if(token!==laborRead)return;laborRecords=rows;laborStatus.textContent='Принято '+rows.length+' групп; пользовательские данные, не независимая статистическая проверка.';}
+   catch(e){if(token!==laborRead)return;laborStatus.textContent='Файл отклонён: '+String(e.message||e)}
+   draw();
+  };
+  [laborEnabled,laborLimit,laborProd].forEach(x=>x.oninput=draw);
   function resourceCard(){
    if(resourceFields.length>=6)return;
    const card=node('article',''),controls=node('div','');controls.className='project-controls';card.className='pf-resource-card';
@@ -73,17 +88,23 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   $('pf-add-resource').onclick=resourceCard;
   function draw(){
-   exp.disabled=true;$('pf-checks').replaceChildren();$('pf-result').replaceChildren();
+   exp.disabled=true;$('pf-checks').replaceChildren();$('pf-result').replaceChildren();$('pf-labor-summary').replaceChildren();
    if(all.some(x=>!x.value||!x.validity.valid||!Number.isFinite(x.valueAsNumber))){status.textContent='Проверьте числовые параметры.';return}
    const vals=a=>a.map(x=>x.valueAsNumber),p={budget:budget.valueAsNumber,importLimit:importLimit.valueAsNumber,minimum:vals(minimum),maximum:vals(maximum),capacity:vals(capacity),priority:vals(priority)};
    if(resourceFields.some(r=>[r.name,r.unit,r.source].some(x=>!x.value.trim())||[r.limit,...r.intensity].some(x=>!x.value||!x.validity.valid||!Number.isFinite(x.valueAsNumber)))){status.textContent='Заполните все поля ресурсов, включая явные нули. Незаполненный коэффициент не равен нулю.';return}
    p.resources=resourceFields.map(r=>({name:r.name.value,unit:r.unit.value,source:r.source.value,limit:r.limit.valueAsNumber,intensity:vals(r.intensity)}));
+   $('pf-labor-summary').replaceChildren();
+   if(laborEnabled.checked){
+    if(!laborRecords||[laborLimit,laborProd].some(x=>!x.value||!x.validity.valid||!Number.isFinite(x.valueAsNumber))){status.textContent='Для трудового ограничения нужен проверенный CSV и допустимые лимит и производительность.';return}
+    p.labor={records:laborRecords,limit:laborLimit.valueAsNumber,productivity:laborProd.valueAsNumber};
+   }
    try{
     const r=PlanFeasibility.calculate(m,p,ResourcePlan.solve),x=r.optimum?.x||r.alternative,used=r.optimum?.usage||r.alternativeUse;
     status.textContent=r.feasible?'Обязательный минимум допустим. Найден максимум взвешенного дополнительного спроса; невязка цели '+r.optimum.gap.toExponential(2)+'.':'Обязательный минимум недопустим. Нарушено ограничений: '+r.checks.filter(c=>!c.feasible).length+'. Максимальный единый масштаб минимальных целей: '+fmt(r.alpha*100)+'%. Альтернатива не удовлетворяет исходному минимуму.';
     table($('pf-checks'),['Ограничение','Единица','Лимит','Требует минимум','Превышение','Потребность альтернативы / оптимума','Минимум допустим'],r.checks.map((c,i)=>[c.label,c.unit,fmt(c.limit),fmt(c.required),fmt(c.gap),fmt(used[i]),c.feasible?'Да':'Нет']));
     table($('pf-result'),['Группа','Обязательный спрос, млрд ₽','Результат, млрд ₽','Результат, % базового спроса','Доп. выпуск, млрд ₽'],m.names.map((v,i)=>[v,fmt(r.lower[i]),fmt(x[i]),fmt(100000*x[i]/m.demand[i]),fmt(r.coeff[i].reduce((s,c,j)=>s+c*x[j],0))]));
-    exp.disabled=false;exp.onclick=()=>csv('plan-feasibility-2021.csv',[['Год','Тип строки','Позиция','Минимум / требование','Максимум / лимит','Результат / использование','Превышение','Предел выпуска, %','Вес','Допустимость исходного минимума','Масштаб минимума','Цель оптимума','Двойственная цель','Невязка','SHA-256','Манифест','Единица','Источник / допущение','Прямой коэффициент на млрд руб. выпуска','Полный коэффициент на млрд руб. спроса'],...r.checks.map((c,i)=>[2021,'ограничение',c.label,c.required,c.limit,used[i],c.gap,'','',r.feasible?'да':'нет',r.alpha,r.optimum?.objective,r.optimum?.dualObjective,r.optimum?.gap,entry.sha256,manifest.data_fingerprint,c.unit,c.source,'','']),...m.names.map((name,i)=>[2021,'группа',name,r.lower[i],r.upper[i],x[i],'',p.capacity[i],p.priority[i],r.feasible?'да':'нет',r.alpha,r.optimum?.objective,r.optimum?.dualObjective,r.optimum?.gap,entry.sha256,manifest.data_fingerprint,'млрд руб. (2021)','','','']),...r.resourceRows.flatMap(a=>m.names.map((name,i)=>[2021,'коэффициент ресурса',a.name+' / '+name,'','','','','','','','','','','',entry.sha256,manifest.data_fingerprint,a.unit,a.source,a.intensity[i],a.row[i]]))]);
+    if(p.labor){const a=r.resourceRows.find(a=>a.labor),output=r.coeff.map(row=>row.reduce((s,c,j)=>s+c*x[j],0)),laborUse=a.intensity.map((v,i)=>v*output[i]);table($('pf-labor-summary'),['Группа выпуска','Базовые FTE','Прямой коэффициент базы','После изменения производительности','Дополнительные FTE','Источник'],p.labor.records.map((v,i)=>[v.name,fmt(v.fte),fmt(v.intensity),fmt(a.intensity[i]),fmt(laborUse[i]),v.source]));}
+    exp.disabled=false;exp.onclick=()=>csv('plan-feasibility-2021.csv',[['Год','Тип строки','Позиция','Минимум / требование','Максимум / лимит','Результат / использование','Превышение','Предел выпуска, %','Вес','Допустимость исходного минимума','Масштаб минимума','Цель оптимума','Двойственная цель','Невязка','SHA-256','Манифест','Единица','Источник / допущение','Прямой коэффициент на млрд руб. выпуска','Полный коэффициент на млрд руб. спроса','Базовые FTE','Базовый трудовой коэффициент','Изменение производительности, %'],...r.checks.map((c,i)=>[2021,'ограничение',c.label,c.required,c.limit,used[i],c.gap,'','',r.feasible?'да':'нет',r.alpha,r.optimum?.objective,r.optimum?.dualObjective,r.optimum?.gap,entry.sha256,manifest.data_fingerprint,c.unit,c.source,'','','','','']),...m.names.map((name,i)=>[2021,'группа',name,r.lower[i],r.upper[i],x[i],'',p.capacity[i],p.priority[i],r.feasible?'да':'нет',r.alpha,r.optimum?.objective,r.optimum?.dualObjective,r.optimum?.gap,entry.sha256,manifest.data_fingerprint,'млрд руб. (2021)','','','','','','']),...r.resourceRows.flatMap(a=>m.names.map((name,i)=>[2021,'коэффициент ресурса',a.name+' / '+name,'','','','','','','','','','','',entry.sha256,manifest.data_fingerprint,a.unit,a.labor?p.labor.records[i].source:a.source,a.intensity[i],a.row[i],a.labor?p.labor.records[i].fte:'',a.labor?p.labor.records[i].intensity:'',a.labor?p.labor.productivity:'']))]);
    }catch(e){console.error(e);status.textContent='Расчёт не подтверждён: '+String(e.message||e)}
   }
   all.forEach(x=>x.oninput=draw);$('pf-run').onclick=draw;draw();

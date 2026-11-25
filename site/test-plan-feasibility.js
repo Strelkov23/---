@@ -15,3 +15,9 @@ r=F.calculate(m,{...p,resources:[{...resource,limit:35}]},R.solve);assert.equal(
 const coupled={...m,effects:[[100000,50000],[25000,100000]]};r=F.calculate(coupled,{...p,resources:[{...resource,limit:100}]},R.solve);assert.deepEqual(r.resourceRows[0].row,[3,5]);
 const scaled=F.calculate(m,{...p,resources:[{...resource,limit:35000,intensity:[2000,4000]}]},R.solve);assert.ok(Math.abs(scaled.optimum.x[0]-7.5)<1e-8);
 assert.throws(()=>F.calculate(m,{...p,resources:[{...resource,intensity:[2,null]}]},R.solve));assert.throws(()=>F.calculate(m,{...p,resources:[resource,resource]},R.solve));assert.throws(()=>F.calculate(m,{...p,resources:[{...resource,intensity:[0,0]}]},R.solve));console.log('Physical resources: direct/full coefficients, incompatible minimum, binding limit, unit scaling and invalid assumptions OK');
+
+const laborRecords=m.names.map((name,i)=>({id:i+1,name,year:2021,output:m.output[i],fte:[2000,4000][i],intensity:[10,20][i],source:'Эталон'}));
+let lab={records:laborRecords,limit:75,productivity:0};
+r=F.calculate(m,{...p,labor:lab},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,.5);assert.equal(r.checks.at(-1).required,150);
+r=F.calculate(m,{...p,labor:{...lab,productivity:100}},R.solve);assert.equal(r.feasible,true);assert.deepEqual(r.optimum.x,[5,5]);assert.equal(r.optimum.usage.at(-1),75);
+assert.throws(()=>F.calculate(m,{...p,labor:{...lab,records:[]}},R.solve));assert.throws(()=>F.calculate(m,{...p,labor:{...lab,records:laborRecords.map(v=>({...v,year:2022}))}},R.solve));assert.throws(()=>F.calculate(m,{...p,labor:{...lab,productivity:-100}},R.solve));console.log('Labor constraints: calibration identity, productivity, infeasible and feasible cases OK');

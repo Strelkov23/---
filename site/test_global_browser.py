@@ -164,6 +164,28 @@ with sync_playwright() as p:
         assert sum(row[1]=="коэффициент ресурса" for row in natural_rows)==19
         card.get_by_role("button",name="Удалить ресурс").click()
         assert page.locator("#pf-checks tbody tr").count()==40
+        page.locator("#pf-labor-enabled").check()
+        assert page.locator("#pf-export").is_disabled()
+        page.locator("#pf-labor-file").set_input_files({"name":"invalid.csv","mimeType":"text/csv","buffer":b"invalid"})
+        page.wait_for_function("document.querySelector('#pf-labor-status').textContent.includes('отклонён')")
+        import io
+        template=Path("labor-coefficients-template.csv").read_text(encoding="utf-8-sig")
+        labor_rows=list(csv.reader(io.StringIO(template)))
+        for row in labor_rows[1:]:
+            row[4]="1000";row[5]="Эталон браузерной проверки"
+        buffer=io.StringIO();csv.writer(buffer).writerows(labor_rows)
+        page.locator("#pf-labor-file").set_input_files({"name":"labor.csv","mimeType":"text/csv","buffer":buffer.getvalue().encode()})
+        page.wait_for_function("document.querySelector('#pf-labor-status').textContent.includes('Принято 19')")
+        assert page.locator("#pf-checks tbody tr").count()==41
+        assert page.locator("#pf-labor-summary tbody tr").count()==19
+        assert "человеко-лет" in page.locator("#pf-checks tbody tr").last.inner_text()
+        with page.expect_download() as labor_export:
+            page.locator("#pf-export").click()
+        with open(labor_export.value.path(),encoding="utf-8-sig",newline="") as f:
+            labor_export_rows=list(csv.reader(f,delimiter=";"))
+        assert len(labor_export_rows)==80 and len({len(r) for r in labor_export_rows})==1
+        page.locator("#pf-labor-enabled").uncheck()
+        assert page.locator("#pf-checks tbody tr").count()==40
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
