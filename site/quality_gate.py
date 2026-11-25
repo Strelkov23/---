@@ -169,6 +169,11 @@ def check(out,previous,stamp):
             import bank_disclosure
             counts.update(bank_disclosure.quality(json.loads((out/"bank-disclosure.json").read_text(encoding="utf-8"))))
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Раскрытие банков: "+str(e))
+    if (out/"group-passports.json").is_file():
+        try:
+            import group_passports
+            counts.update(group_passports.quality(json.loads((out/"group-passports.json").read_text(encoding="utf-8"))))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Группы компаний: "+str(e))
     try:
         import company_sources
         counts.update(company_sources.quality(data["company-sources.json"]))
