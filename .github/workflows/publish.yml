@@ -196,6 +196,9 @@ jobs:
           assert a.get('group-status','').startswith('Документальный снимок'), a.get('group-status')
           assert a.get('group-cross-status','').startswith('Сопоставимых расчётов:'), a.get('group-cross-status')
           assert a.get('group-level-status','').startswith('Сопоставимые уровни:'), a.get('group-level-status')
+          paired=json.loads(Path('sme-finance.json').read_text())
+          expected='Парные наблюдения' if paired.get('paired_sums_version')==1 else 'Парные суммы'
+          assert a.get('sme-pair-status','').startswith(expected), a.get('sme-pair-status')
           assert b.get('bank-coverage-status','').startswith(('Все три формы проверены','Общая выборка не подтверждена')), b.get('bank-coverage-status')
           for name,id,yes,no in [('sme-matrix.json','sme-matrix-status','Диагностический срез','Диагностическая матрица пока недоступна.'),('sme-finance.json','sme-finance-status','Финансовый год:','Финансово-отраслевая диагностика пока не опубликована.')]:
               d=json.loads(Path(name).read_text())
