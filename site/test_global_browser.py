@@ -277,6 +277,15 @@ with sync_playwright() as p:
                 page.locator("#geo-compare-export").click()
             assert comparison.value.suggested_filename.startswith("regional-comparison-")
             page.locator("#geo-comparison summary").click()
+            page.locator("#geo-dashboard summary").click()
+            page.wait_for_function("document.querySelector('#gd-status').textContent.startsWith('Год:')",timeout=45000)
+            assert page.locator("#gd-table tbody tr").count()==8
+            page.locator("#gd-scope").check()
+            assert "общая выборка" in page.locator("#gd-status").inner_text()
+            with page.expect_download() as gd:
+                page.locator("#gd-export").click()
+            assert gd.value.suggested_filename.startswith("regional-multivariate-")
+            page.locator("#geo-dashboard summary").click()
             page.locator("#geo-scale").select_option("growth")
             page.locator("#geo-markers").select_option("top")
             assert page.locator("#geo-map g[role=button]").count()>0
