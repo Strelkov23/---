@@ -1,0 +1,68 @@
+name: Atlas preflight
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/group-passports.json'
+      - 'site/group_passports.py'
+      - 'site/test_group_passports.py'
+      - 'site/group-passports.js'
+      - 'site/test-group-passports.js'
+      - 'site/bank-*.js'
+      - 'site/test-bank-*.js'
+      - 'site/company-lookup.js'
+      - 'site/test-company-lookup.js'
+      - 'site/sme-finance.js'
+      - 'site/test-sme-finance.js'
+      - 'site/project-search.js'
+      - 'site/test-project-search.js'
+      - '.github/workflows/atlas-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atlas-preflight
+  cancel-in-progress: true
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            site
+          sparse-checkout-cone-mode: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate documentary source snapshot and atlas calculations
+        working-directory: site
+        run: |
+          set -eu
+          python -m unittest -v test_group_passports.py
+          for t in test-group-passports.js test-bank-directory.js test-bank-balance.js test-bank-profit.js test-bank-capital.js test-bank-capital-history.js test-company-lookup.js test-sme-finance.js test-project-search.js; do
+            node "$t"
+          done
+          python - <<'PY'
+          import json,hashlib,os
+          from pathlib import Path
+          import group_passports as g
+          raw=Path(g.FILE).read_bytes()
+          d=json.loads(raw)
+          result=g.quality(d)
+          report=dict(source_revision=os.environ["GITHUB_SHA"],snapshot_sha256=hashlib.sha256(raw).hexdigest(),**result)
+          Path("atlas-preflight.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("## Corporate atlas preflight\n\n")
+              for k,v in report.items():f.write(f"- {k}: {v}\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-preflight
+          path: site/atlas-preflight.json
+          if-no-files-found: error
+          retention-days: 14
