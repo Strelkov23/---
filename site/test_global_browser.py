@@ -285,6 +285,18 @@ with sync_playwright() as p:
             page.locator("#gd-query").fill("")
             page.locator("#gd-sort").select_option("0")
             page.locator("#gd-view").select_option("rank")
+            page.locator("#gd-view").select_option("percentile")
+            assert page.locator("#gd-table td[data-gd-band]").count()>0
+            page.locator("#gd-heat").uncheck()
+            assert page.locator("#gd-table td[data-gd-band]").count()==0
+            page.locator("#gd-heat").check()
+            page.locator("#gd-pair-a").select_option("3")
+            page.locator("#gd-pair-b").select_option("5")
+            if page.locator("#gd-pair-export").is_enabled():
+                assert page.locator("#gd-pair-chart svg").count()==1
+                with page.expect_download() as pair:
+                    page.locator("#gd-pair-export").click()
+                assert pair.value.suggested_filename.startswith("regional-pairs-")
             with page.expect_download() as wide:
                 page.locator("#gd-wide-export").click()
             assert wide.value.suggested_filename.startswith("regional-multivariate-matrix-")

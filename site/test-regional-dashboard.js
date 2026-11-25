@@ -17,3 +17,11 @@ assert.deepEqual(D.matrixRows(opts,calc,'','0','asc').map(x=>x.key),['томск
 assert.equal(D.matrixRows(opts,calc,'RU-MOW').length,1);
 assert.equal(D.matrixRows(opts,calc,'','name','desc','value',common).length,2);
 assert.equal(D.matrixRows(opts,calc,'','name','desc','value',new Set()).length,0);
+
+assert.equal(D.percentile([0,10,10],10),100*2/3);
+assert.equal(D.percentile([0,10,10],0),100*.5/3);
+assert.equal(D.percentile([],0),null);
+const paired=D.matrixRows(opts,[...calc,{result:D.summarize(b,2024,opts.map(o=>o.key),S.sample,S.stats)}]);
+assert.equal(D.pair(paired,0,1,S.pearson).rows.length,2);
+assert.equal(D.pair(paired,0,1,S.pearson).correlation,null);
+assert.equal(D.pair(paired,0,0,S.pearson).rows.length,0);
