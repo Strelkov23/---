@@ -144,6 +144,26 @@ with sync_playwright() as p:
         with open(feasibility.value.path(),encoding="utf-8-sig",newline="") as f:
             feasibility_rows=list(csv.reader(f,delimiter=";"))
         assert len(feasibility_rows)==60 and len({len(r) for r in feasibility_rows})==1
+        page.locator("#pf-add-resource").click()
+        assert "Заполните все поля" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-export").is_disabled()
+        card=page.locator(".pf-resource-card")
+        card.get_by_label("Название ресурса").fill("Электроэнергия")
+        card.get_by_label("Единица ресурса").fill("МВт·ч")
+        card.get_by_label("Источник или сценарное допущение").fill("Тестовое допущение")
+        card.get_by_label("Доступный дополнительный ресурс").fill("0")
+        for field in card.locator("tbody input").all(): field.fill("1")
+        assert "недопустим" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-checks tbody tr").count()==41
+        assert "МВт·ч" in page.locator("#pf-checks tbody tr").last.inner_text()
+        with page.expect_download() as natural:
+            page.locator("#pf-export").click()
+        with open(natural.value.path(),encoding="utf-8-sig",newline="") as f:
+            natural_rows=list(csv.reader(f,delimiter=";"))
+        assert len(natural_rows)==80 and len({len(r) for r in natural_rows})==1
+        assert sum(row[1]=="коэффициент ресурса" for row in natural_rows)==19
+        card.get_by_role("button",name="Удалить ресурс").click()
+        assert page.locator("#pf-checks tbody tr").count()==40
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)

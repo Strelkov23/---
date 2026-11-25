@@ -1,7 +1,7 @@
 name: Economic code checks
 on:
   push:
-    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility]
+    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:

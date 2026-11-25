@@ -9,3 +9,9 @@ r=F.calculate(m,{...p,minimum:[0,0],budget:0},R.solve);assert.equal(r.feasible,t
 const n=real.names.length,arr=v=>Array(n).fill(v);
 r=F.calculate(real,{budget:3000,importLimit:500,minimum:arr(0),maximum:arr(10),capacity:arr(10),priority:arr(1)},R.solve);assert.equal(r.feasible,true);assert.ok(r.optimum.usage.every((v,i)=>v<=r.checks[i].limit+1e-5));
 assert.throws(()=>F.calculate(m,{...p,minimum:[-1,0]},R.solve));console.log('Plan feasibility: exact floor, infeasible budget, capacity, import and ceiling, zero, real balance OK');
+const resource={name:'Энергия',unit:'МВт·ч',source:'Эталонное допущение',limit:20,intensity:[2,4]};
+r=F.calculate(m,{...p,resources:[resource]},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,2/3);assert.equal(r.checks.at(-1).required,30);assert.equal(r.checks.at(-1).unit,'МВт·ч');assert.equal(r.checks.at(-1).gap,10);
+r=F.calculate(m,{...p,resources:[{...resource,limit:35}]},R.solve);assert.equal(r.feasible,true);assert.ok(Math.abs(r.optimum.x[0]-7.5)<1e-8);assert.ok(Math.abs(r.optimum.usage.at(-1)-35)<1e-8);
+const coupled={...m,effects:[[100000,50000],[25000,100000]]};r=F.calculate(coupled,{...p,resources:[{...resource,limit:100}]},R.solve);assert.deepEqual(r.resourceRows[0].row,[3,5]);
+const scaled=F.calculate(m,{...p,resources:[{...resource,limit:35000,intensity:[2000,4000]}]},R.solve);assert.ok(Math.abs(scaled.optimum.x[0]-7.5)<1e-8);
+assert.throws(()=>F.calculate(m,{...p,resources:[{...resource,intensity:[2,null]}]},R.solve));assert.throws(()=>F.calculate(m,{...p,resources:[resource,resource]},R.solve));assert.throws(()=>F.calculate(m,{...p,resources:[{...resource,intensity:[0,0]}]},R.solve));console.log('Physical resources: direct/full coefficients, incompatible minimum, binding limit, unit scaling and invalid assumptions OK');
