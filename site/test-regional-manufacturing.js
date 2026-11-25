@@ -61,3 +61,16 @@ assert.equal(M.orderChanges(changes,'shareDelta','asc')[0].key,'свердлов
 assert.equal(M.orderChanges(changes,'shareDelta','desc','RU-MOS',true).length,1);
 assert.equal(M.orderChanges(changes,'shareDelta','desc','',true).length,2);
 assert.equal(M.regionalChanges(dset,'light',2024,2022,territories,S.sample).length,0);
+
+const totalRow=r(a,'total',100),part1=r(a,'food',60),part2=r(a,'light',40);
+const parts=[{group:'food',title:'Пищевая',observation:part1},{group:'light',title:'Лёгкая',observation:part2}];
+let concentration=M.concentration(totalRow,parts,2);
+assert.ok(Math.abs(concentration.hhi-.52)<1e-12);
+assert.ok(Math.abs(concentration.effective-1/.52)<1e-12);
+assert.equal(concentration.topShare,60);
+assert.equal(M.concentration(totalRow,parts.slice(0,1),2).hhi,null);
+assert.equal(M.concentration(totalRow,[parts[0],{...parts[1],observation:{...part2,edition:'old'}}],2).hhi,null);
+assert.equal(M.concentration({...totalRow,value:120},parts,2).hhi,null);
+assert.equal(M.concentration({...totalRow,value:100.2},parts,2).hhi,.52);
+assert.equal(M.concentration(totalRow,[{...parts[0],observation:{...part1,value:100}},{...parts[1],observation:{...part2,value:0}}],2).hhi,1);
+assert.equal(M.concentration({...totalRow,value:0},parts,2).hhi,null);

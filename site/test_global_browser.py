@@ -650,6 +650,16 @@ with sync_playwright() as p:
             assert page.locator("#rm-year").input_value()=="2024"
             assert page.locator("#rm-map svg path[data-region]").count()>70
             assert page.locator("#rm-table tbody tr").count()>65
+            assert page.locator(".rm-quick-nav a").count()==5
+            assert page.locator("#rm-conc-table tbody tr").count()>65
+            assert page.locator("#rm-conc-region").input_value()=="RU-MOS"
+            with page.expect_download() as concentration:
+                page.locator("#rm-conc-export").click()
+            assert concentration.value.suggested_filename=="regional-concentration-C-2024.csv"
+            with open(concentration.value.path(),encoding="utf-8-sig",newline="") as f:
+                concentration_rows=list(csv.reader(f,delimiter=";"))
+            assert len(concentration_rows)>65 and len({len(r) for r in concentration_rows})==1
+            assert page.locator(".rm-formula-diagram > div").count()==3
             assert "Московская" in page.locator("#rm-detail").inner_text()
             page.locator("#rm-all-profile summary").click()
             extra_profile=json.loads(Path("regional-mining-energy.json").read_text())

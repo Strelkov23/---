@@ -52,6 +52,31 @@ const ManufacturingAtlas=(()=>{
    return ax&&x!==y?sign*(x-y):a.name.localeCompare(b.name,'ru');
   });
  }
+ // HHI is meaningful only for complete, mutually exclusive groups in one section.
+ // Allow up to 0.5% difference from the published total for rounding / small residuals.
+ function concentration(total,parts,expected){
+  const empty={hhi:null,effective:null,topShare:null,top:null,coverage:null,known:0,expected,parts:[],reason:'Нет положительного итога'};
+  if(!total||!finite(total.value)||total.value<=0)return empty;
+  const valid=parts.filter(p=>p.observation&&identity(p.observation)===identity(total)&&finite(p.observation.value));
+  const sum=valid.reduce((s,p)=>s+p.observation.value,0),coverage=100*sum/total.value;
+  const result={...empty,coverage,known:valid.length,reason:'Неполный состав групп'};
+  if(!expected||parts.length!==expected||valid.length!==expected||new Set(valid.map(p=>p.group)).size!==expected)return result;
+  if(sum<=0||Math.abs(coverage-100)>.5+1e-9)return {...result,reason:'Сумма групп не совпадает с опубликованным итогом (допуск 0,5%)'};
+  const ordered=valid.map(p=>({...p,shareOfSum:100*p.observation.value/sum})).sort((a,b)=>b.shareOfSum-a.shareOfSum||a.title.localeCompare(b.title,'ru'));
+  const hhi=ordered.reduce((s,p)=>s+(p.shareOfSum/100)**2,0);
+  return {...result,hhi,effective:1/hhi,topShare:ordered[0].shareOfSum,top:ordered[0].title,parts:ordered,reason:'Полный сопоставимый состав'};
+ }
+ function concentrationRows(data,section,year,territories,sample){
+  const sectionTotal=sections[section]?.total;
+  if(!sectionTotal)return [];
+  const groups=(data.groups||[]).filter(g=>g.section===section&&g.id!==sectionTotal);
+  const total=calculate(data,sectionTotal,year,sample).rows;
+  const by=groups.map(g=>({g,rows:calculate(data,g.id,year,sample).rows}));
+  return territories.map(t=>{
+   const base=total.get(t.key)||null,parts=by.map(({g,rows})=>({group:g.id,title:g.title||g.id,okved:g.okved,observation:rows.get(t.key)||null}));
+   return {...t,total:base,sourceParts:parts,...concentration(base,parts,groups.length)};
+  });
+ }
  function localizationBin(v){return !finite(v)?-1:v<.5?0:v<1?1:v<1.5?2:v<2?3:4}
  function regionalProfile(data,key,year,sample){
   return (data.groups||[]).map(g=>{
@@ -62,7 +87,7 @@ const ManufacturingAtlas=(()=>{
  function profileFilter(rows,section='',mode='all'){
   return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
  }
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -157,6 +182,37 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     ['Раздел','Группа','ОКВЭД2','Территория','ISO','Начало','Конец','Отгрузка начало','Отгрузка конец','Итог раздела начало','Итог раздела конец','Доля начало','Доля конец','Локализация начало','Локализация конец','Отгрузка РФ начало','Отгрузка РФ конец','Итог РФ начало','Итог РФ конец','Изменение отгрузки, млн руб.','Номинальное изменение, %','Изменение доли, п. п.','Изменение локализации','Статус','ОКАТО начало','ОКАТО конец','ОКТМО начало','ОКТМО конец','Издание начало','Издание конец','Лист начало','Лист конец','Строка начало','Строка конец','Строка итога начало','Строка итога конец','Строка РФ начало','Строка РФ конец','Строка итога РФ начало','Строка итога РФ конец','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...rows.map(r=>{const a=r.first,b=r.last,d=r.delta;return [group.section,group.title,group.okved,r.name,r.code,start,end,a?.value,b?.value,a?.total,b?.total,a?.share,b?.share,a?.localization,b?.localization,a?.national,b?.national,a?.nationalTotal,b?.nationalTotal,d?.valueDelta,d?.nominalChange,d?.shareDelta,d?.localizationDelta,r.status,a?.okato,b?.okato,a?.oktmo,b?.oktmo,a?.edition,b?.edition,a?.sheet,b?.sheet,a?.row,b?.row,a?.totalRow,b?.totalRow,a?.nationalRow,b?.nationalRow,a?.nationalTotalRow,b?.nationalTotalRow,src?.data.source,src?.data.sha256,src?.sha256,manifest.data_fingerprint]})]);
   }
   for(const el of [startPick,endPick,deltaMetric,deltaOrder,deltaKnown])el.onchange=drawDelta;deltaQuery.oninput=drawDelta;
+  const concRegion=$('rm-conc-region'),concMetric=$('rm-conc-metric'),concStatus=$('rm-conc-status'),concTable=$('rm-conc-table'),concChart=$('rm-conc-chart'),concExport=$('rm-conc-export');
+  const concOptions=deltaTerritories.slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const concId=t=>t.code||t.key;
+  concRegion.replaceChildren(new Option('Выберите регион',''),...concOptions.map(t=>new Option(t.name,concId(t))));
+  function drawConcentration(){
+   const section=sectionPick.value,year=Number($('rm-year').value);
+   const rows=ManufacturingAtlas.concentrationRows(combined,section,year,concOptions,RegionalStats.sample),metric=concMetric.value;
+   const known=rows.filter(r=>Number.isFinite(r.hhi)),sorted=[...rows].sort((a,b)=>{
+    const av=Number.isFinite(a[metric]),bv=Number.isFinite(b[metric]);return av!==bv?(av?-1:1):av?b[metric]-a[metric]||a.name.localeCompare(b.name,'ru'):a.name.localeCompare(b.name,'ru');
+   });
+   concStatus.textContent='Раздел '+section+' · '+year+' · полных сопоставимых структур: '+known.length+' из '+rows.length+' территорий. Пропуски и несходящиеся итоги исключены из расчёта.';
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+   for(const label of ['Регион','HHI (0–1)','Эффективное число групп','Крупнейшая группа','Её доля, %','Охват групп / итог, %','Статус']){const th=node('th',label);th.scope='col';h.append(th)}
+   for(const r of sorted){const tr=body.insertRow(),button=node('button',r.name);button.type='button';button.className='rm-region-link';button.onclick=()=>{concRegion.value=concId(r);drawConcentration();concChart.scrollIntoView({block:'nearest'})};tr.insertCell().append(button);
+    for(const v of [number(r.hhi),number(r.effective),r.top||'—',number(r.topShare),number(r.coverage)+' · '+r.known+'/'+r.expected,r.reason])tr.insertCell().textContent=v;
+   }
+   concTable.replaceChildren(t);concChart.replaceChildren();
+   const chosen=rows.find(r=>concId(r)===concRegion.value);
+   if(!chosen)concChart.append(node('p','Выберите регион для диаграммы структуры.'));
+   else if(!Number.isFinite(chosen.hhi))concChart.append(node('h3',chosen.name+' · '+year),node('p',chosen.reason+'. Числовых групп: '+chosen.known+'/'+chosen.expected+'.'));
+   else{
+    concChart.append(node('h3',chosen.name+' · '+year),node('p','Распределение отгрузки по '+chosen.expected+' группам раздела '+section+'. HHI: '+number(chosen.hhi)+' · эффективное число групп: '+number(chosen.effective)+'.'));
+    const chart=node('div','');chart.className='rm-composition';
+    for(const x of chosen.parts){const line=node('div','');line.className='rm-composition-row';const bar=node('div','');bar.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=x.shareOfSum+'%';bar.append(fill);line.append(node('span',x.title+' · '+x.okved),bar,node('strong',number(x.shareOfSum)+'%'));chart.append(line)}
+    concChart.append(chart);
+   }
+   const src=bySection[section];
+   concExport.disabled=!rows.length;
+   concExport.onclick=()=>csv('regional-concentration-'+section+'-'+year+'.csv',[['Год','Раздел','Территория','ISO','Итог раздела, млн руб.','HHI','Эффективное число групп','Крупнейшая группа','Доля крупнейшей, %','Сумма групп / итог, %','Числовых групп','Всего групп','Статус','Группа','ОКВЭД2','Отгрузка группы, млн руб.','Доля в сумме групп, %','ОКАТО','ОКТМО','Издание','Лист','Строка группы','Строка итога','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...sorted.flatMap(r=>r.sourceParts.map(p=>[year,section,r.name,r.code,r.total?.value,r.hhi,r.effective,r.top,r.topShare,r.coverage,r.known,r.expected,r.reason,p.title,p.okved,p.observation?.value,r.parts.find(x=>x.group===p.group)?.shareOfSum,p.observation?.okato,p.observation?.oktmo,p.observation?.edition,p.observation?.sheet,p.observation?.row,r.total?.row,src?.data.source,src?.data.sha256,src?.sha256,manifest.data_fingerprint]))]);
+  }
+  concRegion.onchange=concMetric.onchange=drawConcentration;
   const shape=(svg,tag,attrs,label)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;svg.append(e);return e};
   function renderMap(items,metric,group){
    const host=$('rm-map');host.replaceChildren();
@@ -266,7 +322,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const r of ordered){const tr=body.insertRow();tr.insertCell().textContent=Number.isFinite(r[metric])?1+known.filter(x=>x[metric]>r[metric]).length:'—';const b=node('button',r.name);b.type='button';b.onclick=()=>{select.value=r.code;draw();detail.scrollIntoView({block:'start'})};tr.insertCell().append(b);for(const v of [r.value,r.total,r.share,r.localization,r.countryShare])tr.insertCell().textContent=number(v)}
    $('rm-table').replaceChildren(table);exporter.disabled=false;
    exporter.onclick=()=>csv('regional-manufacturing-'+group.id+'-'+year+'.csv',[['Группа','Раздел ОКВЭД2','ОКВЭД2','Год','Регион','ISO геометрии','Территория источника','ОКАТО','ОКТМО','Отгрузка, млн руб.','Итог региона, млн руб.','Доля, %','Локализация','Доля РФ, %','Отгрузка РФ, млн руб.','Итог РФ, млн руб.','Доля отрасли в разделе '+group.section+' РФ, %','Подраздел','Издание','Лист','Строка отгрузки','Строка итога','Строка отгрузки РФ','Строка итога РФ','Примечание','Источник','SHA-256 исходника','SHA-256 JSON','Отпечаток манифеста'],...ordered.map(r=>[group.title,group.section,group.okved,year,r.name,r.code,r.region,r.okato,r.oktmo,r.value,r.total,r.share,r.localization,r.countryShare,result.national,result.nationalTotal,result.nationalShare,r.subsection,r.edition,r.sheet,r.row,r.totalRow,r.nationalRow,r.nationalTotalRow,r.note,selected.data.source,selected.data.sha256,selected.sha256,manifest.data_fingerprint])]);
-   syncDeltaYears(group);drawDelta();save(fields);
+   syncDeltaYears(group);drawDelta();if(chosen&&concOptions.some(t=>t.code===chosen.code))concRegion.value=chosen.code;drawConcentration();save(fields);
   }
   $('rm-form').addEventListener('change',e=>{if(e.target===sectionPick)setGroups('');draw()});$('rm-form').addEventListener('submit',e=>e.preventDefault());draw();
  }catch(e){console.error(e);status.textContent='Не удалось проверить архив: '+String(e.message||e);exporter.disabled=true}
