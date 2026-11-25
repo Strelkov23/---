@@ -13,23 +13,10 @@ MAX_ARCHIVE=4*1024**3
 MAX_UNPACKED=40*1024**3
 NOTE="Полный проход реестра МСП одного среза. Только юридические лица; регион места нахождения, не площадка. ОКВЭД заявительный и отчётный отдельно. Не ЕГРЮЛ и не финансовая статистика."
 
-def download(url,path,opener=urlopen):
-    u=urlsplit(url)
-    if u.scheme!="https" or u.hostname not in ("file.nalog.ru","data.nalog.ru") or u.query or u.fragment or not re.fullmatch(r"/opendata/7707329152-rsmp/data-\d{8}-structure-\d{8}\.zip",u.path):raise ValueError("URL ZIP")
-    sha=hashlib.sha256();size=0
-    with opener(Request(url,headers={"User-Agent":"EconomicMonitor/1.0","Accept-Encoding":"identity"}),timeout=90) as r,open(path,"wb") as f:
-        target=urlsplit(r.geturl())
-        if target.scheme!="https" or target.hostname not in ("file.nalog.ru","data.nalog.ru") or target.path!=u.path or target.query or target.fragment:raise ValueError("Перенаправление ZIP")
-        expected=int(r.headers["Content-Length"]) if r.headers.get("Content-Length") else None
-        if expected is not None and not 0<expected<=MAX_ARCHIVE:raise ValueError("Размер архива")
-        while True:
-            raw=r.read(1024*1024)
-            if not raw:break
-            size+=len(raw)
-            if size>MAX_ARCHIVE:raise ValueError("Бюджет ZIP")
-            sha.update(raw);f.write(raw)
-    if not size or expected is not None and size!=expected:raise ValueError("Неполный ZIP")
-    return sha.hexdigest(),size
+def download(url,path,opener=None):
+    from stream_archive import download_zip,approved
+    if not approved(url) or not re.fullmatch(r"/opendata/7707329152-rsmp/data-\d{8}-structure-\d{8}\.zip",urlsplit(url).path):raise ValueError("URL ZIP")
+    return download_zip(url,path,max_bytes=MAX_ARCHIVE,timeout=90,opener=opener)
 
 def setup(db):
     db.executescript("""
@@ -38,11 +25,12 @@ def setup(db):
     """)
 
 def full(db,z,edition):
-    members=sorted((m for m in z.infolist() if not m.is_dir()),key=lambda m:m.filename)
-    if not members or len(members)>30000 or len({m.filename for m in members})!=len(members) or any(not m.filename.lower().endswith(".xml") or not 0<m.file_size<=s.MAX_XML for m in members) or sum(m.file_size for m in members)>MAX_UNPACKED:raise ValueError("Состав XML")
+    from stream_archive import inventory_xml,read_member
+    entries,_=inventory_xml(z,max_members=30000,max_member_bytes=s.MAX_XML,max_unpacked=MAX_UNPACKED,strict=True)
+    members=sorted(entries,key=lambda m:m.filename)
     totals=Counter();quarantined=[]
     for i,m in enumerate(members,1):
-        raw=z.read(m);rejected=[];rows,counts=s.parse_member(raw,edition,rejected);totals.update(counts)
+        raw=read_member(z,m,s.MAX_XML);rejected=[];rows,counts=s.parse_member(raw,edition,rejected);totals.update(counts)
         quarantined.extend(dict(member=m.filename,**r) for r in rejected)
         if len(quarantined)>10000:raise ValueError("Слишком много некорректных идентификаторов")
         db.execute("INSERT INTO members VALUES(?,?,?,?)",(i,m.filename,hashlib.sha256(raw).hexdigest(),counts["documents"]))

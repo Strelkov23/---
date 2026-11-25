@@ -40,18 +40,10 @@ def parse_xml(raw,kind):
         if all(v is None for v in vals):raise ValueError("Нет числовых полей документа")
         yield inn,name,*vals
 def download(url,path):
-    u=urlsplit(url)
-    if u.scheme!="https" or u.hostname not in ("file.nalog.ru","data.nalog.ru") or not re.fullmatch(r"/opendata/7707329152-(?:revexp|sshr2019)/data-\d{8}-structure-\d{8}\.zip",u.path):raise ValueError("URL архива")
-    sha=hashlib.sha256();size=0
-    with urlopen(Request(url,headers={"User-Agent":"Mozilla/5.0"}),timeout=60) as r,open(path,"wb") as f:
-        if urlsplit(r.geturl()).hostname not in ("file.nalog.ru","data.nalog.ru"):raise ValueError("Перенаправление архива")
-        while True:
-            b=r.read(1024*1024)
-            if not b:break
-            size+=len(b)
-            if size>MAX_ARCHIVE:raise ValueError("Превышен лимит ZIP")
-            sha.update(b);f.write(b)
-    return sha.hexdigest(),size
+    from stream_archive import download_zip,approved
+    if not approved(url) or not re.fullmatch(r"/opendata/7707329152-(?:revexp|sshr2019)/data-\d{8}-structure-\d{8}\.zip",urlsplit(url).path):raise ValueError("URL архива")
+    return download_zip(url,path,max_bytes=MAX_ARCHIVE,timeout=60)
+
 def setup(db):
     db.executescript("""
     CREATE TABLE IF NOT EXISTS income(inn TEXT,year INTEGER,name TEXT,income_cents INTEGER,expense_cents INTEGER,member TEXT,doc INTEGER,PRIMARY KEY(inn,year));
@@ -63,15 +55,13 @@ def import_zip(db,path,kind,year,limit=None):
     table="income" if kind=="income_expense" else "employment"
     n=dups=conflicts=excluded_conflicts=0
     with zipfile.ZipFile(path) as z:
-        members=z.infolist()
-        files=[m for m in members if not m.is_dir() and m.filename.lower().endswith(".xml")]
-        if not files or len(files)>3_000_000 or len({m.filename for m in files})!=len(files):raise ValueError("Состав XML архива")
-        if any(m.file_size>MAX_XML for m in files) or sum(m.file_size for m in files)>MAX_UNPACKED:raise ValueError("Превышен лимит XML")
+        from stream_archive import inventory_xml,read_member
+        files,only_xml=inventory_xml(z,max_members=3_000_000,max_member_bytes=MAX_XML,max_unpacked=MAX_UNPACKED,strict=False)
         selected=files if limit is None else files[:limit]
         # Any non-XML payload makes completeness unknown.
-        complete=len(selected)==len(files) and all(m.is_dir() or m.filename.lower().endswith(".xml") for m in members)
+        complete=len(selected)==len(files) and only_xml
         for m in selected:
-            for j,row in enumerate(parse_xml(z.read(m),kind),1):
+            for j,row in enumerate(parse_xml(read_member(z,m,MAX_XML),kind),1):
                 inn,name,*vals=row;n+=1
                 if db.execute("SELECT 1 FROM conflicts WHERE kind=? AND inn=? AND year=?",(kind,inn,year)).fetchone():
                     excluded_conflicts+=1;continue

@@ -142,4 +142,53 @@ class PipelineTests(unittest.TestCase):
         base='<ValCurs ID="R01235"><Record Date="01.01.2026"><Nominal>1</Nominal><Value>90</Value></Record>'
         with self.assertRaises(ValueError):cbr_data.fx_rows((base+'<Record Date="01.01.2026"><Nominal>1</Nominal><Value>91</Value></Record></ValCurs>').encode(),"R01235")
         with self.assertRaises(ValueError):cbr_data.fx_rows(base.replace(">90<",">nan<").encode()+b"</ValCurs>","R01235")
+class StreamTests(unittest.TestCase):
+    def raw_zip(self):
+        import zipfile
+        buf=io.BytesIO()
+        with zipfile.ZipFile(buf,"w") as z:z.writestr("fixture.xml",b"x"*100)
+        return buf.getvalue()
+    def test_atomic_zip(self):
+        import stream_archive as sa,hashlib
+        url="https://file.nalog.ru/opendata/7707329152-rsmp/data-20261110-structure-20261110.zip"
+        raw=self.raw_zip()
+        with tempfile.TemporaryDirectory() as tmp:
+            dest=Path(tmp)/"source.zip";dest.write_bytes(b"previous")
+            for response in (FakeResponse(raw,url=url,length=len(raw)+1),FakeResponse(raw,url=url,status=206),FakeResponse(b"not zip",url=url),FakeResponse(raw,url=url.replace("20261110","20261111")),FakeResponse(raw,url=url,encoding="gzip")):
+                with self.assertRaises(ValueError):sa.download_zip(url,dest,max_bytes=1000,opener=Client(response).open)
+                self.assertEqual(dest.read_bytes(),b"previous")
+                self.assertEqual(list(Path(tmp).iterdir()),[dest])
+            response=FakeResponse(raw,url=url,length=len(raw))
+            self.assertEqual(sa.download_zip(url,dest,max_bytes=1000,opener=Client(response).open),(hashlib.sha256(raw).hexdigest(),len(raw)))
+            self.assertEqual(dest.read_bytes(),raw)
+    def test_chunked_transport(self):
+        import stream_archive as sa,zipfile
+        class Bounded(FakeResponse):
+            def read(self,n=-1):
+                if not 0<n<=sa.CHUNK:raise AssertionError("Unbounded read")
+                return super().read(n)
+        buf=io.BytesIO()
+        with zipfile.ZipFile(buf,"w") as z:z.writestr("big.xml",b"x"*(2*sa.CHUNK+1))
+        raw=buf.getvalue();url="https://data.nalog.ru/opendata/7707329152-revexp/data-20261110-structure-20261110.zip"
+        with tempfile.TemporaryDirectory() as tmp:
+            target=Path(tmp)/"zip"
+            with self.assertRaises(ValueError):sa.download_zip(url,target,max_bytes=sa.CHUNK,opener=Client(Bounded(raw,url=url)).open)
+            self.assertFalse(target.exists())
+            sa.download_zip(url,target,max_bytes=len(raw),opener=Client(Bounded(raw,url=url)).open)
+            with zipfile.ZipFile(target) as z:
+                members,complete=sa.inventory_xml(z,max_members=10,max_member_bytes=3*sa.CHUNK,max_unpacked=3*sa.CHUNK,strict=True)
+                self.assertTrue(complete);self.assertEqual(len(sa.read_member(z,members[0],3*sa.CHUNK)),2*sa.CHUNK+1)
+                with self.assertRaises(ValueError):sa.inventory_xml(z,max_members=10,max_member_bytes=sa.CHUNK,max_unpacked=sa.CHUNK,strict=True)
+    def test_inventory_and_source_scope(self):
+        import stream_archive as sa,zipfile
+        self.assertFalse(sa.approved("https://data.nalog.ru/other.zip"))
+        self.assertFalse(sa.approved("https://data.nalog.ru:8080/opendata/7707329152-rsmp/data-20261110-structure-20261110.zip"))
+        buf=io.BytesIO()
+        with zipfile.ZipFile(buf,"w") as z:z.writestr("data.xml",b"valid");z.writestr("readme.txt",b"note")
+        with zipfile.ZipFile(buf) as z:
+            options=dict(max_members=10,max_member_bytes=10,max_unpacked=10)
+            with self.assertRaises(ValueError):sa.inventory_xml(z,strict=True,**options)
+            members,complete=sa.inventory_xml(z,strict=False,**options)
+            self.assertFalse(complete);self.assertEqual(sa.read_member(z,members[0],10),b"valid")
+            with self.assertRaises(ValueError):sa.read_member(z,members[0],2)
 if __name__=="__main__":unittest.main()

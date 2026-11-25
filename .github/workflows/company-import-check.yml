@@ -2,7 +2,7 @@ name: FNS corporate archive complete import
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/company-import-check.yml','site/company_import.py','site/company_index.py','site/test_company_index.py']
+    paths: ['.github/workflows/company-import-check.yml','site/company_import.py','site/stream_archive.py','site/source_transport.py','site/company_index.py','site/test_company_index.py']
   workflow_dispatch:
 permissions:
   contents: read
