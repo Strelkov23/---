@@ -105,6 +105,15 @@ class CatalogueTests(unittest.TestCase):
         self.assertIsNone(literature.metadata({})["cited_by"])
         self.db.execute("insert into literature_meta values(?,?,?)",("10.1234/test",'{"volume":"2"}',"2026-11-24"))
         self.assertEqual(literature.enrich(self.db,[{"doi":"10.1234/test"}])[0]["volume"],"2")
+    def test_access_metadata(self):
+        x={"license":[{"URL":"https://creativecommons.org/licenses/by/4.0/","content-version":"vor","start":{"date-parts":[[2026,1,2]]}},{"URL":"javascript:alert(1)"},{"URL":"http://127.0.0.1/x"}],"link":[{"URL":"https://publisher.example.org/paper.pdf","content-type":"application/pdf","intended-application":"text-mining"},{"URL":"https://user:password@example.org/file"},{"URL":"https://publisher.example.org/read","intended-application":"similarity-checking"}]}
+        a=literature.metadata(x)["access"]
+        self.assertEqual(len(a["licenses"]),1)
+        self.assertEqual(a["licenses"][0]["start"],"2026-01-02")
+        self.assertEqual(len(a["links"]),2)
+        self.assertEqual(a["links"][0]["application"],"text-mining")
+        self.assertEqual(literature.metadata({})["access"],{"licenses":[],"links":[]})
+        self.assertEqual(literature.public_link("https://host.local/file"),"")
     def test_classification_and_audit(self):
         self.db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/a?b","Вопросы экономики","2026-01","Стратегическое планирование промышленности","A",""))
         literature.reclassify(self.db)

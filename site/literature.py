@@ -171,12 +171,46 @@ TOPICS={
 def tidy(text):
     return ' '.join(unescape(re.sub('<[^>]*>',' ',text)).split())
 
+def public_link(value):
+    # Provider-deposited links are displayed only; never fetch automatically.
+    try:
+        if not isinstance(value,str) or len(value)>2048 or any(ord(c)<33 or c=="\\" for c in value):return ""
+        u=urlsplit(value)
+        if u.scheme not in ("http","https") or not u.hostname or u.username or u.password or u.port not in (None,80,443):return ""
+        host=u.hostname.lower()
+        if not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,63}",host) or host.endswith((".local",".internal",".localhost",".invalid",".test")):return ""
+        return value
+    except (TypeError,ValueError):return ""
+
+def access_metadata(item):
+    licenses=[];links=[]
+    def label(v):
+        return tidy(v)[:100] if isinstance(v,str) else ""
+    for x in item.get("license",[])[:20] if isinstance(item.get("license"),list) else []:
+        if not isinstance(x,dict):continue
+        url=public_link(x.get("URL"))
+        if not url:continue
+        start=None
+        try:
+            parts=x.get("start",{}).get("date-parts",[[]])[0]
+            if len(parts)==3 and all(type(v) is int for v in parts):start=date(*parts).isoformat()
+        except (ValueError,TypeError,IndexError,AttributeError):pass
+        entry=dict(url=url,version=label(x.get("content-version")),start=start)
+        if entry not in licenses:licenses.append(entry)
+    for x in item.get("link",[])[:20] if isinstance(item.get("link"),list) else []:
+        if not isinstance(x,dict):continue
+        url=public_link(x.get("URL"))
+        if not url:continue
+        entry=dict(url=url,version=label(x.get("content-version")),media_type=label(x.get("content-type")),application=label(x.get("intended-application")))
+        if entry not in links:links.append(entry)
+    return dict(licenses=licenses,links=links)
+
 def metadata(item):
     def string(key):
         v=item.get(key)
         return tidy(v) if isinstance(v,str) else ""
     count=item.get("is-referenced-by-count")
-    return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None)
+    return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None,access=access_metadata(item))
 
 class CrossrefRateLimited(Exception):
     def __init__(self,retry_after=None):
@@ -212,7 +246,7 @@ def defer_journal(db,issn,deadline):
     db.execute("insert into journal_checks values(?,null,null,?) on conflict(issn) do update set status=excluded.status",
         (issn,"Отложено: Crossref HTTP 429, до "+deadline))
 
-SELECT_FIELDS="DOI,title,author,published,volume,issue,page,is-referenced-by-count"
+SELECT_FIELDS="DOI,title,author,published,volume,issue,page,is-referenced-by-count,license,link"
 def fetch_batch(issn,filters,offset=0,select=False):
     # A bounded, ordinary /works query avoids cursor restrictions introduced in 2026.
     params=dict(filter=",".join(["issn:"+issn,*filters]),rows=1000,offset=offset)

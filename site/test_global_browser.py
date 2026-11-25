@@ -41,6 +41,9 @@ with sync_playwright() as p:
         assert project_id and page.locator("#rp-save").is_enabled()
         page.goto("http://localhost:8765/papers.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#paper-project option').length>1",timeout=30000)
+        assert "Записей с заявленной лицензией:" in page.locator("#paper-access-summary").inner_text()
+        assert page.locator("#paper-access option").count()==4
+        assert page.locator("#papers details").count()>0
         page.locator("#paper-project").select_option(project_id)
         page.locator("#papers .paper-project-add").first.click()
         assert "Сохранено в проекте: 1" in page.locator("#paper-project-status").inner_text()
