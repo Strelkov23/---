@@ -1,0 +1,66 @@
+name: Public site integrity
+on:
+  push:
+    branches: [stage-g-live-monitor]
+    paths: ['.github/workflows/live-health.yml']
+  schedule:
+    - cron: '37 11 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check public version and critical datasets
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, re, time
+          from urllib.request import Request, urlopen
+          from pathlib import Path
+          base = "https://strelkov23.github.io/---/"
+          def get(name, limit):
+              url = base + name
+              with urlopen(Request(url, headers={"Cache-Control":"no-cache"}), timeout=30) as r:
+                  if r.geturl() != url: raise ValueError("Unexpected redirect: "+name)
+                  raw = r.read(limit+1)
+              if len(raw)>limit: raise ValueError("Size limit: "+name)
+              return raw
+          def sha(raw): return hashlib.sha256(raw).hexdigest()
+          def check():
+              version=get("version.txt",256).decode().strip()
+              if not re.fullmatch(r"[0-9a-f]{40}",version): raise ValueError("Invalid version")
+              manifest=json.loads(get("data-manifest.json",16*1024*1024))
+              if manifest.get("schema")!="1" or not isinstance(manifest.get("files"),dict): raise ValueError("Invalid manifest")
+              files=manifest["files"]
+              for name,entry in files.items():
+                  if not (name=="federal-budget.csv" or re.fullmatch(r"(?:regional-data/)?[A-Za-z0-9_.-]+\.(?:json|geojson)",name)): raise ValueError("Invalid name")
+                  if not isinstance(entry,dict) or set(entry)!={"sha256","bytes"} or not re.fullmatch(r"[0-9a-f]{64}",entry["sha256"]) or type(entry["bytes"]) is not int or entry["bytes"]<0: raise ValueError("Invalid entry")
+              canonical="".join(f"{n}\t{files[n]['sha256']}\t{files[n]['bytes']}\n" for n in sorted(files))
+              if sha(canonical.encode())!=manifest["data_fingerprint"]: raise ValueError("Manifest mismatch")
+              names=["normalized-observations.json","historical.json","literature-quality.json","bank-directory.json","sme-profile-index.json","federal-budget.csv"]
+              checked=[]
+              for name in names:
+                  e=files[name]
+                  raw=get(name,min(e["bytes"],64*1024*1024))
+                  if len(raw)!=e["bytes"] or sha(raw)!=e["sha256"]: raise ValueError("Integrity failure: "+name)
+                  if name.endswith(".json"): json.loads(raw)
+                  checked.append(name)
+              if get("version.txt",256).decode().strip()!=version: raise ValueError("Deployment changed during check")
+              return {"version":version,"manifest":manifest["data_fingerprint"],"verified":checked}
+          for attempt in range(3):
+              try:
+                  result=check()
+                  break
+              except Exception:
+                  if attempt==2: raise
+                  time.sleep(20)
+          Path("live-health.json").write_text(json.dumps(result,indent=2))
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-health
+          path: live-health.json
+          if-no-files-found: error
