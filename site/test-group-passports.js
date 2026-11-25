@@ -69,3 +69,16 @@ assert.equal(G.levels({groups:[{...rg,id:'a',metrics:[mm('profit',[[2024,-5],[20
 assert.equal(G.levels({groups:[{...rg,id:'a',metrics:[mm('assets',[[2024,10],[2025,-1]])]}]},2025,'assets').eligible,0);
 assert.throws(()=>G.levels(lv,2025,'net_assets'));
 assert.throws(()=>G.levels(lv,2025.5,'assets'));
+
+const obs={groups:[{id:'a',name:'Ёлка',sector:'Металлургия',scope:'consolidated',standard:'IFRS',source:'https://example.org/a',section:'Отчёт',metrics:[{id:'revenue',label:'Выручка',unit:'млн руб.',observations:[{year:2024,value:'0'},{year:2025,value:'9007199254740993'}]},{id:'output',label:'Выпуск',unit:'тыс. т',source:'https://example.org/b',section:'Таблица',observations:[{year:2025,value:'1.005'}]}]},{id:'b',name:'Бета',sector:'Добыча',scope:'consolidated',standard:'IFRS_based_disclosure',source:'https://example.org/c',section:'Релиз',metrics:[{id:'revenue',label:'Выручка',unit:'млн долл. США',observations:[{year:2025,value:'10'}]}]}]};
+assert.equal(G.observationRows(obs).length,4);
+assert.equal(G.observationRows(obs,{year:'2025'}).length,3);
+assert.equal(G.observationRows(obs,{query:'елка выпуск'})[0].value,'1.005');
+assert.equal(G.observationRows(obs,{query:'елка выпуск'})[0].source,'https://example.org/b');
+assert.equal(G.observationRows(obs,{query:'елка выпуск'})[0].section,'Таблица');
+assert.equal(G.observationRows(obs,{group:'a',unit:'млн руб.',year:'2025'})[0].value,'9007199254740993');
+assert.equal(G.observationRows(obs,{group:'a',unit:'млн руб.',year:2024})[0].value,'0');
+assert.equal(G.observationRows(obs,{standard:'IFRS_based_disclosure'}).length,1);
+assert.equal(G.observationRows(obs,{sector:'Добыча',unit:'млн руб.'}).length,0);
+assert.equal(G.observationRows(obs,{query:'нет такого показателя'}).length,0);
+assert.equal(G.observationRows(obs).at(-1).year,2024);
