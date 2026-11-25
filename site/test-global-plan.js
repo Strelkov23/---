@@ -47,3 +47,12 @@ assert.equal(G.sensitivityCases({...p,investment:0},'investment',5,'absolute')[2
 assert.equal(G.sensitivityCases({...p,spare:100},'spare',25,'relative')[2].clamped,true);
 assert.equal(G.sensitivityCases(laborP,'laborCap',10,'absolute')[2].params.labor.cap,110);
 assert.throws(()=>G.sensitivityCases(p,'laborCap',10,'absolute'));
+
+const joint=G.jointSensitivity(m,p,'cumulative','investment',25,'importLimit',25,'relative');
+assert.equal(joint.rows.length,9);
+assert.ok(joint.rows.every(x=>!x.error));
+near(joint.rows[4].score,schedulePlan.score);
+near(joint.rows[4].delta,0);
+assert.ok(joint.rows[8].score>=joint.rows[0].score-1e-6);
+assert.throws(()=>G.jointCases(p,'investment',25,'investment',25));
+assert.equal(G.jointCases(laborP,'laborCap',10,'investment',2,'absolute')[8].params.labor.cap,110);
