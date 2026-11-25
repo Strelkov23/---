@@ -18,3 +18,14 @@ class Full(unittest.TestCase):
         with sqlite3.connect(":memory:") as db,zipfile.ZipFile(data) as z:
             f.setup(db)
             with self.assertRaises(ValueError):f.full(db,z,"2026-11-10")
+    def test_quarantine_balance(self):
+        data=io.BytesIO()
+        with zipfile.ZipFile(data,"w") as z:
+            z.writestr("a.xml",fixture());z.writestr("b.xml",fixture().replace(b"1027700132195",b"1027700132190"))
+        with sqlite3.connect(":memory:") as db,zipfile.ZipFile(data) as z:
+            f.setup(db);r=f.full(db,z,"2026-11-10")
+        self.assertEqual(r["unique_legal"],1)
+        self.assertEqual(r["counts"]["legal"],2)
+        self.assertEqual(r["counts"]["quarantined"],1)
+        self.assertEqual(r["quarantine"],[{"member":"b.xml","document":1,"reason":"ogrn"}])
+        self.assertEqual(sum(x["count"] for x in r["declared_matrix"]),1)

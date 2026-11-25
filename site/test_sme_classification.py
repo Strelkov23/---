@@ -18,3 +18,10 @@ class SME(unittest.TestCase):
         self.assertEqual(r["region_counts"],{"77":1})
         self.assertEqual(r["declared_okved2_class_counts"],{"64":1})
         self.assertEqual(r["mode"],"pilot")
+    def test_quarantine_identifiers(self):
+        raw=fixture().replace(b"1027700132195",b"1027700132190")
+        rejected=[];rows,c=s.parse_member(raw,"2026-11-10",rejected)
+        self.assertEqual(rows,[])
+        self.assertEqual(c["legal"],1);self.assertEqual(c["quarantined"],1)
+        self.assertEqual(rejected,[{"document":1,"reason":"ogrn"}])
+        with self.assertRaises(ValueError):s.parse_member(raw,"2026-11-10")

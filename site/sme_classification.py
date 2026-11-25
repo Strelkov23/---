@@ -69,12 +69,12 @@ def code(doc,tag):
     if not v or not re.fullmatch(r"\d{2}(?:\.\d{1,2}){0,2}",v) or version not in ("2001","2014"):raise ValueError("ОКВЭД")
     return v,version
 
-def parse_member(raw,edition):
+def parse_member(raw,edition,quarantine=None):
     if not 0<len(raw)<=MAX_XML or re.search(br"<!\s*(?:DOCTYPE|ENTITY)",raw,re.I):raise ValueError("XML")
     root=ET.fromstring(raw)
     if root.tag!="Файл":raise ValueError("Корень XML")
     counts=Counter();rows=[]
-    for doc in root.findall("Документ"):
+    for ordinal,doc in enumerate(root.findall("Документ"),1):
         counts["documents"]+=1
         if datetime.strptime(doc.get("ДатаСост",""),"%d.%m.%Y").date().isoformat()!=edition:raise ValueError("Другая дата среза")
         org=unique(doc,"ОргВклМСП");ip=unique(doc,"ИПВклМСП")
@@ -82,7 +82,14 @@ def parse_member(raw,edition):
         if org is None:counts["individual_excluded"]+=1;continue
         counts["legal"]+=1
         inn=org.get("ИННЮЛ","");ogrn=org.get("ОГРН","")
-        if not ci.inn_valid(inn) or not re.fullmatch(r"\d{13}",ogrn) or int(ogrn[:12])%11%10!=int(ogrn[-1]):raise ValueError("ИНН/ОГРН")
+        bad_inn=not ci.inn_valid(inn)
+        bad_ogrn=not re.fullmatch(r"\d{13}",ogrn) or int(ogrn[:12])%11%10!=int(ogrn[-1])
+        if bad_inn or bad_ogrn:
+            if quarantine is None:raise ValueError("ИНН/ОГРН")
+            reason="inn_and_ogrn" if bad_inn and bad_ogrn else "inn" if bad_inn else "ogrn"
+            counts["quarantined"]+=1
+            quarantine.append({"document":ordinal,"reason":reason})
+            continue
         location=unique(doc,"СведМН");region=location.get("КодРегион") if location is not None else None
         if region is not None and not re.fullmatch(r"\d{2}",region):raise ValueError("Регион")
         declared,dver=code(doc,"СвОКВЭД");reported,rver=code(doc,"СвОКВЭДотч")

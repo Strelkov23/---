@@ -33,16 +33,18 @@ def download(url,path,opener=urlopen):
 
 def setup(db):
     db.executescript("""
-    CREATE TABLE org(inn TEXT PRIMARY KEY,ogrn TEXT NOT NULL,region TEXT,declared TEXT,dver TEXT,reported TEXT,rver TEXT,category TEXT,member INTEGER,legal_ordinal INTEGER) WITHOUT ROWID;
+    CREATE TABLE org(inn TEXT PRIMARY KEY,ogrn TEXT NOT NULL,region TEXT,declared TEXT,dver TEXT,reported TEXT,rver TEXT,category TEXT,member INTEGER,accepted_ordinal INTEGER) WITHOUT ROWID;
     CREATE TABLE members(id INTEGER PRIMARY KEY,filename TEXT UNIQUE,sha256 TEXT,documents INTEGER);
     """)
 
 def full(db,z,edition):
     members=sorted((m for m in z.infolist() if not m.is_dir()),key=lambda m:m.filename)
     if not members or len(members)>30000 or len({m.filename for m in members})!=len(members) or any(not m.filename.lower().endswith(".xml") or not 0<m.file_size<=s.MAX_XML for m in members) or sum(m.file_size for m in members)>MAX_UNPACKED:raise ValueError("Состав XML")
-    totals=Counter()
+    totals=Counter();quarantined=[]
     for i,m in enumerate(members,1):
-        raw=z.read(m);rows,counts=s.parse_member(raw,edition);totals.update(counts)
+        raw=z.read(m);rejected=[];rows,counts=s.parse_member(raw,edition,rejected);totals.update(counts)
+        quarantined.extend(dict(member=m.filename,**r) for r in rejected)
+        if len(quarantined)>10000:raise ValueError("Слишком много некорректных идентификаторов")
         db.execute("INSERT INTO members VALUES(?,?,?,?)",(i,m.filename,hashlib.sha256(raw).hexdigest(),counts["documents"]))
         for j,row in enumerate(rows,1):
             old=db.execute("SELECT inn,ogrn,region,declared,dver,reported,rver,category FROM org WHERE inn=?",(row[0],)).fetchone()
@@ -54,13 +56,13 @@ def full(db,z,edition):
             db.commit();print("SME_PROGRESS",i,len(members),totals["legal"],flush=True)
     db.commit()
     unique=db.execute("SELECT count(*) FROM org").fetchone()[0]
-    if totals["documents"]!=totals["legal"]+totals["individual_excluded"] or unique!=totals["legal"]-totals["exact_duplicates"]:raise ValueError("Баланс документов")
+    if totals["documents"]!=totals["legal"]+totals["individual_excluded"] or unique!=totals["legal"]-totals["exact_duplicates"]-totals["quarantined"] or totals["quarantined"]!=len(quarantined):raise ValueError("Баланс документов")
     def matrix(field,version):
         return [{"region":r,"class":k,"count":n} for r,k,n in db.execute(f"""SELECT coalesce(region,'missing'),CASE WHEN {version}='2014' AND {field} IS NOT NULL THEN substr({field},1,2) ELSE 'missing_or_other_version' END,count(*) FROM org GROUP BY 1,2 ORDER BY 1,2""")]
     regions=dict(db.execute("SELECT coalesce(region,'missing'),count(*) FROM org GROUP BY 1 ORDER BY 1"))
     declared=matrix("declared","dver");reported=matrix("reported","rver")
     if any(sum(r["count"] for r in m)!=unique for m in (declared,reported)) or sum(regions.values())!=unique:raise ValueError("Баланс классификации")
-    return dict(mode="full",edition=edition,note=NOTE,xml_total=len(members),xml_processed=len(members),counts=dict(totals),unique_legal=unique,region_counts=regions,declared_matrix=declared,reported_matrix=reported,members=[dict(id=i,member=f,sha256=h,documents=n) for i,f,h,n in db.execute("SELECT * FROM members ORDER BY id")])
+    return dict(mode="full",edition=edition,note=NOTE,xml_total=len(members),xml_processed=len(members),counts=dict(totals),quarantine=quarantined,unique_legal=unique,region_counts=regions,declared_matrix=declared,reported_matrix=reported,members=[dict(id=i,member=f,sha256=h,documents=n) for i,f,h,n in db.execute("SELECT * FROM members ORDER BY id")])
 
 def reconcile(report,reference):
     regional.quality(reference)
@@ -68,7 +70,7 @@ def reconcile(report,reference):
     official={r["code"]:r["legal"] for r in reference["rows"]}
     actual=report["region_counts"]
     rows=[dict(region=k,official=official.get(k),imported=actual.get(k,0),difference=actual.get(k,0)-official[k] if k in official else None) for k in sorted(set(official)|set(actual))]
-    return dict(period=reference["period"],source=reference["source"],sha256=reference["sha256"],national_official=reference["national"]["legal"],national_imported=report["unique_legal"],national_difference=report["unique_legal"]-reference["national"]["legal"],rows=rows,exact=report["unique_legal"]==reference["national"]["legal"] and all(r["difference"]==0 for r in rows))
+    return dict(period=reference["period"],source=reference["source"],sha256=reference["sha256"],national_official=reference["national"]["legal"],national_imported=report["unique_legal"],national_difference=report["unique_legal"]-reference["national"]["legal"],rows=rows,exact=report["unique_legal"]==reference["national"]["legal"] and all(r["difference"]==0 for r in rows) and not report["counts"].get("quarantined",0))
 
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",required=True,type=Path);a=p.parse_args()
@@ -89,6 +91,7 @@ def main():
         except (ValueError,KeyError,TypeError) as e:result["reconciliation_error"]=str(e)
         (a.output/"classification.json").write_text(json.dumps(result,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
         print("SME_FULL",json.dumps({k:result[k] for k in ("edition","xml_total","xml_processed","counts","unique_legal","archive_bytes","archive_sha256")},ensure_ascii=False),flush=True)
+        print("SME_QUARANTINE",json.dumps({"count":len(result["quarantine"]),"reasons":dict(Counter(r["reason"] for r in result["quarantine"]))},ensure_ascii=False),flush=True)
         print("SME_RECONCILIATION",json.dumps(result.get("reconciliation",result.get("reconciliation_error")),ensure_ascii=False),flush=True)
         if not result.get("reconciliation",{}).get("exact"):raise SystemExit("Полный проход сохранён, но независимые итоги не совпали или недоступны; не публиковать как подтверждённый")
 if __name__=="__main__":main()

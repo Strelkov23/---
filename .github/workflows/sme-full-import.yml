@@ -2,7 +2,7 @@ name: FNS full SME classification
 on:
   push:
     branches: [main]
-    paths: ['site/sme_full_import.py','site/test_sme_full_import.py','.github/workflows/sme-full-import.yml']
+    paths: ['site/sme_full_import.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','.github/workflows/sme-full-import.yml']
   workflow_dispatch:
 permissions:
   contents: read
