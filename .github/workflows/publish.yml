@@ -88,6 +88,7 @@ jobs:
           node test-sme-map.js
           node test-sme-matrix.js
           node test-sme-finance.js
+          node test-project-search.js
           node test-enterprise-diagnostics.js
           node test-district-map.js
           node test-freshness.js
