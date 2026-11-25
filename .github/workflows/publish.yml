@@ -62,8 +62,18 @@ jobs:
           if ! test -s /tmp/sme-source/classification.json; then
             echo "No complete diagnostic artifact; use validated archived data when compatible."
           fi
+      - name: Restore verified official bank archive diagnostic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/bank-archive-source
+          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow bank-report-probe.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty') || id=""
+          if [ -n "$id" ]; then
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --name bank-form-123-source-structure --dir /tmp/bank-archive-source || true
+          fi
       - name: Restore archive and build
         env:
+          BANK_ARCHIVE_SOURCE: /tmp/bank-archive-source
           SME_FINANCE_REPORT: /tmp/sme-source/finance-join.json
           SME_MATRIX_REPORT: /tmp/sme-source/classification.json
         run: |
@@ -368,7 +378,7 @@ jobs:
                       if attempt==3:raise RuntimeError(name) from exc
                       time.sleep(5)
           manifest=json.loads(get("data-manifest.json",os.environ["EXPECTED_MANIFEST_SHA256"]))
-          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","corporate-watch.json","corporate-discovery.json")
+          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","corporate-watch.json","corporate-discovery.json","bank-archive-summary.json")
           for name in names:
               entry=manifest["files"][name]
               json.loads(get(name,entry["sha256"],entry["bytes"]))

@@ -184,6 +184,11 @@ def check(out,previous,stamp):
             import bank_capital
             counts.update(bank_capital.quality(json.loads((out/"bank-capital.json").read_text(encoding="utf-8"))))
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Капитал банков: "+str(e))
+    if (out/"bank-archive-summary.json").is_file():
+        try:
+            import bank_archive_summary
+            counts.update(bank_archive_summary.quality(json.loads((out/"bank-archive-summary.json").read_text(encoding="utf-8"))))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Архивы банков: "+str(e))
     if (out/"bank-disclosure.json").is_file():
         try:
             import bank_disclosure

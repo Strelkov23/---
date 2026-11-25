@@ -88,3 +88,14 @@ class BankReportProbeTests(unittest.TestCase):
         self.assertEqual(p.mapped135(raw)["counts"]["observations"],0)
         fields[2]["decimals"]=2
         with self.assertRaises(ValueError):p.mapped135(raw)
+
+    def test_public_archive_summary_empty_and_reject_invalid(self):
+        import bank_archive_summary as a
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as f:
+            root=Path(f)
+            d=a.publish(root,root)
+            self.assertEqual(a.quality(d)["bank_archive_forms"],0)
+            self.assertIn("ещё не загружен",a.render(d))
+            with self.assertRaises(ValueError):a.quality(dict(d,status="verified"))
