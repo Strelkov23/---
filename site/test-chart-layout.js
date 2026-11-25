@@ -10,3 +10,12 @@ assert.equal(chartAdjacent('2024-12','2025-01',true),true);
 assert.equal(chartAdjacent('2024-12','2025-02',true),false);
 assert.equal(chartAdjacent(2020,2022),false);
 console.log('Chart layout tests passed');
+
+const M=require('./layout.js');
+assert.equal(M.dimensions(1000,390,1),390);
+assert.equal(M.dimensions(1000,390,2),780);
+assert.equal(M.dimensions(1000,1440,4),4000);
+assert.equal(M.nextZoom(1,-.5),1);
+assert.equal(M.nextZoom(3.5,.5),4);
+assert.equal(M.nextZoom(4,.5),4);
+assert.equal(M.nextZoom(2,-.5),1.5);

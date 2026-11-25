@@ -334,3 +334,13 @@ main:has(.atlas-tools) .metric span{font-size:.85rem;color:#49646d}
 @media(max-width:460px){.atlas-task-grid{grid-template-columns:1fr}.atlas-task{min-height:66px;padding:.65rem 1.8rem .65rem .75rem}.atlas-tools{padding:.75rem}.atlas-tools-head p{font-size:.85rem}main:has(.atlas-tools) .project-controls{padding:.7rem}main:has(.atlas-tools)>.mast h1{font-size:2.35rem}main:has(.atlas-tools) .metric{flex-basis:130px}}
 @media(prefers-reduced-motion:reduce){.atlas-task{transition:none}}
 @media print{.atlas-tools,.atlas-back,.table-scroll-hint{display:none!important}}
+
+/* Compact map toolbar: controls remain legible and touch-friendly on phones. */
+.map-controls{justify-content:flex-start;gap:.5rem;padding:.55rem .65rem;margin:.7rem 0 .25rem;background:#fff;border:1px solid #d0dfe0;border-radius:.55rem}
+.map-controls button{min-width:44px;min-height:44px;padding:.35rem .75rem;font-weight:650;font-size:1rem}
+.map-controls button:nth-child(-n+2){font-size:1.4rem;line-height:1}
+.map-controls button:disabled{background:#e9efef;color:#526870;border-color:#cbd8d8;opacity:1;cursor:default}
+.map-controls span{margin-inline-start:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
+.map-viewport-hint{font-size:.82rem;line-height:1.45;color:#49646d;margin:.35rem 0 .55rem}
+@media(max-width:420px){.map-controls{gap:.4rem;padding:.45rem}.map-controls button{padding:.35rem .55rem}.map-controls span{margin-inline-start:0;flex:1 1 100%;font-size:.85rem}}
+@media print{.map-controls,.map-viewport-hint{display:none!important}}

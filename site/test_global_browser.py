@@ -636,6 +636,13 @@ with sync_playwright() as p:
         page.unroute("**/data-manifest.json")
         page.locator("#news-geo-map .map-controls button").nth(1).click()
         assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
+        viewport=page.locator("#news-geo-map .map-viewport")
+        viewport.focus()
+        viewport.press("+")
+        assert "200%" in page.locator("#news-geo-map .map-controls").inner_text()
+        viewport.press("-")
+        assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
+
         page.locator("#news-geo-map .map-controls button").nth(2).click()
         assert "100%" in page.locator("#news-geo-map .map-controls").inner_text()
         page.locator("#news-geo-days").select_option("1")
