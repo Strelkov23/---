@@ -1,8 +1,8 @@
 name: Regional verified series live acceptance
 on:
   push:
-    branches: [stage-f-regional-verified-series]
-    paths: ['site/historical.py','.github/workflows/regional-verified-live.yml']
+    branches: [stage-f-regional-verified-series, stage-f-regional-regression-fix]
+    paths: ['site/historical.py','site/test_historical.py','.github/workflows/regional-verified-live.yml']
   workflow_dispatch:
 permissions:
   contents: read
