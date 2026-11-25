@@ -826,6 +826,14 @@ with sync_playwright() as p:
                 project_rows=list(csv.reader(f,delimiter=";"))
             assert len(project_rows)>1 and len({len(r) for r in project_rows})==1
             assert all(r[0]=="RU-BU" for r in project_rows[1:])
+        if page.locator("#project-search-totals-export").is_enabled():
+            assert page.locator("#project-search-totals .metric").count()==6
+            with page.expect_download() as totals_csv:
+                page.locator("#project-search-totals-export").click()
+            with open(totals_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                totals=list(csv.reader(f,delimiter=";"))
+            assert len(totals)==2 and len(totals[0])==len(totals[1])
+            assert totals[1][0]=="RU-BU"
         page.locator("#project-search-query").fill("zzzz_no_project_987654")
         assert page.locator("#project-search-table tbody tr").count()==0
         assert page.locator("#project-search-export").is_disabled()
