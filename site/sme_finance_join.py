@@ -1,5 +1,5 @@
 """Diagnostic exact-INN join of two dated public FNS datasets.
-Keep only aggregate output; do not impute missing monetary or employment data.
+Aggregate output and bounded enterprise profiles; do not impute missing monetary or employment data.
 """
 import gzip,json,hashlib,heapq
 from collections import Counter,defaultdict
@@ -51,8 +51,12 @@ def join(db,root,report):
                 c=cells[(kind,region,cls)];c["matched"]+=1
                 for key,value in (("income",r[3]),("expense",r[4]),("workers",r[5])):
                     if value is not None:c[key+"_observations"]+=1;c[key+"_sum"]+=int(value)
-                if r[3] is not None and r[4] is not None:c["paired_money"]+=1
-                if r[3] is not None and r[5] is not None:c["income_workers_pair"]+=1
+                if r[3] is not None and r[4] is not None:
+                    c["paired_money"]+=1
+                    c["paired_income_sum"]+=int(r[3]);c["paired_expense_sum"]+=int(r[4])
+                if r[3] is not None and r[5] is not None:
+                    c["income_workers_pair"]+=1
+                    c["worker_pair_income_sum"]+=int(r[3]);c["worker_pair_workers_sum"]+=int(r[5])
     if counts["financial_index"]!=index["count"] or counts["matched_sme"]+counts["not_in_sme"]!=index["count"] or counts["included"]+counts["excluded_region"]!=counts["matched_sme"]:raise ValueError("Баланс объединения")
     # Denominators from the full SME matrix; preserve cells with zero overlap.
     result={}
@@ -68,7 +72,9 @@ def join(db,root,report):
                 n=c[k+"_observations"];v[k+"_observations"]=n
                 # Monetary sums use arbitrary-precision integers serialized as strings.
                 v[k+"_sum"]=str(c[k+"_sum"]) if n else None
+            for count,fields in (("paired_money",("paired_income_sum","paired_expense_sum")),("income_workers_pair",("worker_pair_income_sum","worker_pair_workers_sum"))):
+                for field in fields:v[field]=str(c[field]) if c[count] else None
             rows.append(v)
         if any(k[0]==kind and k not in seen for k in cells) or sum(x["matched"] for x in rows)!=counts["included"] or sum(x["sme_total"] for x in rows)!=sum(eligible.values()):raise ValueError("Баланс матрицы объединения")
         result[kind]=rows
-    return dict(schema=1,status="diagnostic",note=NOTE,financial_year=index["year"],financial_fingerprint=index["fingerprint"],financial_sources=index["sources"],sme_edition=report["edition"],sme_archive_sha256=report["archive_sha256"],reference_sha256=rec["sha256"],national_difference=rec["national_difference"],quarantined=report["counts"].get("quarantined",0),eligible_regions=len(eligible),counts=dict(counts),profiles=profiles(db,heaps,eligible),**result)
+    return dict(schema=1,status="diagnostic",note=NOTE,financial_year=index["year"],financial_fingerprint=index["fingerprint"],financial_sources=index["sources"],sme_edition=report["edition"],sme_archive_sha256=report["archive_sha256"],reference_sha256=rec["sha256"],national_difference=rec["national_difference"],quarantined=report["counts"].get("quarantined",0),eligible_regions=len(eligible),counts=dict(counts),paired_sums_version=1,profiles=profiles(db,heaps,eligible),**result)
