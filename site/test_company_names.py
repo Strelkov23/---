@@ -23,5 +23,8 @@ class Names(unittest.TestCase):
             self.assertEqual(d["count"],1)
             path=out/n.filename(n.bucket("сбе"))
             self.assertEqual(json.loads(gzip.decompress(path.read_bytes())),[["7707083893","ПАО Сбербанк"]])
+            from unittest.mock import patch
+            with patch.object(n,"MAX_COMBINED_BYTES",1):
+                with self.assertRaises(ValueError):n.quality(d,out,idx)
             path.write_bytes(b"bad")
             with self.assertRaises(ValueError):n.quality(d,out,idx)

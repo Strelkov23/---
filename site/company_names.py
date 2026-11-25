@@ -5,7 +5,8 @@ import company_index as ci
 FILE="company-names.json"
 DIR="company-names"
 BUCKETS=256
-MAX_BYTES=48*1024*1024
+MAX_BYTES=96*1024*1024
+MAX_COMBINED_BYTES=224*1024*1024
 MAX_BLOCK=8*1024*1024
 FORMS={"ооо","пао","ао","зао","оао","нко","фгуп","гуп","муп","ип","llc","jsc"}
 def normalize(value):
@@ -35,6 +36,7 @@ def quality(d,root=None,index=None):
             raw=(root/name).read_bytes()
             if len(raw)!=x["bytes"] or hashlib.sha256(raw).hexdigest()!=x["sha256"]:raise ValueError("Контрольная сумма имён "+name)
     if count!=d["count"] or size>MAX_BYTES:raise ValueError("Охват или размер имён")
+    if index is not None and size+sum(v["bytes"] for v in index["files"].values())>MAX_COMBINED_BYTES:raise ValueError("Совокупный бюджет поиска")
     return {"company_name_records":count,"company_name_bytes":size}
 def create(source,index,out):
     ci.quality(index,source)
@@ -55,7 +57,7 @@ def create(source,index,out):
         db.commit()
         for i in range(BUCKETS):
             name=filename(i);n=0
-            with (out/name).open("wb") as target,gzip.GzipFile(filename="",fileobj=target,mode="wb",mtime=0,compresslevel=6) as z:
+            with (out/name).open("wb") as target,gzip.GzipFile(filename="",fileobj=target,mode="wb",mtime=0,compresslevel=9) as z:
                 z.write(b"[")
                 for inn,label in db.execute("SELECT inn,name FROM names WHERE bucket=? ORDER BY key,inn,name",(i,)):
                     if n:z.write(b",")
@@ -63,8 +65,11 @@ def create(source,index,out):
                 z.write(b"]")
             raw=(out/name).read_bytes()
             d["files"][name]=dict(count=n,bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest());d["count"]+=n
-            if len(raw)>MAX_BLOCK or sum(v["bytes"] for v in d["files"].values())>MAX_BYTES:raise ValueError("Превышен бюджет поиска по именам")
-    quality(d,out,index)
+            size=sum(v["bytes"] for v in d["files"].values())
+            if len(raw)>MAX_BLOCK:raise ValueError(f"Блок имён {i}: {len(raw)} байт превышает лимит {MAX_BLOCK}")
+            if size>MAX_BYTES:raise ValueError(f"Индекс имён: уже {size} байт при лимите {MAX_BYTES}; блок {i+1}/{BUCKETS}")
+    q=quality(d,out,index)
+    print("COMPANY_NAMES",json.dumps({**q,"status":d["status"],"reason":d.get("reason"),"max_bytes":MAX_BYTES},ensure_ascii=False),flush=True)
     (out/FILE).write_bytes(ci.encode(d));return d
 def publish(out,previous):
     index=json.loads((out/ci.FILE).read_text(encoding="utf-8"))

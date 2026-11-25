@@ -223,6 +223,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const full=names?.status==='ready'&&index.status==='ready'&&names.index_fingerprint===index.fingerprint;
   const rows=Object.values(rank.report?.rankings||{}).flatMap(x=>x.rows.flatMap(r=>[...new Set([r.income_name,r.employment_name,r.name].filter(Boolean))].map(n=>[r.inn,n])));
   status.textContent=full?'Поиск по началу названия в полном финансовом индексе.':rows.length?'Поиск по началу названия только в опубликованных рейтингах. Полный индекс имён недоступен.':'Данные поиска пока отсутствуют.';
+  if(!full&&names?.reason)status.textContent+=' Причина: '+names.reason+'.';
   submit.disabled=!(full||rows.length);
   form.onsubmit=async e=>{
    e.preventDefault();out.replaceChildren();const key=CompanyLookup.normalizeName(input.value);
