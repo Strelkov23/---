@@ -148,6 +148,9 @@ def collect(out,stamp):
     add("park-certificates","Предприятия","Документы добровольной сертификации АИП",cert["source"],cert,cert.get("success","")[:10] if cert.get("success") else None,days=7,available=bool(cert["rows"]),policy="Проверка каждые 7 суток; после ошибки через 2 суток; календарный срок не подтверждает отсутствие отзыва",href="industrial-parks.html#park-certificates",failure_days=2)
     p=read("industrial-parks.json")
     add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,(p.get("success") or "")[:10] or None,days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html",failure_days=2)
+    if (out/"nao-projects.json").is_file():
+        nao=read("nao-projects.json")
+        add("nao-investment-projects","Инвестиции","НАО · три редакции проектов",nao["source"],nao,"2025-01-01 / 2025-06-04" if nao["report"] else None,days=7,failure_days=2,available=bool(nao["report"]),policy="Проверка фиксированных редакций раз в 7 суток; изменение хеша требует нового анализа.",href="nao-projects.html")
     ae=read("amur-enterprises.json")
     add("amur-enterprises","Предприятия","Амурская область · каталог организаций",ae["source"],ae,None,days=7,available=bool(ae["rows"]),policy="Проверка карточек каталога; не подтверждение действующего статуса",href="facility-map.html#amur-enterprise-directory",failure_days=2)
     banks=read("bank-directory.json")

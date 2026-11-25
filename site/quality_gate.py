@@ -367,6 +367,12 @@ def check(out,previous,stamp):
         if not kd["rows"]:warnings.append("Краснодарский край: нет подтвержденного импорта проектов")
         if kd.get("error"):warnings.append("Краснодарский край: "+kd["error"])
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Краснодарский край: "+str(e))
+    if (out/"nao-projects.json").is_file():
+        try:
+            import nao_project_public as np
+            d=json.loads((out/np.FILE).read_text(encoding="utf-8"));counts.update(np.quality(d));np.verify_csv(out/np.CSV,d)
+            if d["error"]:warnings.append("НАО: "+d["error"])
+        except (OSError,ValueError,KeyError,TypeError,AttributeError,ArithmeticError) as e:issues.append("НАО: "+str(e))
     try:
         import project_coverage as pcov
         coverage=data["project-coverage.json"]

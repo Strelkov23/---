@@ -82,7 +82,7 @@ def render(d):
                 body+='<tr data-project-breakdown="1"><td>'+e("Не указано в источнике" if g["category_missing"] else g["category"])+'</td><td>'+e(share(g["records"],g["denominator"]))+'</td></tr>'
             body+='</tbody></table></div></details>'
         body+='</article>'
-    body+='</section><section><h2>Связанные данные</h2><p><a href="frp-snapshot.html">Фонд развития промышленности</a> — документальные агрегаты. <a href="https://invest.nalog.gov.ru/public-registry-szpk">Реестр СЗПК</a> — отдельный федеральный источник, импорт не подключён.</p><p><a href="facility-map.html">Карта площадок</a> · <a href="industrial-parks.html">Парки и ОЭЗ</a> · <a href="capital.html">Основные фонды и загрузка мощностей</a>.</p></section>'
+    body+='</section><section><h2>Связанные данные</h2><p><a href="nao-projects.html">Ненецкий автономный округ</a> — три отдельные редакции реестров; не включены в общий поиск до отдельной приёмки.</p><p><a href="frp-snapshot.html">Фонд развития промышленности</a> — документальные агрегаты. <a href="https://invest.nalog.gov.ru/public-registry-szpk">Реестр СЗПК</a> — отдельный федеральный источник, импорт не подключён.</p><p><a href="facility-map.html">Карта площадок</a> · <a href="industrial-parks.html">Парки и ОЭЗ</a> · <a href="capital.html">Основные фонды и загрузка мощностей</a>.</p></section>'
     return body+'<script defer src="provenance.js"></script><script defer src="project-search.js"></script>'
 
 
