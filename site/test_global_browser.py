@@ -16,6 +16,14 @@ with sync_playwright() as p:
         assert page.locator(".route-grid article").count()==3
         assert page.locator(".route-steps a").count()==12
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        for route,target in (("company-atlas.html","company-lookup"),("banks.html","bank-capital"),("economic-map.html","regional-map"),("regional-manufacturing.html","rm-ranking"),("project-coverage.html","project-search")):
+            page.goto("http://localhost:8765/"+route,wait_until="load")
+            assert page.locator(".atlas-task-grid a").count()>=2
+            page.locator(".atlas-task-grid a[href='#"+target+"']").click()
+            assert page.url.endswith("#"+target)
+            assert page.locator("#"+target).count()==1
+            assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+            assert page.locator(".atlas-back").count()>0
         page.goto("http://localhost:8765/analysis-centre.html",wait_until="load")
         page.locator("#hub-query").fill("финансовая диагностика регионов")
         assert page.locator("#hub-tools article:visible").count()==1
@@ -628,6 +636,13 @@ with sync_playwright() as p:
         page.unroute("**/data-manifest.json")
         page.locator("#news-geo-map .map-controls button").nth(1).click()
         assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
+        viewport=page.locator("#news-geo-map .map-viewport")
+        viewport.focus()
+        viewport.press("+")
+        assert "200%" in page.locator("#news-geo-map .map-controls").inner_text()
+        viewport.press("-")
+        assert "150%" in page.locator("#news-geo-map .map-controls").inner_text()
+
         page.locator("#news-geo-map .map-controls button").nth(2).click()
         assert "100%" in page.locator("#news-geo-map .map-controls").inner_text()
         page.locator("#news-geo-days").select_option("1")

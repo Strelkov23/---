@@ -58,6 +58,7 @@ def page(name, body):
     import re
     from html import unescape
     body=method_passports.links(body,name)
+    body=navigation.atlas_tools(name,body)
     match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
     title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
     shell=Path("shell.html").read_text()
@@ -217,7 +218,7 @@ amur_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" 
 import krasnodar_projects
 krasnodar_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 import project_coverage
-project_coverage.publish(page,out,m.now())
+project_coverage.publish(page,out,m.now(),Path('../history/published'),'--refresh' in sys.argv)
 with m.connect() as finance_db:
     finance_check=finance_data.check_files(finance_db,m.now(),"--refresh" in sys.argv)
     finance_data.publish(page,out,finance_check)

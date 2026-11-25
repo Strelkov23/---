@@ -187,6 +187,13 @@ def collect(out,stamp):
             current={"waiting":"waiting","ok":"ok","unavailable":"cached" if r["success"] else "unavailable"}[r["status"]]
             info=dict(checked=r["checked"],success=r["success"],status=labels[r["status"]],error=r["error"])
             add("corp-discovery-"+k,"Корпоративные документы",k+" · поиск новых публикаций",r["url"],info,None,days=7,failure_days=2,policy="HTML официальной страницы; найденные ссылки требуют проверки, дата обнаружения не дата отчётности.",href="company-atlas.html#group-discovery",state_override=current)
+    path=out/"project-source-discovery.json"
+    if path.is_file():
+        d=read(path.name)
+        for k,r in d["rows"].items():
+            current={"waiting":"waiting","ok":"ok","unavailable":"cached" if r["success"] else "unavailable"}[r["status"]]
+            info=dict(checked=r["checked"],success=r["success"],status="Кандидатов файлов: "+str(len(r["candidates"]))+"; не импорт проектов",error=r["error"])
+            add("project-discovery-"+k,"Инвестиции",r["region"]+" · поиск реестра",r["source"],info,None,days=7,failure_days=2,policy="Проверка HTML; ссылки требуют проверки формата, содержимое не импортировано.",href="project-coverage.html#project-discovery",state_override=current)
     path=out/"company-index.json"
     if path.is_file():
         d=read(path.name);ready=d["status"]=="ready"

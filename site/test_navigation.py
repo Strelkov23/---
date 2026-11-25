@@ -37,4 +37,13 @@ class NavTests(unittest.TestCase):
             self.assertIn('id="hub-query"',pages[key+".html"])
             self.assertIn('id="hub-tools"',pages[key+".html"])
             for href,_,_ in items:self.assertIn('href="'+href+'"',pages[key+".html"])
+    def test_atlas_task_navigation(self):
+        for page,(_,tasks) in n.ATLAS_TASKS.items():
+            body='<section class="mast"><h1>Title</h1></section>'+''.join('<section id="'+key+'"><h2>Target</h2></section>' for key,_,_ in tasks)
+            result=n.atlas_tools(page,body)
+            self.assertIn('id="atlas-tools"',result)
+            self.assertEqual(result.count('class="atlas-task"'),len(tasks))
+            self.assertTrue(all('href="#'+key+'"' in result for key,_,_ in tasks))
+            with self.assertRaises(ValueError):n.atlas_tools(page,'<section class="mast"><h1>Title</h1></section>')
+        self.assertEqual(n.atlas_tools("index.html","plain"),"plain")
 if __name__=="__main__":unittest.main()
