@@ -210,7 +210,7 @@ def metadata(item):
         v=item.get(key)
         return tidy(v) if isinstance(v,str) else ""
     count=item.get("is-referenced-by-count")
-    return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None,access=access_metadata(item))
+    return dict(volume=string("volume"),issue=string("issue"),pages=string("page"),article_number=string("article-number"),language=string("language"),cited_by=count if type(count) is int and count>=0 else None,access=access_metadata(item),access_observed=any(isinstance(item.get(k),list) for k in ('license','link')))
 
 class CrossrefRateLimited(Exception):
     def __init__(self,retry_after=None):
@@ -300,6 +300,18 @@ def period_items(issn,filters,date_key,start,end):
         items=batch["items"]
     if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
+def preserve_bibliography(new,old,checked):
+    # Keep only bibliographic fields, not license/access declarations or citation
+    # counts. Mark carried values with the date of their last receipt.
+    new=dict(new);carried={}
+    prior=old.get("metadata_carried",{})
+    for field in ("volume","issue","pages","article_number","language"):
+        if not new.get(field) and isinstance(old.get(field),str) and old[field]:
+            new[field]=old[field]
+            carried[field]=prior.get(field,checked)
+    if carried:new["metadata_carried"]=carried
+    return new
+
 def sync(db, stamp, refresh):
     started=time.monotonic()
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
@@ -345,7 +357,10 @@ def sync(db, stamp, refresh):
                     doi=(item.get('DOI') or '').strip().lower()
                     if not re.fullmatch(r'10\.\d{4,9}/\S+',doi):continue
                     entries.append((doi,journal,when,title,authors,topics))
-                    details.append((doi,json.dumps(metadata(item),ensure_ascii=False),stamp))
+                    meta=metadata(item)
+                    prior=db.execute("select payload,checked from literature_meta where doi=?",(doi,)).fetchone()
+                    if prior:meta=preserve_bibliography(meta,json.loads(prior[0]),prior[1])
+                    details.append((doi,json.dumps(meta,ensure_ascii=False),stamp))
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)

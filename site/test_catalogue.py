@@ -114,6 +114,35 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(a["links"][0]["application"],"text-mining")
         self.assertEqual(literature.metadata({})["access"],{"licenses":[],"links":[]})
         self.assertEqual(literature.public_link("https://host.local/file"),"")
+    def test_preserve_bibliographic_fields_not_access(self):
+        old=dict(volume="3",pages="12-20",cited_by=15,access={"licenses":[{"url":"old"}],"links":[]},metadata_carried={"pages":"2026-11-20"})
+        x=literature.preserve_bibliography(literature.metadata({"volume":"4"}),old,"2026-11-24")
+        self.assertEqual(x["volume"],"4")
+        self.assertEqual(x["pages"],"12-20")
+        self.assertEqual(x["metadata_carried"],{"pages":"2026-11-20"})
+        self.assertIsNone(x["cited_by"])
+        self.assertEqual(x["access"],{"licenses":[],"links":[]})
+        self.assertFalse(x["access_observed"])
+    def test_cc_evidence_and_catalogue_quality(self):
+        import literature_quality as lq
+        url="https://creativecommons.org/licenses/by/4.0/"
+        self.assertEqual(lq.cc_license(url),"CC BY 4.0")
+        self.assertIsNone(lq.cc_license("https://creativecommons.org.example.org/licenses/by/4.0/"))
+        self.assertIsNone(lq.cc_license("https://creativecommons.org/publicdomain/mark/1.0/"))
+        licenses=[dict(url=url,version="vor",start="2025-01-01"),dict(url=url,version="am",start="2027-01-01"),dict(url=url,version="",start="2024-01-01"),dict(url=url,version="vor",start=None)]
+        paper=dict(doi="10.1234/a",journal="Вопросы экономики",authors="A",volume="1",issue="2",pages="3",access=dict(licenses=licenses,links=[{"application":"similarity-checking"}]),access_observed=True)
+        stamp="2026-11-25T12:00:00+00:00"
+        lq.decorate([paper],stamp)
+        self.assertEqual(len(paper["cc_evidence"]),1)
+        lit=dict(articles=[paper],registry=literature.registry(),links={})
+        d=lq.collect(lit,stamp)
+        self.assertEqual(d["total"]["complete_bibliography"],1)
+        self.assertEqual(d["total"]["with_cc_evidence"],1)
+        self.assertEqual(d["total"]["with_reading_link"],0)
+        self.assertEqual(d["total"]["link_unchecked"],1)
+        lq.quality(d,lit)
+        d["total"]["with_cc_evidence"]=2
+        with self.assertRaises(ValueError):lq.quality(d,lit)
     def test_classification_and_audit(self):
         self.db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/a?b","Вопросы экономики","2026-01","Стратегическое планирование промышленности","A",""))
         literature.reclassify(self.db)

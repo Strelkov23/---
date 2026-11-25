@@ -21,8 +21,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const meta=r=>reg[r.journal]||{},check=r=>audit[r.doi]||{},state=r=>check(r).status||'unchecked';
   const publicLink=v=>{try{const u=new URL(v);return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password&&(!u.port||['80','443'].includes(u.port))&&/^[a-z0-9.-]+\.[a-z]{2,63}$/i.test(u.hostname)&&!/\.(local|internal|localhost|invalid|test)$/i.test(u.hostname)?u.href:''}catch{return ''}};
   const licenses=r=>Array.isArray(r.access?.licenses)?r.access.licenses.filter(x=>x&&publicLink(x.url)):[];
-  const textLinks=r=>Array.isArray(r.access?.links)?r.access.links.filter(x=>x&&publicLink(x.url)&&x.application!=='text-mining'):[];
+  const textLinks=r=>Array.isArray(r.access?.links)?r.access.links.filter(x=>x&&publicLink(x.url)&&['','unspecified'].includes(x.application||'')):[];
   $('paper-access-summary').textContent='Записей с заявленной лицензией: '+fmt(records.filter(r=>licenses(r).length).length)+' · со ссылкой на текст: '+fmt(records.filter(r=>textLinks(r).length).length)+' · остальные сведения могут отсутствовать или ещё не быть загружены.';
+  const cc=r=>Array.isArray(r.cc_evidence)?r.cc_evidence.filter(x=>x&&publicLink(x.url)):[];
   const themes=r=>String(r.topics||'').split(' · ').filter(Boolean);
   for(const [label,n] of [['Статей',records.length],['Журналов',new Set(records.map(r=>r.journal)).size],['Проверено ссылок',records.filter(r=>state(r)!=='unchecked').length],['Требуют внимания',records.filter(r=>['missing','restricted','error'].includes(state(r))).length]]){
    const box=node('div','');box.className='metric';box.append(node('b',fmt(n)),node('span',label));$('paper-metrics').append(box)
@@ -88,7 +89,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    selected=records.filter(r=>{
     const y=Number(String(r.published||'').slice(0,4)),marks=meta(r).tags||[],mc=$('paper-meta').value;
     const accessFilter=$('paper-access').value,lc=licenses(r).length,tc=textLinks(r).length;
-    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
+    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:accessFilter==='cc'?cc(r).length:!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
    });
    selected.sort((a,b)=>$('order').value==='cited'?(Number.isFinite(b.cited_by)?b.cited_by:-1)-(Number.isFinite(a.cited_by)?a.cited_by:-1):$('order').value==='title'?a.title.localeCompare(b.title,'ru'):$('order').value==='old'?String(a.published).localeCompare(String(b.published)):String(b.published).localeCompare(String(a.published)));
    $('found').textContent=from>to?'Начальный год позже конечного':'Найдено статей: '+fmt(selected.length);
@@ -107,6 +108,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
     if(!lic.length&&!txt.length)accessDetails.append(node('p','Сведения отсутствуют. Открытый доступ не установлен.'));
     for(const x of lic){const line=node('p','Заявленная лицензия'+(x.version?' · версия '+x.version:'')+(x.start?' · с '+x.start:'')+' · ');line.append(link('Условия лицензии',x.url));accessDetails.append(line)}
     for(const x of txt){const line=node('p','Ссылка из метаданных издателя (доступ не проверен)'+(x.media_type?' · '+x.media_type:'')+(x.version?' · '+x.version:'')+' · ');line.append(link('Открыть',x.url));accessDetails.append(line)}
+    for(const x of cc(r))accessDetails.append(node('p','Заявлена '+x.code+' · версия '+x.version+' · с '+x.start+'; доступность файла не подтверждена.'));
+    if(r.metadata_carried&&Object.keys(r.metadata_carried).length)card.append(node('small','Некоторые библиографические поля сохранены из прошлой редакции: '+Object.entries(r.metadata_carried).map(([k,v])=>k+' · '+v).join('; ')));
     card.append(accessDetails);
     const add=node('button',basket.has(doi)?'Убрать из подборки':'В подборку');add.type='button';add.disabled=!doi;add.setAttribute('aria-pressed',String(basket.has(doi)));add.onclick=()=>toggle(r);
     card.append(node('p',(citation(r)||'Том, номер и страницы пока не загружены')+' · Ссылки Crossref: '+(Number.isFinite(r.cited_by)?fmt(r.cited_by):'нет данных')),add);
@@ -122,7 +125,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   $('paper-filters').oninput=()=>{limit=30;draw()};$('paper-filters').onsubmit=e=>e.preventDefault();$('paper-filters').onreset=()=>setTimeout(()=>{limit=30;draw()},0);
   $('next').onclick=()=>{limit+=40;draw()};
   $('paper-add-page').onclick=()=>{for(const r of selected.slice(0,limit)){const x=item(r);if(x.url)basket.set(x.url,x)}store();draw()};
-  $('references').onclick=()=>csv('economics-bibliography.csv',[['Авторы','Название','Дата публикации','Журнал','ISSN','Индексация журнала','Дата проверки журнала','Источники классификации','Темы','DOI','Ссылка','Статус ссылки','Дата проверки ссылки','Том','Номер','Страницы','Номер статьи','Ссылки Crossref','Дата метаданных','Заявленные лицензии (JSON)','Ссылки на текст (JSON)'],...selected.map(r=>[r.authors,r.title,r.published,r.journal,meta(r).issn,(meta(r).tags||[]).join(' · '),meta(r).verified,(meta(r).sources||[]).join(' | '),r.topics,r.doi,doiURL(r.doi),labels[state(r)],check(r).checked,r.volume,r.issue,r.pages,r.article_number,r.cited_by,r.metadata_checked,JSON.stringify(licenses(r)),JSON.stringify(textLinks(r))])]);
+  $('references').onclick=()=>csv('economics-bibliography.csv',[['Авторы','Название','Дата публикации','Журнал','ISSN','Индексация журнала','Дата проверки журнала','Источники классификации','Темы','DOI','Ссылка','Статус ссылки','Дата проверки ссылки','Том','Номер','Страницы','Номер статьи','Ссылки Crossref','Дата метаданных','Заявленные лицензии (JSON)','Ссылки на текст (JSON)','CC-доказательства (JSON)','Ранее полученные поля (JSON)'],...selected.map(r=>[r.authors,r.title,r.published,r.journal,meta(r).issn,(meta(r).tags||[]).join(' · '),meta(r).verified,(meta(r).sources||[]).join(' | '),r.topics,r.doi,doiURL(r.doi),labels[state(r)],check(r).checked,r.volume,r.issue,r.pages,r.article_number,r.cited_by,r.metadata_checked,JSON.stringify(licenses(r)),JSON.stringify(textLinks(r)),JSON.stringify(cc(r)),JSON.stringify(r.metadata_carried||{})])]);
   function exportText(filename,content){const url=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'})),a=node('a','');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
   const clean=v=>String(v??'').replace(/[\r\n]+/g,' ').trim();
   const bib=v=>clean(v).replace(/\\/g,'/').replace(/[{}]/g,'').replace(/[%&#_$]/g,m=>'\\'+m);

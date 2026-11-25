@@ -42,7 +42,7 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/papers.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#paper-project option').length>1",timeout=30000)
         assert "Записей с заявленной лицензией:" in page.locator("#paper-access-summary").inner_text()
-        assert page.locator("#paper-access option").count()==4
+        assert page.locator("#paper-access option").count()==5
         assert page.locator("#papers details").count()>0
         page.locator("#paper-project").select_option(project_id)
         page.locator("#papers .paper-project-add").first.click()
@@ -63,6 +63,10 @@ with sync_playwright() as p:
         page.locator("#rp-import").set_input_files(str(backup.value.path()))
         page.wait_for_function("document.querySelectorAll('#rp-select option').length===3")
         assert page.locator("#rp-items tbody tr").count()==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/literature-quality.html",wait_until="load")
+        assert page.locator("h1").inner_text()=="Качество научного каталога"
+        assert page.locator("main table tbody tr").count()>=13
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/journal-evidence.html",wait_until="load")
         assert page.locator("main article").count()>=13
