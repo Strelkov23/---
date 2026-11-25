@@ -32,7 +32,33 @@ const SmeFinance=(()=>{
     unmatched:r.sme_total?100*(r.sme_total-r.matched)/r.sme_total:null};
   })};
  }
- return {compare,fmt,select,summary,graph};
+ const pairSpecs=[
+  {id:'balance',label:'Доходы минус расходы',unit:'руб.',count:'paired_money',a:'paired_income_sum',b:'paired_expense_sum'},
+  {id:'cost_share',label:'Расходы / доходы',unit:'%',count:'paired_money',a:'paired_income_sum',b:'paired_expense_sum'},
+  {id:'income_worker',label:'Доходы на работника',unit:'руб./чел.',count:'income_workers_pair',a:'worker_pair_income_sum',b:'worker_pair_workers_sum'}
+ ];
+ // Rounded to hundredths, with an exact integer numerator and denominator.
+ function rounded(n,d){const sign=n<0n?-1n:1n;const a=n<0n?-n:n;return sign*((2n*a+d)/(2n*d))}
+ function pairValue(id,a,b){
+  if(a===null||b===null)return null;
+  const x=BigInt(a),y=BigInt(b);
+  if(id==='balance')return (x-y).toString();
+  if(id==='cost_share')return x>0n&&y>=0n?rounded(y*10000n,x).toString():null;
+  if(id==='income_worker')return y>0n&&x>=0n?rounded(x,y).toString():null;
+  throw Error('Показатель');
+ }
+ function paired(d,kind,cls,id){
+  const spec=pairSpecs.find(s=>s.id===id);
+  if(!spec||!['declared','reported'].includes(kind))throw Error('Параметр');
+  if(d.paired_sums_version!==1)return null;
+  return d[kind].filter(r=>r.class===cls).map(r=>{const a=r[spec.a],b=r[spec.b],observations=r[spec.count];return {...r,a,b,observations,value:pairValue(id,a,b),coverage:r.sme_total?100*observations/r.sme_total:null}}).sort((a,b)=>a.value===null?b.value===null?a.region.localeCompare(b.region):1:b.value===null?-1:BigInt(a.value)>BigInt(b.value)?-1:BigInt(a.value)<BigInt(b.value)?1:a.region.localeCompare(b.region));
+ }
+ function pairSummary(rows,id){
+  const total=rows.reduce((a,r)=>a+r.sme_total,0),observations=rows.reduce((a,r)=>a+r.observations,0);
+  const valid=rows.filter(r=>r.observations>0),a=valid.length?valid.reduce((n,r)=>n+BigInt(r.a),0n).toString():null,b=valid.length?valid.reduce((n,r)=>n+BigInt(r.b),0n).toString():null;
+  return {total,observations,coverage:total?100*observations/total:null,a,b,value:pairValue(id,a,b)};
+ }
+ return {compare,fmt,select,summary,graph,pairSpecs,pairValue,paired,pairSummary};
 })();
 if(typeof module!=='undefined')module.exports=SmeFinance;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -80,6 +106,26 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const v of ['Регион','ЮЛ МСП','Совпали по ИНН','Есть показатель','Охват, %','Сумма, '+unit]){const th=node('th',v);th.scope='col';h.append(th)}
    for(const r of rows){const tr=b.insertRow();for(const v of [names.get(r.region)||r.region,r.sme_total.toLocaleString('ru'),r.matched.toLocaleString('ru'),r.observations.toLocaleString('ru'),r.coverage===null?'—':r.coverage.toLocaleString('ru',{maximumFractionDigits:2}),SmeFinance.fmt(r.value,metric.value)])tr.insertCell().textContent=v}
    table.replaceChildren(t);if(!rows.length)table.append(node('p','Нет территорий, соответствующих выбранному порогу охвата.'));exp.disabled=!rows.length;exp.onclick=()=>csv('sme-finance-'+cls.value+'.csv',[['Год финансов','Дата МСП','Тип кода','Класс','Регион','ЮЛ','Совпали','Есть показатель','Охват, %','Показатель','Сумма в копейках или людях','Отпечаток финансового индекса','SHA-256 МСП','SHA-256 сверки','Минимальный охват, %','Сортировка'],...rows.map(r=>[d.financial_year,d.sme_edition,kind.value,cls.value,r.region,r.sme_total,r.matched,r.observations,r.coverage,metric.value,r.value,d.financial_fingerprint,d.sme_archive_sha256,d.reference_sha256,min,sort])]);
+  }
+  const pk=$('sme-pair-kind'),pc=$('sme-pair-class'),pm=$('sme-pair-metric'),pt=$('sme-pair-table'),ps=$('sme-pair-status'),pe=$('sme-pair-export'),po=$('sme-pair-overview');
+  if(pk&&pc&&pm&&pt&&ps&&pe&&po){
+   if(d.paired_sums_version!==1)ps.textContent='Парные суммы ещё не получены. Расчёты по несовпадающим наблюдениям не выполняются.';
+   else{
+    pm.replaceChildren(...SmeFinance.pairSpecs.map(x=>new Option(x.label,x.id)));
+    function pairOptions(){const old=pc.value;pc.replaceChildren(...[...new Set(d[pk.value].map(r=>r.class))].sort().map(c=>new Option(c==='missing_or_other_version'?'Нет ОКВЭД2 / другая версия':c,c)));if([...pc.options].some(o=>o.value===old))pc.value=old;pairDraw()}
+    function pairDraw(){
+     const spec=SmeFinance.pairSpecs.find(x=>x.id===pm.value),rows=SmeFinance.paired(d,pk.value,pc.value,pm.value),a=SmeFinance.pairSummary(rows,pm.value),pct=n=>n===null?'—':n.toLocaleString('ru',{maximumFractionDigits:2})+' %',fmt=n=>SmeFinance.fmt(n,'income');
+     ps.textContent='Парные наблюдения · финансовый год '+d.financial_year+' · МСП '+d.sme_edition+'. Не прибыль и не производительность труда.';
+     po.replaceChildren();for(const [label,value] of [['ЮЛ МСП',a.total.toLocaleString('ru')],['Парных наблюдений',a.observations.toLocaleString('ru')],['Охват',pct(a.coverage)],[spec.label,fmt(a.value)+(a.value===null?'':' '+spec.unit)]]){const card=node('div','');card.className='metric';card.append(node('b',value),node('span',label));po.append(card)}
+     const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+     const units=pm.value==='income_worker'?'Работники, чел.':'Расходы, руб.';
+     for(const v of ['Регион','ЮЛ МСП','Парных наблюдений','Охват','Доходы, руб.',units,spec.label+', '+spec.unit]){const th=node('th',v);th.scope='col';h.append(th)}
+     for(const r of rows){const tr=body.insertRow();for(const v of [names.get(r.region)||r.region,r.sme_total.toLocaleString('ru'),r.observations.toLocaleString('ru'),pct(r.coverage),fmt(r.a),SmeFinance.fmt(r.b,pm.value==='income_worker'?'workers':'income'),fmt(r.value)])tr.insertCell().textContent=v}
+     pt.replaceChildren(t);pe.disabled=!rows.length;
+     pe.onclick=()=>csv('sme-paired-'+spec.id+'-'+pc.value+'.csv',[['Год финансов','Дата МСП','Тип ОКВЭД','Класс','Регион','ЮЛ МСП','Парных наблюдений','Охват, %','Показатель','Доходы, копейки','Расходы, копейки или работники','Результат, копейки или сотые процента','Единица','Отпечаток финансового индекса','SHA-256 МСП','SHA-256 сверки','Отпечаток манифеста'],...rows.map(r=>[d.financial_year,d.sme_edition,pk.value,pc.value,r.region,r.sme_total,r.observations,r.coverage,spec.id,r.a,r.b,r.value,spec.unit,d.financial_fingerprint,d.sme_archive_sha256,d.reference_sha256,m.data_fingerprint])]);
+    }
+    pk.disabled=pc.disabled=pm.disabled=false;pk.onchange=pairOptions;pc.onchange=pm.onchange=pairDraw;pairOptions();
+   }
   }
   kind.disabled=cls.disabled=metric.disabled=false;kind.onchange=options;cls.onchange=metric.onchange=draw;for(const el of [threshold,order,$('sme-finance-chart-limit')])if(el){el.disabled=false;el.onchange=draw;}options();
  }catch(e){status.textContent='Диагностика недоступна: '+String(e.message||e)}
