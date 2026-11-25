@@ -2,7 +2,7 @@ name: FNS full SME classification
 on:
   push:
     branches: [main]
-    paths: ['site/sme_full_import.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','.github/workflows/sme-full-import.yml']
+    paths: ['site/sme_full_import.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','site/sme_finance_join.py','site/test_sme_finance_join.py','.github/workflows/sme-full-import.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,8 +20,8 @@ jobs:
           python-version: '3.12'
       - run: |
           cd site
-          python -m unittest test_sme_classification.py test_sme_full_import.py
-          python sme_full_import.py --output ../sme-full
+          python -m unittest test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py
+          python sme_full_import.py --output ../sme-full --financial-index ../history/published
       - uses: actions/upload-artifact@v4
         if: always()
         with:

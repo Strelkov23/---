@@ -73,7 +73,7 @@ def reconcile(report,reference):
     return dict(period=reference["period"],source=reference["source"],sha256=reference["sha256"],national_official=reference["national"]["legal"],national_imported=report["unique_legal"],national_difference=report["unique_legal"]-reference["national"]["legal"],rows=rows,exact=report["unique_legal"]==reference["national"]["legal"] and all(r["difference"]==0 for r in rows) and not report["counts"].get("quarantined",0))
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("--output",required=True,type=Path);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument("--output",required=True,type=Path);p.add_argument("--financial-index",type=Path);a=p.parse_args()
     a.output.mkdir(parents=True,exist_ok=True)
     raw,enc=fetch(s.SOURCE,4_000_000);meta=s.parse(raw,enc);raw,_=fetch(meta["schema"],2_000_000);schema=inspect_schema(raw)
     if not {"ИННЮЛ","ОГРН","КодРегион","КодОКВЭД","ВерсОКВЭД","ДатаСост"}<=set(schema["attributes"]):raise ValueError("Необходимые поля XSD")
@@ -90,6 +90,12 @@ def main():
         try:result["reconciliation"]=reconcile(result,reference)
         except (ValueError,KeyError,TypeError) as e:result["reconciliation_error"]=str(e)
         (a.output/"classification.json").write_text(json.dumps(result,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+        if a.financial_index and result.get("reconciliation"):
+            import sme_finance_join
+            with sqlite3.connect("file:"+str((folder/"org.sqlite").resolve())+"?mode=ro",uri=True) as db:
+                linked=sme_finance_join.join(db,a.financial_index,result)
+            (a.output/"finance-join.json").write_text(json.dumps(linked,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+            print("SME_FINANCE_JOIN",json.dumps({k:linked[k] for k in ("financial_year","sme_edition","eligible_regions","counts")},ensure_ascii=False),flush=True)
         print("SME_FULL",json.dumps({k:result[k] for k in ("edition","xml_total","xml_processed","counts","unique_legal","archive_bytes","archive_sha256")},ensure_ascii=False),flush=True)
         print("SME_QUARANTINE",json.dumps({"count":len(result["quarantine"]),"reasons":dict(Counter(r["reason"] for r in result["quarantine"]))},ensure_ascii=False),flush=True)
         print("SME_RECONCILIATION",json.dumps(result.get("reconciliation",result.get("reconciliation_error")),ensure_ascii=False),flush=True)
