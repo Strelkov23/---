@@ -456,7 +456,7 @@ jobs:
           entry=manifest["files"]["federal-budget.csv"]
           get("federal-budget.csv",entry["sha256"],entry["bytes"])
           analytics=json.loads(os.environ["EXPECTED_ANALYTICS_SHA256"])
-          expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js"]
+          expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json"]
           assert set(analytics)==set(expected_names),"Incomplete analytics hash manifest"
           for name in expected_names:
               get(name,analytics[name])
