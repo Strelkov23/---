@@ -352,6 +352,32 @@ def check(out,previous,stamp):
         pcov.verify_csv(out/"project-coverage.csv",coverage)
         pcov.verify_breakdown_csv(out/"project-breakdown.csv",coverage)
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Охват проектов: "+str(e))
+    # Explicit scope diagnostics: incomplete sources are warnings, not structural failures.
+    try:
+        feeds={}
+        for name in ("capital","balance","profit"):
+            p=out/("bank-"+name+".json")
+            if p.is_file():feeds[name]=json.loads(p.read_text())
+        if feeds:
+            forms,target,verified=bank_scope(feeds)
+            for name,r in forms.items():
+                counts["bank_"+name+"_cohort_target"]=r["target"]
+                counts["bank_"+name+"_cohort_verified"]=r["verified"]
+                if r["target"] is None:warnings.append("Банковская отчётность "+name+": целевой перечень не подтверждён")
+                elif r["verified"]<r["target"]:warnings.append("Банковская отчётность "+name+": проверено "+str(r["verified"])+" из "+str(r["target"])+" целевых банков")
+            counts["bank_three_forms_target"]=target
+            counts["bank_three_forms_verified"]=verified
+        p=out/"bank-disclosure.json"
+        if p.is_file() and counts.get("bank_disclosure_verified_forms",0)==0:warnings.append("Пилот раскрытия ЦБ: доступность дат форм не подтверждена; числовые нормативы не импортированы")
+        p=out/"sme-finance.json"
+        if p.is_file():
+            d=json.loads(p.read_text());profiles=d.get("profiles",{}).get("rows")
+            counts["sme_paired_sums_available"]=int(d.get("status")=="diagnostic" and d.get("paired_sums_version")==1)
+            counts["sme_profile_pilot_records"]=len(profiles) if profiles is not None else None
+            counts["sme_profile_pilot_matched"]=sum(r["status"]=="matched" for r in profiles) if profiles is not None else None
+            if not counts["sme_paired_sums_available"]:warnings.append("МСП: парные суммы ещё не подтверждены")
+            if profiles is None:warnings.append("МСП: индивидуальная отраслевая классификация ещё не опубликована")
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Охват атласа: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):
             issues.append("Правовой архив: число карточек расходится "+day["day"])
@@ -369,6 +395,22 @@ def check(out,previous,stamp):
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)
     return {"built":stamp,"errors":issues,"warnings":warnings,"counts":counts,"files":hashes}
+
+def bank_scope(feeds):
+    """Measure verified coverage within each dated target cohort, not all records."""
+    result={};common=None;verified_common=None
+    for name,key in (("capital","target_cohort"),("balance","cohort"),("profit","cohort")):
+        d=feeds.get(name)
+        target=set(d.get(key,[])) if d else set()
+        if not target:
+            result[name]=dict(target=None,verified=None)
+            continue
+        verified={r["registration_number"] for r in d["rows"] if r["registration_number"] in target and (name!="capital" or r.get("verification")=="html")}
+        result[name]=dict(target=len(target),verified=len(verified))
+        common=target if common is None else common&target
+        verified_common=verified if verified_common is None else verified_common&verified
+    complete=all(r["target"] is not None for r in result.values())
+    return result,len(common) if complete else None,len(verified_common) if complete else None
 
 def publish(out,previous,stamp):
     # Include the new report itself in link resolution before writing it.
