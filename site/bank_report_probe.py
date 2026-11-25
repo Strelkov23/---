@@ -72,14 +72,76 @@ def inspect_dbf(raw):
         fields.append(dict(name=name,type=chr(raw[pos+11]),length=raw[pos+16],decimals=raw[pos+17]))
     if len({f["name"] for f in fields})!=len(fields) or sum(f["length"] for f in fields)+1!=record:raise ValueError("Длина записи DBF")
     return dict(rows=rows,fields=fields,sha256=hashlib.sha256(raw).hexdigest())
-def inspect_zip(raw):
+# Exact source columns; these are deliberately not interpreted as financial measures.
+TABLES={
+    "123":{"123B":("REGN",),"123D":("REGN","C1","C3"),"123N":("C0","C1","C2_1","C2_2","C2_3")},
+    "135":{"135B":("REGN",),"135_3":("REGN","C1_3","C2_3","C3_3","C4_3")},
+}
+def selected_rows(raw,fields):
+    import struct
+    meta=inspect_dbf(raw)
+    count,head,width=struct.unpack_from("<IHH",raw,4)
+    wanted=set(fields)
+    offsets={};pos=1
+    for f in meta["fields"]:
+        if f["name"] in wanted:offsets[f["name"]]=(pos,f)
+        pos+=f["length"]
+    if set(offsets)!=wanted or count>100000:raise ValueError("Неожиданная структура исходных полей")
+    rows=[];deleted=0;non_numeric=0
+    for i in range(count):
+        record=raw[head+i*width:head+(i+1)*width]
+        if record[:1]==b"*":deleted+=1;continue
+        if record[:1]!=b" ":raise ValueError("Маркер записи DBF")
+        row={"source_row":i+1}
+        for key in fields:
+            offset,f=offsets[key]
+            cell=record[offset:offset+f["length"]].strip(b" \x00")
+            if not cell:row[key]=None;continue
+            try:value=cell.decode("ascii")
+            except UnicodeDecodeError:
+                # Preserve original text bytes until encoding is confirmed.
+                value={"hex":cell.hex()}
+            if f["type"]=="N" and (not isinstance(value,str) or not re.fullmatch(r"[+-]?\d+(?:\.\d+)?",value)):
+                non_numeric+=1
+            row[key]=value
+        rows.append(row)
+    if len(rows)+deleted!=count:raise ValueError("Баланс строк DBF")
+    return dict(sha256=meta["sha256"],language_driver=raw[29],source_rows=count,deleted=deleted,non_numeric_cells=non_numeric,fields=[f for f in meta["fields"] if f["name"] in wanted],rows=rows)
+
+def raw_table(form,member,raw,tables):
+    match=re.fullmatch(r"\d{6}_([A-Za-z0-9_]+)\.dbf",Path(member).name,re.I)
+    if not match:return
+    key=match.group(1).upper()
+    if key not in TABLES[form]:return
+    if key in tables:raise ValueError("Дублирующая исходная таблица")
+    tables[key]=dict(member=member,**selected_rows(raw,TABLES[form][key]))
+
+def raw_report(form,entry,info,tables):
+    if set(tables)!=set(TABLES[form]):raise ValueError("Неполный комплект таблиц формы")
+    source_hashes={m["member"]:m["sha256"] for m in info["members"]}
+    if any(source_hashes.get(t["member"])!=t["sha256"] for t in tables.values()):raise ValueError("Разные отпечатки таблиц")
+    def reg(row):
+        v=row["REGN"]
+        if not isinstance(v,str) or not re.fullmatch(r"\d{1,6}",v):return None
+        return str(int(v))
+    bank=tables[form+"B"]["rows"]
+    values=tables["123D" if form=="123" else "135_3"]["rows"]
+    bank_ids={reg(r) for r in bank}-{None}
+    value_ids={reg(r) for r in values}-{None}
+    code="C1" if form=="123" else "C1_3"
+    codes=sorted({r[code] for r in values if isinstance(r[code],str)})
+    return dict(schema=1,status="raw_unmapped",note="Исходные поля DBF без установленных единиц и экономической интерпретации; число строк не число банков. Не использовать для расчёта нормативов.",**entry,archive_sha256=info["sha256"],tables=tables,coverage=dict(directory_unique_regn=len(bank_ids),values_unique_regn=len(value_ids),matched_unique_regn=len(bank_ids&value_ids),unmatched_regn=sorted(value_ids-bank_ids,key=int),invalid_directory_regn=sum(reg(r) is None for r in bank),invalid_values_regn=sum(reg(r) is None for r in values),source_codes=codes))
+
+def inspect_zip(raw,on_member=None):
     out=[]
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         members=z.infolist()
         if len(members)>100 or sum(x.file_size for x in members)>100*1024*1024:raise ValueError("Размер распаковки")
         for member in members:
             if member.filename.lower().endswith(".dbf"):
-                out.append(dict(member=member.filename,**inspect_dbf(z.read(member))))
+                data=z.read(member)
+                out.append(dict(member=member.filename,**inspect_dbf(data)))
+                if on_member is not None:on_member(member.filename,data)
     if not out:raise ValueError("Нет DBF")
     return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),members=out)
 def archive_candidates(links):
@@ -115,7 +177,7 @@ def bounded_tar(args,limit):
     if len(raw)>limit:raise ValueError("Размер распаковки RAR")
     return raw
 
-def inspect_rar(raw,reader=bounded_tar):
+def inspect_rar(raw,reader=bounded_tar,on_member=None):
     if not raw.startswith((b"Rar!\x1a\x07\x00",b"Rar!\x1a\x07\x01\x00")):raise ValueError("Сигнатура RAR")
     if not 0<len(raw)<=MAX_ARCHIVE:raise ValueError("Размер RAR")
     with tempfile.TemporaryDirectory() as folder:
@@ -132,6 +194,7 @@ def inspect_rar(raw,reader=bounded_tar):
             total+=len(data)
             if total>MAX_RAR_OUTPUT:raise ValueError("Размер распаковки RAR")
             out.append(dict(member=name,**inspect_dbf(data)))
+            if on_member is not None:on_member(name,data)
         if not out:raise ValueError("Нет DBF")
     return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),members=out)
 
@@ -148,8 +211,13 @@ def main():
             url=entry["url"]
             try:
                 data=get(url,MAX_ARCHIVE)
-                info=inspect_rar(data) if urlsplit(url).path.lower().endswith(".rar") else inspect_zip(data)
-                report["archives"].append(dict(entry,**info))
+                tables={}
+                def capture(member,raw):raw_table(entry["form"],member,raw,tables)
+                info=inspect_rar(data,on_member=capture) if urlsplit(url).path.lower().endswith(".rar") else inspect_zip(data,on_member=capture)
+                diagnostic=raw_report(entry["form"],entry,info,tables)
+                filename="form-"+entry["form"]+"-raw.json"
+                (out/filename).write_text(json.dumps(diagnostic,ensure_ascii=False,indent=2),encoding="utf-8")
+                report["archives"].append(dict(entry,**info,raw_file=filename,raw_coverage=diagnostic["coverage"]))
             except Exception as e:report["archives"].append(dict(entry,error=str(e)[:300]))
     except Exception as e:report["errors"].append("catalog: "+str(e)[:300])
     try:
