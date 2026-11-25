@@ -34,3 +34,8 @@ class FullDirectoryTests(unittest.TestCase):
     def test_missing_license(self):
         d=b.parse_full(full_fixture().replace("Действующая".encode(),b"",1))
         self.assertIsNone(d["rows"][0]["license_status"])
+
+    def test_identical_duplicate(self):
+        raw=full_fixture().replace(b"</table>",b"<tr><td>101</td><td></td><td>1</td><td>1027739043750</td><td>\xd0\xa2\xd0\xb5\xd1\x81\xd1\x82 1</td><td>\xd0\x90\xd0\x9e</td><td>06.09.1994</td><td>"+ "Действующая".encode()+b"</td><td>"+ "адрес".encode()+b"</td></tr></table>")
+        d=b.parse_full(raw);self.assertEqual(len(d["rows"]),100);self.assertEqual(d["source_count"],101);self.assertEqual(d["duplicate_rows"],[dict(registration_number="1",source_row=101)])
+        with self.assertRaises(ValueError):b.parse_full(raw.replace(b"<td>101</td>",b"<td>101</td>",1).replace(b"<td>1</td><td>1027739043750</td>",b"<td>1</td><td>1027739043751</td>",1))

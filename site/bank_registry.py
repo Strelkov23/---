@@ -61,18 +61,21 @@ def parse_full(raw,encoding="utf-8"):
     edition=datetime.strptime(dates.pop(),"%d.%m.%Y").date().isoformat()
     tables=[t for t in p.tables if t and tuple(t[0])==HEADERS]
     if len(tables)!=1:raise ValueError("Не найдена точная таблица кредитных организаций")
-    rows=[];ids=set()
+    rows=[];ids={};duplicates=[]
     for i,r in enumerate(tables[0][1:],1):
         if len(r)!=9 or r[0]!=str(i):raise ValueError("Структура строки "+str(i))
         _,kind,reg,ogrn,name,form,registered,status,_address=r
-        if not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or reg in ids or not name or ogrn and not re.fullmatch(r"\d{13}",ogrn):raise ValueError("Идентификатор/статус строки "+str(i))
-        ids.add(reg)
+        if not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or not name or ogrn and not re.fullmatch(r"\d{13}",ogrn):raise ValueError("Идентификатор/статус строки "+str(i))
+        if reg in ids:
+            if ids[reg]!=r[1:]:raise ValueError("Противоречащие записи номера "+reg+" в строке "+str(i))
+            duplicates.append(dict(registration_number=reg,source_row=i));continue
+        ids[reg]=r[1:]
         if registered:
             registered=datetime.strptime(registered,"%d.%m.%Y").date().isoformat()
         # The exact street address is unnecessary for the analytical directory.
         rows.append(dict(registration_number=reg,ogrn=ogrn or None,name=name,kind=kind or None,legal_form=form or None,registered=registered or None,license_status=status or None,source_row=i))
     if not 100<=len(rows)<=5000:raise ValueError("Неожиданное число записей")
-    return dict(schema=1,source=FULL_SOURCE,edition=edition,sha256=hashlib.sha256(raw).hexdigest(),rows=rows,note="Все записи официального списка, в том числе исторические. Статус лицензии не является финансовой оценкой.")
+    return dict(schema=1,source=FULL_SOURCE,edition=edition,sha256=hashlib.sha256(raw).hexdigest(),rows=rows,duplicate_rows=duplicates,source_count=len(tables[0])-1,note="Уникальные записи официального списка; точные дубли сохранены отдельно. В том числе исторические. Статус лицензии не является финансовой оценкой.")
 def fetch_full():
     with urlopen(Request(FULL_SOURCE,headers={"User-Agent":"Mozilla/5.0"}),timeout=25) as r:
         from urllib.parse import urlsplit
@@ -91,12 +94,18 @@ def quality(d):
             datetime.strptime(x["edition"],"%Y-%m-%d")
             if not (5<=len(rows)<=50 if kind=="system" else 100<=len(rows)<=5000):raise ValueError("Охват")
         elif x["status"] in ("ok","cached") or any(x.get(k) for k in ("edition","sha256","success")):raise ValueError("Пустой успех")
-        ids=set()
+        ids=set();source_rows=set()
         for i,r in enumerate(rows,1):
             reg=r["registration_number"]
-            if reg in ids or not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or not r["name"] or r["source_row"]!=i:raise ValueError("Строка перечня")
-            ids.add(reg)
+            if reg in ids or not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or not r["name"] or type(r["source_row"]) is not int or r["source_row"]<=0 or r["source_row"] in source_rows or (kind=="system" and r["source_row"]!=i):raise ValueError("Строка перечня")
+            ids.add(reg);source_rows.add(r["source_row"])
             if kind=="full" and (r["license_status"] is not None and (not isinstance(r["license_status"],str) or not r["license_status"].strip()) or r["ogrn"] and not re.fullmatch(r"\d{13}",r["ogrn"])):raise ValueError("Поля полного списка")
+        if kind=="full" and rows:
+            for r in x.get("duplicate_rows",[]):
+                if r["registration_number"] not in ids or type(r["source_row"]) is not int or r["source_row"] in source_rows:raise ValueError("Метаданные дубля")
+                source_rows.add(r["source_row"])
+            count=x.get("source_count",len(rows))
+            if source_rows!=set(range(1,count+1)):raise ValueError("Неполный учёт строк источника")
     a,b=d["datasets"]["system"],d["datasets"]["full"]
     return {"system_bank_records":len(a["rows"]),"credit_organization_records":len(b["rows"]),"credit_organization_active_license":sum(r["license_status"]=="Действующая" for r in b["rows"])}
 def publish(out,previous,stamp,refresh,fetchers=None):

@@ -15,7 +15,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  let page=0;const size=50;
  try{
   const manifest=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(manifest,'bank-directory.json',root),data=entry.data,a=data.datasets.system,b=data.datasets.full;
-  status.textContent='Системно значимые: '+(a.edition||'нет проверенной редакции')+'; полный список: '+(b.edition||'нет проверенной редакции')+'. '+[a,b].map(x=>x.error||'').filter(Boolean).join(' · ');
+  status.textContent='Системно значимые: '+(a.edition||'нет проверенной редакции')+'; полный список: '+(b.edition||'нет проверенной редакции')+' · точных повторов: '+(b.duplicate_rows?.length??0)+'. '+[a,b].map(x=>x.error||'').filter(Boolean).join(' · ');
   for(const [label,value] of [['Системно значимые',a.rows.length||'—'],['Записей полного перечня',b.rows.length||'—'],['Действующая лицензия',b.rows.length?b.rows.filter(r=>r.license_status==='Действующая').length:'—']]){const c=node('div','');c.className='metric';c.append(node('b',String(value)),node('span',label));metrics.append(c)}
   license.replaceChildren(new Option('Все',''),...[...new Set(b.rows.map(r=>r.license_status).filter(Boolean))].sort().map(v=>new Option(v,v)),new Option('Не указан','__unknown__'));
   if(!a.rows.length&&b.rows.length)mode.value='full';
