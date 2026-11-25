@@ -1,5 +1,5 @@
 const BankHistory=(()=>{
- function series(d,reg){return Object.entries(d.snapshots).sort(([a],[b])=>a.localeCompare(b)).map(([period,rows])=>({period,record:rows.find(r=>r.registration_number===reg)||null}));}
+ function series(d,reg){return [...new Set([...Object.keys(d.snapshots),...Object.keys(d.attempts||{})])].sort().map(period=>({period,record:(d.snapshots[period]||[]).find(r=>r.registration_number===reg)||null,error:d.attempts?.[period]?.errors?.[reg]||null}));}
  function delta(a,b){return a!==null&&b!==null&&BigInt(a)>0n?Number((BigInt(b)-BigInt(a))*10000n/BigInt(a))/100:null}
  return {series,delta};
 })();
@@ -19,7 +19,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    chart.replaceChildren();const max=available.reduce((a,x)=>BigInt(x.record.capital)>a?BigInt(x.record.capital):a,0n);
    let prev=null;
    for(const x of rows){const tr=b.insertRow(),v=x.record?.capital??null,change=BankHistory.delta(prev,v);for(const val of [x.period,fmt(v),change===null?'—':change.toLocaleString('ru')+' %'])tr.insertCell().textContent=val;
-    if(x.record){const a=node('a','Форма 808');a.href=x.record.source;tr.insertCell().append(a);prev=v;}else tr.insertCell().textContent='Нет данных';
+    if(x.record){const a=node('a','Форма 808');a.href=x.record.source;tr.insertCell().append(a);prev=v;}else tr.insertCell().textContent=x.error?'Не подтверждено: '+x.error:'Нет данных';
     if(v!==null&&BigInt(v)>=0n&&max>0n){const row=node('div','');row.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';const bar=node('div','');bar.className='group-signed-fill';bar.style.left='0';bar.style.width=Number(BigInt(v)*10000n/max)/100+'%';track.append(bar);row.append(node('span',x.period),track,node('strong',fmt(v)));chart.append(row)}
    }
    out.replaceChildren(t);exp.disabled=!available.length;exp.onclick=()=>csv('bank-capital-history-'+pick.value+'.csv',[['Дата','Рег. номер','Капитал, тыс. руб.','Строка','Источник','SHA-256 HTML','Перечень системно значимых на дату','Отпечаток манифеста'],...rows.map(x=>[x.period,pick.value,x.record?.capital,x.record?.line,x.record?.source,x.record?.sha256,d.cohort_edition,m.data_fingerprint])]);

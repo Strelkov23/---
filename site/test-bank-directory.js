@@ -11,3 +11,6 @@ assert.deepEqual(B.commonDates(disclosure,'123'),['2026-09-01']);
 assert.equal(B.commonDates(disclosure,'101'),null);
 assert.equal(B.commonDates({rows:[]},'123'),null);
 assert.deepEqual(B.commonDates({rows:[{forms:{123:{status:'ok',dates:[]}}}]},'123'),[]);
+
+const profile=B.profile('1',{capital:{period:'2026-01-01',rows:[{registration_number:'1',capital:'10',source:'a',verification:'html'}]},profit:{period:'2026-Q1',rows:[{registration_number:'1',current:{profit:'0',net_interest:null},source:'b'}]}});
+assert.equal(profile.length,2);assert.equal(profile[1].value,'0');assert.equal(profile[1].period,'2026-Q1');assert.equal(B.profile('2',{}).length,0);
