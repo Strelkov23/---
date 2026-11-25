@@ -40,3 +40,14 @@ class Resume(unittest.TestCase):
         self.assertEqual(r.plan(db,"x",True,None,"2026-11-27T00:00:00+00:00")[1],lo)
         with db:r.clear_window(db,"x")
         self.assertEqual(r.window_days(db,"x",True),1830)
+
+    def test_queue_passport(self):
+        db=sqlite3.connect(":memory:");self.addCleanup(db.close);r.setup(db)
+        journals={"a":"А","b":"Б"}
+        r.plan(db,"a",True,None,"2026-11-26T00:00:00+00:00")
+        d=r.passport(db,journals)
+        self.assertEqual(r.quality(d,{"А":{"issn":"a"},"Б":{"issn":"b"}}),{"active":1,"watermarks":0})
+        self.assertEqual(d["rows"][0]["next_start"],"1991-01-01")
+        self.assertIsNone(d["rows"][1]["next_start"])
+        d["rows"][0]["next_start"]="2028-01-01"
+        with self.assertRaises(ValueError):r.quality(d,{"А":{"issn":"a"},"Б":{"issn":"b"}})

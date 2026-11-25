@@ -47,3 +47,33 @@ def advance(db,issn,hi,finish,watermark):
         return True
     db.execute("update literature_progress set start=? where issn=?",((hi+timedelta(days=1)).isoformat(),issn))
     return False
+
+def passport(db,journals):
+    progress={r[0]:r[1:] for r in db.execute("select issn,full,start,finish,watermark from literature_progress")}
+    watermarks=dict(db.execute("select issn,stamp from literature_watermark"))
+    rows=[]
+    for issn,name in sorted(journals.items()):
+        p=progress.get(issn)
+        rows.append(dict(issn=issn,journal=name,mode=("history" if p[0] else "index") if p else None,next_start=p[1] if p else None,finish=p[2] if p else None,started=p[3] if p else None,watermark=watermarks.get(issn),window_days=window_days(db,issn,bool(p[0])) if p else None))
+    result=dict(schema=1,request_limit=LIMIT,seconds_before_next_request=SECONDS,rows=rows)
+    quality(result,{name:dict(issn=issn) for issn,name in journals.items()})
+    return result
+def quality(d,registry):
+    from datetime import datetime
+    if d.get("schema")!=1 or d.get("request_limit")!=LIMIT or d.get("seconds_before_next_request")!=SECONDS:raise ValueError("Паспорт очереди")
+    rows=d["rows"]
+    if len(rows)!=len(registry) or {r["journal"] for r in rows}!=set(registry):raise ValueError("Охват очереди")
+    def timestamp(s):
+        v=datetime.fromisoformat(s)
+        if v.tzinfo is None:raise ValueError("Часовой пояс")
+        return v
+    for r in rows:
+        if r["issn"]!=registry[r["journal"]]["issn"] or r["mode"] not in (None,"history","index"):raise ValueError("Журнал")
+        if r["watermark"] is not None:timestamp(r["watermark"])
+        if r["mode"] is None:
+            if any(r[k] is not None for k in ("next_start","finish","started","window_days")):raise ValueError("Пустой курсор")
+        else:
+            lo,hi=date.fromisoformat(r["next_start"]),date.fromisoformat(r["finish"])
+            timestamp(r["started"])
+            if lo>hi or lo<date(1991,1,1) or type(r["window_days"]) is not int or not 1<=r["window_days"]<=(366*5 if r["mode"]=="history" else 7):raise ValueError("Период очереди")
+    return dict(active=sum(r["mode"] is not None for r in rows),watermarks=sum(r["watermark"] is not None for r in rows))

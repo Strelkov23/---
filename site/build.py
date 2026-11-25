@@ -126,7 +126,8 @@ with m.connect() as db:
     openalex_access.sync(db,papers,m.now(),"--refresh" in sys.argv)
     journal_counts=Counter(r["journal"] for r in papers)
     journal_checks=[dict(r,journal=literature.JOURNALS.get(r["issn"],r["issn"]),count=journal_counts[literature.JOURNALS.get(r["issn"],r["issn"])]) for r in db.execute("select * from journal_checks")]
-    write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),service=literature.service_status(db,m.now()),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))
+    import literature_resume
+    write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),queue=literature_resume.passport(db,literature.JOURNALS),service=literature.service_status(db,m.now()),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))
     import journal_evidence
     journal_evidence.publish(page,out,db,m.now())
     literature_quality.publish(page,out,m.now())

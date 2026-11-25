@@ -72,7 +72,9 @@ def collect(literature,stamp):
     if sum(v for k,v in total.items() if k.startswith("oa_"))!=total["total"]:raise ValueError("Баланс результатов OpenAlex")
     if any(sum(r["counts"][k] for r in rows)!=v for k,v in total.items()):raise ValueError("Баланс научного каталога")
     import literature_coverage as coverage
-    return dict(schema=1,built=stamp,note=NOTE,total=total,journals=rows,coverage=coverage.collect(literature,stamp))
+    import literature_resume as resume
+    queue=resume.quality(literature["queue"],registry) if "queue" in literature else None
+    return dict(schema=1,built=stamp,note=NOTE,total=total,journals=rows,coverage=coverage.collect(literature,stamp),queue=queue)
 
 def quality(data,literature):
     if data!=collect(literature,data["built"]):raise ValueError("Сводка качества не воспроизводится")
