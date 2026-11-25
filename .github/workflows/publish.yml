@@ -124,6 +124,7 @@ jobs:
           node test-global-plan.js
           node test-labor-calibration.js
           node test-data-registry.js
+          node test-research-projects.js
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js
