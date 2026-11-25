@@ -44,3 +44,8 @@ assert.deepEqual(summary.distribution,[0,1,0,1]);
 assert.equal(B.coverageSummary({}).distribution,null);
 assert.deepEqual(B.coverageSummary({...covFeeds,profit:{cohort:['9'],rows:[]}}).distribution,[0,0,0,0]);
 assert.deepEqual(B.coverageSummary({capital:{target_cohort:['1'],rows:[{registration_number:'1',verification:'documentary'}]},balance:{cohort:['1'],rows:[]},profit:{cohort:['1'],rows:[]}}).distribution,[1,0,0,0]);
+
+assert.deepEqual(summary.commonRows,[{registration_number:'1',capital:true,balance:true,profit:true,count:3},{registration_number:'2',capital:false,balance:true,profit:false,count:1}]);
+assert.equal(B.coverageSummary({}).commonRows,null);
+assert.deepEqual(B.coverageSummary({...covFeeds,profit:{cohort:['9'],rows:[]}}).commonRows,[]);
+assert.equal(summary.commonRows.reduce((n,r)=>n+r.count,0),summary.distribution.reduce((n,v,i)=>n+i*v,0));
