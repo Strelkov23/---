@@ -1,0 +1,273 @@
+{
+  "schema": 1,
+  "checked": "2026-11-25",
+  "mode": "documentary_snapshot",
+  "groups": [
+    {
+      "id": "phosagro",
+      "name": "ФосАгро",
+      "sector": "Минеральные удобрения",
+      "role": "Производство фосфорных и азотных удобрений для сельского хозяйства.",
+      "source": "https://ar2025.phosagro.ru/perfomance-review/financial-performance/",
+      "section": "Финансовые показатели, 2023–2025",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "440304"
+            },
+            {
+              "year": 2024,
+              "value": "507689"
+            },
+            {
+              "year": 2025,
+              "value": "573628"
+            }
+          ]
+        },
+        {
+          "id": "ebitda",
+          "label": "EBITDA (определение эмитента)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "183038"
+            },
+            {
+              "year": 2024,
+              "value": "177005"
+            },
+            {
+              "year": 2025,
+              "value": "176317"
+            }
+          ]
+        },
+        {
+          "id": "adj_ebitda",
+          "label": "Скорректированная EBITDA",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "168352"
+            },
+            {
+              "year": 2024,
+              "value": "170553"
+            },
+            {
+              "year": 2025,
+              "value": "199448"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Чистая прибыль группы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "86141"
+            },
+            {
+              "year": 2024,
+              "value": "84469"
+            },
+            {
+              "year": 2025,
+              "value": "114243"
+            }
+          ]
+        },
+        {
+          "id": "fcf",
+          "label": "Свободный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "70208"
+            },
+            {
+              "year": 2024,
+              "value": "28986"
+            },
+            {
+              "year": 2025,
+              "value": "21428"
+            }
+          ]
+        },
+        {
+          "id": "netdebt",
+          "label": "Чистый долг на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "223207"
+            },
+            {
+              "year": 2024,
+              "value": "325356"
+            },
+            {
+              "year": 2025,
+              "value": "320468"
+            }
+          ]
+        },
+        {
+          "id": "sales",
+          "label": "Продажи удобрений",
+          "unit": "тыс. т",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "11138.7"
+            },
+            {
+              "year": 2024,
+              "value": "11604.3"
+            },
+            {
+              "year": 2025,
+              "value": "12032.2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rosneft",
+      "name": "Роснефть",
+      "sector": "Нефтегазовая промышленность",
+      "role": "Добыча углеводородов, переработка и поставки нефтепродуктов.",
+      "source": "https://limited.rosneft.ru/press/releases/item/223841/",
+      "section": "Таблица финансовых показателей за 12 месяцев 2025 и 2024 гг.",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue_combined",
+          "label": "Выручка и доход от ассоциированных и совместных предприятий",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "10139"
+            },
+            {
+              "year": 2025,
+              "value": "8236"
+            }
+          ]
+        },
+        {
+          "id": "ebitda",
+          "label": "EBITDA (определение эмитента)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3029"
+            },
+            {
+              "year": 2025,
+              "value": "2173"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль, относящаяся к акционерам головной компании",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1084"
+            },
+            {
+              "year": 2025,
+              "value": "293"
+            }
+          ]
+        },
+        {
+          "id": "capex",
+          "label": "Капитальные затраты",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1442"
+            },
+            {
+              "year": 2025,
+              "value": "1360"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_fcf",
+          "label": "Скорректированный свободный денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1295"
+            },
+            {
+              "year": 2025,
+              "value": "700"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "x5",
+      "name": "X5",
+      "sector": "Розничная торговля",
+      "role": "Продовольственная розница; сети Пятёрочка, Перекрёсток и Чижик.",
+      "source": "https://www.x5.ru/ru/news/x5-obyavlyaet-o-roste-vyruchki-na-188-v-2025-g-rentabelnost-skorr-ebitda-do-primeneniya-msfo-ifrs-16-sostavila-61/",
+      "section": "Заголовок и описание годовых результатов 2025 г.",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue_growth",
+          "label": "Рост выручки год к году (сообщённый эмитентом)",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2025,
+              "value": "18.8"
+            }
+          ]
+        },
+        {
+          "id": "adj_ebitda_margin_pre16",
+          "label": "Рентабельность скорр. EBITDA до МСФО 16",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2025,
+              "value": "6.1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

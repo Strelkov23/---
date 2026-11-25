@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-25T11:13:47+00:00",
+  "built": "2026-11-25T11:22:43+00:00",
   "errors": [],
   "warnings": [
     "Исторические ряды: исключено служебных кодов пропусков и конфиденциальности 2261",
@@ -29,7 +29,7 @@
     "История · Архив регионов · Внешняя торговля · Ошибка: Структура CSV распознана, но нет наблюдений выбранных показателей"
   ],
   "counts": {
-    "archive": 8518,
+    "archive": 8531,
     "papers": 10028,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -72,6 +72,8 @@
     "credit_organization_active_license": 358,
     "bank_disclosure_pilot_banks": 3,
     "bank_disclosure_verified_forms": 0,
+    "group_passports": 3,
+    "group_observations": 33,
     "company_catalogs_checked": 2,
     "company_schemas_checked": 2,
     "corporate_income_records": 1800991,
@@ -79,14 +81,16 @@
     "corporate_paired_records": 1791696,
     "company_index_records": 0,
     "company_index_bytes": 0,
+    "company_name_records": 0,
+    "company_name_bytes": 0,
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 2327,
     "freshness_ok": 227,
-    "freshness_unavailable": 59,
-    "freshness_waiting": 3,
+    "freshness_unavailable": 61,
     "freshness_archive": 6,
-    "revision_builds": 18,
+    "freshness_waiting": 1,
+    "revision_builds": 19,
     "revision_events": 4,
     "consistency_согласовано": 1443,
     "consistency_нет данных": 192,
@@ -138,12 +142,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "ae83e16efc50dead1f8c74b64bb052add21f95dccef43bd6e04276fc7bc3c035",
-      "bytes": 4200626
+      "sha256": "688719a61084206fb3e55d71eab846e3cbb483fa9acc05bda1d3faae2254e231",
+      "bytes": 4204814
     },
     "literature.json": {
-      "sha256": "325d054954f790cf37f27c0cb9ab52e78daa8059c81d4e50bcf6f3ecd55ef712",
-      "bytes": 5918278
+      "sha256": "aa78eae04707dd546d9a04324effe01bc4a902c9a2d521828c2cf7a9745ab507",
+      "bytes": 6095269
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -158,11 +162,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "8396426b8f1a7e890504992a1dced2defba1e797cad2971e04503e245d96e72b",
+      "sha256": "af2fcc46fadd1e7eda43e1c60958993540bfb79661853beada0abcc8c8f39e27",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "514a377297f4068eef4f64f5c9159207f197c7073b2c8cfb316ea4bb33730425",
+      "sha256": "152b62a12d3629fa6a246a89328756ba10d24ff5152aef9357e79e6adf782dd6",
       "bytes": 55611
     },
     "sectors.json": {
@@ -170,27 +174,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "4e38de4d4d669906850d7cf361d6dc9f4c4827554eeec5a397dfdcc81f599a25",
+      "sha256": "43217dbe52e3f05d977565bd0ca182d59073416fa2ed2846b67f0077096ea67a",
       "bytes": 37936
     },
     "links.json": {
-      "sha256": "7eb179664be40e6741c2b7a601cc391105fd52abce73ae81dbd00a2eca3c5578",
-      "bytes": 1625819
+      "sha256": "73ab2d19a3bdd419290d6b7c487dad6e4c91f0ff515f51482b45231ed71e48d7",
+      "bytes": 1628423
     },
     "national.json": {
-      "sha256": "a3f562f25549d52d15da4e0547b2242dcf5b236eb945851c577f3e962c34cb5f",
+      "sha256": "ff562611212c7fb9a0b0e0db82eac3b8396d5e9ffe8411f60b6d91333e581230",
       "bytes": 772824
     },
     "historical.json": {
-      "sha256": "7da60fe0cd892054c325a9aa60b45d9232a8df00ebf0b3ce9830e0203dc026d8",
+      "sha256": "7e54d605af81d11162ae90136dd2123c3b55394b79aee89310fd68be9cca7e5c",
       "bytes": 258311
     },
     "industrial.json": {
-      "sha256": "965832575071f0a14daeb10bf01a2ae6530e7e3a654722cdb8ac9819f04f07a9",
+      "sha256": "41077582ed8f436d17302754f28fcea21307a6216e9a997d1a46f5e25407c204",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "a49de12265359e74407ef6e6c86c805815766933c2ee17e5fc067df4d22ad02e",
+      "sha256": "43644e1c3d8e9b44e6401e5c0ebb442ca26e50b865a464e4202c16c3488e201f",
       "bytes": 845011
     },
     "regional-boundaries.json": {
@@ -218,43 +222,43 @@
       "bytes": 584
     },
     "freshness.json": {
-      "sha256": "969f893306ebb79c931d9a03251aaa08731d7157ece337a4bbbc093a770fa0b3",
-      "bytes": 179141
+      "sha256": "9accd81ee90e43b3fe55227f7ee36cb4f79ef51891928f1dd9de28a25e3423a0",
+      "bytes": 178910
     },
     "stat-revisions.json": {
-      "sha256": "0b6bce9c916169ccf4f5e0911506fbeca956a86d12b1c66b4e2bc12a04c9cdb0",
-      "bytes": 9518
+      "sha256": "30f27b5ee9ef0b64112faf9ec27d35dece3bd0acbea34de17a39be1881108a97",
+      "bytes": 9747
     },
     "consistency.json": {
-      "sha256": "56bd66040a7da613fb755ca6bd4b34256d1e9ff77e7f38c8737b2f59f2bac4a9",
+      "sha256": "767b5187d9e9034748b99872d5545dbe03e345a4efb6add83a05e94b5ccececb",
       "bytes": 289597
     },
     "finance-workbooks.json": {
-      "sha256": "e747ca6cbc9e718e27316831cddba9c80fe844bef748f0a9a333f064cffa9792",
+      "sha256": "e1d222c1809b4e8a4269261ff238397e5d0133af309576eaeab1b094f0d25c0a",
       "bytes": 683539
     },
     "rosstat-workbooks.json": {
-      "sha256": "ca3484c6158968f49029d334561d3e12ca16c97b2d31d0827b0f1d478d65ac05",
-      "bytes": 23250
+      "sha256": "100aa7d3dd1070f1cebfaa867e24727f6bad6eb374306a0443dff0bc7814feed",
+      "bytes": 23801
     },
     "federal-budget.json": {
-      "sha256": "73b094066c926529713a32c5f8c5bcf762a303308de32b4189955a6f97ee75ee",
+      "sha256": "bc0671854f6eabbff955c20073ec4ec3735a87340be91e1fe6af369ed7d1b536",
       "bytes": 7354
     },
     "regional-manufacturing.json": {
-      "sha256": "2399b611acb8aa9468345388b7ef2095688f019e2f5c531fe5914c9265d5cdae",
+      "sha256": "a4df041292111f62c7e9a1bf539bcd4a187a094cf41ceab4ed85f73616e90192",
       "bytes": 1519527
     },
     "regional-mining-energy.json": {
-      "sha256": "e3fd4c0340d57b10f963fca793153719c88f3747a5f8375e791e926106a2be90",
+      "sha256": "d8592ad9d49c31ca68f40a7d861f52ca58bfbcb9efc0e7cdee50503e19e1dff0",
       "bytes": 1115210
     },
     "industrial-parks.json": {
-      "sha256": "65473ca666950ceccef047fc273a53fced0e3bff51c2fc06e3863e526238837b",
+      "sha256": "8bd8fe4b70cdfb2e3d45c67bb2f7cfc045d6d6c41494b7e0f854b3a507a913e5",
       "bytes": 132614
     },
     "park-certificates.json": {
-      "sha256": "4ec1baecd374bd26e50e99fb4eb6e0bd85b25b5e3f4bb98a05000046d424f7b3",
+      "sha256": "917fd83cb75602b42d75c7c62517f603f0be1743b3dcf23a91229612b87df0ad",
       "bytes": 5100
     },
     "frp-snapshot.json": {
@@ -262,23 +266,23 @@
       "bytes": 2761
     },
     "investment-projects.json": {
-      "sha256": "7759c9570cfc4ef40f231b75127bc5ac5f4c6f667140ac65b9f1b8354086d9ac",
+      "sha256": "6f20a1c40e78690723f4d03f71cab7a2748ee0358a6db8b3482ee592992d212a",
       "bytes": 44385
     },
     "amur-projects.json": {
-      "sha256": "f8b247e8bd870caaeb9b6d7400d8954bfb0f377cb0716d053620197dfaac3f20",
+      "sha256": "d3e3400effe1b219e411b5bff6be2a9dc8fd683dcbeaeebf3a2bd45898800241",
       "bytes": 219269
     },
     "krasnodar-projects.json": {
-      "sha256": "e3555e9f9073eb977689af1c3b09eba5f5ba5e930a20ad7187049a6c3f7706d7",
+      "sha256": "07cba9b3ce47b99c7a57a9bfce65b26ef423411627392814bd4821a9e2c15837",
       "bytes": 94575
     },
     "project-coverage.json": {
-      "sha256": "35c351a88a42be5a4d2c02b8abadec55ae49a11542939546ec63f977aaf15fa4",
+      "sha256": "853aa429011920e1e0a95eaabe89a8c31459de6a0543b3fcb1658abc9ecc02d2",
       "bytes": 59176
     },
     "enterprise-sources.json": {
-      "sha256": "626856618cc19d8e04dfb530524b645771ebd251a1ceb77f5881b87f70b0ce60",
+      "sha256": "9505d1d29348f8aaf1bd4a486f2a2afc1245ceca09ff9cade43e1b90c6ad0b4d",
       "bytes": 950
     },
     "amur-enterprises.json": {
