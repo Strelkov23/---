@@ -11,7 +11,12 @@ const GroupPassports=(()=>{
   const eligible=rows.filter(r=>r.value!==null).length;
   return {eligible,rows:rows.map(r=>({...r,rank:r.value===null?null:1+rows.filter(x=>x.value!==null&&x.value>r.value).length}))};
  }
- return {change,revenueComparison};
+ function signedBars(values){
+  if(values.some(v=>!Number.isFinite(v)))throw Error('Некорректный ряд');
+  const signed=values.some(v=>v<0),max=Math.max(0,...values.map(Math.abs)),scale=signed?50:100;
+  return {signed,zero:signed?50:0,bars:values.map(v=>{const width=max?Math.abs(v)/max*scale:0;return {left:v<0?50-width:signed?50:0,width,negative:v<0}})};
+ }
+ return {change,revenueComparison,signedBars};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -26,13 +31,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   function drawChart(g){
    chart.replaceChildren();const p=g.metrics.find(x=>x.id===metric.value);if(!p)return;
    chart.append(node('h3',p.label+' · '+p.unit));
-   const max=Math.max(0,...p.observations.map(r=>Number(r.value))),bars=node('div','');bars.className='rm-composition';
-   for(const r of p.observations){const line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=(max>0?Math.max(0,100*Number(r.value)/max):0)+'%';track.append(fill);line.append(node('span',String(r.year)),track,node('strong',fmt(r.value)));bars.append(line)}chart.append(bars);
+   const model=GroupPassports.signedBars(p.observations.map(r=>Number(r.value))),bars=node('div','');bars.className='rm-composition';
+   if(model.signed)chart.append(node('p','Нулевая отметка в центре: убытки и отрицательные величины слева, положительные справа.'));
+   for(const [i,r] of p.observations.entries()){const b=model.bars[i],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';const fill=node('div','');fill.className='group-signed-fill'+(b.negative?' negative':'');fill.style.left=b.left+'%';fill.style.width=b.width+'%';const zero=node('span','');zero.className='group-signed-zero';zero.style.left=model.zero+'%';track.append(fill,zero);line.append(node('span',String(r.year)),track,node('strong',fmt(r.value)));bars.append(line)}chart.append(bars);
   }
   function draw(){
    const g=d.groups.find(x=>x.id===pick.value);if(!g)return;
    detail.replaceChildren(node('h3',g.name+' · '+g.sector),node('p',g.role),node('p','Периметр: консолидированная группа. Стандарт: МСФО. Определения показателей — по эмитенту.'));
-   const source=node('a','Официальный источник · '+g.section);source.href=g.source;detail.append(source);
+   const source=node('a','Первичный документ эмитента · '+g.section);source.href=g.source;detail.append(source);
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
    for(const v of ['Показатель','Единица','Год','Значение','Изменение к предыдущему году']){const th=node('th',v);th.scope='col';h.append(th)}
    for(const p of g.metrics)p.observations.forEach((r,i)=>{const prev=p.observations[i-1],delta=prev&&prev.year===r.year-1?GroupPassports.change(Number(prev.value),Number(r.value),p.unit):null;const tr=b.insertRow();for(const v of [p.label,p.unit,r.year,fmt(r.value),delta==null?'—':fmt(delta)+(p.unit==='%'?' п.п.':'%')])tr.insertCell().textContent=v});

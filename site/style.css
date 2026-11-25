@@ -250,3 +250,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #sme-compare-form label,#sme-compare-form select{min-width:0;max-width:100%;width:100%}#sme-compare-selected{display:flex;flex-wrap:wrap;gap:.5rem}.sme-compare-chip{white-space:normal;overflow-wrap:anywhere;max-width:100%}#sme-compare-table table{min-width:950px}#sme-compare-chart .rm-composition-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}#sme-compare-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}
 
 #group-compare-year{max-width:100%;min-width:0}#group-compare-table td,#group-detail{overflow-wrap:anywhere}#group-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}
+
+.group-signed-track{height:1.25rem;background:#e8eef1;position:relative;border-radius:.2rem;min-width:0}.group-signed-fill{position:absolute;top:0;bottom:0;background:#387f90}.group-signed-fill.negative{background:#a64b35}.group-signed-zero{position:absolute;top:0;bottom:0;width:1px;background:#234455}

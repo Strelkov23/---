@@ -505,6 +505,300 @@
           ]
         }
       ]
+    },
+    {
+      "id": "severstal",
+      "name": "Северсталь",
+      "sector": "Чёрная металлургия",
+      "role": "Горнодобывающие активы, выплавка стали и выпуск металлопродукции.",
+      "source": "https://rspp.ru/upload/uf/fab/edupyztz85ko35hvo3nzazwtm6sgkmsm/Severstal_Annual_Report_2025.pdf",
+      "section": "Интегрированный отчёт 2025, обзор финансовых результатов (стр. 38–39); копия РСПП, текстовый слой",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млрд руб.",
+          "comparable": "annual_consolidated_revenue_rub",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "728.8"
+            },
+            {
+              "year": 2024,
+              "value": "829.8"
+            },
+            {
+              "year": 2025,
+              "value": "712.9"
+            }
+          ]
+        },
+        {
+          "id": "ebitda",
+          "label": "EBITDA (методика эмитента)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "262.2"
+            },
+            {
+              "year": 2024,
+              "value": "237.2"
+            },
+            {
+              "year": 2025,
+              "value": "137.6"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Операционный денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "179.2"
+            },
+            {
+              "year": 2024,
+              "value": "183.3"
+            },
+            {
+              "year": 2025,
+              "value": "124.2"
+            }
+          ]
+        },
+        {
+          "id": "investment",
+          "label": "Инвестиции (определение эмитента)",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "72.6"
+            },
+            {
+              "year": 2024,
+              "value": "118.5"
+            },
+            {
+              "year": 2025,
+              "value": "173.5"
+            }
+          ]
+        },
+        {
+          "id": "fcf",
+          "label": "Свободный денежный поток",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "120"
+            },
+            {
+              "year": 2024,
+              "value": "96.8"
+            },
+            {
+              "year": 2025,
+              "value": "-30.5"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Чистая прибыль",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "190.9"
+            },
+            {
+              "year": 2024,
+              "value": "149.6"
+            },
+            {
+              "year": 2025,
+              "value": "32"
+            }
+          ]
+        },
+        {
+          "id": "netdebt",
+          "label": "Чистый долг",
+          "unit": "млрд руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "-210.5"
+            },
+            {
+              "year": 2024,
+              "value": "-20.1"
+            },
+            {
+              "year": 2025,
+              "value": "21.7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rushydro",
+      "name": "РусГидро",
+      "sector": "Электроэнергетика",
+      "role": "Гидроэнергетика, генерация и сбыт электроэнергии, в том числе на Дальнем Востоке.",
+      "source": "https://storage.yandexcloud.net/storage.rushydro.ru/iblock/585/585b9e66c710007219e59b4db582d559/IFRS%20RusHydro_2512_rus_bp.pdf",
+      "section": "Консолидированная финансовая отчётность МСФО за 2025 г., печатные стр. 1–2 (PDF 10–11)",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка без государственных субсидий",
+          "unit": "млн руб.",
+          "comparable": "annual_consolidated_revenue_rub",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "579817"
+            },
+            {
+              "year": 2025,
+              "value": "663772"
+            }
+          ]
+        },
+        {
+          "id": "subsidies",
+          "label": "Государственные субсидии",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "63059"
+            },
+            {
+              "year": 2025,
+              "value": "77541"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Прибыль от операционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "12190"
+            },
+            {
+              "year": 2025,
+              "value": "216613"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль / убыток за год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-61162"
+            },
+            {
+              "year": 2025,
+              "value": "117839"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль / убыток акционеров головной компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-54136"
+            },
+            {
+              "year": 2025,
+              "value": "114116"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1365732"
+            },
+            {
+              "year": 2025,
+              "value": "1756059"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "585304"
+            },
+            {
+              "year": 2025,
+              "value": "703593"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "780428"
+            },
+            {
+              "year": 2025,
+              "value": "1052466"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1021976"
+            },
+            {
+              "year": 2025,
+              "value": "1372817"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

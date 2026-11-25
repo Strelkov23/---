@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 FILE="group-passports.json"
-HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru"}
+HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net"}
 def quality(d):
     if d.get("schema")!=1 or d.get("mode")!="documentary_snapshot":raise ValueError("Тип снимка")
     from datetime import date
@@ -25,6 +25,10 @@ def quality(d):
                 if not Decimal(r["value"]).is_finite():raise ValueError("Число")
                 years.append(r["year"]);count+=1
             if not years or years!=sorted(set(years)):raise ValueError("Дубликаты лет")
+        if {"assets","equity","liabilities"}<=mids:
+            balance={m["id"]:{r["year"]:Decimal(r["value"]) for r in m["observations"]} for m in g["metrics"] if m["id"] in ("assets","equity","liabilities")}
+            for year in balance["assets"].keys() & balance["equity"].keys() & balance["liabilities"].keys():
+                if balance["assets"][year]!=balance["equity"][year]+balance["liabilities"][year]:raise ValueError("Баланс активов и обязательств")
         if not mids:raise ValueError("Нет показателей")
     if not ids:raise ValueError("Пустой каталог")
     return {"group_passports":len(ids),"group_observations":count}
