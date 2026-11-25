@@ -200,6 +200,8 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#enterprise-source-status').textContent.startsWith('Загрузка')",timeout=30000)
+        assert page.locator("#enterprise-source-status article").count()==2
         page.wait_for_function("!document.querySelector('#facility-status').textContent.startsWith('Загрузка')",timeout=30000)
         if page.locator("#facility-status").inner_text().startswith("Архивных записей:"):
             assert page.locator("#facility-map svg").count()==1

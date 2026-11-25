@@ -1,0 +1,34 @@
+name: Enterprise registration source check
+on:
+  push:
+    branches: [main]
+    paths: ['site/enterprise_sources.py', '.github/workflows/enterprise-source-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install openpyxl==3.1.5
+      - name: Verify original workbooks
+        working-directory: site
+        run: |
+          python3 -m unittest -v test_enterprise_sources.py
+          python3 - <<'PY'
+          import enterprise_sources as e
+          from tempfile import TemporaryDirectory
+          from pathlib import Path
+          from datetime import date
+          import json
+          with TemporaryDirectory() as tmp:
+              p=Path(tmp)
+              d=e.publish(p,p,date.today().isoformat(),True)
+              print(json.dumps(d,ensure_ascii=False,indent=2))
+              assert all(r["status"]=="ok" for r in d["rows"]), "Original source verification incomplete"
+          PY

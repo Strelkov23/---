@@ -38,3 +38,21 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  function refresh(){rows=FacilityMap.filter(data.rows,fuel.value,query.value,reported.value==='reported');selected=null;limit=25;status.textContent='Архивных записей: '+rows.length+' из '+data.rows.length+' · с опубликованной мощностью: '+rows.filter(r=>Number.isFinite(r.capacity_mw)).length+' · с исторической выработкой: '+rows.filter(r=>Object.keys(r.generation||{}).length).length;draw();renderList()}
  try{manifest=await Provenance.validateManifest(await load('data-manifest.json'));const get=async n=>(await Provenance.get(manifest,n,root)).data;data=await get('facility-energy.json');if(!data.rows?.length){status.textContent='Архив площадок пока не загружен. '+(data.error||'');return}geo=await get('regional-boundaries.geojson');if(!data.rows.some(r=>Object.keys(r.generation||{}).length)){const o=reported.querySelector('option[value="reported"]');o.disabled=true;o.textContent='Нет опубликованной выработки в архиве'}for(const f of [...new Set(data.rows.map(r=>r.fuel))].sort())fuel.add(new Option(type(f),f));fuel.onchange=reported.onchange=refresh;query.oninput=refresh;more.onclick=()=>{limit+=25;renderList()};all.onclick=()=>{selected=null;limit=25;renderList()};form.onsubmit=e=>e.preventDefault();refresh()}catch(e){status.textContent='Карта недоступна: '+e.message}
 });
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const host=document.getElementById('enterprise-source-status');if(!host)return;
+ try{
+  const manifest=await Provenance.validateManifest(await load('data-manifest.json'));
+  const d=(await Provenance.get(manifest,'enterprise-sources.json',root)).data;
+  const state={ok:'Оригинал проверен',cached:'Сохранённая проверка',unavailable:'Источник недоступен',not_loaded:'Ожидает проверки'};
+  const names={organizations:'Организации',entrepreneurs:'Индивидуальные предприниматели'};
+  host.replaceChildren();
+  for(const r of d.rows){
+   const article=node('article','');article.append(node('h3',names[r.kind]),node('p',state[r.status]+' · попытка: '+(r.checked||'—')+' · успех: '+(r.success||'—')));
+   if(r.sheets.length){const a=node('a','Оригинал XLSX');a.href=r.url;article.append(a,node('p','Листов: '+r.sheets.length+' · SHA-256: '+r.sha256.slice(0,16)+'…'))}
+   if(r.error)article.append(node('p','Ошибка последней проверки: '+r.error));
+   host.append(article)
+  }
+  if(pinned){const a=document.querySelector('a[href="enterprise-sources.json"]');if(a)a.href=root+'enterprise-sources.json'}
+ }catch(e){host.textContent='Протокол источников недоступен для этой версии.'}
+});
