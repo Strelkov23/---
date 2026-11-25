@@ -299,3 +299,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #project-search-totals,#project-search-totals .metrics{min-width:0;max-width:100%;overflow-wrap:anywhere}#project-search-totals .metric b{white-space:normal;overflow-wrap:anywhere}
 
 #bank-ratio-table,#bank-balance-ratios .project-controls{min-width:0;max-width:100%;overflow-wrap:anywhere}#bank-ratio-table table{min-width:760px}#bank-ratio-metric{max-width:100%}
+
+#bank-profit-ratio-table,#bank-profit-ratios .project-controls,#bank-profit-paired{min-width:0;max-width:100%;overflow-wrap:anywhere}#bank-profit-ratio-table table{min-width:790px}#bank-profit-paired .metric b{white-space:normal;overflow-wrap:anywhere}
