@@ -289,3 +289,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #group-coverage-summary,#group-coverage-table,#group-coverage-year{min-width:0;max-width:100%;overflow-wrap:anywhere}#group-coverage-table table{min-width:760px}
 
 #bank-coverage-table{min-width:0;max-width:100%;overflow-wrap:anywhere}#bank-coverage-table table{min-width:890px}#bank-coverage-status{overflow-wrap:anywhere}
+
+#group-level-chart,#group-level-table,#group-level-year,#group-level-metric,#group-level-sector{min-width:0;max-width:100%;overflow-wrap:anywhere}#group-level-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}#group-level-chart strong{white-space:normal}#group-level-table table{min-width:850px}
