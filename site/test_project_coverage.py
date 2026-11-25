@@ -48,18 +48,48 @@ class CoverageTests(unittest.TestCase):
     def test_discovery_retains_verified_links(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t)
-            samples={"RU-ROS":b'<a href="/docs/register.xlsx">Download</a><a href="https://example.org/fake.xlsx">Other</a>',"RU-PER":b'<a href="/docs/register.pdf">Register</a><a href="/docs/register.xlsx">Other format</a>'}
+            samples={"RU-ROS":b'<a href="/docs/register.xlsx">Download</a><a href="https://example.org/fake.xlsx">Other</a>',"RU-PER":b'<a href="/docs/register.pdf">Register</a><a href="/docs/register.xlsx">Other format</a>',"RU-NEN":'<a href="/images/Ekonom/Reestr_1_01012025.xlsx">Скачать</a>'.encode("utf-8")}
             d=p.discover(root,root,"2026-11-25T04:00:00+00:00",True,lambda k:p.discovery_parse(k,samples[k]))
-            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],2)
+            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],3)
             self.assertIn("Ростовская область",p.discovery_render(d))
             self.assertIn("Пермский край",p.discovery_render(d))
             def fail(k):raise OSError("offline")
             d=p.discover(root,root,"2026-12-02T04:00:00+00:00",True,fail)
-            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],2)
+            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],3)
             self.assertEqual(d["rows"]["RU-ROS"]["status"],"unavailable")
             self.assertFalse(p.discovery_allowed("RU-PER","https://example.org/a.pdf"))
             self.assertFalse(p.discovery_allowed("RU-ROS","https://user@invest-don.com/a.xlsx"))
             with self.assertRaises(ValueError):p.discovery_parse("RU-ROS",b'<a href="https://example.org/a.xlsx">Bad</a>')
+    def test_discovery_migration_retains_existing_status(self):
+        import json
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t)
+            old_specs={k:v for k,v in p.DISCOVERY.items() if k!="RU-NEN"}
+            with patch.object(p,"DISCOVERY",old_specs):
+                old=p.discover(root,root,"2026-11-25T04:00:00+00:00",True,lambda k:p.discovery_parse(k,b'<a href="/docs/sample.xlsx">Register</a>' if k=="RU-ROS" else b'<a href="/docs/sample.pdf">Register</a>'))
+            d=p.discover(root,root,"2026-11-26T04:00:00+00:00",False)
+            self.assertEqual(d["rows"]["RU-ROS"],old["rows"]["RU-ROS"])
+            self.assertEqual(d["rows"]["RU-PER"],old["rows"]["RU-PER"])
+            self.assertEqual(d["rows"]["RU-NEN"]["status"],"waiting")
+    def test_nao_registers_separate_when_unavailable(self):
+        import nao_project_public as np
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            for _,_,_,mod,_,_ in p.SPECS:mod.publish(lambda *a:None,root,root,"2026-11-26",False)
+            np.publish(lambda *a:None,root,root,"2026-11-26",False)
+            d=p.collect(root,"2026-11-26")
+            self.assertEqual(len(d["nao_registers"]),3)
+            self.assertEqual(p.quality(d,root)["project_registers_configured"],6)
+            self.assertTrue(all(r["records"] is None for r in d["nao_registers"]))
+            self.assertIn("Ненецкий автономный округ",p.render(d))
+            d=p.publish(lambda *a:None,root,"2026-11-26")
+            p.verify_csv(root/"project-coverage.csv",d)
+            self.assertEqual(len(p.sources(d)),6)
+            self.assertIn("RU-NEN:planned",(root/"project-coverage.csv").read_text(encoding="utf-8-sig"))
+            for g in np.imp.GROUPS:
+                self.assertIn('id="nao-'+g+'"',np.render(np.blank()))
+                self.assertIn('href="nao-projects.html#nao-'+g+'"',p.render(d))
     def test_offline_discovery_accepts_date_without_network(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

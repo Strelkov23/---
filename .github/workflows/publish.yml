@@ -408,7 +408,7 @@ jobs:
           for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json group-passports.js group-passports.json corporate-watch.json corporate-discovery.json; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route" > /dev/null
           done
-          for route in project-coverage.html project-search.js project-coverage.json project-coverage.csv project-breakdown.csv investment-projects.html investment-projects.json investment-projects.csv amur-projects.html amur-projects.json amur-projects.csv krasnodar-projects.html krasnodar-projects.json krasnodar-projects.csv; do
+          for route in project-coverage.html project-search.js project-coverage.json project-coverage.csv project-breakdown.csv investment-projects.html investment-projects.json investment-projects.csv amur-projects.html amur-projects.json amur-projects.csv krasnodar-projects.html krasnodar-projects.json krasnodar-projects.csv nao-projects.html nao-projects.json nao-projects.csv; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route?build=$EXPECTED_VERSION" > /dev/null
           done
           export VERIFY_BASE="$base"
@@ -431,7 +431,7 @@ jobs:
                       if attempt==3:raise RuntimeError(name) from exc
                       time.sleep(5)
           manifest=json.loads(get("data-manifest.json",os.environ["EXPECTED_MANIFEST_SHA256"]))
-          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","sme-profile-index.json","corporate-watch.json","corporate-discovery.json","bank-archive-summary.json")
+          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","nao-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","sme-profile-index.json","corporate-watch.json","corporate-discovery.json","bank-archive-summary.json")
           for name in names:
               entry=manifest["files"][name]
               json.loads(get(name,entry["sha256"],entry["bytes"]))

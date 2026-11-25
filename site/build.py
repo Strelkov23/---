@@ -233,6 +233,8 @@ import amur_projects
 amur_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 import krasnodar_projects
 krasnodar_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+import nao_project_public
+nao_project_public.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 import project_coverage
 project_coverage.publish(page,out,m.now(),Path('../history/published'),'--refresh' in sys.argv)
 with m.connect() as finance_db:

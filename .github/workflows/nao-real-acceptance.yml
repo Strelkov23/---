@@ -1,0 +1,67 @@
+name: NAO real project publication acceptance
+on:
+  push:
+    branches: [stage-f-nao-real-acceptance, stage-f-nao-release-integration]
+    paths: ['.github/workflows/nao-real-acceptance.yml','site/project_coverage.py','site/nao_project_public.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore exact verified project import
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test "$(gh run view 45718952342 --json conclusion --jq '.conclusion')" = success
+          test "$(gh run view 45718952342 --json headSha --jq '.headSha')" = 7035dc5d79d7509706d0341eba2ff7bed6526399
+          gh run download 45718952342 --name nao-projects-diagnostic --dir /tmp/nao-accepted
+      - name: Verify real project publication and coverage exports
+        run: |
+          python -m pip install openpyxl==3.1.5
+          cd site
+          python - <<'PY'
+          import csv,json,tempfile,shutil
+          from pathlib import Path
+          import nao_project_public as np,project_coverage as p
+          source=Path("/tmp/nao-accepted/nao-projects-diagnostic.json")
+          report=json.loads(source.read_text())
+          assert np.imp.quality(report)==dict(records=167,cost_numeric=152,jobs_numeric=0)
+          stamp="2026-11-26T00:00:00+00:00"
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp);prev=root/"prev";out=root/"out";prev.mkdir();out.mkdir()
+              for _,_,slug,_,_,_ in p.SPECS:
+                  shutil.copyfile(Path("../history/published")/(slug+".json"),out/(slug+".json"))
+              snapshot=np.sync(prev,stamp,True,lambda:report)
+              (prev/np.FILE).write_text(json.dumps(snapshot))
+              pages={}
+              page=lambda name,html:pages.__setitem__(name,html)
+              published=np.publish(page,out,prev,stamp,False)
+              assert published==snapshot
+              d=p.publish(page,out,stamp,prev,False)
+              p.verify_csv(out/"project-coverage.csv",d);p.verify_breakdown_csv(out/"project-breakdown.csv",d)
+              np.verify_csv(out/np.CSV,published)
+              assert [r["records"] for r in d["nao_registers"]]==[70,72,25]
+              assert [r["cost_numeric"] for r in d["nao_registers"]]==[66,64,22]
+              for r in d["nao_registers"]:
+                  assert 'id="nao-'+r["group"]+'"' in pages["nao-projects.html"]
+                  assert 'href="'+r["page"]+'"' in pages["project-coverage.html"]
+                  for dimension in ("sector","location"):
+                      groups=[g for g in d["breakdown"] if g["key"]==r["key"] and g["dimension"]==dimension]
+                      assert groups and sum(g["records"] for g in groups)==r["records"]
+                      assert all(g["denominator"]==r["records"] for g in groups)
+              assert len(p.sources(d))==6
+              # Simulate changed workbook or failed download: preserve accepted snapshot.
+              def fail():raise ValueError("Changed edition")
+              cached=np.sync(prev,"2026-12-04T00:00:00+00:00",True,fail)
+              assert cached["status"]=="cached" and cached["report"]==report and cached["success"]==stamp
+              print("NAO_REAL_ACCEPTANCE",json.dumps(dict(records=167,cost_numeric=152,registers=len(p.sources(d)),breakdown_rows=len(d["breakdown"]),restored=True),ensure_ascii=False))
+          PY
+          node test-project-search.js
