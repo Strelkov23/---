@@ -147,8 +147,17 @@ REGISTRY.update({
  "2949-320X":{"tags":["РИНЦ"],"site":"https://1economic.ru/journals/pre","sources":["https://1economic.ru/journals/pre","https://1economic.ru/journals/pre/publication"],"note":"Другие категории не подтверждены."}
 })
 
+# Verified individual sources; do not infer article indexing or VAK K1–K3.
+JOURNALS.update({"0424-7388":"Экономика и математические методы","2073-6487":"Вестник Института экономики Российской академии наук","1609-1442":"Экономическая наука современной России","2076-3182":"Научные труды: Институт народнохозяйственного прогнозирования РАН"})
+REGISTRY.update({
+ "0424-7388":{"tags":["ВАК","Web of Science","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/5904/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/5904/","https://journalrank.rcsi.science/ru/record-sources/levels/5904/"],"white_history":{"2023":3,"2025":1},"verified":"2026-11-26","note":"Категория ВАК К1–К3 и другие базы не подтверждены в этой редакции справочника."},
+ "2073-6487":{"tags":["ВАК","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/31145/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/31145/","https://journalrank.rcsi.science/ru/record-sources/levels/31145/"],"white_history":{"2025":1},"verified":"2026-11-26","note":"Категория ВАК К1–К3 не установлена."},
+ "1609-1442":{"tags":["ВАК","Белый список 2"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/30864/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/30864/","https://journalrank.rcsi.science/ru/record-sources/levels/30864/"],"white_history":{"2025":2},"verified":"2026-11-26","note":"Запрос по печатному ISSN; электронный ISSN 2618-8996 указан в РЦНИ, полнота охвата обоих не подтверждена."},
+ "2076-3182":{"tags":["ВАК"],"site":"https://ecfor.ru/nauchnye-izdaniya/nauchnye-trudy/ob-izdanii/","sources":["https://ecfor.ru/nauchnye-izdaniya/nauchnye-trudy/ob-izdanii/"],"verified":"2026-11-26","note":"Статус ВАК по издателю; категория и полнота регистрации DOI не подтверждены."}
+})
+
 def registry():
-    return {JOURNALS[issn]:dict(meta,issn=issn,verified='2026-11-24') for issn,meta in REGISTRY.items()}
+    return {JOURNALS[issn]:dict(meta,issn=issn,verified=meta.get('verified','2026-11-24')) for issn,meta in REGISTRY.items()}
 
 TOPICS={
  "Макроэкономика и рост":"макроэконом|macroeconom|экономическ.{1,4} рост|economic growth|gross domestic|inflation|инфляц",

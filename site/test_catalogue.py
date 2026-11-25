@@ -24,6 +24,19 @@ class CatalogueTests(unittest.TestCase):
         for tag in ("ВАК К1","ВАК К2","ВАК К3","РИНЦ","Scopus","RSCI","Web of Science"):
             self.assertIn(tag,tags)
         self.assertTrue(all(m["sources"] and m["verified"] for m in registry.values()))
+    def test_expanded_verified_registry(self):
+        import journal_evidence as je
+        registry=literature.registry()
+        self.assertEqual(len(registry),17)
+        for issn in ("0424-7388","2073-6487","1609-1442","2076-3182"):
+            m=registry[literature.JOURNALS[issn]]
+            self.assertTrue(je.issn_valid(issn))
+            self.assertEqual(m["verified"],"2026-11-26")
+            self.assertIn("ВАК",m["tags"])
+            self.assertFalse(any(t.startswith("ВАК К") for t in m["tags"]))
+            je.canonical(literature.JOURNALS[issn],m)
+        self.assertEqual(registry["Вопросы экономики"]["verified"],"2026-11-24")
+        self.assertEqual(registry["Экономика и математические методы"]["white_history"],{"2023":3,"2025":1})
     def test_crossref_bounded_windows(self):
         from urllib.parse import urlsplit,parse_qs
         from io import BytesIO
