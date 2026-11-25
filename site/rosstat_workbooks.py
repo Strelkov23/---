@@ -335,7 +335,7 @@ def sync(db,stamp,refresh,out):
                     keys=lambda rr:{(r["metric"],h.norm(r["title"]),r.get("period",str(r["year"]))) for r in rr}
                     if keys(json.loads(old[3]))-keys(rows):raise ValueError("Новая редакция теряет ранее принятые наблюдения")
                 with db:
-                    db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,stamp,"Частично импортировано: см. паспорт" if meta else "Импортировано",digest,json.dumps(rows,ensure_ascii=False,allow_nan=False)))
+                    db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,stamp,"Частичный импорт: см. паспорт" if meta else "Импортировано",digest,json.dumps(rows,ensure_ascii=False,allow_nan=False)))
                     if meta:db.execute("insert or replace into rosstat_workbook_review values(?,?)",(url,json.dumps(meta,ensure_ascii=False,allow_nan=False)))
                     else:db.execute("delete from rosstat_workbook_review where url=?",(url,))
             except Exception as e:
