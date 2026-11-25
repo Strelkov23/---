@@ -16,3 +16,16 @@ assert.equal(G.ratios(rg,2024).find(x=>x.id==='asset_return').value,null);
 assert.equal(G.ratios({...rg,scope:'legal_entity'},2025).every(x=>x.value===null),true);
 assert.equal(G.ratios({...rg,metrics:[mm('profit_parent',[[2025,100]]),mm('revenue',[[2025,200]])]},2025)[0].value,null);
 assert.equal(G.ratios({...rg,metrics:[mm('profit',[[2025,100]]),mm('revenue',[[2025,0]])]},2025)[0].value,null);
+
+const groups={groups:[{...rg,id:'a',name:'А',sector:'А'},{...rg,id:'rushydro',name:'Б',sector:'Б'},{...g,id:'c',name:'В',sector:'А'},{...rg,id:'d',name:'Г',scope:'legal_entity',sector:'А'}]};
+const cr=G.ratioComparison(groups,2025,'net_margin');
+assert.equal(cr.eligible,1);
+assert.equal(cr.rows[0].value,-5);
+assert.equal(cr.rows.find(x=>x.id==='rushydro').value,null);
+assert.equal(cr.rows.find(x=>x.id==='c').reason,'Нет сопоставимого числителя');
+assert.equal(cr.rows.find(x=>x.id==='d').reason,'Несопоставимый стандарт или периметр');
+assert.equal(G.ratioComparison(groups,2025,'equity_share').eligible,2);
+assert.equal(G.ratioComparison(groups,2025,'net_margin','Б').eligible,0);
+assert.equal(G.ratioComparison(groups,2024,'asset_return').eligible,0);
+assert.throws(()=>G.ratioComparison(groups,2025,'unknown'));
+assert.throws(()=>G.ratioComparison(groups,2025.5,'net_margin'));
