@@ -105,7 +105,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const params=new URLSearchParams(location.search);if(d.groups.some(g=>g.id===params.get('group')))pick.value=params.get('group');
   function drawChart(g){
    chart.replaceChildren();const p=g.metrics.find(x=>x.id===metric.value);if(!p)return;
-   chart.append(node('h3',p.label+' · '+p.unit));
+   chart.append(node('h3',p.label+' · '+p.unit));if(p.source){const a=node('a','Источник показателя · '+p.section);a.href=p.source;chart.append(a);}
    const model=GroupPassports.signedBars(p.observations.map(r=>Number(r.value))),bars=node('div','');bars.className='rm-composition';
    if(model.signed)chart.append(node('p','Нулевая отметка в центре: убытки и отрицательные величины слева, положительные справа.'));
    for(const [i,r] of p.observations.entries()){const b=model.bars[i],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';const fill=node('div','');fill.className='group-signed-fill'+(b.negative?' negative':'');fill.style.left=b.left+'%';fill.style.width=b.width+'%';const zero=node('span','');zero.className='group-signed-zero';zero.style.left=model.zero+'%';track.append(fill,zero);line.append(node('span',String(r.year)),track,node('strong',fmt(r.value)));bars.append(line)}chart.append(bars);
@@ -115,8 +115,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    detail.replaceChildren(node('h3',g.name+' · '+g.sector),node('p',g.role),node('p','Периметр: консолидированная группа. Стандарт: '+(g.standard==='IFRS'?'МСФО':'раскрываемая отчётность на основе МСФО, не полный комплект МСФО')+'. Определения показателей — по эмитенту.'));
    const source=node('a',(g.source_kind==='republished_issuer_release'?'Перепубликация пресс-релиза · ':'Документ эмитента · ')+g.section);source.href=g.source;detail.append(source);if(g.note)detail.append(node('p',g.note));
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
-   for(const v of ['Показатель','Единица','Год','Значение','Изменение к предыдущему году']){const th=node('th',v);th.scope='col';h.append(th)}
-   for(const p of g.metrics)p.observations.forEach((r,i)=>{const prev=p.observations[i-1],delta=prev&&prev.year===r.year-1?GroupPassports.change(Number(prev.value),Number(r.value),p.unit):null;const tr=b.insertRow();for(const v of [p.label,p.unit,r.year,fmt(r.value),delta==null?'—':fmt(delta)+(p.unit==='%'?' п.п.':'%')])tr.insertCell().textContent=v});
+   for(const v of ['Показатель','Единица','Год','Значение','Изменение к предыдущему году','Источник']){const th=node('th',v);th.scope='col';h.append(th)}
+   for(const p of g.metrics)p.observations.forEach((r,i)=>{const prev=p.observations[i-1],delta=prev&&prev.year===r.year-1?GroupPassports.change(Number(prev.value),Number(r.value),p.unit):null;const tr=b.insertRow();for(const v of [p.label,p.unit,r.year,fmt(r.value),delta==null?'—':fmt(delta)+(p.unit==='%'?' п.п.':'%')])tr.insertCell().textContent=v;const a=node('a',p.section||g.section);a.href=p.source||g.source;tr.insertCell().append(a)});
    table.replaceChildren(t);metric.replaceChildren(...g.metrics.map(x=>new Option(x.label,x.id)));metric.onchange=()=>drawChart(g);drawChart(g);
    const ry=$('group-ratio-year'),rt=$('group-ratio-table'),re=$('group-ratio-export'),rs=$('group-ratio-status');
    const years=[...new Set(g.metrics.flatMap(p=>p.observations.map(r=>r.year)))].sort((a,b)=>b-a);
@@ -131,7 +131,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     re.onclick=()=>csv('group-ratios-'+g.id+'-'+y+'.csv',[['Группа','Год','Код','Коэффициент','Единица','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Знаменатель на конец года, млн руб.','Знаменатель на начало года, млн руб.','Исходный числитель','Исходный знаменатель','Источник','Раздел','SHA-256 JSON','Отпечаток манифеста'],...rows.map(x=>[g.name,y,x.id,x.label,x.unit,x.value,x.numerator?.value,x.denominator,x.denCurrent?.value,x.denPrevious?.value,x.numerator?.label,x.denCurrent?.label,g.source,g.section,entry.sha256,m.data_fingerprint])]);
    }
    ry.onchange=drawRatios;drawRatios();
-   exp.disabled=false;exp.onclick=()=>csv('group-'+g.id+'.csv',[['Группа','Отрасль','Периметр','Стандарт','Код','Показатель','Единица','Год','Значение','Источник','Раздел','Проверено','Тип источника','Примечание','SHA-256 JSON','Отпечаток манифеста'],...g.metrics.flatMap(p=>p.observations.map(r=>[g.name,g.sector,g.scope,g.standard,p.id,p.label,p.unit,r.year,r.value,g.source,g.section,d.checked,g.source_kind||'documentary',g.note||'',entry.sha256,m.data_fingerprint]))]);
+   exp.disabled=false;exp.onclick=()=>csv('group-'+g.id+'.csv',[['Группа','Отрасль','Периметр','Стандарт','Код','Показатель','Единица','Год','Значение','Источник','Раздел','Проверено','Тип источника','Примечание','SHA-256 JSON','Отпечаток манифеста'],...g.metrics.flatMap(p=>p.observations.map(r=>[g.name,g.sector,g.scope,g.standard,p.id,p.label,p.unit,r.year,r.value,p.source||g.source,p.section||g.section,d.checked,g.source_kind||'documentary',g.note||'',entry.sha256,m.data_fingerprint]))]);
   }
   function filter(){
    const old=pick.value,visible=GroupPassports.filterGroups(d,sector.value,query.value);
