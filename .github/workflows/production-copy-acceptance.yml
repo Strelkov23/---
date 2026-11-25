@@ -1,7 +1,7 @@
 name: Production copy and real SME preflight
 on:
   push:
-    branches: [stage-f-publish-real-preflight]
+    branches: [stage-f-publish-real-preflight, stage-f-final-real-acceptance]
     paths: ['.github/workflows/production-copy-acceptance.yml']
   workflow_dispatch:
 permissions:
@@ -59,6 +59,17 @@ jobs:
           assert q["sme_profile_records"]==1823060,q
           assert q["sme_profile_regions"]==88,q
           print("PRODUCTION_PROFILE_OK",json.dumps(q,ensure_ascii=False))
+          if (out/"literature-journals.csv").exists():
+              import literature_coverage as lc
+              import literature_quality as lq
+              lit=json.loads((out/"literature.json").read_text())
+              quality=json.loads((out/"literature-quality.json").read_text())
+              lq.quality(quality,lit)
+              c=quality["coverage"]
+              for name,fields,rows in (("literature-journals.csv",lc.REGISTRY_FIELDS,c["registry_journals"]),("literature-years.csv",lc.FIELDS,c["rows"]),("literature-topics.csv",lc.TOPIC_FIELDS,c["topics"])):
+                  lc.verify_csv(out/name,fields,rows)
+              assert len(c["registry_journals"])==17
+              print("PRODUCTION_LITERATURE_OK",c["records"])
           PY
       - uses: actions/upload-artifact@v4
         if: always()
