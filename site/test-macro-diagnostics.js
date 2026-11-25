@@ -3,3 +3,5 @@ assert.equal(D.rules.length,13);assert.equal(D.value(10,20,'ratio100'),50);asser
 const r={a:'a',b:'b',op:'diff'},data={a:{values:{2020:5,2022:0}},b:{values:{2020:2,2021:1,2022:3}}};
 assert.deepEqual(D.compute(r,data,2020,2022),[{year:2020,a:5,b:2,value:3},{year:2022,a:0,b:3,value:-3}]);
 console.log('Macro diagnostics tests passed');
+const snap=D.snapshot({[D.rules[0].a]:{values:{2020:5}},[D.rules[0].b]:{values:{2020:2}}},2020);assert.equal(snap[0].current.value,3);assert.equal(snap[0].change,null);assert.equal(snap.length,13);
+assert.deepEqual(D.capacitySummary([{year:2024,utilization_pct:91},{year:2024,utilization_pct:40},{year:2024,utilization_pct:null},{year:2023,utilization_pct:99}],2024),{total:3,valid:2,high:1,low:1});

@@ -221,3 +221,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #global-robustness-table table{min-width:860px}#global-robustness{min-width:0;max-width:100%}#global-robustness .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}
 
 #global-robust-period-table table{min-width:920px}#global-robust-period-table td{overflow-wrap:anywhere}
+
+.diag-overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}.diag-overview-card{min-width:0;margin:0;padding:1rem;border:1px solid #cbdadd;border-radius:.6rem;display:flex;flex-direction:column;gap:.45rem}.diag-overview-card small{color:#486d80}.diag-overview-card h3{font-size:1rem;line-height:1.3;margin:0}.diag-overview-card strong{font-size:1.3rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.diag-overview-card p{font-size:.88rem;margin:0}.diag-overview-card a{margin-top:auto;font-size:.85rem}#diag-overview-table table{min-width:760px}@media(max-width:850px){.diag-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.diag-overview-grid{grid-template-columns:1fr}}

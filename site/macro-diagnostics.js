@@ -28,7 +28,17 @@ const MacroDiagnostics=(()=>{
   return rows;
  }
  const formula=op=>op==='diff'?'A − B':op==='ratio100'?'A / B × 100':'A / B';
- return {rules,compute,value,formula};
+ function snapshot(data,year){
+  return rules.map(r=>{const rows=compute(r,data,year,year),current=rows[0]||null,previous=compute(r,data,year-1,year-1)[0]||null;return {...r,current,previous,change:current&&previous?current.value-previous.value:null}});
+ }
+ function capacitySummary(rows,year){
+  const selected=rows.filter(r=>r.year===year),valid=selected.filter(r=>Number.isFinite(r.utilization_pct)&&r.utilization_pct>=0&&r.utilization_pct<=100);
+  return {total:selected.length,valid:valid.length,high:valid.filter(r=>r.utilization_pct>=90).length,low:valid.filter(r=>r.utilization_pct<50).length};
+ }
+ function regionalSummary(rows,year,sample,stats){
+  const s=sample(rows.filter(r=>r.year===year));return {statistics:stats([...s.out.values()].map(r=>r.value)),excluded:s.excluded,ambiguous:s.ambiguous};
+ }
+ return {rules,compute,value,formula,snapshot,capacitySummary,regionalSummary};
 })();
 if(typeof module!=='undefined')module.exports=MacroDiagnostics;
 
@@ -79,4 +89,59 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   form.oninput=draw;form.onsubmit=e=>e.preventDefault();form.onreset=()=>setTimeout(draw,0);draw()
  }catch(e){console.error(e);status.textContent='Не удалось загрузить данные для выбранной версии.'}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),host=$('diag-overview-cards');if(!host)return;
+ const year=$('diag-overview-year'),status=$('diag-overview-status'),exp=$('diag-overview-export'),details=$('diag-overview-table');
+ const sourceBalance='https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx',f=v=>Number.isFinite(v)?fmt(v):'—',link=(label,url)=>{const a=node('a',label);const u=new URL(url,location.href);if(pinned&&u.origin===location.origin)u.searchParams.set('snapshot',pinned);a.href=u.href;return a};
+ const manifests=await Promise.allSettled([load('data-manifest.json').then(Provenance.validateManifest)]);
+ if(manifests[0].status!=='fulfilled'){status.textContent='Не удалось проверить манифест. Сводные числа не отображаются.';return}
+ const m=manifests[0].value,get=name=>Provenance.get(m,name,root),entries=await Promise.allSettled(['compare.json','historical.json','capital-data.json','sectors.json','catalog.json'].map(get));
+ const data=entries.map(e=>e.status==='fulfilled'?e.value:null),[macro,historical,capital,balance,catalog]=data;
+ const codes=['R_f54f02504bfb051e_84c74d6e51','R_a4138d558584b81a_1db3db8e79'];
+ const regionMeta=codes.map(code=>{const found=(historical?.data.series||[]).filter(r=>r.code===code);return found.length===1?found[0]:null});
+ const regionEntries=await Promise.allSettled(regionMeta.map(r=>r?get(r.file):Promise.reject(Error('Ряд отсутствует'))));
+ const regionData=regionEntries.map((r,i)=>{if(r.status!=='fulfilled')return null;const e=r.value,meta=regionMeta[i];return e.data.title===meta.title&&e.data.unit===meta.unit&&e.data.source===meta.source?e:null});
+ const years=new Set();
+ if(macro)for(const r of MacroDiagnostics.rules)for(const y of Object.keys(macro.data[r.a]?.values||{}))if(/^\d{4}$/.test(y))years.add(Number(y));
+ for(const r of capital?.data.capacity||[])if(Number.isInteger(r.year))years.add(r.year);
+ for(const e of regionData)for(const r of e?.data.values||[])if(Number.isInteger(r.year))years.add(r.year);
+ const ys=[...years].filter(y=>y>=1991&&y<=2100).sort((a,b)=>b-a);
+ year.replaceChildren(...ys.map(y=>new Option(String(y),String(y))));year.disabled=!ys.length;
+ // Select the newest year with all three statistical domains present, otherwise latest available.
+ const common=ys.find(y=>macro&&MacroDiagnostics.snapshot(macro.data,y).some(r=>r.current)&&capital?.data.capacity.some(r=>r.year===y)&&regionData.every(e=>e?.data.values.some(r=>r.year===y)));
+ if(common)year.value=String(common);
+ function draw(){
+  host.replaceChildren();details.replaceChildren();const y=Number(year.value),rows=[];
+  function card(title,period,value,description,url){
+   const el=node('article','');el.className='diag-overview-card';el.append(node('small',period),node('h3',title),node('strong',value),node('p',description),link('Открыть подробный анализ',url));host.append(el)
+  }
+  if(!ys.length){status.textContent='Проверенных годовых данных для сводки нет.';return}
+  const add=(group,title,period,value,unit,coverage,source,hash,note)=>rows.push([group,title,period,value,unit,coverage,source,hash,note,m.data_fingerprint]);
+  const snapshot=macro?MacroDiagnostics.snapshot(macro.data,y):[];
+  const count=snapshot.filter(r=>r.current).length;
+  card('Макроэкономические разрывы',String(y),count+' / '+MacroDiagnostics.rules.length,'Сопоставимые пары годовых рядов WDI; не число кризисных сигналов.','diagnostics.html#diag-form');
+  for(const r of snapshot){const sources=[catalog?.data[r.a]?.source,catalog?.data[r.b]?.source].filter(Boolean).join(' | ')||'WDI: '+r.a+' / '+r.b;add('Макроэкономика',r.title,y,r.current?.value,r.unit,r.current?'одна пара':'нет пары',sources,macro.sha256,r.note)}
+  for(const [i,e] of regionData.entries()){
+   const meta=regionMeta[i],title=i===0?'ВРП на душу населения: разброс регионов':'Безработица: разброс регионов',s=e?MacroDiagnostics.regionalSummary(e.data.values,y,RegionalStats.sample,RegionalStats.stats):null,v=s?.statistics;
+   card(title,String(y),v?f(v.p90)+' / '+f(v.p10):'Нет данных',v?'P90 / P10 — два уровня в исходных единицах. '+v.n+' непересекающихся территорий.':'Нет проверенной выборки за выбранный год.','historical.html#regional-disparities');
+   if(e)for(const [k,label] of [['median','Медиана'],['p10','P10'],['p90','P90'],['ratio','P90 / P10']])add('Регионы',meta.title+' · '+label,y,v?.[k],k==='ratio'?'раз':meta.unit,v?.n??0,meta.source,e.sha256,'Невзвешенная выборка; исключено '+s.excluded+', неоднозначных территорий '+s.ambiguous);
+  }
+  const c=capital?MacroDiagnostics.capacitySummary(capital.data.capacity,y):null;
+  card('Высокая загрузка мощностей',String(y),c?.valid?c.high+' / '+c.valid:'Нет данных','Продукты с использованием среднегодовой мощности ≥90%; не доля всей промышленности.','capital.html');
+  if(c)for(const [label,value] of [['Загрузка не менее 90%',c.valid?c.high:null],['Загрузка менее 50%',c.valid?c.low:null]])add('Мощности',label,y,value,'продуктов',c.valid,'Росстат · документальный снимок capital-data.json',capital.sha256,'Числовых позиций '+c.valid+' из '+c.total+'; пороги описательные');
+  let concentrated=null,eligible=0;
+  if(balance){const d=balance.data;if(Array.isArray(d.names)&&Array.isArray(d.flows)&&d.flows.length===d.names.length&&d.flows.every(r=>r.length===d.names.length&&r.every(Number.isFinite))){
+   const top=d.names.map((_,i)=>{const vals=d.flows.map(r=>r[i]),total=vals.reduce((a,b)=>a+b,0);return total>0&&vals.every(v=>v>=0)?Math.max(...vals)/total:null}).filter(Number.isFinite);eligible=top.length;concentrated=eligible?top.filter(v=>v>=.5).length:null;
+  }}
+  card('Концентрация промежуточных закупок','Баланс 2021',Number.isFinite(concentrated)?concentrated+' / '+eligible:'Нет данных','Группы, где крупнейший поставщик занимает ≥50% отечественных промежуточных закупок.','atlas.html#supplier-dependencies');
+  if(balance)add('Межотраслевой баланс','Крупнейший поставщик ≥50%',2021,concentrated,'групп',eligible,sourceBalance,balance.sha256,'Включены внутригрупповые потоки; описательный порог, не риск остановки');
+  card('Сценарная диагностика','Условная модель 2021','Отдельный расчёт','Задайте ограничения и конечный спрос; сценарий не смешивается с наблюдаемой статистикой.','scenario.html#chain-stress');
+  const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();for(const label of ['Направление','Показатель','Год','Значение','Единица','Охват']){const th=node('th',label);th.scope='col';h.append(th)}for(const r of rows){const tr=body.insertRow();for(const v of [r[0],r[1],r[2],f(r[3]),r[4],r[5]])tr.insertCell().textContent=v??'—'}details.append(t);
+  const missing=[...entries,...regionEntries].filter(x=>x.status!=='fulfilled').length;
+  status.textContent='Год статистики: '+y+' · межотраслевой баланс: 2021 · отпечаток: '+m.data_fingerprint.slice(0,12)+'… · недоступных файлов: '+missing+'. Пропуски не заменены нулями.';
+  exp.disabled=!rows.length;exp.onclick=()=>csv('economic-diagnostic-overview-'+y+'.csv',[['Направление','Показатель','Год','Значение','Единица','Охват','Источник','SHA-256 JSON','Ограничение','Отпечаток манифеста'],...rows]);
+ }
+ year.onchange=draw;draw();
 });

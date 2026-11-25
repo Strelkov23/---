@@ -25,6 +25,13 @@ with sync_playwright() as p:
         page.locator("#hub-query").fill("")
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/diagnostics.html#diag-overview",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#diag-overview-cards article').length===6",timeout=45000)
+        assert page.locator("#diag-overview-export").is_enabled()
+        with page.expect_download() as overview:
+            page.locator("#diag-overview-export").click()
+        assert overview.value.suggested_filename.startswith("economic-diagnostic-overview-")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
         page.wait_for_function("document.querySelector('#stress-limit-chart svg')!==null",timeout=30000)
