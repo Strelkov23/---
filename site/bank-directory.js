@@ -22,7 +22,16 @@ const BankDirectory=(()=>{
   add(feeds.profit,[['profit','Прибыль / убыток'],['net_interest','Чистые процентные доходы'],['operating_expense','Операционные расходы']],feeds.profit?.period,'807');
   return result;
  }
- return {rows,commonDates,profile};
+ function coverage(reg,feeds){
+  return [['capital','808'],['balance','806'],['profit','807']].map(([key,form])=>{
+   const d=feeds[key],r=d?.rows?.find(x=>x.registration_number===reg);
+   const error=d?.attempts?.[reg]?.error||d?.errors?.find(x=>x.registration_number===reg)?.error||null;
+   const target=d?.target_cohort??d?.cohort;
+   const status=!d?'Набор недоступен':r?(r.verification==='documentary'?'Документальная сверка':'Запись получена'):error?'Не подтверждено':Array.isArray(target)&&target.length&&!target.includes(reg)?'Вне целевой выборки':'Нет записи';
+   return {form,period:d?.period??null,status,error,checked:d?.attempts?.[reg]?.checked??null};
+  });
+ }
+ return {rows,commonDates,profile,coverage};
 })();
 if(typeof module!=='undefined')module.exports=BankDirectory;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -47,6 +56,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     wrap.append(table);passport.append(wrap);
     const exp=node('button','Скачать финансовый паспорт CSV');exp.type='button';exp.onclick=()=>csv('bank-passport-'+r.registration_number+'.csv',[['Регистрационный номер','Банк','Показатель','Тыс. руб.','Период','Форма','Источник','SHA-256','Проверка','Отпечаток манифеста'],...values.map(v=>[r.registration_number,r.name,v.label,v.value,v.period,v.form,v.source,v.sha256,v.verification,manifest.data_fingerprint])]);passport.append(exp);
    }
+   passport.append(node('h4','Доступность форм отчётности'));
+   const coverageWrap=node('div','');coverageWrap.className='table-scroll';
+   const coverageTable=node('table',''),coverageHead=coverageTable.createTHead().insertRow(),coverageBody=coverageTable.createTBody();
+   for(const label of ['Форма','Период','Статус','Последняя попытка','Причина']){const th=node('th',label);th.scope='col';coverageHead.append(th)}
+   for(const c of BankDirectory.coverage(r.registration_number,feeds)){const row=coverageBody.insertRow();for(const value of [c.form,c.period,c.status,c.checked,c.error])row.insertCell().textContent=value??'—';}
+   coverageWrap.append(coverageTable);passport.append(coverageWrap);
    passport.append(node('p','Периоды и определения показателей различаются; капитал формы 808 не равен бухгалтерским собственным средствам. Прибыль за квартал не годовая.'));
    const share=new URL(location.href);share.searchParams.set('bank',r.registration_number);const link=node('a','Ссылка на карточку');link.href=share.href;passport.append(link);
    for(const [label,url] of [['Полный перечень ЦБ',b.source],['Системно значимые организации',a.source],['Официальная отчётность','https://www.cbr.ru/banking_sector/otchetnost-kreditnykh-organizaciy/']]){const link=node('a',label);link.href=url;passport.append(node('p',''),link)}
