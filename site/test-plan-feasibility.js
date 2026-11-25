@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),F=require('./plan-feasibility.js'),R=require('./resource-plan.js'),real=require('./sectors.json');
+const m={names:['A','B'],demand:[100000,100000],output:[200000,200000],imports:[10000,20000],effects:[[100000,0],[0,100000]]},p={budget:15,importLimit:100,minimum:[5,5],maximum:[20,20],capacity:[100,100],priority:[2,1]};
+let r=F.calculate(m,p,R.solve);assert.equal(r.feasible,true);assert.deepEqual(r.optimum.x,[10,5]);assert.equal(r.optimum.objective,25);
+r=F.calculate(m,{...p,budget:5},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,.5);assert.equal(r.optimum,null);assert.deepEqual(r.alternative,[2.5,2.5]);assert.equal(r.checks[0].gap,5);
+r=F.calculate(m,{...p,maximum:[0,20]},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,0);
+r=F.calculate(m,{...p,capacity:[0,100]},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,0);
+r=F.calculate(m,{...p,importLimit:0},R.solve);assert.equal(r.feasible,false);assert.equal(r.alpha,0);
+r=F.calculate(m,{...p,minimum:[0,0],budget:0},R.solve);assert.equal(r.feasible,true);assert.deepEqual(r.optimum.x,[0,0]);
+const n=real.names.length,arr=v=>Array(n).fill(v);
+r=F.calculate(real,{budget:3000,importLimit:500,minimum:arr(0),maximum:arr(10),capacity:arr(10),priority:arr(1)},R.solve);assert.equal(r.feasible,true);assert.ok(r.optimum.usage.every((v,i)=>v<=r.checks[i].limit+1e-5));
+assert.throws(()=>F.calculate(m,{...p,minimum:[-1,0]},R.solve));console.log('Plan feasibility: exact floor, infeasible budget, capacity, import and ceiling, zero, real balance OK');

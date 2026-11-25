@@ -134,6 +134,17 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pf-input tbody tr').length===19",timeout=45000)
+        page.locator("#pf-budget").fill("0")
+        assert "недопустим" in page.locator("#pf-status").inner_text()
+        assert page.locator("#pf-checks tbody tr").count()==40
+        with page.expect_download() as feasibility:
+            page.locator("#pf-export").click()
+        with open(feasibility.value.path(),encoding="utf-8-sig",newline="") as f:
+            feasibility_rows=list(csv.reader(f,delimiter=";"))
+        assert len(feasibility_rows)==60 and len({len(r) for r in feasibility_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
         page.wait_for_function("document.querySelector('#stress-limit-chart svg')!==null",timeout=30000)
