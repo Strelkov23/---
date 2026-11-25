@@ -266,7 +266,7 @@ def main():
                     try:
                         mapped=mapped135(diagnostic)
                         (out/"form-135-documented.json").write_text(json.dumps(mapped,ensure_ascii=False,indent=2),encoding="utf-8")
-                        details.update(mapped_file="form-135-documented.json",mapped_counts=mapped["counts"],language_driver=mapped["language_driver"])
+                        details.update(mapped_file="form-135-documented.json",mapped_counts=mapped["counts"],language_driver=mapped["language_driver"],code_counts=dict(sorted(Counter(r["code"] for r in mapped["rows"]).items())))
                     except (ValueError,KeyError,TypeError) as e:details["mapping_error"]=str(e)[:300]
                 report["archives"].append(details)
             except Exception as e:report["archives"].append(dict(entry,error=str(e)[:300]))
