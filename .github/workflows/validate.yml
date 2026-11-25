@@ -41,6 +41,8 @@ jobs:
           node test-freshness.js
           node test-stat-revisions.js
           node test-chain-stress.js
+          node test-sector-chain.js
+          node test-capacity-analysis.js
           node test-chart-layout.js
           node test-macro-diagnostics.js
           node test-reproduction-plan.js

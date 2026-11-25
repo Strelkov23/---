@@ -467,6 +467,14 @@ with sync_playwright() as p:
         assert page.locator("#sp-sector").input_value()=="chemical"
         assert page.locator("#sp-sector option").count()==20
         assert "Химическая промышленность" in page.locator("#sp-scope").inner_text()
+        assert page.locator("#sp-chain-table tbody tr").count()==19
+        page.locator("#sp-chain-direction").select_option("outputs")
+        page.locator("#sp-chain-self").select_option("no")
+        assert page.locator("#sp-chain-table tbody tr").count()==18
+        with page.expect_download() as chain:
+            page.locator("#sp-chain-export").click()
+        assert chain.value.suggested_filename.endswith("-outputs-2021.csv")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         passports=json.loads(Path("sector-passports.json").read_text())["profiles"]
         chemical=next(p for p in passports if p["id"]=="chemical")
         if chemical["finance"]:

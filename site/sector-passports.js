@@ -13,7 +13,14 @@ const SectorPassports=(()=>{
   const scope=capitalScopes[profile]||{assets:[],products:[]};
   return {assets:(data.assets||[]).filter(r=>r.year===year&&scope.assets.includes(r.code)),products:(data.capacity||[]).filter(r=>r.year===year&&scope.products.includes(r.code))};
  }
- return {financeDelta,relatedBalance,relatedRegional,capitalRows}
+ function chain(m,i,direction,includeSelf=true){
+  const n=m.names.length;
+  if(!Number.isInteger(i)||i<0||i>=n||!['inputs','outputs'].includes(direction)||!Array.isArray(m.flows)||m.flows.length!==n||m.flows.some(r=>!Array.isArray(r)||r.length!==n||r.some(v=>!Number.isFinite(v))))throw Error('Некорректная матрица потоков');
+  const rows=m.names.flatMap((name,j)=>includeSelf||i!==j?[{i:j,name,value:direction==='inputs'?m.flows[j][i]:m.flows[i][j]}]:[]);
+  const total=rows.reduce((s,r)=>s+r.value,0),valid=total>0&&rows.every(r=>r.value>=0);
+  return {total,valid,rows:rows.map(r=>({...r,share:valid?r.value/total:null})).sort((a,b)=>b.value-a.value||a.i-b.i)};
+ }
+ return {financeDelta,relatedBalance,relatedRegional,capitalRows,chain}
 })();
 if(typeof module!=='undefined')module.exports=SectorPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -162,7 +169,32 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    if(balance&&!pinned){
     const related=SectorPassports.relatedBalance(p.id,balance);
     b.append(node('p','Тематическое соответствие групп продуктов ОКПД2 и отраслей ОКВЭД2 не является точным статистическим переходом. Выпуск относится ко всей указанной группе баланса; не к одному классу. Группы и паспорта могут пересекаться.'));
-    for(const x of related){const line=node('p','');line.append(link(x.name,'sector-'+(x.i+1)+'.html'),document.createTextNode(' · выпуск в балансе 2021: '+fmt(balance.output[x.i]/1000)+' млрд ₽'));b.append(line)}
+    for(const x of related){
+     const line=node('p','');line.append(link(x.name,'sector-'+(x.i+1)+'.html'),document.createTextNode(' · выпуск в балансе 2021: '+fmt(balance.output[x.i]/1000)+' млрд ₽'));b.append(line);
+    }
+    if(related.length){
+     const box=node('div','');box.className='project-controls';
+     const group=node('select',''),direction=node('select',''),self=node('select','');
+     group.id='sp-chain-group';direction.id='sp-chain-direction';self.id='sp-chain-self';
+     for(const x of related)group.add(new Option(x.name,String(x.i)));
+     direction.add(new Option('Поставщики — входящие потоки','inputs'));direction.add(new Option('Покупатели — исходящие потоки','outputs'));
+     self.add(new Option('Включая внутригрупповые потоки','yes'));self.add(new Option('Без внутригрупповых потоков','no'));
+     for(const [label,control] of [['Группа баланса 2021',group],['Направление потока',direction],['Внутригрупповые связи',self]]){const l=node('label',label);l.append(control);box.append(l)}
+     const description=node('p','');description.id='sp-chain-status';description.setAttribute('role','status');
+     const host=node('div','');host.id='sp-chain-table';host.className='table-scroll';host.tabIndex=0;host.setAttribute('role','region');host.setAttribute('aria-label','Промежуточные межгрупповые потоки');
+     const exp=node('button','Скачать потоки CSV');exp.id='sp-chain-export';exp.type='button';
+     b.append(node('h3','Структура прямых производственных связей'),box,description,host,exp);
+     function chainDraw(){
+      const i=Number(group.value),dir=direction.value,inc=self.value==='yes',r=SectorPassports.chain(balance,i,dir,inc);
+      description.textContent='Группа: '+balance.names[i]+' · '+(dir==='inputs'?'отечественные промежуточные закупки':'отечественные промежуточные поставки')+' · сумма выбранных потоков: '+fmt(r.total/1000)+' млрд ₽, 2021. '+(r.valid?'Доля — поток / сумма выбранных потоков.':'Доли не рассчитываются при отрицательных потоках или неположительном итоге.');
+      const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+      for(const title of ['Группа контрагента','Поток, млрд ₽','Доля, %']){const th=node('th',title);th.scope='col';h.append(th)}
+      for(const x of r.rows){const tr=body.insertRow();tr.insertCell().append(link(x.name,'sector-'+(x.i+1)+'.html'));tr.insertCell().textContent=fmt(x.value/1000);tr.insertCell().textContent=x.share===null?'—':fmt(x.share*100)}
+      host.replaceChildren(t);
+      exp.onclick=()=>csv('sector-chain-'+(i+1)+'-'+dir+'-2021.csv',[['Группа','Направление','Внутригрупповые потоки','Группа контрагента','Поток, млн руб.','Знаменатель, млн руб.','Доля, 0–1','Год','Источник'],...r.rows.map(x=>[balance.names[i],dir,inc?'да':'нет',x.name,x.value,r.total,x.share,2021,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
+     }
+     group.onchange=direction.onchange=self.onchange=chainDraw;chainDraw();
+    }
     if(!related.length)b.append(node('p','Нет однозначно подобранной тематической группы баланса.'));
    }else b.append(node('p','Статические паспорта баланса относятся к текущей сборке, а не закреплённой версии.'));
    b.append(link('Все 19 групп межотраслевого баланса','atlas.html'));
