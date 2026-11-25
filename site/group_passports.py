@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 FILE="group-passports.json"
-HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net","www.rusagrogroup.ru","www.aviaport.ru","www.alrosa.ru","reportcollection.inion.ru"}
+HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net","www.rusagrogroup.ru","www.aviaport.ru","www.alrosa.ru","reportcollection.inion.ru","ptport.ru"}
 def quality(d):
     if d.get("schema")!=1 or d.get("mode")!="documentary_snapshot":raise ValueError("Тип снимка")
     from datetime import date
