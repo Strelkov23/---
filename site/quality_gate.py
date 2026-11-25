@@ -204,6 +204,11 @@ def check(out,previous,stamp):
         if d["status"]=="ready":company_index.publishable(d,out,data["company-rankings.json"]["report"])
         else:warnings.append("ФНС: полный индекс не опубликован; поиск ограничен доступными рейтингами")
     except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Индекс организаций: "+str(e))
+    if (out/"sme-finance.json").is_file():
+        try:
+            import sme_finance_public
+            counts.update(sme_finance_public.quality(json.loads((out/"sme-finance.json").read_text()),json.loads((out/"company-index.json").read_text()),json.loads((out/"sme-matrix.json").read_text())))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Финансы МСП: "+str(e))
     if (out/"sme-matrix.json").is_file():
         try:
             import sme_matrix

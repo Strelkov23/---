@@ -1,0 +1,13 @@
+import unittest,copy
+import sme_finance_public as p
+class Public(unittest.TestCase):
+    def test_balance(self):
+        idx=dict(status="ready",year=2025,fingerprint="a",sources=[],count=2)
+        m=dict(status="diagnostic",edition="2026-11-10",archive_sha256="b",reference_sha256="c",national_difference=5,quarantined=1)
+        m["declared"]=m["reported"]=[{"region":"77","class":"01","count":2}]
+        row=dict(region="77",**{"class":"01"},sme_total=2,matched=1,income_observations=1,income_sum="9007199254740993",expense_observations=0,expense_sum=None,workers_observations=1,workers_sum="0",paired_money=0,income_workers_pair=1)
+        d=dict(schema=1,status="diagnostic",note=p.NOTE,financial_year=2025,financial_fingerprint="a",financial_sources=[],sme_edition=m["edition"],sme_archive_sha256="b",reference_sha256="c",national_difference=5,quarantined=1,eligible_regions=1,counts=dict(financial_index=2,matched_sme=1,not_in_sme=1,included=1),declared=[row],reported=[copy.deepcopy(row)])
+        self.assertEqual(p.quality(d,idx,m),{"sme_finance_matched":1,"sme_finance_cells":2})
+        with self.assertRaises(ValueError):p.quality(d,{**idx,"fingerprint":"bad"},m)
+        d["reported"][0]["expense_sum"]="0"
+        with self.assertRaises(ValueError):p.quality(d,idx,m)
