@@ -20,13 +20,41 @@ const GroupPassports=(()=>{
   const signed=values.some(v=>v<0),max=Math.max(0,...values.map(Math.abs)),scale=signed?50:100;
   return {signed,zero:signed?50:0,bars:values.map(v=>{const width=max?Math.abs(v)/max*scale:0;return {left:v<0?50-width:signed?50:0,width,negative:v<0}})};
  }
- return {change,revenueComparison,signedBars,filterGroups};
+ const ratioSpecs=[
+  {id:'net_margin',label:'Чистая прибыль / выручка',num:'profit',den:'revenue',unit:'%',scale:100},
+  {id:'operating_margin',label:'Операционная прибыль / выручка',num:'operating_profit',den:'revenue',unit:'%',scale:100},
+  {id:'equity_share',label:'Капитал / активы на конец года',num:'equity',den:'assets',unit:'%',scale:100},
+  {id:'liability_share',label:'Обязательства / активы на конец года',num:'liabilities',den:'assets',unit:'%',scale:100},
+  {id:'liabilities_equity',label:'Обязательства / капитал на конец года',num:'liabilities',den:'equity',unit:'раз',scale:1},
+  {id:'ppe_share',label:'Основные средства / активы на конец года',num:'ppe',den:'assets',unit:'%',scale:100},
+  {id:'asset_return',label:'Чистая прибыль / средние активы',num:'profit',den:'assets',unit:'%',scale:100,average:true},
+  {id:'equity_return',label:'Чистая прибыль / средний капитал',num:'profit',den:'equity',unit:'%',scale:100,average:true}
+ ];
+ function monetary(g,id,year){
+  if(g.scope!=='consolidated'||g.standard!=='IFRS')return null;
+  const m=g.metrics.find(x=>x.id===id&&['млн руб.','млрд руб.'].includes(x.unit));
+  if(!m||(id==='revenue'&&m.comparable!=='annual_consolidated_revenue_rub'))return null;
+  const r=m.observations.find(x=>x.year===year);
+  if(!r||typeof r.value!=='string'||! /^-?\d+(?:\.\d+)?$/.test(r.value))return null;
+  const value=Number(r.value)*(m.unit==='млрд руб.'?1000:1);
+  return Number.isFinite(value)?{value,label:m.label,unit:m.unit,original:r.value,year}:null;
+ }
+ function ratios(g,year){
+  return ratioSpecs.map(spec=>{
+   const n=monetary(g,spec.num,year),a=monetary(g,spec.den,year),b=spec.average?monetary(g,spec.den,year-1):null;
+   const validDen=!!a&&a.value>0&&(!spec.average||(!!b&&b.value>0));
+   const denominator=validDen?(spec.average?(a.value+b.value)/2:a.value):null;
+   const value=n&&denominator!==null?n.value/denominator*spec.scale:null;
+   return {...spec,numerator:n,denominator,denCurrent:a,denPrevious:b,value:Number.isFinite(value)?value:null};
+  });
+ }
+ return {change,revenueComparison,signedBars,filterGroups,ratios};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),host=$('group-passports');if(!host)return;
  const status=$('group-status'),pick=$('group-pick'),metric=$('group-metric'),table=$('group-table'),chart=$('group-chart'),detail=$('group-detail'),exp=$('group-export');
- const fmt=v=>Number.isFinite(Number(v))?Number(v).toLocaleString('ru',{maximumFractionDigits:2}):'—';
+ const fmt=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))?Number(v).toLocaleString('ru',{maximumFractionDigits:2}):'—';
  try{
   const m=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(m,'group-passports.json',root),d=entry.data;
   status.textContent='Документальный снимок · проверка '+d.checked+' · '+d.groups.length+' групп. Не автоматическое обновление и не общероссийский рейтинг.';
@@ -50,6 +78,19 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const v of ['Показатель','Единица','Год','Значение','Изменение к предыдущему году']){const th=node('th',v);th.scope='col';h.append(th)}
    for(const p of g.metrics)p.observations.forEach((r,i)=>{const prev=p.observations[i-1],delta=prev&&prev.year===r.year-1?GroupPassports.change(Number(prev.value),Number(r.value),p.unit):null;const tr=b.insertRow();for(const v of [p.label,p.unit,r.year,fmt(r.value),delta==null?'—':fmt(delta)+(p.unit==='%'?' п.п.':'%')])tr.insertCell().textContent=v});
    table.replaceChildren(t);metric.replaceChildren(...g.metrics.map(x=>new Option(x.label,x.id)));metric.onchange=()=>drawChart(g);drawChart(g);
+   const ry=$('group-ratio-year'),rt=$('group-ratio-table'),re=$('group-ratio-export'),rs=$('group-ratio-status');
+   const years=[...new Set(g.metrics.flatMap(p=>p.observations.map(r=>r.year)))].sort((a,b)=>b-a);
+   ry.replaceChildren(...years.map(y=>new Option(String(y),String(y))));ry.disabled=false;
+   function drawRatios(){
+    const y=Number(ry.value),rows=GroupPassports.ratios(g,y),available=rows.filter(x=>x.value!==null).length;
+    rs.textContent='Рассчитано '+available+' из '+rows.length+' коэффициентов · '+g.name+' · '+y+' год. Это не кредитный рейтинг.';
+    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
+    for(const label of ['Коэффициент','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Основание']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const x of rows){const tr=b.insertRow(),note=x.value===null?'Нет необходимых сопоставимых данных или знаменатель ≤ 0':x.average?'Среднее начала и конца года':'Значения одного отчётного года';for(const v of [x.label,x.value===null?'—':fmt(x.value)+' '+x.unit,fmt(x.numerator?.value),fmt(x.denominator),note])tr.insertCell().textContent=v}
+    rt.replaceChildren(t);re.disabled=!available;
+    re.onclick=()=>csv('group-ratios-'+g.id+'-'+y+'.csv',[['Группа','Год','Код','Коэффициент','Единица','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Знаменатель на конец года, млн руб.','Знаменатель на начало года, млн руб.','Исходный числитель','Исходный знаменатель','Источник','Раздел','SHA-256 JSON','Отпечаток манифеста'],...rows.map(x=>[g.name,y,x.id,x.label,x.unit,x.value,x.numerator?.value,x.denominator,x.denCurrent?.value,x.denPrevious?.value,x.numerator?.label,x.denCurrent?.label,g.source,g.section,entry.sha256,m.data_fingerprint])]);
+   }
+   ry.onchange=drawRatios;drawRatios();
    exp.disabled=false;exp.onclick=()=>csv('group-'+g.id+'.csv',[['Группа','Отрасль','Периметр','Стандарт','Код','Показатель','Единица','Год','Значение','Источник','Раздел','Проверено','Тип источника','Примечание','SHA-256 JSON','Отпечаток манифеста'],...g.metrics.flatMap(p=>p.observations.map(r=>[g.name,g.sector,g.scope,g.standard,p.id,p.label,p.unit,r.year,r.value,g.source,g.section,d.checked,g.source_kind||'documentary',g.note||'',entry.sha256,m.data_fingerprint]))]);
   }
   function filter(){
@@ -57,7 +98,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    pick.replaceChildren(...visible.map(g=>new Option(g.name,g.id)));if(visible.some(g=>g.id===old))pick.value=old;
    status.textContent='Найдено '+visible.length+' из '+d.groups.length+' групп · документальный снимок '+d.checked+'.';
    pick.disabled=!visible.length;metric.disabled=!visible.length;
-   if(!visible.length){detail.replaceChildren(node('p','Нет групп по выбранным условиям.'));table.replaceChildren();chart.replaceChildren();exp.disabled=true;return}
+   if(!visible.length){detail.replaceChildren(node('p','Нет групп по выбранным условиям.'));table.replaceChildren();chart.replaceChildren();$('group-ratio-table').replaceChildren();$('group-ratio-status').textContent='Выберите группу';$('group-ratio-year').disabled=true;$('group-ratio-export').disabled=true;exp.disabled=true;return}
    draw();
   }
   sector.onchange=query.oninput=filter;pick.onchange=draw;draw();
