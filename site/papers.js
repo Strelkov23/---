@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   let basket=new Map(),persistent=true;
   try{for(const item of JSON.parse(localStorage.getItem(storageKey)||'[]'))if(item&&valid(item.url))basket.set(item.url,item)}catch{persistent=false}
   const complete=r=>Boolean(r.volume&&r.issue&&(r.pages||r.article_number));
-  function item(r){return {title:r.title,url:doiURL(r.doi),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics||'',authors:r.authors||''}}
+  function item(r){return {title:r.title,url:doiURL(r.doi),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics||'',authors:r.authors||'',doi:r.doi||'',issn:meta(r).issn||'',volume:r.volume||'',issue:r.issue||'',pages:r.pages||'',article_number:r.article_number||'',metadata_checked:r.metadata_checked||'',archive_revision:version||''}}
   function store(){try{localStorage.setItem(storageKey,JSON.stringify([...basket.values()]))}catch{persistent=false}
    $('paper-selection').textContent='В общей подборке: '+fmt(basket.size)+(persistent?' · сохраняется в этом браузере':' · сохранение между страницами недоступно')}
   function toggle(r){const x=item(r);if(!x.url)return;if(basket.has(x.url))basket.delete(x.url);else basket.set(x.url,x);store();draw()}

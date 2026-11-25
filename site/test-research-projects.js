@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),P=require('./research-projects.js');
+const x={title:'Article',url:'https://doi.org/10.1234/ABC',authors:'A'},y={title:'Article revised',url:'http://dx.doi.org/10.1234/abc',pages:'1-2'};
+const rows=P.merge([x],[y]);assert.equal(rows.length,1);assert.equal(rows[0].authors,'A');assert.equal(rows[0].pages,'1-2');
+assert.throws(()=>P.item({title:'Bad',url:'javascript:alert(1)'}));
+assert.throws(()=>P.item({title:'Bad',url:'https://a:b@example.org/'}));
+const base={schema:1,projects:[{id:'a',title:'Research',note:'note',items:rows}]};
+const saved=P.parse(P.encode(base));assert.deepEqual(saved,P.validate(base));
+const copy=P.importCopy(base,base,()=> 'b');assert.equal(copy.projects.length,2);assert.equal(base.projects.length,1);
+assert.throws(()=>P.importCopy(base,base,()=> 'a'));
+assert.throws(()=>P.parse('{"schema":2,"projects":[]}'));
+assert.throws(()=>P.validate({schema:1,projects:[base.projects[0],base.projects[0]]}));
+assert.match(P.reference(rows[0],0),/С\. 1-2/);
+console.log('Research projects: validation, DOI deduplication and non-destructive import passed');
