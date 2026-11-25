@@ -28,3 +28,9 @@ assert.throws(()=>P.decimalSum(['1e2']));
 assert.deepEqual(P.numericSummary(rows,'RU-BU'),{iso:'RU-BU',records:2,costCount:1,jobsCount:1,both:1,cost:'0',jobs:'0'});
 assert.equal(P.numericSummary(rows,'RU-AMU').cost,null);
 assert.throws(()=>P.numericSummary(rows,''));
+
+assert.equal(P.displayDecimal('0.005'),'0,01');
+assert.equal(P.displayDecimal('0.999'),'1,00');
+assert.equal(P.displayDecimal('0'),'0,00');
+assert.equal(P.displayDecimal(null),'—');
+assert.throws(()=>P.displayDecimal('-1'));
