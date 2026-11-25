@@ -12,7 +12,21 @@ const ProjectSearch=(()=>{
   return rows.filter(r=>(!iso||r.iso===iso)&&(!sector||(sector==='__missing__'?!r.sector:r.sector===sector))&&(!status||(status==='__missing__'?!r.status:r.status===status))&&(!numeric||(numeric==='both'?r.cost!==null&&r.jobs!==null:r[numeric]!==null))&&q.every(t=>norm([r.name,r.investor,r.investorAvailability,r.location,r.sector,r.status,r.stage,r.region].join(' ')).includes(t)));
  }
  function counts(rows){return specs.map(s=>({iso:s.iso,records:rows.filter(r=>r.iso===s.iso).length,cost:rows.filter(r=>r.iso===s.iso&&r.cost!==null).length,jobs:rows.filter(r=>r.iso===s.iso&&r.jobs!==null).length}));}
- return {specs,records,select,counts};
+ function decimalSum(values){
+  if(!values.length)return null;
+  const parts=values.map(v=>{if(typeof v!=='string'||!/^\d+(?:\.\d+)?$/.test(v))throw Error('Некорректная стоимость');return v.split('.')});
+  const scale=Math.max(...parts.map(p=>(p[1]||'').length));
+  if(scale>20)throw Error('Точность стоимости');
+  const sum=parts.reduce((n,[a,b=''])=>n+BigInt(a+b.padEnd(scale,'0')),0n).toString().padStart(scale+1,'0');
+  return scale?sum.slice(0,-scale)+'.'+sum.slice(-scale):sum;
+ }
+ function numericSummary(rows,iso){
+  if(!specs.some(s=>s.iso===iso))throw Error('Выберите один источник');
+  const selected=rows.filter(r=>r.iso===iso),costs=selected.filter(r=>r.cost!==null),jobs=selected.filter(r=>r.jobs!==null);
+  if(jobs.some(r=>!Number.isSafeInteger(r.jobs)||r.jobs<0))throw Error('Численность');
+  return {iso,records:selected.length,costCount:costs.length,jobsCount:jobs.length,both:selected.filter(r=>r.cost!==null&&r.jobs!==null).length,cost:decimalSum(costs.map(r=>r.cost)),jobs:jobs.length?jobs.reduce((n,r)=>n+BigInt(r.jobs),0n).toString():null};
+ }
+ return {specs,records,select,counts,decimalSum,numericSummary};
 })();
 if(typeof module!=='undefined')module.exports=ProjectSearch;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -43,6 +57,22 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     if(iso.value&&iso.value!==c.iso)continue;
     const ref=coverage.rows.find(r=>r.iso===c.iso),loaded=ok.some(x=>x.spec.iso===c.iso)&&ref.records!==null;
     const article=node('div','');article.className='metric';article.append(node('b',loaded?String(c.records):'—'),node('span',ref.region+(loaded?' · стоимость: '+(ref.cost_numeric===null?'—':c.cost)+' · места: '+(ref.jobs_numeric===null?'—':c.jobs):' · нет подтверждённого набора')));summary.append(article);
+   }
+   const totals=$('project-search-totals'),totalsExport=$('project-search-totals-export');
+   if(totals&&totalsExport){
+    totals.replaceChildren();const ref=coverage.rows.find(r=>r.iso===iso.value);
+    const loaded=ref&&ref.records!==null&&ok.some(x=>x.spec.iso===iso.value);
+    totalsExport.disabled=!loaded||!rows.length;
+    if(!loaded)totals.append(node('p',iso.value?'Нет подтверждённого набора выбранного региона.':'Выберите один регион для расчёта заявленных параметров.'));
+    else{
+     const n=ProjectSearch.numericSummary(rows,iso.value),fmt=v=>v===null?'—':v.replace('.',',');
+     const cards=node('div','');cards.className='metrics';
+     for(const [label,v] of [['Записей в выборке',String(n.records)],['Стоимость: числовых записей',ref.cost_numeric===null?'Поле отсутствует':String(n.costCount)],['Сумма заявленной стоимости, млн руб.',fmt(n.cost)],['Рабочие места: числовых записей',ref.jobs_numeric===null?'Поле отсутствует':String(n.jobsCount)],['Сумма заявленных мест',fmt(n.jobs)],['Оба поля заполнены',ref.cost_numeric===null||ref.jobs_numeric===null?'—':String(n.both)]]){
+      const item=node('div','');item.className='metric';item.append(node('b',v),node('span',label));cards.append(item)
+     }
+     totals.append(cards,node('p','Суммы только по заполненным полям выбранных записей одного источника. Возможны пересечения проектов и разные сроки; это не фактические вложения, не созданные места и не общий итог региона.'));
+     totalsExport.onclick=()=>csv('project-numeric-'+iso.value+'.csv',[['Регион ISO','Редакция','Записей','Записей со стоимостью','Сумма стоимости, млн руб.','Записей с местами','Сумма мест','Оба поля','Отрасль','Статус','Поиск','Числовой фильтр','Источник','SHA-256','Отпечаток манифеста'],[n.iso,ref.edition,n.records,ref.cost_numeric===null?null:n.costCount,n.cost,ref.jobs_numeric===null?null:n.jobsCount,n.jobs,ref.cost_numeric===null||ref.jobs_numeric===null?null:n.both,sector.value,state.value,query.value,numeric.value,ref.source,ref.sha256,m.data_fingerprint]]);
+    }
    }
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
    for(const label of ['Проект / запись','Регион и дата','Отрасль источника','Место','Статус / стадия','Инвестор / наличие','Заявленная стоимость, млн руб.','Заявленные места','Источник']){const th=node('th',label);th.scope='col';h.append(th);}
