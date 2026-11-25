@@ -60,4 +60,12 @@ class CoverageTests(unittest.TestCase):
             self.assertFalse(p.discovery_allowed("RU-PER","https://example.org/a.pdf"))
             self.assertFalse(p.discovery_allowed("RU-ROS","https://user@invest-don.com/a.xlsx"))
             with self.assertRaises(ValueError):p.discovery_parse("RU-ROS",b'<a href="https://example.org/a.xlsx">Bad</a>')
+    def test_offline_discovery_accepts_date_without_network(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            def forbidden(key):self.fail("Offline discovery must not contact sources")
+            d=p.discover(root,root,"2026-11-25",False,forbidden)
+            self.assertEqual(p.discovery_quality(d)["project_discovery_success"],0)
+            self.assertTrue(all(r["checked"] is None for r in d["rows"].values()))
+            with self.assertRaises(ValueError):p.discover(root,root,"2026-11-25",True,forbidden)
 if __name__=="__main__":unittest.main()

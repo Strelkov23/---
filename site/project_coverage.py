@@ -146,7 +146,7 @@ def discover(out,previous,stamp,refresh,fetcher=discovery_fetch):
     try:
         old=json.loads((previous/DISCOVERY_FILE).read_text(encoding="utf-8"));discovery_quality(old);d=old
     except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
-    now=time(stamp)
+    now=time(stamp) if refresh else None
     todo=[k for k,r in d["rows"].items() if refresh and (not r["checked"] or now>=time(r["checked"])+timedelta(days=2 if r["status"]=="unavailable" else 7))]
     def one(k):
         row=dict(d["rows"][k],checked=stamp)

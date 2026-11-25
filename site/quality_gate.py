@@ -368,6 +368,8 @@ def check(out,previous,stamp):
         counts.update(pcov.quality(coverage,out))
         pcov.verify_csv(out/"project-coverage.csv",coverage)
         pcov.verify_breakdown_csv(out/"project-breakdown.csv",coverage)
+        if (out/pcov.DISCOVERY_FILE).is_file():
+            counts.update(pcov.discovery_quality(json.loads((out/pcov.DISCOVERY_FILE).read_text(encoding="utf-8"))))
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Охват проектов: "+str(e))
     # Explicit scope diagnostics: incomplete sources are warnings, not structural failures.
     try:
