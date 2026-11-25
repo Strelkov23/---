@@ -1,7 +1,7 @@
 name: Economic code checks
 on:
   push:
-    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon, stage-d-cost-decomposition, stage-d-territorial, stage-d-final-acceptance, stage-e-plan-register, stage-e-public-plan-fact, stage-e-deviation-monitor, stage-e-plan-comparison, stage-e-diagnostic-link, stage-e-analyst-cockpit, stage-e-plan-report, stage-e-visual-system, stage-e-visual-analysis]
+    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon, stage-d-cost-decomposition, stage-d-territorial, stage-d-final-acceptance, stage-e-plan-register, stage-e-public-plan-fact, stage-e-deviation-monitor, stage-e-plan-comparison, stage-e-diagnostic-link, stage-e-analyst-cockpit, stage-e-plan-report, stage-e-visual-system, stage-e-visual-analysis, stage-e-visual-charts]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:

@@ -29,6 +29,11 @@ with sync_playwright() as p:
                 # Test contrast of the shared header's brand link; actual chart colors are unchanged.
                 contrast=page.locator(".site-brand a").evaluate("""e=>{const rgb=s=>s.match(/\\d+(?:\\.\\d+)?/g).slice(0,3).map(Number);const L=a=>a.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);const a=L(rgb(getComputedStyle(e).color)),b=L(rgb(getComputedStyle(e.closest('header')).backgroundColor));return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)}""")
                 assert contrast>=4.5,(route,width,theme,contrast)
+                if route=="planning-centre.html":
+                    assert page.locator(".flow-stage a").count()==4
+                if route in ("economic-map.html","regional-manufacturing.html"):
+                    assert page.locator(".technical-map-legend").first.is_visible()
+                    assert page.locator(".technical-map-legend").first.evaluate("(e)=>e.scrollWidth<=e.clientWidth+2")
                 page.screenshot(path=str(out/f"{route[:-5]}-{width}-{theme}.png"),animations="disabled",timeout=30000)
                 target={"economic-map.html":"#geo-map","regional-manufacturing.html":"#rm-map","diagnostics.html":"#diag-overview","planning-centre.html":".planning-flow","analyst-cockpit.html":"#analyst-cockpit"}.get(route)
                 if target:

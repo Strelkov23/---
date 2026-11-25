@@ -193,6 +193,11 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelectorAll('#pc-results tbody tr').length===2",timeout=45000)
         assert page.locator("#pc-summary tbody tr").count()==4
         assert page.locator("#pc-chart svg").count()==1
+        assert page.locator("#pc-chart .chart-context-coverage li").count()==3
+        assert page.locator("#pc-chart svg path[stroke-dasharray='9 5']").count()==1
+        with page.expect_download() as chart_svg:
+            page.locator("#pc-chart button",has_text="Скачать SVG").click()
+        assert "План А" in chart_svg.value.path().read_text(encoding="utf-8")
         with page.expect_download() as comparison:
             page.locator("#pc-export").click()
         with open(comparison.value.path(),encoding="utf-8-sig",newline="") as f:

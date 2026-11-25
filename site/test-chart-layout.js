@@ -19,3 +19,6 @@ assert.equal(M.nextZoom(1,-.5),1);
 assert.equal(M.nextZoom(3.5,.5),4);
 assert.equal(M.nextZoom(4,.5),4);
 assert.equal(M.nextZoom(2,-.5),1.5);
+
+const {chartCoverage}=require('./chart-export.js');
+assert.deepEqual(chartCoverage([2021,2022,2023],[{name:'A',values:[0,null,3,8]},{name:'B',values:[undefined,NaN,-1]}]),[{name:'A',observed:2,expected:3},{name:'B',observed:1,expected:3}]);
