@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   $('paper-access-summary').textContent='Записей с заявленной лицензией: '+fmt(records.filter(r=>licenses(r).length).length)+' · со ссылкой на текст: '+fmt(records.filter(r=>textLinks(r).length).length)+' · остальные сведения могут отсутствовать или ещё не быть загружены.';
   const oa=r=>r.openalex_access||{};
   const reportedOpen=r=>oa(r).result==='accepted'&&oa(r).evidence?.is_oa===true;
+  const reportedClosed=r=>oa(r).result==='accepted'&&oa(r).evidence?.is_oa===false;
+  const oaLabels={diamond:'Журнал открытого доступа; плата автора не указана',gold:'Журнал открытого доступа',green:'Копия в репозитории',hybrid:'Открытая лицензия в подписном журнале',bronze:'Свободное чтение без установленной открытой лицензии',closed:'Свободная копия не найдена'};
+  const received=records.filter(r=>oa(r).result==='accepted').length;
+  $('paper-oa-summary').textContent='OpenAlex · получены сведения: '+fmt(received)+' из '+fmt(records.length)+' · свободная копия заявлена: '+fmt(records.filter(reportedOpen).length)+' · не найдена: '+fmt(records.filter(reportedClosed).length)+' · без принятого результата: '+fmt(records.length-received)+'.';
   const cc=r=>Array.isArray(r.cc_evidence)?r.cc_evidence.filter(x=>x&&publicLink(x.url)):[];
   const themes=r=>String(r.topics||'').split(' · ').filter(Boolean);
   for(const [label,n] of [['Статей',records.length],['Журналов',new Set(records.map(r=>r.journal)).size],['Проверено ссылок',records.filter(r=>state(r)!=='unchecked').length],['Требуют внимания',records.filter(r=>['missing','restricted','error'].includes(state(r))).length]]){
@@ -91,7 +95,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    selected=records.filter(r=>{
     const y=Number(String(r.published||'').slice(0,4)),marks=meta(r).tags||[],mc=$('paper-meta').value;
     const accessFilter=$('paper-access').value,lc=licenses(r).length,tc=textLinks(r).length;
-    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:accessFilter==='cc'?cc(r).length:accessFilter==='oa'?reportedOpen(r):accessFilter==='oa_unknown'?oa(r).result!=='accepted':!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
+    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:accessFilter==='cc'?cc(r).length:accessFilter==='oa'?reportedOpen(r):accessFilter==='oa_closed'?reportedClosed(r):accessFilter==='oa_unknown'?oa(r).result!=='accepted':!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
    });
    selected.sort((a,b)=>$('order').value==='cited'?(Number.isFinite(b.cited_by)?b.cited_by:-1)-(Number.isFinite(a.cited_by)?a.cited_by:-1):$('order').value==='title'?a.title.localeCompare(b.title,'ru'):$('order').value==='old'?String(a.published).localeCompare(String(b.published)):String(b.published).localeCompare(String(a.published)));
    $('found').textContent=from>to?'Начальный год позже конечного':'Найдено статей: '+fmt(selected.length);
@@ -116,7 +120,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     const oaStatus={accepted:'Сведения получены',not_found:'DOI не найден в OpenAlex',error:'Ошибка проверки',deferred:'Проверка отложена'};
     accessDetails.append(node('p','OpenAlex: '+(oaStatus[independent.result]||'Не проверено')+(independent.checked?' · '+independent.checked.slice(0,10):'')));
     if(evidence){
-      accessDetails.append(node('p',(independent.result!=='accepted'?'Архивные сведения · ':'')+(evidence.is_oa?'Свободная копия заявлена OpenAlex':'Свободная копия не найдена OpenAlex')+' · '+evidence.oa_status+' · '+(independent.success||'')+(evidence.version?' · '+evidence.version:'')+(evidence.license?' · '+evidence.license:'')));
+      accessDetails.append(node('p',(independent.result!=='accepted'?'Архивные сведения · ':'')+(evidence.is_oa?'Свободная копия заявлена OpenAlex':'Свободная копия не найдена OpenAlex')+' · '+(oaLabels[evidence.oa_status]||evidence.oa_status)+' · '+(independent.success||'')+(evidence.version?' · '+evidence.version:'')+(evidence.license?' · '+evidence.license:'')));
       const line=node('p','');links(line,[['Карточка OpenAlex',publicLink(evidence.work)],['Страница копии (не проверена)',evidence.is_oa?publicLink(evidence.landing):''],['PDF (не проверен)',evidence.is_oa?publicLink(evidence.pdf):'']]);accessDetails.append(line)
     }
     card.append(accessDetails);

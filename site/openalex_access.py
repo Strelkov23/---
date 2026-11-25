@@ -57,13 +57,30 @@ def retrieve(doi):
         result=parse(json_load(payload.raw),doi)
     except HTTPError as e:
         if e.code==404:return "not_found",None
-        if e.code in (401,403,429):return "deferred",None
+        if e.code in (401,402,403,429):return "deferred",None
         return "error",None
     except Exception as error:
         source_pipeline.record(request,"OpenAlex DOI","parse",error=error)
         return "error",None
     source_pipeline.record(request,"OpenAlex DOI","parse",1)
     return "accepted",result
+
+def candidates(papers,old,cutoff,limit):
+    # Oldest checks first, rotate across journals rather than spending the
+    # entire daily budget on one DOI prefix. No extra network discovery.
+    from collections import defaultdict,deque
+    groups=defaultdict(list)
+    seen=set()
+    for p in sorted(papers,key=lambda p:(old.get(p["doi"],("",))[0],p["doi"])):
+        doi=p["doi"]
+        if not doi or doi in seen or normalize(doi)!=doi or doi in old and old[doi][0][:10]>cutoff:continue
+        seen.add(doi);groups[p.get("journal","")].append(doi)
+    queues=deque(deque(v) for v in sorted(groups.values(),key=lambda v:(old.get(v[0],("",))[0],v[0])))
+    result=[]
+    while queues and len(result)<limit:
+        q=queues.popleft();result.append(q.popleft())
+        if q:queues.append(q)
+    return result
 
 def sync(db,papers,stamp,refresh,request=None):
     setup(db)
@@ -76,7 +93,7 @@ def sync(db,papers,stamp,refresh,request=None):
             db.execute("insert into openalex_run values(?)",(day,))
             db.execute("delete from openalex_run where day<?",((datetime.fromisoformat(stamp)-timedelta(days=90)).date().isoformat(),))
         cutoff=(datetime.fromisoformat(stamp)-timedelta(days=90)).date().isoformat()
-        pending=sorted({p["doi"] for p in papers if normalize(p["doi"])==p["doi"] and (p["doi"] not in old or old[p["doi"]][0][:10]<=cutoff)},key=lambda doi:(old.get(doi,("",))[0],doi))
+        pending=candidates(papers,old,cutoff,LIMIT)
         began=time.monotonic();errors=0
         for doi in pending[:LIMIT]:
             if time.monotonic()-began>=55:break
@@ -106,7 +123,7 @@ def quality(paper):
         success=datetime.fromisoformat(x["success"])
         if success.tzinfo is None or success>checked:raise ValueError("OpenAlex: дата сведений")
         if set(e)!={"work","is_oa","oa_status","pdf","landing","license","version","host_type"} or not isinstance(e["work"],str) or not re.fullmatch(r"https://openalex\.org/W[0-9]+",e["work"]) or type(e["is_oa"]) is not bool or e["oa_status"] not in STATUSES or e["is_oa"]!=(e["oa_status"]!="closed"):raise ValueError("OpenAlex: сведения")
-        if any(e[k] and public_link(e[k])!=e[k] for k in ("pdf","landing")) or e["version"] not in VERSIONS|{""} or e["host_type"] not in ("","journal","repository") or not isinstance(e["license"],str) or e["license"] and not re.fullmatch(r"[a-zA-Z0-9_.-]{1,80}",e["license"]):raise ValueError("OpenAlex: место доступа")
+        if any(not isinstance(e[k],str) or e[k] and public_link(e[k])!=e[k] for k in ("pdf","landing")) or e["version"] not in VERSIONS|{""} or e["host_type"] not in ("","journal","repository") or not isinstance(e["license"],str) or e["license"] and not re.fullmatch(r"[a-zA-Z0-9_.-]{1,80}",e["license"]):raise ValueError("OpenAlex: место доступа")
         if not e["is_oa"] and any(e[k] for k in ("pdf","landing","license","version","host_type")):raise ValueError("OpenAlex: противоречие доступа")
     if x["result"]=="accepted":
         if e is None or x["success"]!=x["checked"]:raise ValueError("OpenAlex: принят без сведений")

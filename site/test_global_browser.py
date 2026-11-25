@@ -42,7 +42,8 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/papers.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#paper-project option').length>1",timeout=30000)
         assert "Записей с заявленной лицензией:" in page.locator("#paper-access-summary").inner_text()
-        assert page.locator("#paper-access option").count()==7
+        assert page.locator("#paper-access option").count()==8
+        assert "OpenAlex · получены сведения:" in page.locator("#paper-oa-summary").inner_text()
         assert page.locator("#papers details").count()>0
         page.locator("#paper-project").select_option(project_id)
         page.locator("#papers .paper-project-add").first.click()

@@ -469,6 +469,8 @@ def publish(out,previous,stamp):
     # A fresh production build must contain every new stage-A output.
     for name in ("normalized-observations.json","source-journal.json","source-pipeline.json","data-infrastructure.json"):
         if not (out/name).is_file():report["errors"].append("Отсутствует обязательный набор этапа А: "+name)
+    for name in ("journal-evidence.json","literature-quality.json"):
+        if not (out/name).is_file():report["errors"].append("Отсутствует обязательный набор этапа Б: "+name)
     target.write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False),encoding="utf-8")
     print("Quality gate:",json.dumps({"errors":report["errors"],"warnings":report["warnings"],"counts":report["counts"]},ensure_ascii=False))
     if report["errors"]:raise SystemExit("Quality gate rejected the build; previous site is unchanged.")

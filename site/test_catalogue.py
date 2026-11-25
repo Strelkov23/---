@@ -169,6 +169,24 @@ class CatalogueTests(unittest.TestCase):
         with patch("openalex_access.retrieve",side_effect=AssertionError("network")):
             oa.sync(self.db,papers,"2026-11-26T10:00:00+00:00",False)
         self.assertEqual({oa.quality(p) for p in papers},{"reported_open","deferred"})
+    def test_openalex_journal_rotation_and_expired_evidence(self):
+        import openalex_access as oa
+        papers=[{"doi":"10.1234/a","journal":"A"},{"doi":"10.1234/b","journal":"A"},{"doi":"10.2222/a","journal":"B"},{"doi":"10.3333/a","journal":"C"}]
+        self.assertEqual(oa.candidates(papers,{},"2026-08-01",3),["10.1234/a","10.2222/a","10.3333/a"])
+        self.assertNotIn("10.1234/a",oa.candidates(papers,{"10.1234/a":("2026-11-24",)},"2026-08-01",10))
+        stamp="2026-01-01T10:00:00+00:00"
+        e=dict(work="https://openalex.org/W123",is_oa=True,oa_status="green",pdf="",landing="https://repo.example.org/a",license="cc-by",version="acceptedVersion",host_type="repository")
+        oa.sync(self.db,papers[:1],stamp,True,request=lambda d:("accepted",e))
+        oa.sync(self.db,papers[:1],"2026-11-25T10:00:00+00:00",True,request=lambda d:("deferred",None))
+        x=papers[0]["openalex_access"]
+        self.assertEqual(oa.quality(papers[0]),"deferred")
+        self.assertEqual(x["success"],stamp)
+        self.assertEqual(x["evidence"],e)
+    def test_openalex_denial_stops(self):
+        import openalex_access as oa
+        err=HTTPError("https://api.openalex.org/works/doi:10.1234/test",402,"Budget",{},None)
+        with patch("source_registry.fetch",side_effect=err):
+            self.assertEqual(oa.retrieve("10.1234/test"),("deferred",None))
     def test_classification_and_audit(self):
         self.db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/a?b","Вопросы экономики","2026-01","Стратегическое планирование промышленности","A",""))
         literature.reclassify(self.db)

@@ -69,6 +69,7 @@ def collect(literature,stamp):
         m=registry.get(name,{})
         rows.append(dict(journal=name,issn=m.get("issn"),counts=counts(grouped.get(name,[]),audit,as_of)))
     total=counts(papers,audit,as_of)
+    if sum(v for k,v in total.items() if k.startswith("oa_"))!=total["total"]:raise ValueError("Баланс результатов OpenAlex")
     if any(sum(r["counts"][k] for r in rows)!=v for k,v in total.items()):raise ValueError("Баланс научного каталога")
     return dict(schema=1,built=stamp,note=NOTE,total=total,journals=rows)
 
@@ -79,7 +80,7 @@ def quality(data,literature):
 def render(data):
     e=lambda x:escape(str(x),quote=True)
     body='<section class="mast"><p class="kicker">Научно-исследовательский центр</p><h1>Качество научного каталога</h1><p>'+e(NOTE)+'</p><p><a href="papers.html">Поиск статей</a> · <a href="journal-evidence.html">Классификация журналов</a> · <a href="'+FILE+'">Сводка JSON</a></p></section><section><h2>Полнота библиографических сведений</h2><div class="metrics">'
-    for k,label in (("total","Статей"),("complete_bibliography","Авторы, том, номер и страницы / номер статьи"),("with_access_metadata","Метаданные лицензии / текста получены"),("with_cc_evidence","Заявленная действующая CC-лицензия версии"),("carried_bibliography","Ранее полученные поля"),("oa_reported_open","Свободная копия по OpenAlex"),("oa_unchecked","Не проверено OpenAlex")):
+    for k,label in (("total","Статей"),("complete_bibliography","Авторы, том, номер и страницы / номер статьи"),("with_access_metadata","Метаданные лицензии / текста получены"),("with_cc_evidence","Заявленная действующая CC-лицензия версии"),("carried_bibliography","Ранее полученные поля"),("oa_reported_open","Свободная копия по OpenAlex"),("oa_reported_closed","Свободная копия не найдена"),("oa_unchecked","Не проверено OpenAlex"),("oa_deferred","Проверка отложена"),("oa_error","Ошибки OpenAlex"),("oa_not_found","DOI не найден OpenAlex")):
         body+='<div class="metric"><b>'+e(data["total"][k])+'</b>'+e(label)+'</div>'
     body+='</div><p>Критерий полноты — индикатор заполнения полей, а не универсальное требование к статье: у некоторых журналов нет номера или страниц.</p><div class="table-scroll" tabindex="0"><table><thead><tr><th>Журнал / ISSN</th><th>Статей</th><th>Полные сведения</th><th>Лицензии</th><th>Ссылка на текст</th><th>CC версии</th><th>Свободная копия по OpenAlex</th><th>DOI проверен HTTP</th><th>Ошибки / ограничения DOI</th></tr></thead><tbody>'
     for r in data["journals"]:
