@@ -1,0 +1,27 @@
+name: NAO investment verified diagnostic import
+on:
+  push:
+    branches: [stage-f-nao-project-import]
+    paths: ['site/nao_project_import.py','site/test_nao_project_import.py','.github/workflows/nao-project-import.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install openpyxl==3.1.5
+          cd site
+          python -m unittest test_nao_project_import.py
+          python nao_project_import.py
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: nao-projects-diagnostic
+          path: nao-projects-diagnostic.json
