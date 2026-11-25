@@ -1,3 +1,4 @@
+import csv
 import io,csv,zipfile,unittest
 from pathlib import Path
 import openpyxl
@@ -65,7 +66,7 @@ class HistoricalTests(unittest.TestCase):
             first=historical.choose_sections(db,"2026-11-24")
             self.assertEqual(len(first),3)
             for s in first:
-                code="mirror_industry_activity_v2" if s=="industry" else "mirror_"+s
+                code=historical.MIRROR_REVISIONS.get(s,"mirror_"+s)
                 db.execute("insert into hist_sources values(?,?,null,?,?)",(code,"2026-11-24","Ошибка","[]"))
             second=historical.choose_sections(db,"2026-11-24")
             self.assertFalse(set(first)&set(second))
@@ -367,7 +368,8 @@ class HistoricalTests(unittest.TestCase):
             db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
             for section in historical.REGIONAL_ZIPS:
                 db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_"+section,"2026-11-25","2026-11-25","ok","[]"))
-            db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_industry_activity_v2","2026-11-25","2026-11-25","ok","[]"))
+            for section,revision in historical.MIRROR_REVISIONS.items():
+                if section!="enterprises":db.execute("insert into hist_sources values(?,?,?,?,?)",(revision,"2026-11-25","2026-11-25","ok","[]"))
             self.assertEqual(historical.choose_sections(db,"2026-11-25"),["enterprises"])
             db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_enterprises_expanded_v2","2026-11-25","2026-11-25","ok","[]"))
             self.assertEqual(historical.choose_sections(db,"2026-11-25"),[])
@@ -420,4 +422,23 @@ class HistoricalTests(unittest.TestCase):
         import industry
         body="Индекс промышленного производства составил: – в январе-июле 2026 г. по сравнению с январем-июлем 2025 г. – 100,1%; – в июле 2026 г. по сравнению с июлем 2025 г. – 100,4%, по сравнению с июнем 2026 г. – 101,4%. Индексы промышленного производства"
         self.assertEqual(industry.parse_months(body),{"2026-07":100.4})
+
+    def test_verified_regional_units_and_exact_titles(self):
+        h=historical
+        title="Валовой сбор зерна (в весе после доработки)"
+        unit=h.REGIONAL_VERIFIED["agriculture"][title]
+        self.assertEqual(h.regional_unit(unit,"Россия","страна"),"В хозяйствах всех категорий, млн тонн")
+        self.assertEqual(h.regional_unit(unit,"Томская область","регион"),"В хозяйствах всех категорий, тысяч тонн")
+        self.assertIsNone(h.regional_unit(unit,"Неизвестно",""))
+        self.assertFalse(h.verified_regional_concept("agriculture",title,"руб."))
+        for section in ("agriculture","ict","foreign_trade"):
+            b=io.BytesIO()
+            with zipfile.ZipFile(b,"w") as z:
+                header="indicator_name;indicator_unit;object_name;object_level;year;indicator_value\n"
+                stream=io.StringIO();writer=csv.writer(stream,delimiter=";");writer.writerows((title,unit,"Москва","регион",2021,1) for title,unit in h.REGIONAL_VERIFIED[section].items())
+                z.writestr("a.csv",header+stream.getvalue())
+            result=h.mirror_rows(b.getvalue(),section,selected=True)
+            self.assertEqual(len(result),len(h.REGIONAL_VERIFIED[section]))
+            self.assertTrue(all(r["verified_regional"] for r in result))
+
 if __name__=="__main__":unittest.main()

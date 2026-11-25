@@ -36,3 +36,74 @@ class TestRosstat(unittest.TestCase):
         national=dict(url="https://rosstat.gov.ru/b.xlsx",title="Использование мощности без субъектов малого предпринимательства")
         regional=dict(url="https://rosstat.gov.ru/c.xlsx",title="Использование мощности по субъектам Российской Федерации")
         self.assertEqual(w.candidates("capacity",[valid,national,regional]),[valid,national])
+
+    def test_exclude_non_observational_catalogue_entries(self):
+        def f(name,title):return dict(url="https://rosstat.gov.ru/"+name,title=title)
+        capacity=f("Urov_motsh.xlsx","Уровень использования среднегодовой производственной мощности")
+        nom=f("nom_bm-2025.xlsx","Для разработки статистической информации о балансе производственных мощностей")
+        self.assertEqual(w.candidates("capacity",[nom,capacity,capacity]),[capacity])
+        debt=f("fin_sost.xlsx","Финансовое состояние организаций")
+        tax=f("gos_fin_nalog.xls","Поступление налогов и задолженность по налогам и сборам")
+        self.assertEqual(w.candidates("debt",[tax,debt]),[debt])
+        stock=f("stock.xlsx","Наличие основных фондов по видам экономической деятельности")
+        ownership=f("ownership.xlsx","Наличие основных фондов по формам собственности")
+        self.assertEqual(w.candidates("capital",[ownership,stock]),[stock])
+    def test_catalogue_freshness(self):
+        source=dict(files=[{}],success="2026-11-20T00:00:00+00:00")
+        old=("2026-11-25T00:00:00+00:00","2026-11-24T00:00:00+00:00","ok","[]")
+        self.assertFalse(w.catalogue_is_newer(source,old))
+        self.assertTrue(w.catalogue_is_newer(dict(source,success="2026-11-26T00:00:00+00:00"),old))
+        self.assertFalse(w.catalogue_is_newer(dict(source,success=None),None))
+        self.assertTrue(w.catalogue_due(old,"2026-11-26",False))
+        self.assertFalse(w.catalogue_due(old,"2026-11-26",True))
+        self.assertTrue(w.catalogue_due(old,"2026-12-02",True))
+
+    def test_observed_cost_amount_layout(self):
+        rows=[[None]*7 for _ in range(34)]
+        rows[1][0]="ЗАТРАТЫ НА ПРОИЗВОДСТВО И ПРОДАЖУ ПРОДУКЦИИ (ТОВАРОВ, РАБОТ И УСЛУГ) ОРГАНИЗАЦИЙ (ЮРИДИЧЕСКИХ ЛИЦ) ПО РОССИЙСКОЙ ФЕДЕРАЦИИ В 2025 ГОДУ В РАЗРЕЗЕ ВИДОВ ЭКОНОМИЧЕСКОЙ ДЕЯТЕЛЬНОСТИ1) 2)"
+        rows[2][6]="млн.рублей"
+        rows[3][1]="Затраты на производство и продажу продукции (товаров, работ, услуг)"
+        rows[4][2:7]=["Материальные затраты","Расходы на оплату труда","Страховые взносы в Социальный фонд России (СФР), ФФОМС","Амортизация основных средств","Прочие затраты"]
+        rows[12]=["Всего по организациям (юридическим лицам) - млн. рублей",100,60,20,5,5,10]
+        rows[13][0]="Из них с основным видом деятельности"
+        for i in range(14,32):rows[i]=[f"Отрасль {i}",100,60,20,5,5,10]
+        rows[32][0]="1) по организациям без субъектов малого предпринимательства, бюджетных организаций, банков, страховых и прочих финансово-кредитных организаций."
+        rows[33][0]="2)без учета статистической информации по Донецкой Народной Республике, Луганской Народной Республике, Запорожской и Херсонской областям."
+        url="https://rosstat.gov.ru/a.xls"
+        result=w.parse_sheet(rows,"cost","21",url,2026)
+        self.assertEqual(len(result),114)
+        self.assertEqual({r["unit"] for r in result},{"млн руб."})
+        self.assertEqual(result[0]["column"],2)
+        self.assertEqual(w.quality(dict(schema=1,files=[dict(url=url,group="cost",success="2026-11-25",sha256="a"*64,rows=result)]))["rosstat_workbook_observations"],114)
+        rows[14][3]=None
+        self.assertEqual(len(w.parse_sheet(rows,"cost","21",url,2026)),108)
+        rows[15][3]=999
+        with self.assertRaises(ValueError):w.parse_sheet(rows,"cost","21",url,2026)
+        rows[33][0]=""
+        self.assertEqual(w.parse_sheet(rows,"cost","21",url,2026),[])
+
+    def test_cost_diagnostic_keeps_strict_default(self):
+        from unittest.mock import patch
+        rows=[[None]*7 for _ in range(34)]
+        rows[1][0]="ЗАТРАТЫ НА ПРОИЗВОДСТВО И ПРОДАЖУ ПРОДУКЦИИ ОРГАНИЗАЦИЙ (ЮРИДИЧЕСКИХ ЛИЦ) ПО РОССИЙСКОЙ ФЕДЕРАЦИИ В 2025 ГОДУ В РАЗРЕЗЕ ВИДОВ ЭКОНОМИЧЕСКОЙ ДЕЯТЕЛЬНОСТИ"
+        rows[2][6]="млн.рублей"
+        rows[3][1]="Затраты на производство и продажу продукции (товаров, работ, услуг)"
+        rows[4][2:7]=["Материальные затраты","Расходы на оплату труда","Страховые взносы в Социальный фонд России (СФР), ФФОМС","Амортизация основных средств","Прочие затраты"]
+        rows[12]=["Всего по организациям (юридическим лицам)",100,60,20,5,5,10]
+        rows[13][0]="Из них с основным видом деятельности"
+        for i in range(14,32):rows[i]=[f"Отрасль {i}",100,60,20,5,5,10]
+        rows[32][0]="без субъектов малого предпринимательства, бюджетных организаций, банков, страховых и прочих финансово-кредитных организаций"
+        rows[33][0]="без учета статистической информации по Донецкой, Луганской, Запорожской, Херсонской"
+        rows[14][1]=50
+        rows[15][2]=None
+        with self.assertRaises(ValueError):w.cost_amount_sheet(rows,"21","https://rosstat.gov.ru/a.xls",2026)
+        diagnostics=[]
+        result=w.cost_amount_sheet(rows,"21","https://rosstat.gov.ru/a.xls",2026,diagnostics)
+        self.assertEqual(len(result),102)
+        self.assertEqual([x["reason"] for x in diagnostics],["balance_mismatch","missing_component"])
+        self.assertEqual(diagnostics[0]["residual"],-50)
+        self.assertEqual(diagnostics[0]["row"],15)
+
+    def test_reviewed_rejects_unverified_edition(self):
+        with self.assertRaises(ValueError):w.reviewed_cost(b"changed",w.REVIEWED_COST_URL)
+        with self.assertRaises(ValueError):w.quality_reviewed(dict(url=w.REVIEWED_COST_URL,sha256="a"*64,rows=[],review={"kind":"reviewed_partial_cost"}))

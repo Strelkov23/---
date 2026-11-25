@@ -34,6 +34,7 @@ class FreshnessTests(unittest.TestCase):
     def test_partial_import(self):
         now=f.dt("2026-11-25T10:00:00Z")
         self.assertEqual(f.state(now,now,"Ключей: 12; частичный импорт; исключён 2022",now,7),"partial")
+        self.assertEqual(f.state(now,now,"Частично импортировано: см. паспорт",now,7),"partial")
         self.assertEqual(f.state(now,now-timedelta(days=1),"Ошибка 404",now,7),"cached")
         self.assertEqual(f.quality(dict(schema=1,built="2026-11-25",rows=[dict(id="a",state="partial",next_check=None)])),{"partial":1})
     def test_workbook_retry_calculation(self):

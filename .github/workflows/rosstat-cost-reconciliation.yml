@@ -1,0 +1,29 @@
+name: Rosstat monetary reconciliation diagnostic
+on:
+  push:
+    branches: [stage-f-rosstat-cost-reconciliation]
+    paths: ['site/rosstat_cost_reconciliation.py', 'site/rosstat_workbooks.py', '.github/workflows/rosstat-cost-reconciliation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests and isolated reconciliation
+        run: |
+          python -m pip install xlrd==2.0.2
+          cd site
+          python -m unittest test_rosstat_workbooks.py
+          python rosstat_cost_reconciliation.py --output ../rosstat-cost-reconciliation.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rosstat-cost-reconciliation
+          path: rosstat-cost-reconciliation.json
+          if-no-files-found: ignore

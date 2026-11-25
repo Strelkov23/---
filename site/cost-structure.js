@@ -16,7 +16,22 @@ const CostStructure=(()=>{
   const parts=fields.map(k=>({key:k,original:row[k],weight:100*row[k]/sum,shock:shocks[k],contribution:row[k]/sum*shocks[k]}));
   return {mode,sum,parts,index:100+parts.reduce((s,p)=>s+p.contribution,0)};
  }
- return {keys,detailed,calculate};
+
+ const amountLabels={cost_amount_total:'Общие затраты',cost_amount_materials:'Материальные затраты',cost_amount_labor:'Оплата труда',cost_amount_insurance:'Страховые взносы',cost_amount_depreciation:'Амортизация',cost_amount_other:'Прочие затраты'};
+ function monetarySeries(data,title,metric){
+  if(!Object.hasOwn(amountLabels,metric))throw Error('Неизвестный денежный показатель');
+  const files=(data?.files||[]).filter(f=>f.review?.kind==='reviewed_partial_cost');
+  if(files.length!==1)throw Error('Нет однозначной принятой денежной редакции');
+  const f=files[0],years=f.review.coverage.map(r=>r.year);
+  if(!years.length||new Set(years).size!==years.length||years.some((y,i)=>!Number.isInteger(y)||(i>0&&y!==years[i-1]+1)))throw Error('Некорректная шкала периода');
+  const index=new Map();
+  for(const r of f.rows.filter(r=>r.title===title&&r.metric===metric)){
+   if(index.has(r.year)||!years.includes(r.year)||r.unit!=='млн руб.'||!Number.isFinite(r.value)||r.value<0||r.source!==f.url)throw Error('Некорректное денежное наблюдение');
+   index.set(r.year,r);
+  }
+  return {years,values:years.map(y=>index.get(y)?.value??null),rows:years.map(y=>index.get(y)||null),source:f.url,sha256:f.sha256,policy:f.review.policy,success:f.success};
+ }
+ return {keys,detailed,calculate,amountLabels,monetarySeries};
 })();
 if(typeof module!=='undefined')module.exports=CostStructure;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -43,4 +58,34 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }catch(e){$('cost-result').textContent=e.message}};
   draw();trend();$('cost-run').disabled=false;
  }catch(e){$('cost-status').textContent='Набор не подтверждён: '+e.message}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),status=$('cost-amount-status');if(!status)return;
+ try{
+  const manifest=await Provenance.validateManifest(await load('data-manifest.json')),verified=await Provenance.get(manifest,'rosstat-workbooks.json',root),data=verified.data;
+  const files=(data.files||[]).filter(f=>f.review?.kind==='reviewed_partial_cost');
+  if(files.length!==1){status.textContent='Проверенная денежная редакция пока отсутствует в опубликованном архиве.';return}
+  const f=files[0],sector=$('cost-amount-sector'),metric=$('cost-amount-metric');
+  const titles=[...new Set(f.rows.filter(r=>r.metric==='cost_amount_total').map(r=>r.title))];
+  if(!titles.length)throw Error('Нет проверенных отраслей');
+  titles.forEach(t=>sector.add(new Option(t,t)));
+  Object.entries(CostStructure.amountLabels).forEach(([k,v])=>metric.add(new Option(v,k)));
+  sector.disabled=metric.disabled=false;
+  function draw(){
+   const host=$('cost-amount-chart'),tableHost=$('cost-amount-table');host.replaceChildren();tableHost.replaceChildren();
+   try{
+    const d=CostStructure.monetarySeries(data,sector.value,metric.value),name=CostStructure.amountLabels[metric.value];
+    const fmt=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:3}):'—';
+    const t=document.createElement('table'),h=t.createTHead().insertRow(),b=t.createTBody();
+    ['Год','Млн руб.','Исходная ячейка','Статус'].forEach(v=>{const th=document.createElement('th');th.scope='col';th.textContent=v;h.append(th)});
+    d.years.forEach((y,i)=>{const row=d.rows[i],tr=b.insertRow();[y,fmt(d.values[i]),row?'Лист '+row.sheet+', строка '+row.row+', столбец '+row.column:'—',row?'Принято':'Нет принятого наблюдения'].forEach(v=>tr.insertCell().textContent=v)});
+    tableHost.append(t);
+    chartTools(host,sector.value+' — '+name,'млн руб.',d.years,[{code:metric.value,name,values:d.values}],{source:'Росстат · исходный SHA-256 '+d.sha256,url:d.source,territory:'Россия, охват по примечаниям',display:true});
+    status.textContent='Принято '+d.values.filter(Number.isFinite).length+' из '+d.years.length+' годовых позиций. Последний успешный импорт: '+(d.success||'—')+'. '+d.policy;
+    $('cost-amount-notes').textContent=[...new Set(d.rows.filter(Boolean).map(r=>r.definition))].join(' | ');
+   }catch(e){status.textContent='Денежный ряд отклонён: '+e.message}
+  }
+  sector.addEventListener('change',draw);metric.addEventListener('change',draw);draw();
+ }catch(e){status.textContent='Набор не подтверждён: '+e.message}
 });

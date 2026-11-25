@@ -24,7 +24,7 @@ def state(checked,success,status,now,days,archive=False,available=True):
     if archive:return "archive" if available else "unavailable"
     if not success:return "unavailable" if checked else "waiting"
     if checked and (checked>success or re.search(r"ошиб|отлож|недоступ|429|403|404|timeout|failed",status,re.I)):return "cached"
-    if "частичный импорт" in status.lower():return "partial"
+    if re.search(r"частичный импорт|частично импортировано",status,re.I):return "partial"
     if days and now-success>timedelta(days=days):return "overdue"
     return "ok"
 

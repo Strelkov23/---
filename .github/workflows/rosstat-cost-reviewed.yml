@@ -1,0 +1,37 @@
+name: Rosstat reviewed cost acceptance
+on:
+  push:
+    branches: [stage-f-rosstat-cost-reviewed]
+    paths: ['site/rosstat_workbooks.py','.github/workflows/rosstat-cost-reviewed.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the exact reviewed edition and render coverage
+        run: |
+          python -m pip install xlrd==2.0.2
+          cd site
+          python -m unittest test_rosstat_workbooks.py
+          python - <<'PY'
+          import json,tempfile
+          from pathlib import Path
+          import rosstat_workbooks as w
+          from rosstat_network_probe import fetch
+          p=fetch(w.REVIEWED_COST_URL,"workbook")
+          rows,meta=w.reviewed_cost(p.raw,w.REVIEWED_COST_URL)
+          d=dict(schema=1,catalogs=[],files=[dict(url=w.REVIEWED_COST_URL,group="cost",checked="2026-11-25",success="2026-11-25",status="partial",sha256=p.sha256,rows=rows,review=meta)])
+          print("REVIEWED",json.dumps(w.quality(d),ensure_ascii=False))
+          with tempfile.TemporaryDirectory() as directory:
+              html={}
+              w.publish(lambda name,body:html.update({name:body}),Path(directory),d)
+              assert "2022" in html["rosstat-workbooks.html"] and "Исключённые строки: 18" in html["rosstat-workbooks.html"]
+              assert json.loads((Path(directory)/"rosstat-workbooks.json").read_text())["files"][0]["review"]==meta
+          PY
