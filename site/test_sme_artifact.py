@@ -21,3 +21,17 @@ class ArtifactTest(unittest.TestCase):
             with self.assertRaises(ValueError):s.inspect(root)
             (root/"finance-join.json").unlink()
             with self.assertRaises(ValueError):s.inspect(root)
+
+    def test_expected_financial_index(self):
+        a=dict(mode="full",xml_total=1,xml_processed=1,edition="2026-11-10",archive_sha256="a"*64,counts={},reconciliation=dict(period="2026-11-10",sha256="b"*64,national_difference=0))
+        b=dict(schema=1,status="diagnostic",sme_edition=a["edition"],sme_archive_sha256=a["archive_sha256"],reference_sha256="b"*64,financial_fingerprint="c"*64,financial_year=2025,national_difference=0,quarantined=0,declared=[{}],reported=[{}])
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);index=root/"company-index.json"
+            (root/"classification.json").write_text(json.dumps(a))
+            (root/"finance-join.json").write_text(json.dumps(b))
+            ix=dict(status="ready",year=2025,fingerprint="c"*64)
+            index.write_text(json.dumps(ix))
+            self.assertEqual(s.inspect(root,index),("2026-11-10",0))
+            for changes in (dict(year=2024),dict(fingerprint="d"*64),dict(status="not_deployed")):
+                index.write_text(json.dumps({**ix,**changes}))
+                with self.subTest(changes=changes),self.assertRaises(ValueError):s.inspect(root,index)
