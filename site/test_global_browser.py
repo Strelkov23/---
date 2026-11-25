@@ -814,6 +814,22 @@ with sync_playwright() as p:
         assert page.locator("#project-coverage-cards article").count()==len(coverage["rows"])==3
         assert page.locator("#project-coverage-rows tr").count()==3
         assert page.locator("[data-project-breakdown]").count()==len(coverage["breakdown"])
+        page.wait_for_function("document.querySelector('#project-search-status').textContent.startsWith('Записи источников:')",timeout=45000)
+        count=sum(r["records"] or 0 for r in coverage["rows"])
+        assert page.locator("#project-search-table tbody tr").count()==min(count,40)
+        page.locator("#project-search-region").select_option("RU-BU")
+        page.locator("#project-search-numeric").select_option("both")
+        if page.locator("#project-search-export").is_enabled():
+            with page.expect_download() as project_csv:
+                page.locator("#project-search-export").click()
+            with open(project_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                project_rows=list(csv.reader(f,delimiter=";"))
+            assert len(project_rows)>1 and len({len(r) for r in project_rows})==1
+            assert all(r[0]=="RU-BU" for r in project_rows[1:])
+        page.locator("#project-search-query").fill("zzzz_no_project_987654")
+        assert page.locator("#project-search-table tbody tr").count()==0
+        assert page.locator("#project-search-export").is_disabled()
+        page.locator("#project-search-query").fill("")
         if coverage["breakdown"]:
             group=page.locator("details").filter(has=page.locator("[data-project-breakdown]")).first
             group.locator("summary").click()
