@@ -18,12 +18,25 @@ const Provenance=(()=>{
   if(!validEntry(v)||bytes.byteLength!==v.bytes||await digest(bytes)!==v.sha256)throw Error('Контрольная сумма или размер не совпадают: '+name+'. Обновите страницу.');
   return v.sha256;
  }
+ const pending=new Map();
  async function getBytes(m,name,base=''){
   if(!validPath(name)||!Object.prototype.hasOwnProperty.call(m.files,name))throw Error('Файл не входит в манифест: '+name);
   if(!validEntry(m.files[name]))throw Error('Некорректная запись манифеста');
-  const response=await fetch(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Файл недоступен: '+name);
-  const bytes=await response.arrayBuffer(),sha256=await verify(m,name,bytes);
-  return {bytes,sha256};
+  const entry={...m.files[name]},url=base+name,key=JSON.stringify([url,entry.sha256,entry.bytes]);
+  let request=pending.get(key);
+  if(!request){
+   request=(async()=>{
+    const response=await fetch(url,{cache:'no-cache'});if(!response.ok)throw Error('Файл недоступен: '+name);
+    const bytes=await response.arrayBuffer();
+    if(bytes.byteLength!==entry.bytes||await digest(bytes)!==entry.sha256)throw Error('Контрольная сумма или размер не совпадают: '+name);
+    return {bytes,sha256:entry.sha256};
+   })();
+   pending.set(key,request);
+   const clear=()=>{if(pending.get(key)===request)pending.delete(key)};
+   request.then(clear,clear);
+  }
+  const result=await request;
+  return {bytes:result.bytes.slice(0),sha256:result.sha256};
  }
  async function get(m,name,base=''){
   if(!/\.(?:json|geojson)$/.test(name))throw Error('Ожидается JSON-набор');
