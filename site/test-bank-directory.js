@@ -39,3 +39,8 @@ assert.equal(B.coverageSummary({}).forms[0].verified,null);
 assert.equal(B.coverageSummary({capital:covFeeds.capital}).allVerified,null);
 assert.equal(B.coverageSummary({...covFeeds,profit:{cohort:['9'],rows:[]}}).commonTarget,0);
 assert.equal(B.coverageSummary({capital:{target_cohort:['1'],rows:[{registration_number:'1',verification:'html'}],errors:[{registration_number:'1',error:'старое'}]}}).forms[0].failed,0);
+
+assert.deepEqual(summary.distribution,[0,1,0,1]);
+assert.equal(B.coverageSummary({}).distribution,null);
+assert.deepEqual(B.coverageSummary({...covFeeds,profit:{cohort:['9'],rows:[]}}).distribution,[0,0,0,0]);
+assert.deepEqual(B.coverageSummary({capital:{target_cohort:['1'],rows:[{registration_number:'1',verification:'documentary'}]},balance:{cohort:['1'],rows:[]},profit:{cohort:['1'],rows:[]}}).distribution,[1,0,0,0]);
