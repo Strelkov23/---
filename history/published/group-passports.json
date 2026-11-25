@@ -2303,6 +2303,381 @@
           ]
         }
       ]
+    },
+    {
+      "id": "mmk",
+      "name": "ММК",
+      "sector": "Чёрная металлургия",
+      "role": "Производство стали и металлопродукции, добыча угля; российские и зарубежные предприятия группы.",
+      "source": "https://reportcollection.inion.ru/reports/download/?reportId=4704",
+      "section": "Аудированная консолидированная финансовая отчётность за 2025 г., с. 1–2, 4–5 (PDF-страницы 9–10, 12–13); копия ИНИОН РАН",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Обязательства рассчитаны как сумма долгосрочных и краткосрочных обязательств; остальные значения непосредственно из отчёта. Суммы приобретения основных и нематериальных активов сохранены со знаком оттока. Операционная прибыль приведена до отдельно показанного обесценения активов.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "768466"
+            },
+            {
+              "year": 2025,
+              "value": "609865"
+            }
+          ],
+          "comparable": "annual_consolidated_revenue_rub"
+        },
+        {
+          "id": "cost_of_sales",
+          "label": "Себестоимость продаж (расход)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-592380"
+            },
+            {
+              "year": 2025,
+              "value": "-509560"
+            }
+          ]
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "176086"
+            },
+            {
+              "year": 2025,
+              "value": "100305"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "99699"
+            },
+            {
+              "year": 2025,
+              "value": "21444"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль / убыток до налогообложения",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "109758"
+            },
+            {
+              "year": 2025,
+              "value": "-10739"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль / убыток всей группы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "79740"
+            },
+            {
+              "year": 2025,
+              "value": "-14855"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль / убыток акционеров материнской компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "79856"
+            },
+            {
+              "year": 2025,
+              "value": "-14061"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "913176"
+            },
+            {
+              "year": 2025,
+              "value": "877943"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "689812"
+            },
+            {
+              "year": 2025,
+              "value": "664719"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства (сумма долгосрочных и краткосрочных)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "223364"
+            },
+            {
+              "year": 2025,
+              "value": "213224"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "540812"
+            },
+            {
+              "year": 2025,
+              "value": "529833"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Оборотные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "352600"
+            },
+            {
+              "year": 2025,
+              "value": "324231"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_assets",
+          "label": "Внеоборотные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "560576"
+            },
+            {
+              "year": 2025,
+              "value": "553712"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Краткосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "158694"
+            },
+            {
+              "year": 2025,
+              "value": "149083"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_liabilities",
+          "label": "Долгосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "64670"
+            },
+            {
+              "year": 2025,
+              "value": "64141"
+            }
+          ]
+        },
+        {
+          "id": "inventories",
+          "label": "Запасы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "136108"
+            },
+            {
+              "year": 2025,
+              "value": "120406"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и их эквиваленты",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "114435"
+            },
+            {
+              "year": 2025,
+              "value": "38107"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый операционный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "113463"
+            },
+            {
+              "year": 2025,
+              "value": "80472"
+            }
+          ]
+        },
+        {
+          "id": "investment_cash_flow",
+          "label": "Чистый инвестиционный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-80814"
+            },
+            {
+              "year": 2025,
+              "value": "-151325"
+            }
+          ]
+        },
+        {
+          "id": "financing_cash_flow",
+          "label": "Чистый финансовый денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-84856"
+            },
+            {
+              "year": 2025,
+              "value": "-611"
+            }
+          ]
+        },
+        {
+          "id": "ppe_purchases",
+          "label": "Приобретение основных средств (отток)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-99061"
+            },
+            {
+              "year": 2025,
+              "value": "-87899"
+            }
+          ]
+        },
+        {
+          "id": "intangible_purchases",
+          "label": "Приобретение нематериальных активов (отток)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-2183"
+            },
+            {
+              "year": 2025,
+              "value": "-2022"
+            }
+          ]
+        },
+        {
+          "id": "cash_opening",
+          "label": "Денежные средства и эквиваленты на начало года",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "161809"
+            },
+            {
+              "year": 2025,
+              "value": "114435"
+            }
+          ]
+        },
+        {
+          "id": "cash_fx",
+          "label": "Влияние пересчёта и курсовых разниц на денежные средства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "4833"
+            },
+            {
+              "year": 2025,
+              "value": "-4864"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
