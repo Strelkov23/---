@@ -27,3 +27,15 @@ assert.equal(B.coverage('1',{})[0].status,'Набор недоступен');
 assert.equal(B.coverage('1',{capital:{rows:[]}})[0].status,'Нет записи');
 assert.equal(B.coverage('1',{capital:{rows:[{registration_number:'1',verification:'html'}]}})[0].status,'Запись получена');
 assert.equal(B.coverage('1',{capital:{rows:[],errors:[{registration_number:'1',error:'Недоступно'}]}})[0].error,'Недоступно');
+
+const covFeeds={capital:{period:'2026-01-01',target_cohort:['1','2','3','4'],rows:[{registration_number:'1',verification:'html'},{registration_number:'2',verification:'documentary'},{registration_number:'5',verification:'html'}],attempts:{'3':{error:'нет'}}},balance:{period:'2026-01-01',cohort:['1','2','3'],rows:[{registration_number:'1'},{registration_number:'2'}]},profit:{period:'2026-Q1',cohort:['1','2','4'],rows:[{registration_number:'1'},{registration_number:'4'}]}};
+const summary=B.coverageSummary(covFeeds);
+assert.deepEqual(summary.forms[0],{form:'808',label:'Регуляторный капитал',period:'2026-01-01',target:4,verified:1,documentary:1,failed:1,pending:1,outside:1});
+assert.equal(summary.commonTarget,2);
+assert.equal(summary.allVerified,1);
+assert.equal(summary.forms[1].pending,1);
+assert.equal(B.coverageSummary({}).commonTarget,null);
+assert.equal(B.coverageSummary({}).forms[0].verified,null);
+assert.equal(B.coverageSummary({capital:covFeeds.capital}).allVerified,null);
+assert.equal(B.coverageSummary({...covFeeds,profit:{cohort:['9'],rows:[]}}).commonTarget,0);
+assert.equal(B.coverageSummary({capital:{target_cohort:['1'],rows:[{registration_number:'1',verification:'html'}],errors:[{registration_number:'1',error:'старое'}]}}).forms[0].failed,0);
