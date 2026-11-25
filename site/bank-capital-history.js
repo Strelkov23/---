@@ -22,7 +22,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     if(x.record){const a=node('a','Форма 808');a.href=x.record.source;tr.insertCell().append(a);prev=v;}else tr.insertCell().textContent=x.error?'Не подтверждено: '+x.error:'Нет данных';
     if(v!==null&&BigInt(v)>=0n&&max>0n){const row=node('div','');row.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';const bar=node('div','');bar.className='group-signed-fill';bar.style.left='0';bar.style.width=Number(BigInt(v)*10000n/max)/100+'%';track.append(bar);row.append(node('span',x.period),track,node('strong',fmt(v)));chart.append(row)}
    }
-   out.replaceChildren(t);exp.disabled=!available.length;exp.onclick=()=>csv('bank-capital-history-'+pick.value+'.csv',[['Дата','Рег. номер','Капитал, тыс. руб.','Строка','Источник','SHA-256 HTML','Перечень системно значимых на дату','Отпечаток манифеста'],...rows.map(x=>[x.period,pick.value,x.record?.capital,x.record?.line,x.record?.source,x.record?.sha256,d.cohort_edition,m.data_fingerprint])]);
+   out.replaceChildren(t);exp.disabled=!available.length;exp.onclick=()=>csv('bank-capital-history-'+pick.value+'.csv',[['Дата','Рег. номер','Капитал, тыс. руб.','Строка','Источник','SHA-256 HTML','Статус наблюдения','Причина отсутствия','Перечень системно значимых на дату','Отпечаток манифеста'],...rows.map(x=>[x.period,pick.value,x.record?.capital,x.record?.line,x.record?.source,x.record?.sha256,x.record?'Подтверждено':x.error?'Не подтверждено':'Нет данных',x.record?'':x.error||'',d.cohort_edition,m.data_fingerprint])]);
   }
   pick.disabled=!d.cohort.length;pick.onchange=draw;draw();
  }catch(e){status.textContent='История недоступна: '+String(e.message||e)}
