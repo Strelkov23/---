@@ -136,6 +136,10 @@ def collect(out,stamp):
     add("park-certificates","Предприятия","Документы добровольной сертификации АИП",cert["source"],cert,cert.get("success","")[:10] if cert.get("success") else None,days=7,available=bool(cert["rows"]),policy="Проверка каждые 7 суток; после ошибки через 2 суток; календарный срок не подтверждает отсутствие отзыва",href="industrial-parks.html#park-certificates",failure_days=2)
     p=read("industrial-parks.json")
     add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,(p.get("success") or "")[:10] or None,days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html",failure_days=2)
+    enterprise=read("enterprise-sources.json")
+    for r in enterprise["rows"]:
+        title={"organizations":"Организации","entrepreneurs":"ИП"}[r["kind"]]
+        add("enterprise-register-"+r["kind"],"Предприятия","Росстат · "+title+" · проверка файла (без импорта)",r.get("url") or enterprise["source"],r,None,days=7,available=bool(r["sheets"]),policy="Проверка структуры оригинала; 7 суток после успеха, 2 после ошибки. Наблюдения не импортированы.",href="facility-map.html#enterprise-source-section",failure_days=2)
     r=read("sme-regions.json")
     add("sme","Предприятия","Агрегаты реестра МСП ФНС",r.get("documentation"),dict(r,success=r.get("downloaded")),r.get("period"),policy="Ожидаемый месячный срез на 10-е; проверка при сборке",href="facility-map.html#sme-map-section")
     return dict(schema=1,built=stamp,rows=result,policy="Даты следующей проверки — расчётные сроки внутреннего процесса, не календарь публикаций ведомств. При задержке сборки могут сдвигаться.")

@@ -51,8 +51,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const article=node('article','');article.append(node('h3',names[r.kind]),node('p',state[r.status]+' · попытка: '+(r.checked||'—')+' · успех: '+(r.success||'—')));
    if(r.sheets.length){const a=node('a','Оригинал XLSX');a.href=r.url;article.append(a,node('p','Листов: '+r.sheets.length+' · SHA-256: '+r.sha256.slice(0,16)+'…'))}
    if(r.error)article.append(node('p','Ошибка последней проверки: '+r.error));
+   const code={organizations:'58109',entrepreneurs:'58115'}[r.kind],a=node('a','Карточка показателя ЕМИСС (импорт не подтверждён)');a.href='https://fedstat.ru/indicator/'+code;article.append(a);
    host.append(article)
   }
+  if(d.catalog_attempts?.length){const details=node('details','');details.append(node('summary','Попытки доступа к каталогу Росстата'));for(const a of d.catalog_attempts)details.append(node('p',a.url+' · '+(a.status==='ok'?'Каталог получен; количество ссылок: '+Object.values(a.counts).join(' / '):a.error)));host.append(details)}
   if(pinned){const a=document.querySelector('a[href="enterprise-sources.json"]');if(a)a.href=root+'enterprise-sources.json'}
  }catch(e){host.textContent='Протокол источников недоступен для этой версии.'}
 });

@@ -40,6 +40,8 @@ class QualityTests(unittest.TestCase):
         for name,value in self.data.items():self.put(name,value)
         fd.publish(self.out,self.prev,"2026-11-24",False)
         sr.publish(self.out,self.prev,"2026-11-24",False)
+        import enterprise_sources
+        enterprise_sources.publish(self.out,self.prev,"2026-11-24",False)
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})

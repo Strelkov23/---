@@ -30,5 +30,29 @@ jobs:
               p=Path(tmp)
               d=e.publish(p,p,date.today().isoformat(),True)
               print(json.dumps(d,ensure_ascii=False,indent=2))
-              assert all(r["status"]=="ok" for r in d["rows"]), "Original source verification incomplete"
+              ok=all(r["status"]=="ok" for r in d["rows"])
+          import historical as h
+          from collections import Counter
+          try:
+              url=h.mirror_url("enterprises")
+              raw,_=h.get(url,35_000_000)
+              rows=h.mirror_rows(raw,"enterprises",selected=False)
+              titles=Counter((r["title"],r["unit"]) for r in rows)
+              print("ENTERPRISE_ARCHIVE",url,"rows",len(rows),flush=True)
+              for (title,unit),count in titles.most_common(80):
+                  print("TITLE",title,unit,count,flush=True)
+          except Exception as exc:print("ARCHIVE_UNAVAILABLE",str(exc),flush=True)
+          import emiss_archive as ea
+          for kind,code in e.EMISS.items():
+              try:
+                  raw,_=h.get(ea.primary(code),4_000_000)
+                  print("EMISS_CARD",code,len(raw),flush=True)
+              except Exception as exc:print("EMISS_CARD_UNAVAILABLE",code,str(exc),flush=True)
+              for url in (ea.resource(code),"https://datalakeiepru-s3-storage-public.storage.yandexcloud.net/fedstatru/data/parquet/"+code+".parquet"):
+                  try:
+                      raw,_=h.get(url,24_000_000)
+                      if raw[:2]!=bytes([31,139]) and raw[:4]!=b"PAR1":raise ValueError("Unexpected file signature")
+                      print("EMISS_RESOURCE",code,url,len(raw),flush=True)
+                  except Exception as exc:print("EMISS_RESOURCE_UNAVAILABLE",code,url,str(exc),flush=True)
+          assert ok, "Original source verification incomplete"
           PY

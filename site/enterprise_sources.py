@@ -4,11 +4,14 @@ from datetime import date,timedelta
 from urllib.parse import urlsplit
 import historical as h
 SOURCE="https://www.rosstat.gov.ru/folder/522"
+CATALOGS=(SOURCE,"https://rosstat.gov.ru/folder/522","https://www.rosstat.gov.ru/folder/522?print=1")
+EMISS={"organizations":"58109","entrepreneurs":"58115"}
+PARSER_REVISION=2
 KINDS={"organizations":"количество организаций по данным государственной регистрации с 2017","entrepreneurs":"количество индивидуальных предпринимателей по данным государственной регистрации с 2017"}
 NOTE="Диагностика оригиналов Росстата. Регистрация не доказывает производственную деятельность. Статистические наблюдения из этих книг пока не импортируются."
-def candidates(raw):
+def candidates(raw,base=SOURCE):
     result={k:[] for k in KINDS}
-    for f in h.discover(raw,SOURCE):
+    for f in h.discover(raw,base):
         u=urlsplit(f["url"])
         if f["format"]!="xlsx" or u.hostname not in ("rosstat.gov.ru","www.rosstat.gov.ru"):continue
         for k,title in KINDS.items():
@@ -29,10 +32,28 @@ def inspect(raw):
         if not result:raise ValueError("Нет листов")
         return result
     finally:b.close()
+def discover_catalogs(fetch):
+    found={k:[] for k in KINDS};attempts=[]
+    for url in CATALOGS:
+        try:
+            raw,enc=fetch(url,8_000_000)
+            discovered=candidates(raw.decode(enc),url)
+            attempts.append(dict(url=url,status="ok",counts={k:len(v) for k,v in discovered.items()}))
+            for k,values in discovered.items():
+                for v in values:
+                    u=urlsplit(v)
+                    if not any((urlsplit(old).path,urlsplit(old).query)==(u.path,u.query) for old in found[k]):found[k].append(v)
+            if all(len(v)==1 for v in found.values()):break
+        except Exception as e:attempts.append(dict(url=url,status="unavailable",error=str(e)[:160]))
+    return found,attempts
+
 def empty(stamp):
-    return dict(schema=1,built=stamp,source=SOURCE,note=NOTE,rows=[dict(kind=k,status="not_loaded",checked=None,success=None,url=None,sha256=None,sheets=[]) for k in KINDS])
+    return dict(schema=1,parser_revision=PARSER_REVISION,built=stamp,source=SOURCE,note=NOTE,catalog_attempts=[],rows=[dict(kind=k,status="not_loaded",checked=None,success=None,url=None,sha256=None,sheets=[]) for k in KINDS])
 def quality(d):
     if d["schema"]!=1 or d["source"]!=SOURCE or d["note"]!=NOTE or [r["kind"] for r in d["rows"]]!=list(KINDS):raise ValueError("Паспорт источников")
+    for attempt in d.get("catalog_attempts",[]):
+        if attempt["url"] not in CATALOGS or attempt["status"] not in ("ok","unavailable"):raise ValueError("Протокол каталога")
+        if attempt["status"]=="ok" and (set(attempt["counts"])!=set(KINDS) or any(type(v) is not int or v<0 for v in attempt["counts"].values())):raise ValueError("Количество ссылок")
     for r in d["rows"]:
         if r["status"] not in ("not_loaded","unavailable","ok","cached"):raise ValueError("Статус")
         if r["sheets"]:
@@ -43,22 +64,20 @@ def quality(d):
         elif r["status"] in ("ok","cached") or any(r[x] is not None for x in ("success","url","sha256")):raise ValueError("Пустой успех")
     return {"enterprise_source_workbooks_checked":sum(bool(r["sheets"]) for r in d["rows"])}
 def publish(out,previous,stamp,refresh,fetch=h.get):
-    d=empty(stamp)
+    d=empty(stamp);changed=False
     try:
         old=json.loads((previous/"enterprise-sources.json").read_text(encoding="utf-8"));quality(old)
-        d={**old,"built":stamp}
+        d={**old,"built":stamp,"parser_revision":PARSER_REVISION,"catalog_attempts":old.get("catalog_attempts",[])}
+        changed=old.get("parser_revision")!=PARSER_REVISION
         for r in d["rows"]:
             if r["sheets"]:r["status"]="cached"
     except (OSError,ValueError,KeyError,TypeError):pass
-    due=[r for r in d["rows"] if not r["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(r["checked"][:10])+timedelta(days=7 if r["checked"]==r["success"] else 2)]
+    due=[r for r in d["rows"] if changed or not r["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(r["checked"][:10])+timedelta(days=7 if r["checked"]==r["success"] else 2)]
     if refresh and due:
-        found={};failure=None
-        try:
-            raw,enc=fetch(SOURCE,8_000_000);found=candidates(raw.decode(enc))
-        except Exception as e:failure=str(e)[:180]
+        found,attempts=discover_catalogs(fetch);d["catalog_attempts"]=attempts
         for r in due:
             try:
-                if failure:raise ValueError(failure)
+                if not any(a["status"]=="ok" for a in attempts):raise ValueError("; ".join(a.get("error","") for a in attempts)[:180])
                 urls=found.get(r["kind"],[])
                 if len(urls)!=1:raise ValueError("Ожидалась одна точная ссылка, найдено "+str(len(urls)))
                 raw,_=fetch(urls[0],10_000_000);sheets=inspect(raw)
