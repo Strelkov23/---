@@ -28,7 +28,28 @@ def allowed(url):
     u=urlsplit(url)
     return h.allowed(url) and (u.hostname=="rosstat.gov.ru" or u.hostname.endswith(".rosstat.gov.ru")) and u.path.lower().endswith((".xlsx",".xls"))
 def candidates(group,files):
-    return [f for f in files if allowed(f["url"]) and re.search(HINTS[group],h.norm(f["title"]+" "+unquote(f["url"]))) and not re.search(r"по субъектам|в разрезе субъектов|по федеральным округам|региональн",h.norm(f["title"]))]
+    # Exclude catalogue instructions, nomenclatures and unrelated tables before
+    # consuming the limited download queue. The workbook parser remains authoritative.
+    result=[];seen=set()
+    for f in files:
+        url=f["url"];title=h.norm(f["title"]);name=h.norm(unquote(urlsplit(url).path.rsplit("/",1)[-1]))
+        if not allowed(url) or url in seen:continue
+        if not re.search(HINTS[group],title+" "+name):continue
+        if re.search(r"по субъектам|в разрезе субъектов|по федеральным округам|региональн",title):continue
+        if re.search(r"номенклатур|для разработки статистической информации|указания по заполнению|форм[аы] федерального статистического наблюдения|методологические пояснения",title):continue
+        if group=="capacity" and re.search(r"^nom[_-]?bm|^nom[_-]",name):continue
+        if group=="capital" and re.search(r"по формам собственности|по видам основных фондов|арендная плата|фактическая стоимость сделок|ликвидация основных фондов",title):continue
+        if group=="debt" and re.search(r"поступление налогов|задолженность по налогам и сборам|налоговым санкциям",title):continue
+        seen.add(url);result.append(f)
+    return result
+def catalogue_is_newer(source,old):
+    """A cached or failed historical scan must not overwrite a newer accepted list."""
+    if not source or not source.get("files") or not source.get("success"):return False
+    if not old:return True
+    return not old[1] or source["success"]>old[1]
+def catalogue_due(old,stamp,version_current):
+    if not old or not old[0] or not version_current:return True
+    return (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=7
 COST_FIELDS={
  "cost_materials":r"^материальные затраты$",
  "cost_labor":r"^затраты на оплату труда$|^оплата труда$",
@@ -195,11 +216,11 @@ def sync(db,stamp,refresh,out):
     for group,url in CATALOGS.items():
         source=next((s for s in historical["sources"] if s["url"]==url),None)
         old=db.execute("select checked,success,status,files from rosstat_workbook_catalog where grp=?",(group,)).fetchone()
-        if source and source.get("files"):
+        if catalogue_is_newer(source,old) and candidates(group,source["files"]):
             files=candidates(group,source["files"])
             db.execute("insert or replace into rosstat_workbook_catalog values(?,?,?,?,?)",(group,source.get("checked"),source.get("success"),source["status"],json.dumps(files,ensure_ascii=False)))
-        elif refresh and (not old or not old[0] or not db.execute("select 1 from rosstat_catalog_versions where grp=? and version=2",(group,)).fetchone() or (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=7):
-            db.execute("insert or replace into rosstat_catalog_versions values(?,?)",(group,2))
+        elif refresh and catalogue_due(old,stamp,db.execute("select 1 from rosstat_catalog_versions where grp=? and version=3",(group,)).fetchone()):
+            db.execute("insert or replace into rosstat_catalog_versions values(?,?)",(group,3))
             try:
                 raw,enc=h.get(url,5_000_000);files=candidates(group,h.discover(raw.decode(enc,errors="replace"),url))
                 if not files:raise ValueError("Не обнаружено подходящих XLS/XLSX")
@@ -210,7 +231,7 @@ def sync(db,stamp,refresh,out):
     if refresh:
         options=[]
         for cat in catalogs:
-            for file in cat["files"]:
+            for file in candidates(cat["group"],cat["files"]):
                 u=file["url"];old=db.execute("select checked,success,sha,rows from rosstat_workbooks where url=?",(u,)).fetchone()
                 if not old or (date.fromisoformat(stamp[:10])-date.fromisoformat(old[0][:10])).days>=(30 if old[0]==old[1] else 7):
                     options.append((old is not None,old[0] if old else "",u,cat["group"],old))
