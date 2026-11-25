@@ -344,7 +344,7 @@ def sync(db, stamp, refresh):
         if not full:filters.append("from-pub-date:1991-01-01")
         try:
             # One confirmed interval per journal per run; progress survives 429.
-            for lo,hi in windows(start,finish,366*5 if full else 7):
+            for lo,hi in windows(start,finish,resume.window_days(db,issn,full)):
               for items in period_items(issn,filters,key,lo,hi,budget):
                 entries=[]
                 details=[]
@@ -369,6 +369,7 @@ def sync(db, stamp, refresh):
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
               with db:
                 done=resume.advance(db,issn,hi,finish,watermark)
+                resume.clear_window(db,issn)
                 if done:
                     db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
                     if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
@@ -377,7 +378,9 @@ def sync(db, stamp, refresh):
               break
         except resume.BudgetExhausted:
             # Do not mark a partially paginated interval as complete.
-            with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
+            with db:
+                resume.shrink_window(db,issn,full)
+                db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
             break
         except CrossrefRateLimited as err:
             observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')

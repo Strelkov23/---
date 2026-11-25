@@ -15,7 +15,15 @@ class Budget:
 def setup(db):
     db.execute("create table if not exists literature_progress(issn text primary key,full integer not null,start text not null,finish text not null,watermark text not null)")
     db.execute("create table if not exists literature_watermark(issn text primary key,stamp text not null)")
+    db.execute("create table if not exists literature_window(issn text primary key,days integer not null check(days>=1))")
     db.commit()
+def window_days(db,issn,full):
+    row=db.execute("select days from literature_window where issn=?",(issn,)).fetchone()
+    return min(row[0],366*5 if full else 7) if row else (366*5 if full else 7)
+def shrink_window(db,issn,full):
+    db.execute("insert or replace into literature_window values(?,?)",(issn,max(1,window_days(db,issn,full)//2)))
+def clear_window(db,issn):
+    db.execute("delete from literature_window where issn=?",(issn,))
 def plan(db,issn,full,last,stamp):
     r=db.execute("select full,start,finish,watermark from literature_progress where issn=?",(issn,)).fetchone()
     if r:

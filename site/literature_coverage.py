@@ -7,7 +7,7 @@ from pathlib import Path
 from literature import TOPICS
 FIELDS=("journal","issn","year","records","complete_bibliography","with_access_metadata")
 TOPIC_FIELDS=("topic","year","records","denominator")
-NOTE="Числа относятся к локальному каталогу DOI, а не к общему выпуску журналов. Нулевой охват года не означает отсутствие публикаций. Темы определены по заголовкам, одна статья может иметь несколько тем; суммы тематических категорий не равны числу уникальных статей. Будущие годы выделяются отдельно по дате публикации в метаданных."
+NOTE="Числа относятся к локальному каталогу DOI, а не к общему выпуску журналов. Нулевой охват года не означает отсутствие публикаций. Темы определены по заголовкам, одна статья может иметь несколько тем; суммы тематических категорий не равны числу уникальных статей. Годы, следующие за годом сборки, отмечаются как будущие; неизвестный год не приравнивается к нулю."
 def complete(p):
     return bool(p.get("authors") and p.get("volume") and p.get("issue") and (p.get("pages") or p.get("article_number")))
 def collect(lit,stamp):
@@ -44,7 +44,7 @@ def verify_csv(path,fields,rows):
 def render(d):
     e=lambda v:escape(str(v),quote=True)
     body='<section id="literature-period-coverage"><h2>Охват каталога по годам и темам</h2><p>'+e(NOTE)+'</p><p><a href="literature-years.csv">CSV журналов и годов</a> · <a href="literature-topics.csv">CSV тем и годов</a></p><div class="table-scroll" tabindex="0" role="region" aria-label="Охват по годам"><table><thead><tr><th scope="col">Год</th><th scope="col">Записей</th></tr></thead><tbody>'
-    for y,n in d["years"].items():body+='<tr><td>'+e(y if y!="unknown" else "Год не определён")+'</td><td>'+e(n)+'</td></tr>'
+    for y,n in d["years"].items():body+='<tr><td>'+e(("Год не определён" if y=="unknown" else y+" · будущий" if int(y)>int(d["as_of"][:4]) else y))+'</td><td>'+e(n)+'</td></tr>'
     body+='</tbody></table></div>'
     for name in sorted({r["journal"] for r in d["rows"]}):
         rs=[r for r in d["rows"] if r["journal"]==name]

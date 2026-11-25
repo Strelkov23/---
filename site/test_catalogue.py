@@ -41,8 +41,9 @@ class CatalogueTests(unittest.TestCase):
         with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=request):
             literature.sync(self.db,"2026-11-24T00:00:00+00:00",True)
         status=self.db.execute("select status from journal_checks where issn=?",("0042-8736",)).fetchone()[0]
-        self.assertEqual(status,"Проверено",f"Crossref sync failed: {status}")
-        self.assertGreater(len(requests),1)
+        self.assertTrue(status.startswith("Частично проверено:"),f"Crossref sync failed: {status}")
+        self.assertEqual(len(requests),1)
+        self.assertIsNone(self.db.execute("select success from journal_checks where issn=?",("0042-8736",)).fetchone()[0])
         self.assertEqual(self.db.execute("select title from literature where doi='10.1234/new'").fetchone()[0],"Test")
     def test_rate_limit_persists_and_preserves_archive(self):
         stamp="2026-11-24T00:00:00+00:00"
@@ -71,7 +72,7 @@ class CatalogueTests(unittest.TestCase):
     def test_retry_after_is_relative_to_response_time(self):
         stamp="2026-11-24T00:00:00+00:00"
         err=HTTPError("https://api.crossref.org/works",429,"Too many requests",{"Retry-After":"120"},None)
-        with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=err),patch("literature.time.monotonic",side_effect=[100,700]):
+        with patch.dict(literature.JOURNALS,{"0042-8736":"Вопросы экономики"},clear=True),patch("literature.urlopen",side_effect=err),patch("literature_resume.Budget.available",return_value=True),patch("literature.time.monotonic",side_effect=[100,100,700]):
             literature.sync(self.db,stamp,True)
         state=literature.service_status(self.db,"2026-11-24T00:11:00+00:00")
         self.assertEqual(state["limited_at"],"2026-11-24T00:10:00+00:00")
@@ -86,7 +87,7 @@ class CatalogueTests(unittest.TestCase):
             with patch("literature.fetch_batch",return_value={"total-results":0,"items":[]}):
                 literature.sync(self.db,"2026-11-24T00:02:00+00:00",True)
         self.assertFalse(literature.service_status(self.db,"2026-11-24T00:02:00+00:00")["cooldown"])
-        self.assertEqual(self.db.execute("select status from journal_checks where issn='0042-8736'").fetchone()[0],"Проверено")
+        self.assertTrue(self.db.execute("select status from journal_checks where issn='0042-8736'").fetchone()[0].startswith("Частично проверено:"))
     def test_retry_after_formats(self):
         stamp="2026-11-24T00:00:00+00:00"
         self.assertEqual(literature.retry_deadline(stamp,"Tue, 24 Nov 2026 00:10:00 GMT"),"2026-11-24T00:10:00+00:00")

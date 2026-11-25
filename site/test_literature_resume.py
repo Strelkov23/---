@@ -31,3 +31,12 @@ class Resume(unittest.TestCase):
             l.sync(db,"2026-11-27T00:00:00+00:00",True)
             self.assertEqual(db.execute("select start from literature_progress").fetchone()[0],first)
             self.assertIsNone(db.execute("select success from journal_checks").fetchone()[0])
+
+    def test_dense_interval_shrinks_without_advancing(self):
+        db=sqlite3.connect(":memory:");self.addCleanup(db.close);r.setup(db)
+        full,lo,hi,w=r.plan(db,"x",True,None,"2026-11-26T00:00:00+00:00")
+        with db:r.shrink_window(db,"x",True)
+        self.assertEqual(r.window_days(db,"x",True),915)
+        self.assertEqual(r.plan(db,"x",True,None,"2026-11-27T00:00:00+00:00")[1],lo)
+        with db:r.clear_window(db,"x")
+        self.assertEqual(r.window_days(db,"x",True),1830)
