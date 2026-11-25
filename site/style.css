@@ -281,3 +281,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 .sme-finance-legend span{display:inline-flex;align-items:center;gap:.35rem}
 .sme-finance-legend i{display:inline-block;width:.85rem;height:.85rem;border-radius:.15rem;flex:none}
 #sme-finance-table table{min-width:660px}
+
+.company-passport-metrics .metric,.company-passport-metrics .metric b{min-width:0;overflow-wrap:anywhere;white-space:normal}#company-compare-chart strong{white-space:normal;overflow-wrap:anywhere}.company-chart-missing{height:1.25rem;border:1px dashed #9aaab3;border-radius:.2rem;background:repeating-linear-gradient(135deg,transparent,transparent 5px,#9aaab333 5px,#9aaab333 10px)}
