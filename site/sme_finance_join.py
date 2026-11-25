@@ -22,7 +22,7 @@ def profiles(db,heaps,eligible):
         ogrn,region,declared,dver,reported,rver,member,sha256,ordinal=v
         if region not in eligible:rows.append(dict(inn=inn,status="region_excluded"));continue
         if not member or not sha256 or type(ordinal) is not int or ordinal<1:raise ValueError("Нет ссылки на запись МСП")
-        rows.append(dict(inn=inn,status="matched",ogrn=ogrn,region=region,declared=declared,dver=dver,reported=reported,rver=rver,member=member,sha256=sha256,document=ordinal))
+        rows.append(dict(inn=inn,status="matched",ogrn=ogrn,region=region,declared=declared,dver=dver,reported=reported,rver=rver,member=member,sha256=sha256,accepted_ordinal=ordinal))
     return dict(limit_per_metric=PROFILE_LIMIT,rows=rows)
 def join(db,root,report):
     index=json.loads((root/idx.FILE).read_text(encoding="utf-8"))
