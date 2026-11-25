@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from urllib.request import Request,urlopen
 from collections import defaultdict
 import money_history
+import source_pipeline
 INFL="https://www.cbr.ru/hd_base/infl/"
 RES="https://www.cbr.ru/hd_base/mrrf/mrrf_m/"
 MONEY="https://www.cbr.ru/statistics/macro_itm/dkfs/monetary_agg/"
@@ -90,8 +91,8 @@ def parse_money(raw):
         if result:break
     return result
 def get(url):
-    from source_transport import download
-    raw=download(url,hosts={"www.cbr.ru","cbr.ru"},max_bytes=8_000_000,path_check=lambda p:p in ("/hd_base/infl/","/hd_base/mrrf/mrrf_m/","/statistics/macro_itm/dkfs/monetary_agg/"))
+    from source_registry import fetch
+    raw=fetch(url)
     return raw.raw.decode(raw.charset,errors="strict")
 def publish(db,stamp,out,refresh):
     db.execute("create table if not exists national_obs(code text,period text,value real,seen text,source text,primary key(code,period,seen))")
@@ -113,7 +114,7 @@ def publish(db,stamp,out,refresh):
         for url,parser,codes in queries:
             try:
                 html_error=None
-                try:vals=parser(get(url))
+                try:vals=source_pipeline.parsed(url,"HTML",lambda:parser(get(url)))
                 except Exception as e:vals={};html_error=e
                 # Use workbook precision for overlapping dates, with the exact source URI.
                 origin={k:url for k in vals}

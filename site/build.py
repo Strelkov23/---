@@ -48,8 +48,11 @@ import provenance
 out = Path("public")
 out.mkdir(exist_ok=True)
 m.init()
-import source_transport,source_journal
-source_transport.configure_journal(source_journal.Journal(m.DB))
+import source_transport,source_journal,source_pipeline
+transport_buffer=source_journal.BufferedJournal(m.DB)
+source_transport.configure_journal(transport_buffer)
+import_buffer=source_pipeline.Buffer(m.DB)
+source_pipeline.configure(import_buffer)
 if "--refresh" in sys.argv:
     m.collect_all()
 
@@ -255,7 +258,10 @@ import consistency
 consistency.publish(page,out,m.now())
 import observation_contract
 observation_contract.publish(page,out,m.now())
+transport_buffer.flush()
+import_buffer.flush()
 source_journal.publish(page,out,m.DB,m.now())
+source_pipeline.publish(page,out,m.DB,m.now())
 provenance.publish(page,out,m.now())
 routes.publish(out)
 

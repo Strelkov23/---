@@ -52,21 +52,36 @@ class Journal:
         try:Path(name).replace(path)
         finally:Path(name).unlink(missing_ok=True)
     def __call__(self,url,payload,error):
-        if not url_allowed(url,HOSTS):return
-        stamp=utc()
-        # Do not store exception messages: external response bodies may contain
-        # unexpected data. Keep a short, controlled error classification only.
-        reason=type(error).__name__ if error is not None else None
-        if error is not None and type(getattr(error,"code",None)) is int:reason+=" "+str(error.code)
+        event=event_tuple(url,payload,error)
+        if event is not None:self.write([event])
+        if payload is not None:self.retain(payload)
+    def write(self,events):
         with closing(sqlite3.connect(self.db_path,timeout=10)) as db:
             with db:
-                if payload is not None:
-                    db.execute("insert into transport_versions values(?,?,?,?,?,?) on conflict(url,sha) do update set last_seen=excluded.last_seen,final_url=excluded.final_url",(url,payload.sha256,len(payload.raw),stamp,stamp,payload.final_url))
-                db.execute("insert into transport_events(url,stamp,status,sha,bytes,final_url,error) values(?,?,?,?,?,?,?)",(url,stamp,"downloaded" if payload else "failed",payload.sha256 if payload else None,len(payload.raw) if payload else None,payload.final_url if payload else None,reason))
+                for url,stamp,status,sha,size,final,reason in events:
+                    if status=="downloaded":
+                        db.execute("insert into transport_versions values(?,?,?,?,?,?) on conflict(url,sha) do update set last_seen=excluded.last_seen,final_url=excluded.final_url",(url,sha,size,stamp,stamp,final))
+                    db.execute("insert into transport_events(url,stamp,status,sha,bytes,final_url,error) values(?,?,?,?,?,?,?)",(url,stamp,status,sha,size,final,reason))
                 db.execute("delete from transport_events where id not in (select id from transport_events order by id desc limit ?)",(MAX_EVENTS,))
-                # Bound history while preserving at least the newest edition of each retained URL.
                 db.execute("delete from transport_versions where rowid not in (select rowid from transport_versions order by last_seen desc,rowid desc limit ?)",(MAX_VERSIONS,))
-        if payload is not None:self.retain(payload)
+
+def event_tuple(url,payload,error):
+    if not url_allowed(url,HOSTS):return None
+    reason=type(error).__name__ if error is not None else None
+    if error is not None and type(getattr(error,"code",None)) is int:reason+=" "+str(error.code)
+    return (url,utc(),"downloaded" if payload is not None else "failed",payload.sha256 if payload is not None else None,len(payload.raw) if payload is not None else None,payload.final_url if payload is not None else None,reason)
+
+class BufferedJournal:
+    """Metadata only; defer database writes until importer transactions end."""
+    def __init__(self,path):
+        from collections import deque
+        self.journal=Journal(path);self.events=deque(maxlen=MAX_EVENTS)
+    def __call__(self,url,payload,error):
+        event=event_tuple(url,payload,error)
+        if event is not None:self.events.append(event)
+    def flush(self):
+        self.journal.write(self.events)
+        self.events.clear()
 
 def collect(db_path,stamp):
     with closing(sqlite3.connect(db_path,timeout=10)) as db:

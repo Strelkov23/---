@@ -421,6 +421,11 @@ def check(out,previous,stamp):
         if (out/sj.FILE).is_file():
             counts.update(sj.quality(json.loads((out/sj.FILE).read_text(encoding="utf-8"))))
     except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Журнал источников: "+str(e))
+    try:
+        import source_pipeline as sp
+        if (out/sp.FILE).is_file():
+            counts.update(sp.quality(json.loads((out/sp.FILE).read_text(encoding="utf-8"))))
+    except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Реестр импорта: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)
