@@ -39,3 +39,14 @@ class Coverage(unittest.TestCase):
         self.assertEqual(empty["records"],0)
         self.assertEqual(len(empty["registry_journals"]),2)
         self.assertIn("Нет · 9876-5432",p.render(empty))
+
+    def test_registry_csv_zero_and_tamper(self):
+        lit=dict(registry={"Ж":{"issn":"1234-5678"}},articles=[])
+        d=p.collect(lit,"2026-11-26")
+        with tempfile.TemporaryDirectory() as t:
+            path=Path(t)/"registry.csv"
+            p.save_csv(path,p.REGISTRY_FIELDS,d["registry_journals"])
+            p.verify_csv(path,p.REGISTRY_FIELDS,d["registry_journals"])
+            path.write_text("journal,issn,records\nЖ,1234-5678,1\n",encoding="utf-8")
+            with self.assertRaises(ValueError):p.verify_csv(path,p.REGISTRY_FIELDS,d["registry_journals"])
+        self.assertIn("literature-journals.csv",p.render(d))

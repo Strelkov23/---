@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from literature import TOPICS
 FIELDS=("journal","issn","year","records","complete_bibliography","with_access_metadata")
+REGISTRY_FIELDS=("journal","issn","records")
 TOPIC_FIELDS=("topic","year","records","denominator")
 NOTE="Числа относятся к локальному каталогу DOI, а не к общему выпуску журналов. Нулевой охват года не означает отсутствие публикаций. Темы определены по заголовкам, одна статья может иметь несколько тем; суммы тематических категорий не равны числу уникальных статей. Годы, следующие за годом сборки, отмечаются как будущие; неизвестный год не приравнивается к нулю."
 def complete(p):
@@ -51,7 +52,7 @@ def search_link(year,journal=None,topic=None,metadata=None):
     return "papers.html?"+urlencode(params)
 def render(d):
     e=lambda v:escape(str(v),quote=True)
-    body='<section id="literature-period-coverage"><h2>Охват каталога по годам и темам</h2><p>'+e(NOTE)+'</p><p><a href="literature-years.csv">CSV журналов и годов</a> · <a href="literature-topics.csv">CSV тем и годов</a></p><div class="table-scroll" tabindex="0" role="region" aria-label="Охват по годам"><table><thead><tr><th scope="col">Год</th><th scope="col">Записей</th></tr></thead><tbody>'
+    body='<section id="literature-period-coverage"><h2>Охват каталога по годам и темам</h2><p>'+e(NOTE)+'</p><p><a href="literature-journals.csv">CSV всех журналов</a> · <a href="literature-years.csv">CSV журналов и годов</a> · <a href="literature-topics.csv">CSV тем и годов</a></p><div class="table-scroll" tabindex="0" role="region" aria-label="Охват по годам"><table><thead><tr><th scope="col">Год</th><th scope="col">Записей</th></tr></thead><tbody>'
     def link(label,url):return '<a href="'+e(url)+'">'+e(label)+'</a>' if url else e(label)
     for y,n in d["years"].items():body+='<tr><td>'+e(("Год не определён" if y=="unknown" else y+" · будущий" if int(y)>int(d["as_of"][:4]) else y))+'</td><td>'+link(n,search_link(y))+'</td></tr>'
     body+='</tbody></table></div>'

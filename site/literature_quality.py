@@ -97,7 +97,7 @@ def publish(page,out,stamp):
     d=collect(lit,stamp);quality(d,lit)
     (out/FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False,separators=(",",":")),encoding="utf-8")
     import literature_coverage as coverage
-    for name,fields,rows in (("literature-years.csv",coverage.FIELDS,d["coverage"]["rows"]),("literature-topics.csv",coverage.TOPIC_FIELDS,d["coverage"]["topics"])):
+    for name,fields,rows in (("literature-journals.csv",coverage.REGISTRY_FIELDS,d["coverage"]["registry_journals"]),("literature-years.csv",coverage.FIELDS,d["coverage"]["rows"]),("literature-topics.csv",coverage.TOPIC_FIELDS,d["coverage"]["topics"])):
         coverage.save_csv(out/name,fields,rows);coverage.verify_csv(out/name,fields,rows)
     page("literature-quality.html",render(d))
     return d
