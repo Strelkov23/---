@@ -99,3 +99,42 @@ class BankReportProbeTests(unittest.TestCase):
             self.assertEqual(a.quality(d)["bank_archive_forms"],0)
             self.assertIn("ещё не загружен",a.render(d))
             with self.assertRaises(ValueError):a.quality(dict(d,status="verified"))
+
+    def test_public_archive_full_artifact_and_tampering(self):
+        import bank_archive_summary as a
+        import tempfile,json
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as f:
+            root=Path(f)
+            def save(name,data):
+                (root/name).write_text(json.dumps(data),encoding="utf-8")
+            day="2026-10-01"; archives=[]
+            for form,keys in (("123",["123B","123D","123N"]),("135",["135B","135_3"])):
+                url="https://www.cbr.ru/vfs/credit/forms/"+form+"-20261001.rar"
+                sha="a"*64
+                directory=dict(source_row=1,REGN="1",DT="20261001")
+                row=dict(source_row=1,REGN="1",C1_3={"hex":"8d32"},C2_3="10.000",C3_3="8.000")
+                tables={}
+                for key in keys:
+                    entries=[] if key=="123N" else [directory if key.endswith("B") else row]
+                    tables[key]=dict(member=key+".dbf",sha256="b"*64,rows=entries,deleted=0,source_rows=len(entries))
+                cov=dict(directory_unique_regn=1,values_unique_regn=1,matched_unique_regn=1,unmatched_regn=[])
+                report=dict(form=form,date=day,url=url,sha256=sha,raw_coverage=cov,members=[dict(member=x["member"],sha256=x["sha256"]) for x in tables.values()])
+                save("form-"+form+"-raw.json",dict(form=form,date=day,url=url,archive_sha256=sha,coverage=cov,tables=tables))
+                if form=="135":
+                    counts=dict(observations=1,organizations=1,codes=1,excluded={},source_active_rows=1)
+                    report["mapped_counts"]=counts
+                    mapped=dict(archive_sha256=sha,date=day,counts=counts,table_sha256="b"*64,directory_sha256="b"*64,rows=[dict(registration_number="1",code="hex:8d32",date=day,source_row=1,directory_row=1,actual_percent="10.000",control_percent="8.000")])
+                    save("form-135-documented.json",mapped)
+                archives.append(report)
+            save("report.json",dict(checked="2026-11-25T05:00:00+00:00",archives=archives))
+            good=a.from_artifact(root)
+            self.assertEqual(a.quality(good)["bank_archive_135_observations"],1)
+            self.assertIn("Проверенный комплект",a.render(good))
+            a.publish(root,root,root)
+            mapped["rows"][0]["actual_percent"]="11.000"
+            save("form-135-documented.json",mapped)
+            with self.assertRaisesRegex(ValueError,"исходной строкой"):a.from_artifact(root)
+            cached=a.publish(root,root,root)
+            self.assertEqual(cached["status"],"cached")
+            self.assertEqual(cached["forms"],good["forms"])
