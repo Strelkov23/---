@@ -88,7 +88,24 @@ const GroupPassports=(()=>{
   });
   return {groups,total:groups.length,withObservations:groups.filter(g=>g.observed>0).length,ifrs:groups.filter(g=>g.standard==='IFRS').length,observations:groups.reduce((a,g)=>a+g.observed,0),coefficients:groups.reduce((a,g)=>a+g.coefficients,0),revenue:groups.filter(g=>g.revenue).length};
  }
- return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs,coverage,levelSpecs,levels};
+ function observationRows(d,options={}){
+  const norm=v=>String(v??'').toLocaleLowerCase('ru').replace(/ё/g,'е').trim(),terms=norm(options.query).split(/\s+/).filter(Boolean);
+  const result=[];
+  for(const g of d.groups){
+   if(options.sector&&g.sector!==options.sector||options.standard&&g.standard!==options.standard||options.group&&g.id!==options.group)continue;
+   for(const p of g.metrics){
+    if(options.unit&&p.unit!==options.unit)continue;
+    const hay=norm([g.name,g.id,g.sector,g.role,p.id,p.label,p.unit].join(' '));
+    if(!terms.every(t=>hay.includes(t)))continue;
+    for(const r of p.observations){
+     if(options.year&&r.year!==Number(options.year))continue;
+     result.push({group:g.id,name:g.name,sector:g.sector,scope:g.scope,standard:g.standard,id:p.id,label:p.label,unit:p.unit,year:r.year,value:r.value,source:p.source||g.source,section:p.section||g.section,sourceKind:g.source_kind||'documentary',note:g.note||''});
+    }
+   }
+  }
+  return result.sort((a,b)=>b.year-a.year||a.name.localeCompare(b.name,'ru')||a.id.localeCompare(b.id));
+ }
+ return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs,coverage,levelSpecs,levels,observationRows};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -142,6 +159,26 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    draw();
   }
   sector.onchange=query.oninput=filter;pick.onchange=draw;draw();
+  const oq=$('group-observation-query'),oy=$('group-observation-year'),os=$('group-observation-sector'),ou=$('group-observation-unit'),ost=$('group-observation-standard'),ot=$('group-observation-table'),oe=$('group-observation-export'),om=$('group-observation-more'),ostatus=$('group-observation-status'),og=$('group-observation-group');
+  if(oq&&oy&&os&&ou&&ost&&ot&&oe&&om&&ostatus&&og){
+   const rows=GroupPassports.observationRows(d),years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a),units=[...new Set(rows.map(r=>r.unit))].sort((a,b)=>a.localeCompare(b,'ru'));
+   oy.replaceChildren(new Option('Все годы',''),...years.map(y=>new Option(String(y),String(y))));
+   os.replaceChildren(new Option('Все отрасли',''),...sectors.map(v=>new Option(v,v)));
+   ou.replaceChildren(new Option('Все единицы',''),...units.map(v=>new Option(v,v)));
+   og.replaceChildren(new Option('Все группы',''),...d.groups.map(g=>new Option(g.name,g.id)));
+   let limit=40,selected=[];
+   function observationDraw(){
+    selected=GroupPassports.observationRows(d,{query:oq.value,year:oy.value,sector:os.value,unit:ou.value,standard:ost.value,group:og.value});
+    ostatus.textContent='Наблюдений: '+selected.length+' из '+rows.length+' · групп: '+new Set(selected.map(r=>r.group)).size+' · показано '+Math.min(limit,selected.length)+'. Исходные единицы, без суммирования.';
+    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+    for(const v of ['Группа','Отрасль','Показатель','Год','Исходное значение','Единица','Основа отчётности','Источник']){const th=node('th',v);th.scope='col';h.append(th)}
+    for(const r of selected.slice(0,limit)){const tr=body.insertRow(),link=node('a',r.name);link.href='?group='+encodeURIComponent(r.group)+(params.get('snapshot')?'&snapshot='+encodeURIComponent(params.get('snapshot')):'')+'#group-passports';tr.insertCell().append(link);for(const v of [r.sector,r.label,r.year,r.value,r.unit,r.standard==='IFRS'?'МСФО':'Раскрываемый комплект'])tr.insertCell().textContent=v;const a=node('a',r.section);a.href=r.source;tr.insertCell().append(a)}
+    ot.replaceChildren(t);om.hidden=selected.length<=limit;oe.disabled=!selected.length;
+    oe.onclick=()=>csv('group-observations.csv',[['Код группы','Группа','Отрасль','Периметр','Стандарт','Код показателя','Показатель','Единица','Год','Исходное значение','Источник','Раздел','Проверено','Тип источника','Примечание','SHA-256 JSON','Отпечаток манифеста'],...selected.map(r=>[r.group,r.name,r.sector,r.scope,r.standard,r.id,r.label,r.unit,r.year,r.value,r.source,r.section,d.checked,r.sourceKind,r.note,entry.sha256,m.data_fingerprint])]);
+   }
+   function resetObservations(){limit=40;observationDraw()}
+   oq.oninput=resetObservations;oy.onchange=os.onchange=ou.onchange=ost.onchange=og.onchange=resetObservations;om.onclick=()=>{limit+=40;observationDraw()};observationDraw();
+  }
   const year=$('group-compare-year'),comparison=$('group-compare-table'),cs=$('group-compare-status'),ce=$('group-compare-export');
   if(year&&comparison){
    const years=[...new Set(d.groups.flatMap(g=>g.metrics.filter(x=>x.comparable==='annual_consolidated_revenue_rub').flatMap(x=>x.observations.map(r=>r.year))))].sort((a,b)=>b-a);
