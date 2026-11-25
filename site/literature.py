@@ -272,17 +272,18 @@ def windows(start,end,days):
         yield start,finish
         start=finish+timedelta(days=1)
 
-def period_items(issn,filters,date_key,start,end):
+def period_items(issn,filters,date_key,start,end,fetcher=None):
+    fetcher=fetcher or fetch_batch
     # Split dense intervals before using offsets; no silent truncation at 1000 records.
     interval=filters+["from-"+date_key+":"+str(start),"until-"+date_key+":"+str(end)]
-    batch=fetch_batch(issn,interval)
+    batch=fetcher(issn,interval)
     total=batch.get("total-results")
     if type(total) is not int or total<0:raise ValueError("Crossref total-results missing")
     items=batch["items"]
     if total>1000 and start<end:
         mid=start+(end-start)//2
-        yield from period_items(issn,filters,date_key,start,mid)
-        yield from period_items(issn,filters,date_key,mid+timedelta(days=1),end)
+        yield from period_items(issn,filters,date_key,start,mid,fetcher)
+        yield from period_items(issn,filters,date_key,mid+timedelta(days=1),end,fetcher)
         return
     if total>10000:raise ValueError("Crossref: more than 10000 works in a single day")
     seen=set();offset=0
@@ -296,7 +297,7 @@ def period_items(issn,filters,date_key,start,end):
         offset+=len(items)
         if offset>=total:break
         if not items:raise ValueError("Crossref: incomplete page")
-        batch=fetch_batch(issn,interval,offset)
+        batch=fetcher(issn,interval,offset)
         items=batch["items"]
     if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
@@ -318,6 +319,8 @@ def sync(db, stamp, refresh):
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
     db.execute("create table if not exists literature_meta(doi text primary key,payload text,checked text)")
     db.execute("create table if not exists literature_meta_checks(issn text primary key,success text)")
+    import literature_resume as resume
+    resume.setup(db)
     service=service_status(db,stamp)
     if not refresh:return
     if service["cooldown"]:
@@ -329,20 +332,20 @@ def sync(db, stamp, refresh):
     ordered=sorted(JOURNALS,key=lambda issn:checked.get(issn,""))
     # Backfill one previously imported journal per refresh; existing DOI records are not erased.
     backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
+    budget=resume.Budget(fetch_batch)
     for position,issn in enumerate(ordered):
         journal=JOURNALS[issn]
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
+        if not budget.available():break
         full=not(last and last[0]) or issn==backfill
-        today=date.fromisoformat(stamp[:10])
-        # Include forthcoming records within the current calendar year in a full backfill.
+        full,start,finish,watermark=resume.plan(db,issn,full,last[0] if last else None,stamp)
         filters=['type:journal-article']
         key="pub-date" if full else "index-date"
-        start=date(1991,1,1) if full else date.fromisoformat(last[0][:10])-timedelta(days=2)
-        finish=date(today.year,12,31) if full else today
         if not full:filters.append("from-pub-date:1991-01-01")
         try:
+            # One confirmed interval per journal per run; progress survives 429.
             for lo,hi in windows(start,finish,366*5 if full else 7):
-              for items in period_items(issn,filters,key,lo,hi):
+              for items in period_items(issn,filters,key,lo,hi,budget):
                 entries=[]
                 details=[]
                 for item in items:
@@ -364,9 +367,18 @@ def sync(db, stamp, refresh):
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
-            with db:
-                db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
-                if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
+              with db:
+                done=resume.advance(db,issn,hi,finish,watermark)
+                if done:
+                    db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
+                    if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
+                else:
+                    db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Частично проверено: по "+str(hi)))
+              break
+        except resume.BudgetExhausted:
+            # Do not mark a partially paginated interval as complete.
+            with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
+            break
         except CrossrefRateLimited as err:
             observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
             deadline=retry_deadline(observed,err.retry_after)
