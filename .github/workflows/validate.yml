@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Record exact revision for acceptance
+        run: git rev-parse HEAD
       - name: Offline unit and calculation tests
         run: |
           unzip -q EconomicsPages.zip -d monitor
