@@ -88,6 +88,24 @@ class QualityTests(unittest.TestCase):
         self.assertEqual(r["counts"]["indicators_with_data"],1)
         self.assertTrue(r["warnings"])
         self.assertEqual(len(r["files"]["archive.json"]["sha256"]),64)
+    def test_bank_scope(self):
+        feeds={
+            "capital":{"target_cohort":["1","2","3"],"rows":[{"registration_number":"1","verification":"html"},{"registration_number":"2","verification":"documentary"},{"registration_number":"9","verification":"html"}]},
+            "balance":{"cohort":["1","2","4"],"rows":[{"registration_number":"1"},{"registration_number":"2"}]},
+            "profit":{"cohort":["1","2","5"],"rows":[{"registration_number":"1"}]}}
+        forms,target,verified=q.bank_scope(feeds)
+        self.assertEqual(forms["capital"],{"target":3,"verified":1})
+        self.assertEqual(forms["balance"],{"target":3,"verified":2})
+        self.assertEqual((target,verified),(2,1))
+        forms,target,verified=q.bank_scope({"capital":feeds["capital"]})
+        self.assertEqual(forms["balance"],{"target":None,"verified":None})
+        self.assertIsNone(target)
+        self.assertIsNone(verified)
+        empty=q.bank_scope({}) 
+        self.assertIsNone(empty[1])
+        self.assertIsNone(empty[2])
+        feeds["profit"]["cohort"]=["8"]
+        self.assertEqual(q.bank_scope(feeds)[1:],(0,0))
     def test_regression(self):
         (self.prev/"archive.json").write_text('[{"url":"https://example.org/lost"}]')
         self.assertTrue(any("исчезло" in e for e in self.report()["errors"]))
