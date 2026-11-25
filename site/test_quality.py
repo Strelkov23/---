@@ -49,6 +49,8 @@ class QualityTests(unittest.TestCase):
         amur_projects.publish(lambda *args:None,self.out,self.prev,"2026-11-24",False)
         import investment_projects
         investment_projects.publish(lambda *args:None,self.out,self.prev,"2026-11-24",False)
+        import project_coverage
+        project_coverage.publish(lambda *args:None,self.out,"2026-11-24")
         import frp_snapshot
         frp_snapshot.publish(lambda *args:None,self.out)
         import park_certificates

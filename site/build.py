@@ -177,6 +177,8 @@ import amur_projects
 amur_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 import krasnodar_projects
 krasnodar_projects.publish(page,out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+import project_coverage
+project_coverage.publish(page,out,m.now())
 with m.connect() as finance_db:
     finance_check=finance_data.check_files(finance_db,m.now(),"--refresh" in sys.argv)
     finance_data.publish(page,out,finance_check)
