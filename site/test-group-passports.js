@@ -55,3 +55,17 @@ assert.equal(G.ratioComparison({groups:[tr]},2025,'net_margin').eligible,0);
 const irao={...rg,id:'interrao',metrics:rg.metrics.filter(x=>x.id!=='equity').concat(mm('net_assets',[[2024,400],[2025,800]]))};
 assert.equal(G.ratios(irao,2025).find(x=>x.id==='equity_return').value,null);
 assert.equal(G.ratioComparison({groups:[irao]},2025,'net_margin').eligible,1);
+
+const lv={groups:[{...rg,id:'a',name:'А',sector:'A'},{...rg,id:'b',name:'Б',sector:'B',standard:'IFRS_based_disclosure'}]};
+assert.equal(G.levels(lv,2025,'assets').eligible,1);
+assert.equal(G.levels(lv,2025,'assets').paired,1);
+assert.equal(G.levels(lv,2025,'assets').rows[0].delta,1000);
+assert.equal(G.levels(lv,2025,'assets').rows[0].percent,100);
+assert.equal(G.levels(lv,2025,'profit').rows[0].value,-100);
+assert.equal(G.levels(lv,2025,'profit').rows[0].delta,null);
+assert.equal(G.levels(lv,2025,'assets','B').eligible,0);
+assert.equal(G.levels(lv,2025,'revenue').rows[0].value,2000);
+assert.equal(G.levels({groups:[{...rg,id:'a',metrics:[mm('profit',[[2024,-5],[2025,10]])]}]},2025,'profit').rows[0].percent,null);
+assert.equal(G.levels({groups:[{...rg,id:'a',metrics:[mm('assets',[[2024,10],[2025,-1]])]}]},2025,'assets').eligible,0);
+assert.throws(()=>G.levels(lv,2025,'net_assets'));
+assert.throws(()=>G.levels(lv,2025.5,'assets'));
