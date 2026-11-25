@@ -4,7 +4,7 @@ import group_passports as g
 class Groups(unittest.TestCase):
     def test_snapshot(self):
         d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
-        self.assertEqual(g.quality(d),{"group_passports":10,"group_observations":162})
+        self.assertEqual(g.quality(d),{"group_passports":11,"group_observations":194})
         for key,val in [("scope","legal_entity"),("standard","RAS"),("source","https://example.org/")]:
             bad=copy.deepcopy(d);bad["groups"][0][key]=val
             with self.assertRaises(ValueError):g.quality(bad)
@@ -14,4 +14,11 @@ class Groups(unittest.TestCase):
         with self.assertRaises(ValueError):g.quality(bad)
         bad=copy.deepcopy(d);grou=next(g for g in bad["groups"] if g["id"]=="rushydro")
         next(m for m in grou["metrics"] if m["id"]=="assets")["observations"][0]["value"]="1"
+        with self.assertRaises(ValueError):g.quality(bad)
+
+    def test_disclosure_basis(self):
+        d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
+        bad=copy.deepcopy(d);nlmk=next(x for x in bad["groups"] if x["id"]=="nlmk");nlmk["note"]=""
+        with self.assertRaises(ValueError):g.quality(bad)
+        bad=copy.deepcopy(d);nlmk=next(x for x in bad["groups"] if x["id"]=="nlmk");nlmk["metrics"][0]["comparable"]="annual_consolidated_revenue_rub"
         with self.assertRaises(ValueError):g.quality(bad)
