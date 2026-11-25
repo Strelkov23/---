@@ -328,6 +328,18 @@ with sync_playwright() as p:
             with open(obs_csv.value.path(),encoding="utf-8-sig",newline="") as f:
                 obs_rows=list(csv.reader(f,delimiter=";"))
             assert len(obs_rows)==expected_obs+1 and len({len(r) for r in obs_rows})==1
+        expected_pairs=sum(any(p["year"]==2024 for p in m["observations"]) and any(p["year"]==2025 for p in m["observations"]) for g in groups["groups"] if g["id"]=="x5" for m in g["metrics"])
+        page.locator("#group-observation-paired").check()
+        assert page.locator("#group-observation-table tbody tr").count()==min(40,expected_pairs)
+        if expected_pairs:
+            with page.expect_download() as pair_csv:
+                page.locator("#group-observation-export").click()
+            with open(pair_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                pair_rows=list(csv.reader(f,delimiter=";"))
+            assert len(pair_rows)==expected_pairs+1 and len({len(r) for r in pair_rows})==1
+            prior_col=pair_rows[0].index("Предыдущий год")
+            assert all(r[prior_col]=="2024" for r in pair_rows[1:])
+        page.locator("#group-observation-paired").uncheck()
         page.locator("#group-observation-query").fill("zzzz_no_observation")
         assert page.locator("#group-observation-export").is_disabled()
         page.locator("#group-observation-query").fill("")
