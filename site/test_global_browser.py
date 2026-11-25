@@ -594,6 +594,24 @@ with sync_playwright() as p:
             assert page.locator("#rm-map svg path[data-region]").count()>70
             assert page.locator("#rm-table tbody tr").count()>65
             assert "Московская" in page.locator("#rm-detail").inner_text()
+            page.locator("#rm-all-profile summary").click()
+            extra_profile=json.loads(Path("regional-mining-energy.json").read_text())
+            expected_groups=len(manufacturing["groups"])+len(extra_profile["groups"])
+            assert page.locator("#rm-profile-table tbody tr").count()==expected_groups
+            page.locator("#rm-profile-section").select_option("C")
+            assert page.locator("#rm-profile-table tbody tr").count()==14
+            page.locator("#rm-profile-mode").select_option("specialized")
+            for tr in page.locator("#rm-profile-table tbody tr").all():
+                assert float(tr.locator("td").nth(4).inner_text().replace(",","."))>=1
+            page.locator("#rm-profile-mode").select_option("all")
+            with page.expect_download() as profile_export:
+                page.locator("#rm-profile-export").click()
+            assert profile_export.value.suggested_filename=="regional-industry-profile-RU-MOS-2024.csv"
+            with open(profile_export.value.path(),encoding="utf-8-sig",newline="") as f:
+                profile_csv=list(csv.reader(f,delimiter=";"))
+            assert len(profile_csv)==15 and len({len(r) for r in profile_csv})==1
+            assert "SHA-256 ZIP" in profile_csv[0]
+            assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
             if len({r["year"] for r in manufacturing["rows"]})>=2:
                 assert page.locator("#rm-change-table tbody tr").count()==14
                 assert "Изменение доли" in page.locator("#rm-change-table").inner_text()

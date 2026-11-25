@@ -37,7 +37,16 @@ const ManufacturingAtlas=(()=>{
   return {from:a.year,to:b.year,valueDelta:finite(a.value)&&finite(b.value)?b.value-a.value:null,nominalChange:finite(a.value)&&a.value>0&&finite(b.value)?100*(b.value/a.value-1):null,shareDelta:finite(a.share)&&finite(b.share)?b.share-a.share:null,localizationDelta:finite(a.localization)&&finite(b.localization)?b.localization-a.localization:null}
  }
  function localizationBin(v){return !finite(v)?-1:v<.5?0:v<1?1:v<1.5?2:v<2?3:4}
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween}
+ function regionalProfile(data,key,year,sample){
+  return (data.groups||[]).map(g=>{
+   const result=calculate(data,g.id,year,sample),observation=result.rows.get(key);
+   return {group:g.id,section:g.section,title:g.title,okved:g.okved,isTotal:g.id===sections[g.section]?.total,observation:observation||null};
+  });
+ }
+ function profileFilter(rows,section='',mode='all'){
+  return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
+ }
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -152,6 +161,41 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
       ['Регион','ISO геометрии','Раздел ОКВЭД2','Группа','Наименование','Классы ОКВЭД2','Начальный год','Конечный год','Территория источника (начало)','Территория источника (конец)','ОКАТО (начало)','ОКАТО (конец)','ОКТМО (начало)','ОКТМО (конец)','Отгрузка начало, млн руб.','Отгрузка конец, млн руб.','Итог раздела начало, млн руб.','Итог раздела конец, млн руб.','Доля начало, %','Доля конец, %','Локализация начало','Локализация конец','Отгрузка РФ начало, млн руб.','Отгрузка РФ конец, млн руб.','Итог раздела РФ начало, млн руб.','Итог раздела РФ конец, млн руб.','Изменение отгрузки, млн руб.','Номинальное изменение, %','Изменение доли, п. п.','Изменение локализации','Издание начало','Издание конец','Файл начало','Файл конец','Строка начало','Строка конец','Строка итога начало','Строка итога конец','Строка РФ начало','Строка РФ конец','Строка итога РФ начало','Строка итога РФ конец','Исходное значение начало','Исходное значение конец','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...comparisonRows]);
      detail.append(download);
     }
+    const profile=ManufacturingAtlas.regionalProfile(combined,chosen.key,year,RegionalStats.sample);
+    const panel=node('details','');panel.id='rm-all-profile';
+    panel.append(node('summary','Полное промышленное досье: добыча, обработка и энергетика'));
+    panel.append(node('p','Коэффициенты локализации рассчитаны отдельно внутри каждого раздела B, C или D. Значение выше 1 означает большую долю группы относительно структуры России. Это не оценка эффективности. Итоговые строки не считаются специализированными отраслями.'));
+    const controls=node('div','');controls.className='project-controls';
+    const sect=node('select',''),mode=node('select','');sect.id='rm-profile-section';mode.id='rm-profile-mode';
+    sect.add(new Option('Все разделы',''));
+    for(const id of Object.keys(sections))if(profile.some(r=>r.section===id))sect.add(new Option(id+' · '+sections[id].title,id));
+    for(const [label,value] of [['Все группы','all'],['Специализация: локализация > 1','specialized'],['Нет коэффициента локализации','missing']])mode.add(new Option(label,value));
+    for(const [label,control] of [['Раздел ОКВЭД2',sect],['Отбор групп',mode]]){const l=node('label',label);l.append(control);controls.append(l)}
+    const coverage=node('p','');coverage.id='rm-profile-coverage';coverage.setAttribute('role','status');
+    const overview=node('div','');overview.id='rm-profile-table';overview.className='table-scroll';overview.tabIndex=0;overview.setAttribute('role','region');overview.setAttribute('aria-label','Полное промышленное досье');
+    const exp=node('button','Скачать промышленное досье CSV');exp.type='button';exp.id='rm-profile-export';
+    panel.append(controls,coverage,overview,exp);
+    function drawProfile(){
+     const filtered=ManufacturingAtlas.profileFilter(profile,sect.value,mode.value);
+     const available=profile.filter(r=>!sect.value||r.section===sect.value),numeric=available.filter(r=>Number.isFinite(r.observation?.value)).length,local=available.filter(r=>Number.isFinite(r.observation?.localization)).length;
+     coverage.textContent='Групп в охвате: '+available.length+' · числовая отгрузка: '+numeric+' · рассчитана локализация: '+local+' · показано: '+filtered.length+'. Пропуски не равны нулю.';
+     const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+     for(const label of ['Раздел','Группа ОКВЭД2','Отгрузка, млн руб.','Доля внутри раздела, %','Локализация','Доля в отгрузке РФ, %']){const th=node('th',label);th.scope='col';h.append(th)}
+     for(const x of filtered){
+      const r=x.observation,tr=body.insertRow();tr.insertCell().textContent=x.section;
+      const a=link(x.title+' · '+x.okved,current('regional-manufacturing.html',{'rm-group':x.group,'rm-year':year,'rm-region':chosen.code,'rm-metric':metric}));tr.insertCell().append(a);
+      for(const v of [r?.value,r?.share,r?.localization,r?.countryShare])tr.insertCell().textContent=number(v);
+     }
+     overview.replaceChildren(t);
+     exp.disabled=!filtered.length;exp.onclick=()=>csv('regional-industry-profile-'+chosen.code+'-'+year+'.csv',[
+      ['Регион','ISO геометрии','Год','Раздел','Группа','Наименование','ОКВЭД2','Итог раздела','Территория источника','ОКАТО','ОКТМО','Отгрузка, млн руб.','Итог раздела региона, млн руб.','Доля, %','Локализация','Доля в отгрузке РФ, %','Отгрузка РФ, млн руб.','Итог раздела РФ, млн руб.','Доля в разделе РФ, %','Издание','Лист','Строка','Строка итога','Строка РФ','Строка итога РФ','Исходное значение','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],
+      ...filtered.map(x=>{const r=x.observation,entry=bySection[x.section];return [chosen.name,chosen.code,year,x.section,x.group,x.title,x.okved,x.isTotal?'да':'нет',r?.region,r?.okato,r?.oktmo,r?.value,r?.total,r?.share,r?.localization,r?.countryShare,r?.national,r?.nationalTotal,r?.nationalShare,r?.edition,r?.sheet,r?.row,r?.totalRow,r?.nationalRow,r?.nationalTotalRow,r?.raw_value,entry?.data.source,entry?.data.sha256,entry?.sha256,manifest.data_fingerprint]})]);
+    }
+    sect.onchange=mode.onchange=drawProfile;drawProfile();detail.append(panel);
+    const infrastructure=node('p','');infrastructure.append(link('Индустриальные парки и ОЭЗ региона',current('industrial-parks.html',{'park-iso':chosen.code})),document.createTextNode(' · '),link('Новости региона',current('news-map.html',{'news-geo-region':chosen.code})));
+    const registry={'RU-BU':'investment-projects.html','RU-AMU':'amur-projects.html','RU-KDA':'krasnodar-projects.html'}[chosen.code];
+    if(registry)infrastructure.append(document.createTextNode(' · '),link('Инвестиционный реестр (текущая редакция)',registry));
+    detail.append(infrastructure,node('p','Парки и инвестиционные записи не являются доказательством фактической работы предприятия или его вклада в отгрузку. Даты и охват источников различаются.'));
    }else detail.append(node('p','Выберите регион на карте или в списке, чтобы открыть его отраслевое досье.'));
    const chart=$('rm-rank-chart');chart.replaceChildren();if(known.length){
     const top=known.slice(0,10),height=68+top.length*29,w=900,svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+w+' '+height);svg.setAttribute('role','img');svg.setAttribute('aria-label','Десять наибольших значений: '+metricLabels[metric]);
