@@ -5,6 +5,7 @@ from urllib.parse import urlsplit,parse_qs
 from urllib.request import Request,urlopen
 from concurrent.futures import ThreadPoolExecutor
 from bank_registry import Tables,clean
+import bank_form_queue
 from bank_capital import money,target_cohort
 FILE="bank-profit.json"
 ROOT="https://www.cbr.ru/banking_sector/credit/coinfo/f807/1904/"
@@ -77,7 +78,7 @@ def quality(d):
         url(reg);date.fromisoformat(a["checked"][:10])
         if a["error"] is not None and not isinstance(a["error"],str):raise ValueError("Протокол")
     return {"bank_profit_records":len(seen),"bank_profit_observations":sum(v is not None for r in d["rows"] for v in r["current"].values())}
-def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
+def publish(out,previous,stamp,refresh,directory,fetcher=fetch,counts=None):
     d=empty()
     try:
         old=json.loads((previous/FILE).read_text());quality(old);d=old
@@ -88,7 +89,7 @@ def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
     if refresh and (not d["checked"] or d["checked"][:10]!=stamp[:10]):
         by={r["registration_number"]:r for r in d["rows"]};today=date.fromisoformat(stamp[:10]);a=d["attempts"]
         candidates=set(cohort)|system
-        todo=sorted((r for r in candidates if r not in by and (r not in a or today>=date.fromisoformat(a[r]["checked"][:10])+timedelta(days=14))),key=lambda r:(r not in system,r in a,a.get(r,{}).get("checked",""),int(r)))[:20]
+        todo=bank_form_queue.plan(candidates,set(by),system,a,stamp,counts,20)
         def one(reg):
             try:
                 row=fetcher(reg)

@@ -178,13 +178,15 @@ bank_archive_data=bank_archive_summary.publish(out,Path('../history/published'),
 import bank_disclosure
 bank_disclosure.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
 import bank_capital
-bank_capital_snapshot=bank_capital.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
+import bank_form_queue
+bank_coverage_priority=bank_form_queue.coverage(Path("../history/published"))
+bank_capital_snapshot=bank_capital.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory,counts=bank_coverage_priority)
 import bank_capital_history
 bank_capital_history.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory,bank_capital_snapshot)
 import bank_balance
-bank_balance.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
+bank_balance.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory,counts=bank_coverage_priority)
 import bank_profit
-bank_profit.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
+bank_profit.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory,counts=bank_coverage_priority)
 company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_import.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 import company_names
