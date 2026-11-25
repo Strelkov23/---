@@ -164,6 +164,11 @@ def check(out,previous,stamp):
         counts.update(bank_registry.quality(data["bank-directory.json"]))
         if not all(x["rows"] for x in data["bank-directory.json"]["datasets"].values()):warnings.append("Банковский каталог: неполная загрузка")
     except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Банковский каталог: "+str(e))
+    if (out/"bank-balance.json").is_file():
+        try:
+            import bank_balance
+            counts.update(bank_balance.quality(json.loads((out/"bank-balance.json").read_text())))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Балансы банков: "+str(e))
     if (out/"bank-capital-history.json").is_file():
         try:
             import bank_capital_history
