@@ -1,7 +1,7 @@
 name: Economic code checks
 on:
   push:
-    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics]
+    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:
@@ -58,6 +58,7 @@ jobs:
           node test-labor-calibration.js
           node test-labor-diagnostics.js
           node test-investment-diagnostics.js
+          node test-dependency-diagnostics.js
           node test-data-registry.js
           node test-research-projects.js
           node test-provenance.js

@@ -74,6 +74,20 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/diagnostics.html#diag-overview",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#diag-overview-cards article').length===6",timeout=45000)
         assert page.locator("#diag-overview-export").is_enabled()
+        page.wait_for_function("document.querySelectorAll('#dep-diag-table tbody tr').length===19",timeout=45000)
+        assert page.locator("#dep-diag-detail tbody tr").count()==19
+        page.locator("#dep-diag-self").uncheck()
+        assert page.locator("#dep-diag-detail tbody tr").count()==18
+        with page.expect_download() as dep_pairs:
+            page.locator("#dep-diag-pair-export").click()
+        with open(dep_pairs.value.path(),encoding="utf-8-sig",newline="") as f:
+            pair_rows=list(csv.reader(f,delimiter=";"))
+        assert len(pair_rows)==19 and len({len(r) for r in pair_rows})==1
+        with page.expect_download() as dep_summary:
+            page.locator("#dep-diag-export").click()
+        with open(dep_summary.value.path(),encoding="utf-8-sig",newline="") as f:
+            dep_rows=list(csv.reader(f,delimiter=";"))
+        assert len(dep_rows)==20 and len({len(r) for r in dep_rows})==1
         page.wait_for_function("!document.querySelector('#asset-diag-status').textContent.includes('Проверка архива')",timeout=45000)
         assert page.locator("#asset-diag-table tbody tr").count()==19
         with page.expect_download() as inv_assets:
