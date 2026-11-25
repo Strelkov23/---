@@ -4,7 +4,7 @@ import group_passports as g
 class Groups(unittest.TestCase):
     def test_snapshot(self):
         d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
-        self.assertEqual(g.quality(d),{"group_passports":18,"group_observations":518})
+        self.assertEqual(g.quality(d),{"group_passports":20,"group_observations":636})
         for key,val in [("scope","legal_entity"),("standard","RAS"),("source","https://example.org/")]:
             bad=copy.deepcopy(d);bad["groups"][0][key]=val
             with self.assertRaises(ValueError):g.quality(bad)
@@ -76,3 +76,30 @@ class Groups(unittest.TestCase):
             self.assertEqual(v("gross_profit"),v("revenue")+v("cost_of_sales"))
             self.assertEqual(v("cost_of_sales"),v("goods_cost")+v("marketplace_cost")+v("fintech_cost"))
             self.assertEqual(v("operating_expenses"),sum(v(k) for k in ("sales_marketing_expenses","technology_content_expenses","administrative_expenses","fintech_credit_losses")))
+
+    def test_novatek_and_polyus_disclosures(self):
+        from decimal import Decimal
+        d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
+        n=next(x for x in d["groups"] if x["id"]=="novatek")
+        p=next(x for x in d["groups"] if x["id"]=="polyus")
+        self.assertEqual(len(n["metrics"]),30)
+        self.assertEqual(len(p["metrics"]),29)
+        for group in (n,p):
+            self.assertEqual(group["standard"],"IFRS_based_disclosure")
+            self.assertFalse(any(m.get("comparable") for m in group["metrics"]))
+        values={m["id"]:{r["year"]:Decimal(r["value"]) for r in m["observations"]} for m in n["metrics"]}
+        for year in (2024,2025):
+            v=lambda k:values[k][year]
+            for target,terms in (
+                ("assets",("equity","liabilities")),
+                ("assets",("current_assets","noncurrent_assets")),
+                ("liabilities",("current_liabilities","noncurrent_liabilities")),
+                ("revenue",("hydrocarbon_revenue","other_revenue")),
+                ("profit",("profit_before_tax","income_tax")),
+                ("profit",("profit_parent","profit_noncontrolling")),
+                ("cash_change",("operating_cash_flow","investment_cash_flow","financing_cash_flow","cash_fx")),
+                ("cash",("cash_opening","cash_change")),
+                ("comprehensive_income",("profit","other_comprehensive_income"))):
+                self.assertEqual(v(target),sum(v(k) for k in terms))
+        self.assertEqual(next(m for m in p["metrics"] if m["id"]=="revenue")["unit"],"млн долл. США")
+        self.assertEqual(next(m for m in p["metrics"] if m["id"]=="gold_output")["unit"],"тыс. тройских унций")
