@@ -769,8 +769,12 @@ with sync_playwright() as p:
             assert page.locator("#rm-year").input_value()=="2024"
             assert page.locator("#rm-map svg path[data-region]").count()>70
             assert page.locator("#rm-table tbody tr").count()>65
-            assert page.locator(".rm-quick-nav a").count()==5
+            assert page.locator(".rm-quick-nav a").count()==6
             assert page.locator("#rm-conc-table tbody tr").count()>65
+            assert page.locator("#rm-shift-table tbody tr").count()>65
+            with page.expect_download() as shift:
+                page.locator("#rm-shift-export").click()
+            assert shift.value.suggested_filename.startswith("regional-structural-shift-")
             assert page.locator("#rm-conc-region").input_value()=="RU-MOS"
             with page.expect_download() as concentration:
                 page.locator("#rm-conc-export").click()

@@ -74,3 +74,11 @@ assert.equal(M.concentration({...totalRow,value:120},parts,2).hhi,null);
 assert.equal(M.concentration({...totalRow,value:100.2},parts,2).hhi,.52);
 assert.equal(M.concentration(totalRow,[{...parts[0],observation:{...part1,value:100}},{...parts[1],observation:{...part2,value:0}}],2).hhi,1);
 assert.equal(M.concentration({...totalRow,value:0},parts,2).hhi,null);
+
+const old=M.concentration({...totalRow,year:2022},parts.map(p=>({...p,observation:{...p.observation,year:2022}})),2);
+const next=M.concentration(totalRow,[{...parts[0],observation:{...part1,value:40}},{...parts[1],observation:{...part2,value:60}}],2);
+const shifted=M.structuralShift({...old,total:{...totalRow,year:2022}},{...next,total:totalRow});
+assert.equal(shifted.distance,20);assert.ok(Math.abs(shifted.hhiDelta)<1e-12);assert.equal(shifted.parts.reduce((s,p)=>s+p.delta,0),0);
+assert.equal(M.structuralShift({...old,total:{...totalRow,year:2022}},{...next,total:{...totalRow,okato:'changed'}}).distance,null);
+assert.equal(M.structuralShift({...old,total:{...totalRow,year:2022}},{...next,total:totalRow,hhi:null}).distance,null);
+assert.equal(M.concentrationRows(full,'C',2024,territories,S.sample)[0].expected,13);
