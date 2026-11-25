@@ -299,6 +299,18 @@ with sync_playwright() as p:
             with page.expect_download() as rankcsv:
                 page.locator("#company-rank-export").click()
             assert rankcsv.value.suggested_filename.startswith("company-ranking-employment-")
+        finance=json.loads(Path("sme-finance.json").read_text())
+        if finance.get("status")=="diagnostic" and finance.get("paired_sums_version")==1:
+            page.wait_for_function("!document.querySelector('#sme-pair-export').disabled",timeout=45000)
+            page.locator("#sme-pair-metric").select_option("income_worker")
+            assert page.locator("#sme-pair-table tbody tr").count()>0
+            with page.expect_download() as pair_csv:
+                page.locator("#sme-pair-export").click()
+            with open(pair_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                pair_rows=list(csv.reader(f,delimiter=";"))
+            assert len(pair_rows)>1 and len({len(r) for r in pair_rows})==1
+        else:
+            assert page.locator("#sme-pair-export").is_disabled()
         groups=json.loads(Path("group-passports.json").read_text())
         page.wait_for_function("!document.querySelector('#group-coverage-export').disabled",timeout=45000)
         assert page.locator("#group-coverage-table tbody tr").count()==len(groups["groups"])
