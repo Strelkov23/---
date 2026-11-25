@@ -92,6 +92,7 @@ DISCOVERY_NOTE="Кандидаты файлов региональных рее�
 DISCOVERY={
     "RU-ROS":("Ростовская область","https://invest-don.com/ru/register_investment_projects/",".xlsx"),
     "RU-PER":("Пермский край","https://investinperm.permkrai.ru/investoram/realizuemye-proekty/",".pdf"),
+    "RU-NEN":("Ненецкий автономный округ","https://adm-nmar.ru/deyatelnost/ekonomika/malyy-i-sredniy-biznes/podderzhka/investitsionnaya-deyatelnost/",".xlsx"),
 }
 def discovery_allowed(key,url):
     from urllib.parse import urlsplit
@@ -144,7 +145,11 @@ def discover(out,previous,stamp,refresh,fetcher=discovery_fetch):
     from concurrent.futures import ThreadPoolExecutor
     d=dict(schema=1,note=DISCOVERY_NOTE,rows={k:discovery_blank(k) for k in DISCOVERY})
     try:
-        old=json.loads((previous/DISCOVERY_FILE).read_text(encoding="utf-8"));discovery_quality(old);d=old
+        old=json.loads((previous/DISCOVERY_FILE).read_text(encoding="utf-8"))
+        # Preserve earlier checked sources when adding new catalogues.
+        candidate=dict(d,rows={k:old["rows"].get(k,d["rows"][k]) for k in DISCOVERY})
+        if old["schema"]!=d["schema"] or old["note"]!=d["note"]:raise ValueError("Другая схема поиска")
+        discovery_quality(candidate);d=candidate
     except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
     now=time(stamp) if refresh else None
     todo=[k for k,r in d["rows"].items() if refresh and (not r["checked"] or now>=time(r["checked"])+timedelta(days=2 if r["status"]=="unavailable" else 7))]

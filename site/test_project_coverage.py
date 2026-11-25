@@ -48,9 +48,9 @@ class CoverageTests(unittest.TestCase):
     def test_discovery_retains_verified_links(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t)
-            samples={"RU-ROS":b'<a href="/docs/register.xlsx">Download</a><a href="https://example.org/fake.xlsx">Other</a>',"RU-PER":b'<a href="/docs/register.pdf">Register</a><a href="/docs/register.xlsx">Other format</a>'}
+            samples={"RU-ROS":b'<a href="/docs/register.xlsx">Download</a><a href="https://example.org/fake.xlsx">Other</a>',"RU-PER":b'<a href="/docs/register.pdf">Register</a><a href="/docs/register.xlsx">Other format</a>',"RU-NEN":b'<a href="/images/Ekonom/Reestr_1_01012025.xlsx">Скачать</a>'}
             d=p.discover(root,root,"2026-11-25T04:00:00+00:00",True,lambda k:p.discovery_parse(k,samples[k]))
-            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],2)
+            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],3)
             self.assertIn("Ростовская область",p.discovery_render(d))
             self.assertIn("Пермский край",p.discovery_render(d))
             def fail(k):raise OSError("offline")
