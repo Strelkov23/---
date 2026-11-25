@@ -370,6 +370,19 @@ with sync_playwright() as p:
                 coverage=list(csv.reader(f,delimiter=";"))
             assert len(coverage)==4 and len({len(r) for r in coverage})==1
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.wait_for_function("document.querySelector('#bank-ratio-status').textContent.startsWith('Сопоставимых значений:')",timeout=45000)
+        bank_balance=json.loads(Path("bank-balance.json").read_text())
+        target=set(bank_balance["cohort"])
+        expected=sum(r["registration_number"] in target for r in bank_balance["rows"])
+        assert page.locator("#bank-ratio-table tbody tr").count()==expected
+        page.locator("#bank-ratio-metric").select_option("retail_client")
+        if expected:
+            with page.expect_download() as ratios_csv:
+                page.locator("#bank-ratio-export").click()
+            with open(ratios_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                ratio_rows=list(csv.reader(f,delimiter=";"))
+            assert len(ratio_rows)==expected+1 and len({len(r) for r in ratio_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#amur-ent-export").is_enabled():
