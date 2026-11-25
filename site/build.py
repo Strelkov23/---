@@ -177,6 +177,8 @@ import group_passports
 group_passports.publish(out)
 import corporate_watch
 corporate_watch.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+import corporate_discovery
+corporate_discovery.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
