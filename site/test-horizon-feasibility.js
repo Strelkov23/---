@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),H=require('./horizon-feasibility.js'),R=require('./resource-plan.js'),real=require('./sectors.json');
+const m={names:['A'],output:[100000],demand:[100000],imports:[10000],effects:[[100000]]};
+const p={years:3,lag:1,spare:5,capitalRatio:1,depreciation:0,growth:[10],floors:[100,100,100],budgets:[10,10,0],importLimits:[100,100,100]};
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,a+' != '+b);
+let r=H.calculate(m,p,R.solve);near(r.beta,.5);assert.equal(r.full,false);near(r.rows[0].commissioned,0);near(r.rows[2].investment,0);
+r=H.calculate(m,{...p,lag:2},R.solve);near(r.beta,5/21);near(r.rows[1].commissioned,0);
+r=H.calculate(m,{...p,spare:100,importLimits:[0,100,100]},R.solve);near(r.beta,0);
+r=H.calculate(m,{...p,spare:100},R.solve);near(r.beta,1);assert.equal(r.full,true);
+r=H.calculate(m,{...p,years:1,floors:[0],budgets:[0],importLimits:[0]},R.solve);near(r.beta,1);
+r=H.calculate(m,{...p,spare:0,floors:[0,0,100],budgets:[20,0,0],depreciation:100},R.solve);near(r.beta,0);
+r=H.calculate(m,{...p,spare:0,floors:[0,0,100],budgets:[20,0,0],lag:2,depreciation:100},R.solve);near(r.beta,20/33.1);
+assert.throws(()=>H.calculate(m,{...p,lag:0},R.solve));
+r=H.calculate(real,{...p,growth:real.names.map(()=>3)},R.solve);assert.ok(r.beta>=0&&r.beta<=1);assert.equal(r.rows[0].groups.length,19);assert.ok(r.gap<1e-6);
+console.log('Horizon feasibility: lag, annual limits, depreciation, zero target and real balance OK');

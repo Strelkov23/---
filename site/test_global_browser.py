@@ -134,6 +134,21 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/horizon-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#hf-results tbody tr').length===5",timeout=45000)
+        page.locator("#hf-years").fill("3")
+        page.locator("#hf-lag").fill("2")
+        assert page.locator("#hf-export").is_disabled()
+        page.locator("#hf-run").click()
+        assert page.locator("#hf-results tbody tr").count()==3
+        page.locator("#hf-period").select_option("2")
+        assert page.locator("#hf-detail tbody tr").count()==19
+        with page.expect_download() as horizon:
+            page.locator("#hf-export").click()
+        with open(horizon.value.path(),encoding="utf-8-sig",newline="") as f:
+            horizon_rows=list(csv.reader(f,delimiter=";"))
+        assert len(horizon_rows)==58 and len({len(r) for r in horizon_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/plan-feasibility.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#pf-input tbody tr').length===19",timeout=45000)
         page.locator("#pf-budget").fill("0")
