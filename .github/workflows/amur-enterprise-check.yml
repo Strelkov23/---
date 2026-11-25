@@ -1,0 +1,27 @@
+name: Amur enterprise catalog source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/amur-enterprise-check.yml','site/amur_enterprises.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test and verify real cards
+        run: |
+          cd site
+          python -m unittest test_amur_enterprises.py
+          python - <<'PY'
+          import amur_enterprises as a, hashlib
+          raw,enc=a.fetch()
+          rows,matched=a.parse(raw,enc)
+          print("MATCHED",matched,"CORPORATE_CARDS",len(rows),"LOCALITIES",len({r["locality"] for r in rows}),"SHA256",hashlib.sha256(raw).hexdigest())
+          PY

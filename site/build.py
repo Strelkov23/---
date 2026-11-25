@@ -18,6 +18,7 @@ import navigation
 import regional_geo
 import facility_data
 import enterprise_sources
+import amur_enterprises
 import industrial_parks
 import park_certificates
 import sme_regions
@@ -152,6 +153,7 @@ with m.connect() as db:
 regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 facility_data.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 enterprise_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+amur_enterprises.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json","amur-enterprises.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -154,6 +154,11 @@ def check(out,previous,stamp):
         counts.update(enterprise_sources.quality(data["enterprise-sources.json"]))
         if not all(r["sheets"] for r in data["enterprise-sources.json"]["rows"]):warnings.append("Статистический регистр: не все оригиналы проверены; наблюдения не импортированы")
     except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Статистический регистр: "+str(e))
+    try:
+        import amur_enterprises
+        counts.update(amur_enterprises.quality(data["amur-enterprises.json"]))
+        if not data["amur-enterprises.json"]["rows"]:warnings.append("Амурский каталог предприятий: импорт не подтверждён")
+    except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Амурский каталог: "+str(e))
     try:
         import sme_regions
         old_file=previous/"sme-regions.json"

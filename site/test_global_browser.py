@@ -286,6 +286,12 @@ with sync_playwright() as p:
                 page.locator("#ed-trend-export").click()
             assert debt.value.suggested_filename=="enterprise-debt-trend-payable.csv"
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
+        if page.locator("#amur-ent-export").is_enabled():
+            assert page.locator("#amur-ent-table tbody tr").count()>=20
+            page.locator("#amur-ent-query").fill("zzzz_no_such_company")
+            assert page.locator("#amur-ent-table tbody tr").count()==0
+            page.locator("#amur-ent-query").fill("")
         page.wait_for_function("!document.querySelector('#enterprise-source-status').textContent.startsWith('Загрузка')",timeout=30000)
         assert page.locator("#enterprise-source-status article").count()==2
         page.wait_for_function("!document.querySelector('#facility-status').textContent.startsWith('Загрузка')",timeout=30000)
