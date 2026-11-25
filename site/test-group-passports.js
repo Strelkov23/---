@@ -48,3 +48,10 @@ assert.equal(completeness.groups[1].coefficients,0);
 assert.equal(completeness.observations,10);
 assert.equal(G.coverage({groups:[]},2025).coefficients,0);
 assert.equal(G.coverage({groups:[rg]},2000).withObservations,0);
+
+const tr={...rg,id:'transneft',standard:'IFRS_based_disclosure'};
+assert.equal(G.revenueComparison({groups:[tr]},2025).eligible,0);
+assert.equal(G.ratioComparison({groups:[tr]},2025,'net_margin').eligible,0);
+const irao={...rg,id:'interrao',metrics:rg.metrics.filter(x=>x.id!=='equity').concat(mm('net_assets',[[2024,400],[2025,800]]))};
+assert.equal(G.ratios(irao,2025).find(x=>x.id==='equity_return').value,null);
+assert.equal(G.ratioComparison({groups:[irao]},2025,'net_margin').eligible,1);
