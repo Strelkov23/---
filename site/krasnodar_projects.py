@@ -106,7 +106,7 @@ def render(d):
     e=lambda v:escape(str(v if v is not None and v!="" else "—"),quote=True)
     rows=d["rows"];q=quality(d)
     state={"ok":"Загружено","cached":"Сохраненная редакция","not_loaded":"Ожидается загрузка","unavailable":"Источник недоступен"}[d["status"]]
-    body='<section class="mast"><p class="kicker">Инвестиции · Краснодарский край</p><h1>Проекты на сопровождении в Краснодарском крае</h1><p>'+e(NOTE)+'</p><p><a href="'+SOURCE+'">Официальный портал</a> · <a href="investment-projects.html">Бурятия</a> · <a href="amur-projects.html">Амурская область</a> · <a href="economic-map.html">Карта</a> · <a href="methodology.html#krasnodar-projects-method">Методика</a></p></section>'
+    body='<section class="mast"><p class="kicker">Инвестиции · Краснодарский край</p><h1>Проекты на сопровождении в Краснодарском крае</h1><p><a href="project-coverage.html">Все региональные реестры и охват данных</a></p><p>'+e(NOTE)+'</p><p><a href="'+SOURCE+'">Официальный портал</a> · <a href="investment-projects.html">Бурятия</a> · <a href="amur-projects.html">Амурская область</a> · <a href="economic-map.html">Карта</a> · <a href="methodology.html#krasnodar-projects-method">Методика</a></p></section>'
     body+='<section><h2>Охват и актуальность</h2><p>'+state+' · Редакция: '+e(d["edition"])+' · Проверка: '+e(d["checked"])+' · Последняя успешная загрузка: '+e(d["success"])+'</p>'
     if d.get("error"):body+='<p role="status">'+e(d["error"])+'</p>'
     body+='<p>Записей: '+str(len(rows))+' · Отраслевых категорий: '+str(q["krasnodar_project_sectors"])+' · Муниципальных наименований: '+str(q["krasnodar_project_municipalities"])+'</p>'

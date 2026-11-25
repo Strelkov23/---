@@ -504,6 +504,23 @@ with sync_playwright() as p:
             page.locator("#amur-sector").select_option(sector)
             assert page.locator("#amur-rows tr:visible").count()==sum(r["sector"]==sector for r in amur["rows"])
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/krasnodar-projects.html",wait_until="load")
+        kd=json.loads(Path("krasnodar-projects.json").read_text())
+        assert page.locator("#amur-rows tr").count()==len(kd["rows"])
+        page.locator("#amur-query").fill("несуществующий-запрос-987654321")
+        assert page.locator("#amur-rows tr:visible").count()==0
+        page.locator("#amur-query").fill("")
+        assert page.locator("#amur-rows tr:visible").count()==len(kd["rows"])
+        if kd["rows"]:
+            sector=kd["rows"][0]["sector"]
+            page.locator("#amur-sector").select_option(sector)
+            assert page.locator("#amur-rows tr:visible").count()==sum(r["sector"]==sector for r in kd["rows"])
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/project-coverage.html",wait_until="load")
+        coverage=json.loads(Path("project-coverage.json").read_text())
+        assert page.locator("#project-coverage-cards article").count()==len(coverage["rows"])==3
+        assert page.locator("#project-coverage-rows tr").count()==3
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
         if parks["rows"]:
