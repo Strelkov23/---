@@ -14,6 +14,7 @@ const ResearchProjects=(()=>{
    u=new URL('https://doi.org/'+d.split('/').map(encodeURIComponent).join('/'));
   }
   const x={url:u.href};for(const k of fields)x[k]=text(raw[k],k==='title'?4000:2000);
+  if(u.hostname==='doi.org')x.doi=decodeURIComponent(u.pathname.slice(1));
   if(!x.title.trim())throw Error('Отсутствует название');
   return x
  }
@@ -47,7 +48,28 @@ const ResearchProjects=(()=>{
   return validate({schema:1,projects})
  }
  function reference(x,i){return (i+1)+'. '+[x.authors,x.title].filter(Boolean).join('. ')+' // '+[x.source,x.date,x.volume&&'Т. '+x.volume,x.issue&&'№ '+x.issue,x.pages&&'С. '+x.pages,x.article_number&&'Статья '+x.article_number].filter(Boolean).join('. — ')+'. — URL: '+x.url}
- return {KEY,BASKET,LIMIT,ITEM_LIMIT,MAX_BYTES,item,merge,validate,parse,encode,importCopy,reference}
+ function addToProject(state,id,incoming){
+  const next=validate(state);const p=next.projects.find(x=>x.id===id);
+  if(!p)throw Error('Проект не найден. Обновите список проектов.');
+  p.items=merge(p.items,incoming);return next
+ }
+ const clean=v=>String(v??'').replace(/[\r\n\t]+/g,' ').trim();
+ const bib=v=>clean(v).replace(/\\/g,'/').replace(/[{}]/g,'').replace(/[%&#_$]/g,m=>'\\'+m);
+ function bibtex(items){
+  return merge([],items).map((x,i)=>{
+   const article=x.type==='Научная статья'||Boolean(x.doi);
+   const fields={title:x.title,author:clean(x.authors).split(/,\s*/).filter(Boolean).join(' and '),[article?'journal':'howpublished']:x.source,year:/^\d{4}/.test(x.date)?x.date.slice(0,4):'',volume:x.volume,number:x.issue,pages:x.pages,eid:x.article_number,issn:x.issn,doi:x.doi,url:x.url};
+   return '@'+(article?'article':'misc')+'{project'+(i+1)+',\n'+Object.entries(fields).filter(([,v])=>v).map(([k,v])=>'  '+k+' = {'+bib(v)+'}').join(',\n')+'\n}'
+  }).join('\n\n')
+ }
+ function ris(items){
+  return merge([],items).map(x=>{
+   const article=x.type==='Научная статья'||Boolean(x.doi);
+   const pages=clean(x.pages).split(/[-–—]/);
+   return ['TY  - '+(article?'JOUR':'GEN'),'TI  - '+clean(x.title),...clean(x.authors).split(/,\s*/).filter(Boolean).map(v=>'AU  - '+v),...Object.entries({[article?'JO':'T2']:x.source,PY:/^\d{4}/.test(x.date)?x.date.slice(0,4):'',VL:x.volume,IS:x.issue,SP:pages[0],EP:pages.length===2?pages[1]:'',SN:x.issn,DO:x.doi,UR:x.url}).filter(([,v])=>v).map(([k,v])=>k+'  - '+clean(v)),'ER  - '].join('\r\n')
+  }).join('\r\n\r\n')
+ }
+ return {KEY,BASKET,LIMIT,ITEM_LIMIT,MAX_BYTES,item,merge,validate,parse,encode,importCopy,reference,addToProject,bibtex,ris}
 })();
 if(typeof module!=='undefined')module.exports=ResearchProjects;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{
@@ -64,7 +86,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
   const p=get(),list=$('rp-select');list.replaceChildren(new Option('Новый проект',''));for(const x of state.projects)list.add(new Option(x.title,x.id));list.value=selected;
   $('rp-title').value=p?.title||'';$('rp-note').value=p?.note||'';
   for(const id of ['rp-save','rp-add','rp-delete'])$(id).disabled=locked||!p;
-  for(const id of ['rp-csv','rp-txt','rp-to-basket'])$(id).disabled=!p?.items.length;
+  for(const id of ['rp-csv','rp-txt','rp-bibtex','rp-ris','rp-to-basket'])$(id).disabled=!p?.items.length;
   $('rp-create').disabled=locked;$('rp-import').disabled=locked;$('rp-export').disabled=locked;
   $('rp-count').textContent=p?'Источников: '+p.items.length:'Выберите или создайте проект.';
   const host=$('rp-items');host.replaceChildren();if(!p?.items.length)return;
@@ -87,6 +109,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  $('rp-to-basket').onclick=()=>change(()=>{const items=P.merge(readBasket(),get().items);localStorage.setItem(P.BASKET,JSON.stringify(items));status('Источники добавлены в общую подборку без удаления прежних')});
  $('rp-csv').onclick=()=>csv('research-project-bibliography.csv',[['Название проекта','Авторы','Название','Дата','Источник','ISSN','Том','Номер','Страницы','Номер статьи','DOI','URL','Редакция каталога'],...get().items.map(x=>[get().title,x.authors,x.title,x.date,x.source,x.issn,x.volume,x.issue,x.pages,x.article_number,x.doi,x.url,x.archive_revision])]);
  $('rp-txt').onclick=()=>download('research-project-references.txt','Рабочая библиография: '+get().title+'\n\n'+get().items.map(P.reference).join('\n'),'text/plain;charset=utf-8');
+ $('rp-bibtex').onclick=()=>download('research-project.bib',P.bibtex(get().items),'text/plain;charset=utf-8');
+ $('rp-ris').onclick=()=>download('research-project.ris',P.ris(get().items),'application/x-research-info-systems');
  $('rp-export').onclick=()=>change(()=>{if(dirty())throw Error('Сначала сохраните изменения');download('research-projects.json',P.encode(state),'application/json')});
  $('rp-import').onchange=async()=>{const input=$('rp-import'),file=input.files[0];if(!file)return;try{if(locked||file.size>P.MAX_BYTES)throw Error('Файл слишком большой или хранилище недоступно');if(dirty())throw Error('Сначала сохраните изменения');const incoming=P.parse(await file.text());persist(P.importCopy(state,incoming,uid));draw();status('Импортированы отдельные проекты: '+incoming.projects.length)}catch(e){status('Импорт отклонён: '+e.message)}finally{input.value=''}};
  draw()

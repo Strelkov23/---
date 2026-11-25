@@ -50,6 +50,29 @@ document.addEventListener('DOMContentLoaded',async()=>{
   try{for(const item of JSON.parse(localStorage.getItem(storageKey)||'[]'))if(item&&valid(item.url))basket.set(item.url,item)}catch{persistent=false}
   const complete=r=>Boolean(r.volume&&r.issue&&(r.pages||r.article_number));
   function item(r){return {title:r.title,url:doiURL(r.doi),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics||'',authors:r.authors||'',doi:r.doi||'',issn:meta(r).issn||'',volume:r.volume||'',issue:r.issue||'',pages:r.pages||'',article_number:r.article_number||'',metadata_checked:r.metadata_checked||'',archive_revision:version||''}}
+  const projects=$('paper-project'),projectStatus=$('paper-project-status'),P=ResearchProjects;
+  function projectList(){
+   const old=projects.value;projects.replaceChildren(new Option('Выберите проект',''));
+   try{
+    const data=P.parse(localStorage.getItem(P.KEY)||'{"schema":1,"projects":[]}');
+    for(const x of data.projects)projects.add(new Option(x.title,x.id));
+    projects.value=data.projects.some(x=>x.id===old)?old:'';
+    projectStatus.textContent=data.projects.length?'Выберите проект для прямого добавления статей.':'Создайте проект в разделе «Исследовательские проекты».';
+   }catch(e){projectStatus.textContent='Не удалось прочитать проекты. Данные не изменены.'}
+  }
+  function addProject(rows){
+   try{
+    const id=projects.value;if(!id)throw Error('Выберите проект');
+    const old=P.parse(localStorage.getItem(P.KEY)||'{"schema":1,"projects":[]}');
+    const incoming=rows.filter(r=>doiURL(r.doi)).map(item);
+    const next=P.addToProject(old,id,incoming);
+    localStorage.setItem(P.KEY,P.encode(next));
+    projectStatus.textContent='Сохранено в проекте: '+next.projects.find(x=>x.id===id).items.length+' источников. Общая подборка не изменена.';
+   }catch(e){projectStatus.textContent='Не сохранено: '+e.message}
+  }
+  projectList();
+  projects.onchange=()=>draw();
+  $('paper-project-add-page').onclick=()=>addProject(selected.slice(0,limit));
   function store(){try{localStorage.setItem(storageKey,JSON.stringify([...basket.values()]))}catch{persistent=false}
    $('paper-selection').textContent='В общей подборке: '+fmt(basket.size)+(persistent?' · сохраняется в этом браузере':' · сохранение между страницами недоступно')}
   function toggle(r){const x=item(r);if(!x.url)return;if(basket.has(x.url))basket.delete(x.url);else basket.set(x.url,x);store();draw()}
@@ -76,11 +99,13 @@ document.addEventListener('DOMContentLoaded',async()=>{
     links(access,[['DOI',doi],['Страница издателя',c.status==='ok'&&c.final!==doi?c.final:''],['Метаданные Crossref',doi?'https://api.crossref.org/works/'+doi.slice('https://doi.org/'.length):''],['Сайт журнала',m.site],['Поиск по названию','https://search.crossref.org/?q='+encodeURIComponent(r.title)],['Поиск в Google Scholar','https://scholar.google.com/scholar?q='+encodeURIComponent(r.title)],['Поиск в КиберЛенинке','https://cyberleninka.ru/search?q='+encodeURIComponent(r.title)]]);
     const add=node('button',basket.has(doi)?'Убрать из подборки':'В подборку');add.type='button';add.disabled=!doi;add.setAttribute('aria-pressed',String(basket.has(doi)));add.onclick=()=>toggle(r);
     card.append(node('p',(citation(r)||'Том, номер и страницы пока не загружены')+' · Ссылки Crossref: '+(Number.isFinite(r.cited_by)?fmt(r.cited_by):'нет данных')),add);
+    const projectButton=node('button','В выбранный проект');projectButton.type='button';projectButton.className='paper-project-add';projectButton.disabled=!doi||!projects.value;projectButton.onclick=()=>addProject([r]);card.append(projectButton);
     card.append(access,node('small','Ссылка: '+(labels[state(r)]||'Не проверено')+(c.checked?' · '+c.checked.slice(0,10):'')+(c.detail?' · '+c.detail:'')));
     $('papers').append(card)
    }
    $('paper-selection').textContent='В общей подборке: '+fmt(basket.size)+(persistent?' · сохраняется в этом браузере':' · сохранение между страницами недоступно');
    $('paper-add-page').disabled=!selected.some(r=>doiURL(r.doi));
+   $('paper-project-add-page').disabled=!projects.value||!selected.slice(0,limit).some(r=>doiURL(r.doi));
    $('next').hidden=selected.length<=limit;for(const id of ['references','bibtex','ris','gost'])$(id).disabled=!selected.length;save(ids)
   }
   $('paper-filters').oninput=()=>{limit=30;draw()};$('paper-filters').onsubmit=e=>e.preventDefault();$('paper-filters').onreset=()=>setTimeout(()=>{limit=30;draw()},0);
