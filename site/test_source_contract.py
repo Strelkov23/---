@@ -99,7 +99,7 @@ class JournalTests(unittest.TestCase):
 class PipelineTests(unittest.TestCase):
     def test_registry(self):
         import source_registry as sr
-        self.assertEqual(len(sr.passports()),9)
+        self.assertEqual(len(sr.passports()),10)
         self.assertEqual(sr.identify("https://www.cbr.ru/scripts/XML_dynamic.asp?date_req1=01%2F01%2F2025").id,"cbr_fx")
         self.assertEqual(sr.identify("https://data.nalog.ru/a.xlsx").id,"fns_finance")
         for url in ("https://www.cbr.ru/other","https://data.nalog.ru/a.exe","https://example.org/a.xlsx"):
@@ -120,7 +120,7 @@ class PipelineTests(unittest.TestCase):
             journal.flush();pipeline.flush()
             self.assertEqual(sj.quality(sj.collect(db,ContractTests.stamp))["transport_events"],1)
             d=sp.collect(db,ContractTests.stamp)
-            self.assertEqual(sp.quality(d),dict(pipeline_sources=9,pipeline_events=2,pipeline_rejected=1))
+            self.assertEqual(sp.quality(d),dict(pipeline_sources=10,pipeline_events=2,pipeline_rejected=1))
             self.assertEqual(d["events"][0]["reason"],"ValueError")
             self.assertIsNone(d["events"][0]["count"])
             journal.flush();pipeline.flush()
@@ -233,7 +233,7 @@ class InfrastructureTests(unittest.TestCase):
             (root/"company-rankings.json").write_text(json.dumps(company_import.empty()),encoding="utf-8")
             (root/"sme-matrix.json").write_text(json.dumps(sme_matrix.empty()),encoding="utf-8")
             data=di.publish(lambda *a:None,root,ContractTests.stamp)
-            self.assertEqual(di.quality(data,root),dict(infrastructure_loaders=9,infrastructure_bulk_published=0))
+            self.assertEqual(di.quality(data,root),dict(infrastructure_loaders=10,infrastructure_bulk_published=0))
             key=next(x for x in data["loaders"] if x["id"]=="cbr_key")
             self.assertEqual(key["transport_failed"],1)
             self.assertEqual(key["processing_rejected"],1)

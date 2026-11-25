@@ -122,6 +122,8 @@ with m.connect() as db:
     literature.enrich(db,papers)
     import literature_quality
     literature_quality.decorate(papers,m.now())
+    import openalex_access
+    openalex_access.sync(db,papers,m.now(),"--refresh" in sys.argv)
     journal_counts=Counter(r["journal"] for r in papers)
     journal_checks=[dict(r,journal=literature.JOURNALS.get(r["issn"],r["issn"]),count=journal_counts[literature.JOURNALS.get(r["issn"],r["issn"])]) for r in db.execute("select * from journal_checks")]
     write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),service=literature.service_status(db,m.now()),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))

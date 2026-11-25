@@ -143,6 +143,32 @@ class CatalogueTests(unittest.TestCase):
         lq.quality(d,lit)
         d["total"]["with_cc_evidence"]=2
         with self.assertRaises(ValueError):lq.quality(d,lit)
+    def test_openalex_exact_doi_and_versions(self):
+        import openalex_access as oa
+        raw={"id":"https://openalex.org/W123","doi":"https://doi.org/10.1234/test","open_access":{"is_oa":True,"oa_status":"green"},"best_oa_location":{"is_oa":True,"pdf_url":"https://repository.example.org/paper.pdf","landing_page_url":"https://repository.example.org/paper","version":"acceptedVersion","license":"cc-by","source":{"type":"repository"}}}
+        x=oa.parse(raw,"10.1234/test")
+        self.assertEqual(x["host_type"],"repository")
+        self.assertEqual(x["version"],"acceptedVersion")
+        self.assertTrue(x["is_oa"])
+        with self.assertRaises(ValueError):oa.parse(raw,"10.1234/other")
+        raw["best_oa_location"]["pdf_url"]="http://127.0.0.1/file"
+        self.assertEqual(oa.parse(raw,"10.1234/test")["pdf"],"")
+        raw["open_access"]["oa_status"]="closed"
+        with self.assertRaises(ValueError):oa.parse(raw,"10.1234/test")
+        self.assertEqual(oa.normalize("10.1234/../x"),"")
+    def test_openalex_bounded_and_cached(self):
+        import openalex_access as oa
+        papers=[{"doi":"10.1234/test"},{"doi":"10.1234/next"}]
+        stamp="2026-11-25T10:00:00+00:00"
+        e=dict(work="https://openalex.org/W123",is_oa=True,oa_status="gold",pdf="",landing="https://publisher.example.org/a",license="cc-by",version="publishedVersion",host_type="journal")
+        with patch("openalex_access.retrieve",side_effect=[("accepted",e),("deferred",None)]) as fetch:
+            oa.sync(self.db,papers,stamp,True)
+            oa.sync(self.db,papers,stamp,True)
+            self.assertEqual(fetch.call_count,2)
+        self.assertEqual({oa.quality(p) for p in papers},{"reported_open","deferred"})
+        with patch("openalex_access.retrieve",side_effect=AssertionError("network")):
+            oa.sync(self.db,papers,"2026-11-26T10:00:00+00:00",False)
+        self.assertEqual({oa.quality(p) for p in papers},{"reported_open","deferred"})
     def test_classification_and_audit(self):
         self.db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/a?b","Вопросы экономики","2026-01","Стратегическое планирование промышленности","A",""))
         literature.reclassify(self.db)
