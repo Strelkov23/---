@@ -1,7 +1,7 @@
 name: Economic code checks
 on:
   push:
-    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon]
+    branches: [main, stage3-archive-acceptance, stage-a-data-contract, stage-b-research-centre, stage-c-diagnostics, stage-c-dependencies, stage-c-final-acceptance, stage-d-balance-audit, stage-d-feasibility, stage-d-physical-resources, stage-d-labor, stage-d-investment-horizon, stage-d-cost-decomposition]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:
@@ -89,6 +89,7 @@ jobs:
           ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
           node test-price-model.js
           node test-technology.js
+          node test-cost-decomposition.js
           git rev-parse HEAD > public/source-version.txt
           cp public/source-version.txt public/version.txt
           python3 -c "import json; from pathlib import Path; d=json.loads(Path('public/quality.json').read_text()); print(d); assert not d['errors'],d['errors']"

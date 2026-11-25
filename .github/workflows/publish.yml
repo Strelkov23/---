@@ -143,6 +143,7 @@ jobs:
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
           node test-price-model.js
           node test-technology.js
+          node test-cost-decomposition.js
           git rev-parse HEAD > public/source-version.txt
           cp public/source-version.txt public/version.txt
           python3 -c "import sqlite3; s=sqlite3.connect('data/monitor.db'); d=sqlite3.connect('../history/monitor.db'); s.backup(d); d.close(); s.close()"

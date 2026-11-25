@@ -134,6 +134,23 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/cost-decomposition.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#cd-input tbody tr').length===19",timeout=45000)
+        page.locator("#cd-run").click()
+        assert page.locator("#cd-export").is_disabled()
+        page.locator("#cd-share").fill("50")
+        page.locator("#cd-apply").click()
+        page.locator("#cd-source").fill("Условный тест")
+        page.locator("#cd-import-price").fill("10")
+        page.locator("#cd-run").click()
+        assert page.locator("#cd-results tbody tr").count()==19
+        assert page.locator("#cd-basket tbody tr").count()==1
+        with page.expect_download() as cost:
+            page.locator("#cd-export").click()
+        with open(cost.value.path(),encoding="utf-8-sig",newline="") as f:
+            cost_rows=list(csv.reader(f,delimiter=";"))
+        assert len(cost_rows)==21 and len({len(r) for r in cost_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/horizon-feasibility.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#hf-results tbody tr').length===5",timeout=45000)
         page.locator("#hf-years").fill("3")
