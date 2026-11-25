@@ -188,6 +188,26 @@ with sync_playwright() as p:
         page.wait_for_function("document.querySelector('#labor-status').textContent.includes('Наблюдений производительности:')")
         assert page.locator("#labor-broad tbody tr").count()>=1
         assert page.locator("#labor-regional tbody tr").count()>=1
+        assert page.locator("#labor-decomp-start option").count()>1
+        if page.locator("#labor-decomp-export").is_enabled():
+            assert page.locator("#labor-decomp-table tbody tr").count()==3
+            with page.expect_download() as labor_decomp:
+                page.locator("#labor-decomp-export").click()
+            with open(labor_decomp.value.path(),encoding="utf-8-sig",newline="") as f:
+                labor_rows=list(csv.reader(f,delimiter=";"))
+            assert len(labor_rows)==4 and len({len(r) for r in labor_rows})==1
+        else:
+            assert "Нет двух" in page.locator("#labor-decomp-status").inner_text()
+        assert "Выборка:" in page.locator("#labor-gap-status").inner_text()
+        page.locator("#labor-gap-query").fill("zzzz_no_region")
+        assert page.locator("#labor-gap-export").is_disabled()
+        page.locator("#labor-gap-query").fill("")
+        if page.locator("#labor-gap-table tbody tr").count():
+            with page.expect_download() as labor_gap:
+                page.locator("#labor-gap-export").click()
+            with open(labor_gap.value.path(),encoding="utf-8-sig",newline="") as f:
+                gap_rows=list(csv.reader(f,delimiter=";"))
+            assert len(gap_rows)>1 and len({len(r) for r in gap_rows})==1
         page.goto("http://localhost:8765/prices.html",wait_until="load")
         page.wait_for_function("document.querySelector('#price-status').textContent.includes('Баланс 2021 проверен')")
         assert page.locator("#price-results tbody tr").count()==19

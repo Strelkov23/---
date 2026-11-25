@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),L=require('./labor-data.js'),R=require('./regional-disparities.js');
+const sectors=['agriculture','industry','services'];
+const make=(y,p,w)=>sectors.map((sector,i)=>({sector,title:sector,year:y,productivity_usd2015_per_worker:p[i],employment_share_pct:w[i],productivity_source:'p'+i,employment_source:'e'+i}));
+const a=make(2020,[100,200,300],[50,30,20]),b=make(2024,[120,250,300],[30,30,40]);
+const d=L.decompose([...a,...b],2020,2024);
+assert.equal(d.valid,true);assert.equal(d.a.index,170);assert.equal(d.b.index,231);assert.equal(d.within,23);assert.ok(Math.abs(d.between-38)<1e-9);assert.ok(Math.abs(d.residual)<1e-9);
+assert.equal(L.decompose([...a,...b.slice(0,2)],2020,2024).valid,false);assert.equal(L.snapshot([...a,a[0]],2020).valid,false);assert.equal(L.snapshot(make(2020,[1,2,3],[30,30,30]),2020).valid,false);assert.equal(L.snapshot(make(2020,[1,2,3],[33.3,33.3,33.3]),2020).valid,true);
+assert.equal(L.decompose([...a,...b.map((x,i)=>i===0?{...x,productivity_source:'different'}:x)],2020,2024).valid,false);
+const regions=[['Москва',100],['Томская область',50],['Российская Федерация',1000],['Архангельская область',1000]].map(([territory,v])=>({territory,year:2024,nominal_grp_rub_per_employed:v}));
+const reg=L.regional(regions,2024,R.sample);assert.equal(reg.n,2);assert.equal(reg.median,75);assert.equal(reg.excluded,2);assert.equal(reg.rows[0].ratio,50/75);
+console.log('Labor decomposition and regional conservative sample OK');
