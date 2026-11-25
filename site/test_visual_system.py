@@ -20,6 +20,19 @@ with sync_playwright() as p:
                 page.locator("#rm-map button[aria-label='Увеличить масштаб карты']").click()
                 assert "150%" in page.locator("#rm-map .map-controls span").inner_text()
                 page.locator("#rm-map button[aria-label='Сбросить масштаб карты']").click()
+            if width==390:
+                toggle=page.locator("#mobile-nav-toggle")
+                nav=page.locator("#primary-navigation")
+                assert toggle.is_visible() and not nav.is_visible()
+                toggle.click()
+                assert nav.is_visible() and toggle.get_attribute("aria-expanded")=="true"
+                nav.locator("a").first.focus()
+                page.keyboard.press("Escape")
+                assert not nav.is_visible() and toggle.get_attribute("aria-expanded")=="false"
+                assert toggle.evaluate("e=>document.activeElement===e")
+            else:
+                assert not page.locator("#mobile-nav-toggle").is_visible()
+                assert page.locator("#primary-navigation").is_visible()
             for theme in ("light","dark"):
                 page.locator("#theme-mode").select_option(theme)
                 assert page.locator("html").get_attribute("data-theme")==theme
@@ -34,6 +47,8 @@ with sync_playwright() as p:
                 if route in ("economic-map.html","regional-manufacturing.html"):
                     assert page.locator(".technical-map-legend").first.is_visible()
                     assert page.locator(".technical-map-legend").first.evaluate("(e)=>e.scrollWidth<=e.clientWidth+2")
+                page.evaluate("window.scrollTo(0,0)")
+                page.wait_for_function("window.scrollY===0")
                 page.screenshot(path=str(out/f"{route[:-5]}-{width}-{theme}.png"),animations="disabled",timeout=30000)
                 target={"economic-map.html":"#geo-map","regional-manufacturing.html":"#rm-map","diagnostics.html":"#diag-overview","planning-centre.html":".planning-flow","analyst-cockpit.html":"#analyst-cockpit"}.get(route)
                 if target:

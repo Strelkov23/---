@@ -22,6 +22,21 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  const themeSelect=document.getElementById('theme-mode'),themeKey='economic-visual-theme-v1',media=window.matchMedia('(prefers-color-scheme: dark)');let themeStored;try{themeStored=localStorage.getItem(themeKey)}catch{}
  let chosen=InterfaceMode.theme(themeStored);function drawTheme(){document.documentElement.dataset.theme=InterfaceMode.effectiveTheme(chosen,media.matches);if(themeSelect)themeSelect.value=chosen}
  drawTheme();if(themeSelect)themeSelect.onchange=()=>{chosen=InterfaceMode.theme(themeSelect.value);try{localStorage.setItem(themeKey,chosen)}catch{}drawTheme()};media.addEventListener?.('change',()=>{if(chosen==='system')drawTheme()});
+ const nav=document.getElementById('primary-navigation'),navToggle=document.getElementById('mobile-nav-toggle');
+ if(nav&&navToggle){
+  const narrow=window.matchMedia('(max-width: 600px)');
+  let open=false;
+  function drawNav(){
+   navToggle.hidden=!narrow.matches;
+   nav.hidden=narrow.matches&&!open;
+   navToggle.setAttribute('aria-expanded',String(narrow.matches&&open));
+   navToggle.textContent=open?'Свернуть разделы':'Разделы сайта';
+  }
+  navToggle.addEventListener('click',()=>{open=!open;drawNav()});
+  nav.addEventListener('keydown',e=>{if(e.key==='Escape'&&narrow.matches&&open){open=false;drawNav();navToggle.focus()}});
+  narrow.addEventListener?.('change',()=>{if(narrow.matches&&nav.contains(document.activeElement))navToggle.focus();open=false;drawNav()});
+  drawNav();
+ }
  const hub=document.getElementById('hub-query');
  if(hub){
   const cards=[...document.querySelectorAll('#hub-tools article')],status=document.getElementById('hub-status');
