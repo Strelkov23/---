@@ -735,6 +735,31 @@ with sync_playwright() as p:
             with open(bank_cov.value.path(),encoding="utf-8-sig",newline="") as f:
                 coverage=list(csv.reader(f,delimiter=";"))
             assert len(coverage)==4 and len({len(r) for r in coverage})==1
+        common=page.locator("#bank-common-distribution")
+        assert common.count()==1
+        cards=common.locator(".metric")
+        assert cards.count() in (0,4)
+        if page.locator("#bank-common-export").is_enabled():
+            assert cards.count()==4
+            with page.expect_download() as bank_common:
+                page.locator("#bank-common-export").click()
+            with open(bank_common.value.path(),encoding="utf-8-sig",newline="") as f:
+                joint=list(csv.reader(f,delimiter=";"))
+            assert len(joint)>1 and all(len(r)==9 for r in joint)
+            assert len({r[0] for r in joint[1:]})==len(joint)-1
+            counts=[0,0,0,0]
+            for r in joint[1:]:
+                assert all(v in ("0","1") for v in r[1:4])
+                n=sum(map(int,r[1:4]))
+                assert int(r[4])==n
+                counts[n]+=1
+                assert len(r[8])==64
+            assert counts==[int(cards.nth(i).locator("b").inner_text().replace("\u00a0","").replace("\u202f","").replace(" ","")) for i in range(4)]
+        elif cards.count()==4:
+            assert all(cards.nth(i).locator("b").inner_text()=="0" for i in range(4))
+        else:
+            assert "Распределение недоступно" in common.inner_text()
+
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.wait_for_function("document.querySelector('#bank-ratio-status').textContent.startsWith('Сопоставимых значений:')",timeout=45000)
         bank_balance=json.loads(Path("bank-balance.json").read_text())
