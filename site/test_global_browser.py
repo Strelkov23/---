@@ -1073,6 +1073,23 @@ with sync_playwright() as p:
                 assert page.locator("#rm-delta-table tbody tr").count()>65
                 page.locator("#rm-delta-query").fill("RU-MOS")
                 assert page.locator("#rm-delta-table tbody tr").count()==1
+                assert page.locator("#rm-shift-share tbody tr").count()==1
+                page.locator("#rm-shift-share summary").click()
+                with page.expect_download() as ss_export:
+                    page.locator("#rm-shift-share-export").click()
+                with open(ss_export.value.path(),encoding="utf-8-sig",newline="") as f:
+                    ss_rows=list(csv.reader(f,delimiter=";"))
+                assert len(ss_rows)==2 and len(ss_rows[0])==len(ss_rows[1])
+                assert page.locator("#rm-signal-map svg path[data-region]").count()>65
+                page.locator("#rm-signal-threshold").select_option("20")
+                page.locator("#rm-signal-map path[data-region='RU-MOS']").evaluate("(el)=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))")
+                assert "Московская" in page.locator("#rm-signal-detail").inner_text()
+                with page.expect_download() as sig_export:
+                    page.locator("#rm-signal-export").click()
+                with open(sig_export.value.path(),encoding="utf-8-sig",newline="") as f:
+                    sig_rows=list(csv.reader(f,delimiter=";"))
+                assert len(sig_rows)>65 and len({len(r) for r in sig_rows})==1
+                assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
                 page.locator("#rm-delta-metric").select_option("localizationDelta")
                 with page.expect_download() as regional_delta:
                     page.locator("#rm-delta-export").click()
