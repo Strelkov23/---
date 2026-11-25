@@ -164,7 +164,7 @@ with sync_playwright() as p:
         with open(plan.value.path(),encoding="utf-8-sig",newline="") as f:
             plan_rows=list(csv.reader(f,delimiter=";"))
         assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
-        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
         page.goto("http://localhost:8765/territorial-plan.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#tp-controls tbody input').length>0",timeout=45000)
         page.locator("#tp-target").fill("0")
