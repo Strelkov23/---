@@ -4,8 +4,13 @@ on:
     branches: [main]
     paths: ['site/bank_report_probe.py','site/test_bank_report_probe.py','site/bank_disclosure.py','.github/workflows/bank-report-probe.yml']
   workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * 2'
 permissions:
   contents: read
+concurrency:
+  group: cbr-report-probe
+  cancel-in-progress: false
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -24,10 +29,38 @@ jobs:
           cd site
           python -m unittest test_bank_report_probe.py test_bank_disclosure.py
           python bank_report_probe.py --output ../bank-report-probe
+      - name: Verify both official archives and mapped coverage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('bank-report-probe')
+          report=json.loads((root/'report.json').read_text())
+          archives={r['form']:r for r in report['archives']}
+          assert set(archives)=={'123','135'}, 'Missing form'
+          for form,row in archives.items():
+              assert 'error' not in row and row.get('members'), (form,row.get('error'))
+              raw=json.loads((root/('form-'+form+'-raw.json')).read_text())
+              assert raw['archive_sha256']==row['sha256'], 'Archive fingerprint mismatch'
+              assert raw['date']==row['date'] and raw['form']==form
+              cov=raw['coverage']
+              assert cov['matched_unique_regn']>0 and cov['values_unique_regn']>0
+              assert cov['matched_unique_regn']+len(cov['unmatched_regn'])==cov['values_unique_regn']
+          mapped=json.loads((root/'form-135-documented.json').read_text())
+          counts=mapped['counts']
+          assert mapped['archive_sha256']==archives['135']['sha256']
+          assert mapped['date']==archives['135']['date']
+          assert counts['observations']==len(mapped['rows'])>0
+          assert counts['observations']+sum(counts['excluded'].values())==counts['source_active_rows']
+          assert counts['organizations']==len({r['registration_number'] for r in mapped['rows']})
+          assert counts['codes']==len({r['code'] for r in mapped['rows']})
+          assert all(r['date']==mapped['date'] for r in mapped['rows'])
+          print('Both archives and documented form 135 coverage verified:',counts)
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bank-form-123-source-structure
           path: bank-report-probe/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 45
