@@ -85,6 +85,16 @@ with sync_playwright() as p:
         assert signal.value.suggested_filename.startswith("economic-change-signals-")
         page.locator("#diag-signals-rule").select_option("")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/diagnostic-backtest.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#db-configs tbody tr').length===9",timeout=30000)
+        assert page.locator("#db-grid tbody tr").count()==26
+        page.locator("#db-start").fill("2010")
+        assert page.locator("#db-grid tbody tr").count()==16
+        with page.expect_download() as backtest:
+            page.locator("#db-export").click()
+        assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
+        assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
         page.wait_for_function("document.querySelector('#stress-limit-chart svg')!==null",timeout=30000)
