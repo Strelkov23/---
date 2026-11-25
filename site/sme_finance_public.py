@@ -50,13 +50,13 @@ def quality(d,index=None,matrix=None):
             if r["status"] in ("not_matched","region_excluded"):
                 if set(r)!={"inn","status"}:raise ValueError("Неподтверждённый паспорт")
                 continue
-            if r["status"]!="matched" or set(r)!={"inn","status","ogrn","region","declared","dver","reported","rver","member","sha256","document"}:raise ValueError("Паспорт МСП")
+            if r["status"]!="matched" or set(r)!={"inn","status","ogrn","region","declared","dver","reported","rver","member","sha256","accepted_ordinal"}:raise ValueError("Паспорт МСП")
             ogrn=r["ogrn"]
             if not isinstance(ogrn,str) or not re.fullmatch(r"\d{13}",ogrn) or int(ogrn[:12])%11%10!=int(ogrn[-1]) or r["region"] not in eligible:raise ValueError("ОГРН/регион")
             for key,version in (("declared","dver"),("reported","rver")):
                 v=r[key];ver=r[version]
                 if (v is None)!=(ver is None) or v is not None and (not isinstance(v,str) or not re.fullmatch(r"\d{2}(?:\.\d{1,2}){0,2}",v) or ver not in ("2001","2014")):raise ValueError("ОКВЭД")
-            if not isinstance(r["member"],str) or not r["member"].lower().endswith(".xml") or not re.fullmatch(r"[0-9a-f]{64}",r["sha256"]) or type(r["document"]) is not int or r["document"]<1:raise ValueError("Источник паспорта")
+            if not isinstance(r["member"],str) or not r["member"].lower().endswith(".xml") or not re.fullmatch(r"[0-9a-f]{64}",r["sha256"]) or type(r["accepted_ordinal"]) is not int or r["accepted_ordinal"]<1:raise ValueError("Источник паспорта")
     return {"sme_finance_matched":i,"sme_finance_cells":total}
 def publish(out,previous):
     index=json.loads((out/"company-index.json").read_text());matrix=json.loads((out/"sme-matrix.json").read_text());d=empty()
