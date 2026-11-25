@@ -1,8 +1,8 @@
 name: Expanded interface audit
 on:
   push:
-    branches: [stage-g-accessibility-audit]
-    paths: ['site/layout_audit.py', '.github/workflows/expanded-interface-audit.yml']
+    branches: [stage-g-accessibility-audit, stage-g-release-integration]
+    paths: ['site/**', '.github/workflows/expanded-interface-audit.yml', '.github/workflows/validate.yml']
   workflow_dispatch:
 permissions:
   contents: read

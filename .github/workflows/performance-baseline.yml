@@ -1,8 +1,8 @@
 name: Browser performance baseline
 on:
   push:
-    branches: [stage-g-performance-baseline]
-    paths: ['.github/workflows/performance-baseline.yml']
+    branches: [stage-g-performance-baseline, stage-g-release-integration]
+    paths: ['site/**', '.github/workflows/performance-baseline.yml', '.github/workflows/validate.yml']
   workflow_dispatch:
 permissions:
   contents: read
