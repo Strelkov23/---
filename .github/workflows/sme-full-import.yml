@@ -24,7 +24,7 @@ jobs:
           cd site
           python -m unittest test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py test_sme_artifact.py
           python sme_full_import.py --output ../sme-full --financial-index ../history/published --allow-diagnostic
-          python sme_artifact.py ../sme-full
+          python sme_artifact.py ../sme-full --financial-index ../history/published/company-index.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
