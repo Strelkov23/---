@@ -6,6 +6,7 @@ from datetime import date
 from html import escape
 from urllib.parse import urlsplit
 from literature import public_link
+import openalex_access
 
 FILE="literature-quality.json"
 NOTE="Охват относится только к локальному каталогу, не ко всем статьям журналов. Лицензии заявлены в Crossref; даже действующая CC-лицензия конкретной версии не доказывает доступность файла. Сохранённые библиографические поля отмечены датой последнего получения. Пропуск не означает отсутствие в оригинале."
@@ -52,7 +53,8 @@ def counts(articles,audit,as_of):
         r["with_cc_evidence"]+=bool(license_evidence(p,as_of))
         s=audit.get(p["doi"],{}).get("status","unchecked")
         r["link_"+s]+=1
-    keys=("total","with_authors","with_volume","with_issue","with_pages","with_article_number","with_language","complete_bibliography","carried_bibliography","with_citations","with_access_metadata","with_license","with_reading_link","with_cc_evidence","link_ok","link_missing","link_restricted","link_error","link_unchecked")
+        r["oa_"+openalex_access.quality(p)]+=1
+    keys=("total","with_authors","with_volume","with_issue","with_pages","with_article_number","with_language","complete_bibliography","carried_bibliography","with_citations","with_access_metadata","with_license","with_reading_link","with_cc_evidence","link_ok","link_missing","link_restricted","link_error","link_unchecked","oa_reported_open","oa_reported_closed","oa_not_found","oa_error","oa_deferred","oa_unchecked")
     return {k:r[k] for k in keys}
 
 def collect(literature,stamp):
@@ -72,17 +74,17 @@ def collect(literature,stamp):
 
 def quality(data,literature):
     if data!=collect(literature,data["built"]):raise ValueError("Сводка качества не воспроизводится")
-    return {"literature_"+k:v for k,v in data["total"].items() if k in ("complete_bibliography","carried_bibliography","with_access_metadata","with_cc_evidence","with_reading_link")}
+    return {"literature_"+k:v for k,v in data["total"].items() if k in ("complete_bibliography","carried_bibliography","with_access_metadata","with_cc_evidence","with_reading_link","oa_reported_open","oa_reported_closed","oa_unchecked")}
 
 def render(data):
     e=lambda x:escape(str(x),quote=True)
     body='<section class="mast"><p class="kicker">Научно-исследовательский центр</p><h1>Качество научного каталога</h1><p>'+e(NOTE)+'</p><p><a href="papers.html">Поиск статей</a> · <a href="journal-evidence.html">Классификация журналов</a> · <a href="'+FILE+'">Сводка JSON</a></p></section><section><h2>Полнота библиографических сведений</h2><div class="metrics">'
-    for k,label in (("total","Статей"),("complete_bibliography","Авторы, том, номер и страницы / номер статьи"),("with_access_metadata","Метаданные лицензии / текста получены"),("with_cc_evidence","Заявленная действующая CC-лицензия версии"),("carried_bibliography","Ранее полученные поля")):
+    for k,label in (("total","Статей"),("complete_bibliography","Авторы, том, номер и страницы / номер статьи"),("with_access_metadata","Метаданные лицензии / текста получены"),("with_cc_evidence","Заявленная действующая CC-лицензия версии"),("carried_bibliography","Ранее полученные поля"),("oa_reported_open","Свободная копия по OpenAlex"),("oa_unchecked","Не проверено OpenAlex")):
         body+='<div class="metric"><b>'+e(data["total"][k])+'</b>'+e(label)+'</div>'
-    body+='</div><p>Критерий полноты — индикатор заполнения полей, а не универсальное требование к статье: у некоторых журналов нет номера или страниц.</p><div class="table-scroll" tabindex="0"><table><thead><tr><th>Журнал / ISSN</th><th>Статей</th><th>Полные сведения</th><th>Лицензии</th><th>Ссылка на текст</th><th>CC версии</th><th>DOI проверен HTTP</th><th>Ошибки / ограничения DOI</th></tr></thead><tbody>'
+    body+='</div><p>Критерий полноты — индикатор заполнения полей, а не универсальное требование к статье: у некоторых журналов нет номера или страниц.</p><div class="table-scroll" tabindex="0"><table><thead><tr><th>Журнал / ISSN</th><th>Статей</th><th>Полные сведения</th><th>Лицензии</th><th>Ссылка на текст</th><th>CC версии</th><th>Свободная копия по OpenAlex</th><th>DOI проверен HTTP</th><th>Ошибки / ограничения DOI</th></tr></thead><tbody>'
     for r in data["journals"]:
         c=r["counts"]
-        body+='<tr><td>'+e(r["journal"])+' · '+e(r["issn"] or "—")+'</td>'+''.join('<td>'+e(v)+'</td>' for v in (c["total"],c["complete_bibliography"],c["with_license"],c["with_reading_link"],c["with_cc_evidence"],c["link_ok"],c["link_missing"]+c["link_restricted"]+c["link_error"]))+'</tr>'
+        body+='<tr><td>'+e(r["journal"])+' · '+e(r["issn"] or "—")+'</td>'+''.join('<td>'+e(v)+'</td>' for v in (c["total"],c["complete_bibliography"],c["with_license"],c["with_reading_link"],c["with_cc_evidence"],c["oa_reported_open"],c["link_ok"],c["link_missing"]+c["link_restricted"]+c["link_error"]))+'</tr>'
     return body+'</tbody></table></div></section>'
 
 def publish(page,out,stamp):

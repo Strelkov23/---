@@ -39,7 +39,8 @@ SOURCES={s.id:s for s in (
     Source("cbr_money_xlsx","ЦБ · история денежных агрегатов",CBR,"/vfs/statistics/credit_statistics/monetary_agg.xlsx",(),"XLSX",16000000,25,"money_history.parse","При ежедневной сборке"),
     Source("fns_finance","ФНС · отраслевые финансовые таблицы",("data.nalog.ru",),"",(".xls",".xlsx"),"XLS/XLSX",8000000,20,"finance_workbooks.parse","До двух файлов за сборку; 30/7 дней"),
     Source("wdi_series","Всемирный банк · годовые ряды России",("api.worldbank.org",),"",(),"JSON/API",8000000,18,"series.parse_response","При ежедневной сборке",r"/v2/country/RUS/indicator/[A-Za-z0-9_.-]+"),
-    Source("wdi_metadata","Всемирный банк · метаданные показателей",("api.worldbank.org",),"/v2/indicator",(),"JSON/API",8000000,20,"wdi_metadata.collect","Раз в 7 дней")
+    Source("wdi_metadata","Всемирный банк · метаданные показателей",("api.worldbank.org",),"/v2/indicator",(),"JSON/API",8000000,20,"wdi_metadata.collect","Раз в 7 дней"),
+    Source("openalex_oa","OpenAlex · сведения о свободных копиях",("api.openalex.org",),"",(),"JSON/API",1000000,10,"openalex_access.parse","До 10 DOI в сутки; повтор через 90 дней",r"/works/doi:10\.\d{4,9}/[A-Za-z0-9._~%/-]+")
 )}
 
 def identify(url):
