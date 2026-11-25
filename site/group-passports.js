@@ -52,7 +52,7 @@ const GroupPassports=(()=>{
   const spec=ratioSpecs.find(x=>x.id===id);if(!spec||!Number.isInteger(year))throw Error('Параметры сравнения');
   const rows=filterGroups(d,sector).map(g=>{
    const r=ratios(g,year).find(x=>x.id===id);
-   const special=spec.den==='revenue'&&g.id==='rushydro';
+   const special=spec.den==='revenue'&&['rushydro','alrosa'].includes(g.id);
    const reason=g.scope!=='consolidated'||g.standard!=='IFRS'?'Несопоставимый стандарт или периметр':special?'Выручка без субсидий: исключена из сравнения маржи':!r.numerator?'Нет сопоставимого числителя':!r.denCurrent?'Нет знаменателя за выбранный год':spec.average&&!r.denPrevious?'Нет знаменателя за предыдущий год':r.denominator===null?'Неположительный знаменатель':r.value===null?'Расчёт недоступен':null;
    return {...r,value:reason?null:r.value,id:g.id,name:g.name,sector:g.sector,source:g.source,section:g.section,sourceKind:g.source_kind||'documentary',note:g.note||'',reason};
   }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
