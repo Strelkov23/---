@@ -58,7 +58,15 @@ const GroupPassports=(()=>{
   }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
   return {spec,rows,eligible:rows.filter(r=>r.value!==null).length};
  }
- return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs};
+ function coverage(d,year){
+  const groups=d.groups.map(g=>{
+   const observed=g.metrics.filter(m=>m.observations.some(o=>o.year===year)).length;
+   const coefficients=ratioSpecs.filter(spec=>ratioComparison({groups:[g]},year,spec.id).eligible===1).length;
+   return {id:g.id,name:g.name,sector:g.sector,standard:g.standard,observed,coefficients,revenue:revenueComparison({groups:[g]},year).eligible===1,source:g.source};
+  });
+  return {groups,total:groups.length,withObservations:groups.filter(g=>g.observed>0).length,ifrs:groups.filter(g=>g.standard==='IFRS').length,observations:groups.reduce((a,g)=>a+g.observed,0),coefficients:groups.reduce((a,g)=>a+g.coefficients,0),revenue:groups.filter(g=>g.revenue).length};
+ }
+ return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs,coverage};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -146,6 +154,23 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     ct.replaceChildren(t);ce2.disabled=!r.rows.length;ce2.onclick=()=>csv('group-ratio-comparison-'+r.spec.id+'-'+y+'.csv',[['Год','Код коэффициента','Группа','Отрасль','Единица','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Знаменатель на конец года','Знаменатель на начало года','Причина отсутствия','Оговорки','Тип источника','Источник','Раздел','Отпечаток манифеста'],...r.rows.map(x=>[y,r.spec.id,x.name,x.sector,r.spec.unit,x.value,x.numerator?.value,x.denominator,x.denCurrent?.value,x.denPrevious?.value,x.reason,x.note,x.sourceKind,x.source,x.section,m.data_fingerprint])]);
    }
    cy.onchange=cm.onchange=cs2.onchange=cross;cross();
+  }
+  const vy=$('group-coverage-year'),vt=$('group-coverage-table'),vs=$('group-coverage-summary'),ve=$('group-coverage-export');
+  if(vy&&vt&&vs&&ve){
+   const years=[...new Set(d.groups.flatMap(g=>g.metrics.flatMap(p=>p.observations.map(r=>r.year))))].sort((a,b)=>b-a);
+   vy.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
+   function coverageDraw(){
+    const y=Number(vy.value),c=GroupPassports.coverage(d,y);
+    vs.replaceChildren();
+    for(const [label,v] of [['Групп в каталоге',c.total],['С наблюдениями за год',c.withObservations],['С маркировкой МСФО',c.ifrs],['Наблюдений за год',c.observations],['Сопоставимая выручка',c.revenue],['Допущенных коэффициентов',c.coefficients]]){
+     const item=node('div','');item.className='metric';item.append(node('b',String(v)),node('span',label));vs.append(item);
+    }
+    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
+    for(const label of ['Группа','Отрасль','Основа отчётности','Наблюдений за год','Допущено коэффициентов из 8','Сопоставимая выручка','Источник']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const g of c.groups){const tr=b.insertRow();for(const v of [g.name,g.sector,g.standard==='IFRS'?'МСФО':'Раскрываемый комплект на основе МСФО',g.observed,g.coefficients,g.revenue?'Да':'Нет'])tr.insertCell().textContent=v;const a=node('a','Документ');a.href=g.source;tr.insertCell().append(a)}
+    vt.replaceChildren(t);ve.disabled=!c.total;ve.onclick=()=>csv('group-coverage-'+y+'.csv',[['Год','Группа','Отрасль','Основа отчётности','Число наблюдений','Допущено коэффициентов','Всего коэффициентов','Сопоставимая выручка','Источник','Отпечаток манифеста'],...c.groups.map(g=>[y,g.name,g.sector,g.standard,g.observed,g.coefficients,GroupPassports.ratioSpecs.length,g.revenue,g.source,m.data_fingerprint])]);
+   }
+   vy.onchange=coverageDraw;coverageDraw();
   }
  }catch(e){status.textContent='Паспорта недоступны: '+String(e.message||e)}
 });
