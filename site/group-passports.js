@@ -266,3 +266,19 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
  }catch(e){status.textContent='Паспорта недоступны: '+String(e.message||e)}
 });
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const status=document.getElementById('group-discovery-status'),host=document.getElementById('group-discovery-table');if(!status||!host)return;
+ try{
+  const m=await Provenance.validateManifest(await load('data-manifest.json'));
+  const e=await Provenance.get(m,'corporate-discovery.json',root),d=e.data;
+  const labels={x5:'X5',yandex:'Яндекс',ozon:'Ozon'},states={waiting:'Ожидает проверки',ok:'Ссылки распознаны',unavailable:'Недоступно / не распознано'};
+  const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();let total=0;
+  for(const label of ['Компания','Состояние каталога','Последняя проверка','Документ-кандидат','Впервые обнаружен','Последний раз обнаружен']){const th=node('th',label);th.scope='col';h.append(th)}
+  for(const [k,r] of Object.entries(d.rows)){
+   const entries=r.candidates.length?r.candidates:[null];total+=r.candidates.length;
+   for(const x of entries){const tr=body.insertRow();tr.insertCell().textContent=labels[k]||k;tr.insertCell().textContent=states[r.status]+(r.error?' · '+r.error:'');tr.insertCell().textContent=r.checked||'—';const td=tr.insertCell();if(x){const u=new URL(x.url),source=new URL(r.url);if(u.protocol!=='https:'||u.hostname!==source.hostname)throw Error('Недопустимый URL кандидата');const a=node('a',x.title);a.href=x.url;td.append(a)}else td.textContent='Нет подтверждённых ссылок';tr.insertCell().textContent=x?.first_seen||'—';tr.insertCell().textContent=x?.last_seen||'—'}
+  }
+  host.replaceChildren(t);status.textContent='Каталогов: '+Object.keys(d.rows).length+' · кандидатов: '+total+'. Не импортированная финансовая статистика.';
+ }catch(e){status.textContent='Поиск публикаций недоступен: '+String(e.message||e)}
+});
