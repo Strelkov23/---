@@ -1,11 +1,11 @@
 name: Economic code checks
 on:
   push:
-    branches: [main]
+    branches: [main, stage3-archive-acceptance]
     paths: ['EconomicsPages.zip', 'site/**', '.github/workflows/validate.yml']
   workflow_dispatch:
 concurrency:
-  group: economic-code-checks
+  group: economic-code-checks-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
