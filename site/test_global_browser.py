@@ -321,6 +321,19 @@ with sync_playwright() as p:
         assert len(level_rows)==len(groups["groups"])+1 and len({len(r) for r in level_rows})==1
         page.locator("#group-cross-metric").select_option("equity_share")
         assert page.locator("#group-cross-table tbody tr").count()==len(groups["groups"])
+        x5=next((g for g in groups["groups"] if g["id"]=="x5"),None)
+        if x5 and any(m.get("source") for m in x5["metrics"]):
+            page.locator("#group-pick").select_option("x5")
+            metric=next(m for m in x5["metrics"] if m.get("source"))
+            page.locator("#group-metric").select_option(metric["id"])
+            assert page.locator("#group-chart a").get_attribute("href")==metric["source"]
+            with page.expect_download() as x5csv:
+                page.locator("#group-export").click()
+            with open(x5csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                x5rows=list(csv.reader(f,delimiter=";"))
+            source_col=x5rows[0].index("Источник")
+            code_col=x5rows[0].index("Код")
+            assert all(row[source_col]==metric["source"] for row in x5rows[1:] if row[code_col]==metric["id"])
         if any(g["id"]=="nlmk" for g in groups["groups"]):
             page.locator("#group-pick").select_option("nlmk")
             assert "не полный комплект" in page.locator("#group-detail").inner_text()
