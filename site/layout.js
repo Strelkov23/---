@@ -24,6 +24,22 @@ if(typeof module!=='undefined')module.exports=MapViewport;
 (function(){
  if(typeof document==='undefined')return;
  const known='.atlas-table,.table-scroll,#month-list,#stat-list,#pair-table';
+ const watched=new WeakSet();
+ const resize=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>{for(const e of entries){const wrap=e.target;if(!wrap.isConnected){resize.unobserve(wrap);continue}updateWide(wrap)}}):null;
+ function updateWide(wrap){
+  const hint=wrap.previousElementSibling;
+  if(!hint||!hint.classList.contains('table-scroll-hint'))return;
+  const wide=wrap.scrollWidth>wrap.clientWidth+3;wrap.dataset.wide=String(wide);hint.dataset.visible=String(wide);
+ }
+ function tableHint(wrap){
+  if(!watched.has(wrap)){
+   watched.add(wrap);
+   const hint=document.createElement('p');hint.className='table-scroll-hint';hint.setAttribute('aria-hidden','true');hint.textContent='↔ Прокрутите таблицу горизонтально, чтобы увидеть все столбцы.';
+   wrap.before(hint);if(resize)resize.observe(wrap);
+  }
+  updateWide(wrap);
+ }
+
  function enhance(root){
   for(const table of root.querySelectorAll('table')){
    if(table.closest(known))continue;
@@ -40,10 +56,13 @@ if(typeof module!=='undefined')module.exports=MapViewport;
    if(!wrap.hasAttribute('tabindex'))wrap.tabIndex=0;
    if(!wrap.hasAttribute('role'))wrap.setAttribute('role','region');
    if(!wrap.hasAttribute('aria-label'))wrap.setAttribute('aria-label','Таблица данных; при необходимости прокручивайте по горизонтали');
+   if(root.querySelector('.atlas-tools'))tableHint(wrap);
   }
  }
  function start(){
   const main=document.querySelector('main');if(!main)return;
+  const tools=main.querySelector('.atlas-tools');
+  if(tools){for(const section of main.querySelectorAll(':scope > section:not(.mast)')){if(!section.id)continue;const link=document.createElement('a');link.className='atlas-back';link.href='#atlas-tools';link.textContent='↑ К инструментам страницы';section.append(link)}}
   enhance(main);
   let scheduled=false;
   new MutationObserver(records=>{

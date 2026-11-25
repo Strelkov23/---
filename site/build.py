@@ -58,6 +58,7 @@ def page(name, body):
     import re
     from html import unescape
     body=method_passports.links(body,name)
+    body=navigation.atlas_tools(name,body)
     match=re.search(r"<h1[^>]*>(.*?)</h1>",body,re.S)
     title=unescape(re.sub(r"<[^>]+>","",match.group(1))) if match else "Экономический обзор России"
     shell=Path("shell.html").read_text()

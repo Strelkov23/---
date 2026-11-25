@@ -241,3 +241,37 @@ def guide(page):
     if not row:return ""
     message,term,method=row
     return '<aside class="page-guide" aria-label="Подсказка"><strong>Как пользоваться</strong><p>'+escape(message)+'</p><p>'+a("glossary.html#"+term,"Объяснение термина")+' · '+a("methodology.html#"+method,"Методика расчёта")+'</p></aside>'
+
+# Task-first navigation for long atlas pages. Each destination is a real
+# section anchor; the underlying tools, data and methods remain unchanged.
+ATLAS_TASKS={
+ "company-atlas.html":("Предприятия и компании",[
+  ("company-name","Поиск организации","Найти по названию"),("company-lookup","Паспорт по ИНН","Финансы и численность"),("company-compare","Сравнить организации","До пяти юридических лиц"),("group-passports","Крупные компании","МСФО и динамика групп"),("sme-finance","Малый и средний бизнес","Финансы по регионам и отраслям"),("company-rankings","Рейтинги предприятий","Доходы, расходы, работники"),("sme-matrix","Структура МСП","Классы ОКВЭД"),("company-coverage","Полнота данных","Источники и охват")]),
+ "banks.html":("Банковский атлас",[
+  ("bank-directory-section","Найти банк","Название, ОГРН, лицензия"),("bank-capital","Капитал","Регуляторный капитал"),("bank-balance","Балансы","Активы и обязательства"),("bank-profit","Финансовые результаты","Доходы и расходы"),("bank-history","Динамика капитала","Отдельные отчётные даты"),("bank-coverage","Полнота отчётности","Проверенные записи"),("bank-archive-coverage","Архивы ЦБ","Охват форм 123 и 135")]),
+ "economic-map.html":("Экономическая карта",[
+  ("regional-map","Карта показателей","Тема, показатель, год"),("geo-dashboard","Досье региона","Структура и динамика")]),
+ "facility-map.html":("Производственные площадки",[
+  ("facility-energy-section","Энергетические объекты","Карта и фильтры"),("amur-enterprise-directory","Промышленные предприятия","Каталог Амурской области"),("sme-map-section","МСП по регионам","Региональные сравнения"),("enterprise-source-section","Источники предприятий","Проверенные и ожидаемые")]),
+ "sector-passports.html":("Отраслевые паспорта",[
+  ("sp-dynamics","Динамика","Ряды и графики"),("sp-finance","Финансы отрасли","Показатели ФНС"),("sp-capital","Фонды и мощности","Износ, обновление, загрузка"),("sp-links","Производственные связи","Межотраслевые и региональные данные")]),
+ "regional-manufacturing.html":("Специализация регионов",[
+  ("rm-overview","Карта отраслей","Добыча, обработка, энергетика"),("rm-ranking","Сравнить регионы","Отгрузка и локализация"),("rm-structural-change","Изменение специализации","Сравнение периодов"),("rm-concentration","Концентрация","Структура выпуска"),("rm-shift","Структурные сдвиги","Динамика состава отгрузки"),("rm-geoconcentration","География отрасли","Доли и охват")]),
+ "industrial.html":("Промышленность",[
+  ("industrial-comparison","Сравнить выпуск","Виды деятельности и продукция"),("energy-output","Энергоресурсы","Натуральный выпуск"),("electricity-balance","Электроэнергия","Ресурсы и использование"),("fossil-production","Уголь, нефть и газ","Энергосодержание"),("metallurgy-output","Металлургия","Натуральное производство")]),
+ "project-coverage.html":("Инвестиционные проекты",[
+  ("project-registers","Региональные реестры","Источники и редакции"),("project-search","Найти проект","Регион, отрасль, статус"),("project-numeric-coverage","Полнота показателей","Стоимость и рабочие места"),("project-discovery","Новые источники","Кандидаты на импорт")]),
+}
+def atlas_tools(page,body):
+    import re
+    config=ATLAS_TASKS.get(page)
+    if not config:return body
+    label,tasks=config
+    ids=set(re.findall(r'\bid=["\']([^"\']+)["\']',body))
+    if any(target not in ids for target,_,_ in tasks):raise ValueError("Отсутствует переход в атласе "+page)
+    first=body.find("</section>")
+    if first<0:raise ValueError("Отсутствует начало атласа")
+    first+=len("</section>")
+    links=''.join('<a class="atlas-task" href="#'+escape(target,quote=True)+'"><strong>'+escape(title)+'</strong><span>'+escape(desc)+'</span><span class="atlas-task-arrow" aria-hidden="true">↗</span></a>' for target,title,desc in tasks)
+    menu='<nav id="atlas-tools" class="atlas-tools" aria-label="Инструменты: '+escape(label,quote=True)+'"><div class="atlas-tools-head"><h2>Что вы хотите сделать?</h2><p>Быстрый переход к нужному инструменту на этой странице.</p></div><div class="atlas-task-grid">'+links+'</div></nav>'
+    return body[:first]+menu+body[first:]
