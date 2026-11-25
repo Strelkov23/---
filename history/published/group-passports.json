@@ -241,11 +241,297 @@
       "name": "X5",
       "sector": "Розничная торговля",
       "role": "Продовольственная розница; сети Пятёрочка, Перекрёсток и Чижик.",
-      "source": "https://www.x5.ru/ru/news/x5-obyavlyaet-o-roste-vyruchki-na-188-v-2025-g-rentabelnost-skorr-ebitda-do-primeneniya-msfo-ifrs-16-sostavila-61/",
-      "section": "Заголовок и описание годовых результатов 2025 г.",
+      "source": "https://www.x5.ru/wp-content/uploads/2026/03/auditorskoe-zaklyuchenie-i-finansovaya-otchetnost_pao-kcz-iks-5_2025.pdf",
+      "section": "Аудированная консолидированная финансовая отчётность за 2025 год, с. 9–11",
       "standard": "IFRS",
       "scope": "consolidated",
       "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3908047"
+            },
+            {
+              "year": 2025,
+              "value": "4642034"
+            }
+          ],
+          "comparable": "annual_consolidated_revenue_rub"
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "950372"
+            },
+            {
+              "year": 2025,
+              "value": "1119209"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "218138"
+            },
+            {
+              "year": 2025,
+              "value": "247644"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль до налогообложения",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "127475"
+            },
+            {
+              "year": 2025,
+              "value": "108788"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за год (МСФО, с учётом аренды)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "104064"
+            },
+            {
+              "year": 2025,
+              "value": "83139"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров материнской компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "103314"
+            },
+            {
+              "year": 2025,
+              "value": "83080"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1843135"
+            },
+            {
+              "year": 2025,
+              "value": "1925482"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "271188"
+            },
+            {
+              "year": 2025,
+              "value": "96911"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1571947"
+            },
+            {
+              "year": 2025,
+              "value": "1828571"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "421511"
+            },
+            {
+              "year": 2025,
+              "value": "513535"
+            }
+          ]
+        },
+        {
+          "id": "right_of_use_assets",
+          "label": "Активы в форме права пользования",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "554554"
+            },
+            {
+              "year": 2025,
+              "value": "583174"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Оборотные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "645597"
+            },
+            {
+              "year": 2025,
+              "value": "593982"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Краткосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "837841"
+            },
+            {
+              "year": 2025,
+              "value": "885447"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_liabilities",
+          "label": "Долгосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "734106"
+            },
+            {
+              "year": 2025,
+              "value": "943124"
+            }
+          ]
+        },
+        {
+          "id": "inventories",
+          "label": "Запасы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "325569"
+            },
+            {
+              "year": 2025,
+              "value": "342314"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "67933"
+            },
+            {
+              "year": 2025,
+              "value": "178454"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый денежный поток по операционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "277383"
+            },
+            {
+              "year": 2025,
+              "value": "300569"
+            }
+          ]
+        },
+        {
+          "id": "investment_cash_flow",
+          "label": "Чистый денежный поток по инвестиционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-236053"
+            },
+            {
+              "year": 2025,
+              "value": "-31623"
+            }
+          ]
+        },
+        {
+          "id": "financing_cash_flow",
+          "label": "Чистый денежный поток по финансовой деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-12549"
+            },
+            {
+              "year": 2025,
+              "value": "-156630"
+            }
+          ]
+        },
         {
           "id": "revenue_growth",
           "label": "Рост выручки год к году (сообщённый эмитентом)",
@@ -255,7 +541,9 @@
               "year": 2025,
               "value": "18.8"
             }
-          ]
+          ],
+          "source": "https://www.x5.ru/ru/news/x5-obyavlyaet-o-roste-vyruchki-na-188-v-2025-g-rentabelnost-skorr-ebitda-do-primeneniya-msfo-ifrs-16-sostavila-61/",
+          "section": "Пресс-релиз эмитента от 20.03.2026"
         },
         {
           "id": "adj_ebitda_margin_pre16",
@@ -266,9 +554,13 @@
               "year": 2025,
               "value": "6.1"
             }
-          ]
+          ],
+          "source": "https://www.x5.ru/ru/news/x5-obyavlyaet-o-roste-vyruchki-na-188-v-2025-g-rentabelnost-skorr-ebitda-do-primeneniya-msfo-ifrs-16-sostavila-61/",
+          "section": "Пресс-релиз эмитента от 20.03.2026"
         }
-      ]
+      ],
+      "source_kind": "issuer_statement",
+      "note": "Денежные показатели — по аудированной отчётности МСФО, включая учёт аренды. Два относительных показателя из пресс-релиза эмитента сохранены с отдельным источником; скорректированная EBITDA до МСФО 16 не смешивается с финансовой отчётностью."
     },
     {
       "id": "rostelecom",
