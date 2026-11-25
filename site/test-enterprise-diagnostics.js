@@ -15,3 +15,14 @@ assert.throws(()=>D.calculate(a,{...b,title:'Дебиторская задолж
 assert.equal(D.scope({note:''}),null);
 assert.equal(D.calculate(a,{...b,values:[row('Москва',0)]},2024,S.sample).rows.find(x=>x.region==='Москва').value,0);
 console.log('Enterprise diagnostics: exact scope, zero and missing tests passed');
+
+const timeline=(values)=>values.map(([year,value,extra])=>row('Москва',value,{year,...extra}));
+const ta={...a,values:timeline([[2020,100],[2021,100],[2023,100],[2024,100]])};
+const tb={...b,values:timeline([[2020,10],[2021,20],[2023,30],[2024,40]])};
+const tr=D.trend(ta,tb,'москва',S.sample);
+assert.deepEqual(tr.map(x=>x.value),[10,20,null,30,40]);
+assert.deepEqual(tr.map(x=>x.change),[null,10,null,null,10]);
+const changed=note.replace('ОКАТО: 2','ОКАТО: 3');
+const tc={...ta,values:timeline([[2020,100],[2021,100,{note:changed}]])};
+const td={...tb,values:timeline([[2020,10],[2021,20,{note:changed}]])};
+assert.equal(D.trend(tc,td,'москва',S.sample)[1].change,null);

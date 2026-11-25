@@ -199,6 +199,19 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/data-registry.html?id=wdi%3ASL.UEM.TOTL.ZS",wait_until="load")
         page.wait_for_function("document.querySelector('#registry-status').textContent.includes('Найдено: 1 из')")
         assert page.locator("#registry-list article").count()==1
+        historical=json.loads(Path("historical.json").read_text())
+        debts=[s for s in historical["series"] if s["title"] in ("Кредиторская задолженность организаций: Всего","Кредиторская задолженность организаций: Просроченная") and s["source"].endswith("/data_11_socio_economic_102_v20260313.zip")]
+        if len(debts)==2:
+            page.goto("http://localhost:8765/historical.html#enterprise-diagnostics",wait_until="load")
+            page.wait_for_function("document.querySelector('#ed-status').textContent.startsWith('Год:')",timeout=45000)
+            assert page.locator("#ed-table tbody tr").count()>60
+            assert page.locator("#ed-table tbody tr").filter(has_text="Сопоставимо").count()>0
+            page.locator("#ed-region").select_option("москва")
+            assert page.locator("#ed-trend-table tbody tr").count()>=20
+            assert page.locator("#ed-trend svg").count()>=1
+            with page.expect_download() as debt:
+                page.locator("#ed-trend-export").click()
+            assert debt.value.suggested_filename=="enterprise-debt-trend-payable.csv"
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#enterprise-source-status').textContent.startsWith('Загрузка')",timeout=30000)
         assert page.locator("#enterprise-source-status article").count()==2
