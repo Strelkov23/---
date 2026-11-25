@@ -142,6 +142,9 @@ def collect(out,stamp):
     for k,title,days in [("system","Системно значимые банки",7),("full","Кредитные организации: полный список",1)]:
         r=banks["datasets"][k]
         add("banks-"+k,"Предприятия",title,r["source"],r,r["edition"],days=days,available=bool(r["rows"]),policy="Официальный перечень ЦБ; не финансовая отчётность",href="banks.html",failure_days=2)
+    corporate=read("company-sources.json")
+    for r in corporate["rows"]:
+        add("company-source-"+r["kind"],"Предприятия","ФНС · "+("Доходы и расходы" if r["kind"]=="income_expense" else "Среднесписочная численность"),r["catalog"],r,str(r["report_year"]) if r["report_year"] else None,days=7,available=bool(r["archive"]),policy="Проверка паспорта и XSD; наблюдения ещё не импортированы",href="company-atlas.html#company-source-check",failure_days=2)
     enterprise=read("enterprise-sources.json")
     for r in enterprise["rows"]:
         title={"organizations":"Организации","entrepreneurs":"ИП"}[r["kind"]]

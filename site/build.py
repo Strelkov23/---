@@ -20,6 +20,7 @@ import facility_data
 import enterprise_sources
 import amur_enterprises
 import bank_registry
+import company_sources
 import industrial_parks
 import park_certificates
 import sme_regions
@@ -156,6 +157,7 @@ facility_data.publish(out,Path("../history/published"),m.now(),"--refresh" in sy
 enterprise_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 amur_enterprises.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 bank_registry.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

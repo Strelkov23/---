@@ -1,0 +1,36 @@
+name: FNS corporate datasets source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/company-source-check.yml','site/company_sources.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify metadata and XSD of both corporate datasets
+        run: |
+          cd site
+          python -m unittest test_company_sources.py
+          python - <<'PY'
+          import company_sources as c,json
+          from pathlib import Path
+          from datetime import datetime,timezone
+          d=c.publish(Path(".."),Path("/nonexistent"),datetime.now(timezone.utc).isoformat(),True)
+          for r in d["rows"]:
+              print("FNS_CORPORATE",json.dumps(r,ensure_ascii=False))
+          print("FNS_COUNTS",c.quality(d))
+          assert all(r["archive"] for r in d["rows"]), "Catalogue metadata unavailable"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corporate-source-metadata
+          path: company-sources.json

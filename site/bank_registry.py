@@ -65,12 +65,12 @@ def parse_full(raw,encoding="utf-8"):
     for i,r in enumerate(tables[0][1:],1):
         if len(r)!=9 or r[0]!=str(i):raise ValueError("Структура строки "+str(i))
         _,kind,reg,ogrn,name,form,registered,status,_address=r
-        if not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or reg in ids or not name or not status or ogrn and not re.fullmatch(r"\d{13}",ogrn):raise ValueError("Идентификатор/статус строки "+str(i))
+        if not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or reg in ids or not name or ogrn and not re.fullmatch(r"\d{13}",ogrn):raise ValueError("Идентификатор/статус строки "+str(i))
         ids.add(reg)
         if registered:
             registered=datetime.strptime(registered,"%d.%m.%Y").date().isoformat()
         # The exact street address is unnecessary for the analytical directory.
-        rows.append(dict(registration_number=reg,ogrn=ogrn or None,name=name,kind=kind or None,legal_form=form or None,registered=registered or None,license_status=status,source_row=i))
+        rows.append(dict(registration_number=reg,ogrn=ogrn or None,name=name,kind=kind or None,legal_form=form or None,registered=registered or None,license_status=status or None,source_row=i))
     if not 100<=len(rows)<=5000:raise ValueError("Неожиданное число записей")
     return dict(schema=1,source=FULL_SOURCE,edition=edition,sha256=hashlib.sha256(raw).hexdigest(),rows=rows,note="Все записи официального списка, в том числе исторические. Статус лицензии не является финансовой оценкой.")
 def fetch_full():
@@ -96,7 +96,7 @@ def quality(d):
             reg=r["registration_number"]
             if reg in ids or not re.fullmatch(r"\d{1,6}(?:[-–][А-ЯA-Z0-9]+)?",reg,re.I) or not r["name"] or r["source_row"]!=i:raise ValueError("Строка перечня")
             ids.add(reg)
-            if kind=="full" and (not r["license_status"] or r["ogrn"] and not re.fullmatch(r"\d{13}",r["ogrn"])):raise ValueError("Поля полного списка")
+            if kind=="full" and (r["license_status"] is not None and (not isinstance(r["license_status"],str) or not r["license_status"].strip()) or r["ogrn"] and not re.fullmatch(r"\d{13}",r["ogrn"])):raise ValueError("Поля полного списка")
     a,b=d["datasets"]["system"],d["datasets"]["full"]
     return {"system_bank_records":len(a["rows"]),"credit_organization_records":len(b["rows"]),"credit_organization_active_license":sum(r["license_status"]=="Действующая" for r in b["rows"])}
 def publish(out,previous,stamp,refresh,fetchers=None):

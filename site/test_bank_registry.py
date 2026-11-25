@@ -30,3 +30,7 @@ class FullDirectoryTests(unittest.TestCase):
             d=b.publish(out,old,"2026-12-03",True,{"system":fail,"full":fail})
             self.assertEqual(d["datasets"]["full"]["status"],"cached")
             self.assertEqual(b.quality(d)["system_bank_records"],12)
+
+    def test_missing_license(self):
+        d=b.parse_full(full_fixture().replace("Действующая".encode(),b"",1))
+        self.assertIsNone(d["rows"][0]["license_status"])

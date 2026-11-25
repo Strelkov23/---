@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json","amur-enterprises.json","bank-directory.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json","amur-enterprises.json","bank-directory.json","company-sources.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -164,6 +164,11 @@ def check(out,previous,stamp):
         counts.update(bank_registry.quality(data["bank-directory.json"]))
         if not all(x["rows"] for x in data["bank-directory.json"]["datasets"].values()):warnings.append("Банковский каталог: неполная загрузка")
     except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Банковский каталог: "+str(e))
+    try:
+        import company_sources
+        counts.update(company_sources.quality(data["company-sources.json"]))
+        if not all(r["schema_verified"] for r in data["company-sources.json"]["rows"]):warnings.append("ФНС: не все схемы корпоративных наборов проверены; наблюдения не импортированы")
+    except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Корпоративные источники: "+str(e))
     try:
         import sme_regions
         old_file=previous/"sme-regions.json"

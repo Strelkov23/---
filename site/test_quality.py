@@ -46,6 +46,8 @@ class QualityTests(unittest.TestCase):
         amur_enterprises.publish(self.out,self.prev,"2026-11-24",False)
         import bank_registry
         bank_registry.publish(self.out,self.prev,"2026-11-24",False)
+        import company_sources
+        company_sources.publish(self.out,self.prev,"2026-11-24",False)
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
