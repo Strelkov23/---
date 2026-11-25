@@ -293,3 +293,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #group-level-chart,#group-level-table,#group-level-year,#group-level-metric,#group-level-sector{min-width:0;max-width:100%;overflow-wrap:anywhere}#group-level-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}#group-level-chart strong{white-space:normal}#group-level-table table{min-width:850px}
 
 #sme-pair-table,#sme-pair-overview,#sme-pair-kind,#sme-pair-class,#sme-pair-metric{min-width:0;max-width:100%;overflow-wrap:anywhere}#sme-pair-table table{min-width:760px}
+
+#project-search-table,#project-search-summary,#project-search .project-controls{min-width:0;max-width:100%;overflow-wrap:anywhere}#project-search-table table{min-width:1050px}#project-search .project-controls>*{min-width:0;max-width:100%}
