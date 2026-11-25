@@ -14,3 +14,16 @@ assert.deepEqual(B.commonDates({rows:[{forms:{123:{status:'ok',dates:[]}}}]},'12
 
 const profile=B.profile('1',{capital:{period:'2026-01-01',rows:[{registration_number:'1',capital:'10',source:'a',verification:'html'}]},profit:{period:'2026-Q1',rows:[{registration_number:'1',current:{profit:'0',net_interest:null},source:'b'}]}});
 assert.equal(profile.length,2);assert.equal(profile[1].value,'0');assert.equal(profile[1].period,'2026-Q1');assert.equal(B.profile('2',{}).length,0);
+
+const coverage=B.coverage('1',{
+ capital:{period:'2026-01-01',rows:[{registration_number:'1',verification:'documentary'}]},
+ balance:{period:'2026-01-01',rows:[],attempts:{'1':{checked:'2026-11-25',error:'Нет отчёта'}}},
+ profit:{period:'2026-Q1',rows:[],cohort:['2']}
+});
+assert.deepEqual(coverage.map(c=>c.status),['Документальная сверка','Не подтверждено','Вне целевой выборки']);
+assert.equal(coverage[1].error,'Нет отчёта');
+assert.equal(coverage[1].checked,'2026-11-25');
+assert.equal(B.coverage('1',{})[0].status,'Набор недоступен');
+assert.equal(B.coverage('1',{capital:{rows:[]}})[0].status,'Нет записи');
+assert.equal(B.coverage('1',{capital:{rows:[{registration_number:'1',verification:'html'}]}})[0].status,'Запись получена');
+assert.equal(B.coverage('1',{capital:{rows:[],errors:[{registration_number:'1',error:'Недоступно'}]}})[0].error,'Недоступно');
