@@ -58,6 +58,28 @@ const GroupPassports=(()=>{
   }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
   return {spec,rows,eligible:rows.filter(r=>r.value!==null).length};
  }
+ const levelSpecs=[
+  {id:'revenue',label:'Выручка',nonnegative:true},
+  {id:'assets',label:'Активы на конец года',nonnegative:true},
+  {id:'equity',label:'Капитал на конец года'},
+  {id:'liabilities',label:'Обязательства на конец года',nonnegative:true},
+  {id:'profit',label:'Прибыль / убыток всей группы'},
+  {id:'ppe',label:'Основные средства на конец года',nonnegative:true},
+  {id:'operating_cash_flow',label:'Чистый операционный денежный поток'}
+ ];
+ function levels(d,year,id,sector=''){
+  const spec=levelSpecs.find(x=>x.id===id);
+  if(!spec||!Number.isInteger(year))throw Error('Параметры сравнения уровней');
+  const rows=filterGroups(d,sector).map(g=>{
+   const current=monetary(g,id,year),prior=monetary(g,id,year-1);
+   const valid=x=>!!x&&(!spec.nonnegative||x.value>=0);
+   const v=valid(current)?current.value:null,p=valid(prior)?prior.value:null;
+   const reason=g.scope!=='consolidated'||g.standard!=='IFRS'?'Несопоставимый стандарт или периметр':v===null?'Нет сопоставимого значения':null;
+   const delta=v===null||p===null?null:v-p;
+   return {id:g.id,name:g.name,sector:g.sector,source:g.source,section:g.section,note:g.note||'',standard:g.standard,current,prior,value:v,previous:p,delta,percent:delta===null||p<=0?null:delta/p*100,reason};
+  }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
+  return {spec,year,rows,eligible:rows.filter(r=>r.value!==null).length,paired:rows.filter(r=>r.delta!==null).length};
+ }
  function coverage(d,year){
   const groups=d.groups.map(g=>{
    const observed=g.metrics.filter(m=>m.observations.some(o=>o.year===year)).length;
@@ -66,7 +88,7 @@ const GroupPassports=(()=>{
   });
   return {groups,total:groups.length,withObservations:groups.filter(g=>g.observed>0).length,ifrs:groups.filter(g=>g.standard==='IFRS').length,observations:groups.reduce((a,g)=>a+g.observed,0),coefficients:groups.reduce((a,g)=>a+g.coefficients,0),revenue:groups.filter(g=>g.revenue).length};
  }
- return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs,coverage};
+ return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs,coverage,levelSpecs,levels};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -171,6 +193,26 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     vt.replaceChildren(t);ve.disabled=!c.total;ve.onclick=()=>csv('group-coverage-'+y+'.csv',[['Год','Группа','Отрасль','Основа отчётности','Число наблюдений','Допущено коэффициентов','Всего коэффициентов','Сопоставимая выручка','Источник','Отпечаток манифеста'],...c.groups.map(g=>[y,g.name,g.sector,g.standard,g.observed,g.coefficients,GroupPassports.ratioSpecs.length,g.revenue,g.source,m.data_fingerprint])]);
    }
    vy.onchange=coverageDraw;coverageDraw();
+  }
+  const ly=$('group-level-year'),lm=$('group-level-metric'),ls=$('group-level-sector'),lt=$('group-level-table'),lc=$('group-level-chart'),le=$('group-level-export'),lstatus=$('group-level-status');
+  if(ly&&lm&&ls&&lt&&lc&&le&&lstatus){
+   const years=[...new Set(d.groups.flatMap(g=>g.metrics.flatMap(p=>p.observations.map(r=>r.year))))].sort((a,b)=>b-a);
+   ly.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
+   lm.replaceChildren(...GroupPassports.levelSpecs.map(x=>new Option(x.label,x.id)));
+   ls.replaceChildren(new Option('Все отрасли',''),...sectors.map(s=>new Option(s,s)));
+   function levelDraw(){
+    const y=Number(ly.value),r=GroupPassports.levels(d,y,lm.value,ls.value),valid=r.rows.filter(x=>x.value!==null),barsModel=GroupPassports.signedBars(valid.map(x=>x.value));
+    lstatus.textContent='Сопоставимые уровни: '+r.eligible+' из '+r.rows.length+' групп; значения обоих лет: '+r.paired+'. Миллионы рублей; не итог по экономике России.';
+    lc.replaceChildren();const bars=node('div','');bars.className='rm-composition';
+    for(const [i,x] of valid.entries()){const b=barsModel.bars[i],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';track.setAttribute('aria-hidden','true');const fill=node('div','');fill.className='group-signed-fill'+(b.negative?' negative':'');fill.style.left=b.left+'%';fill.style.width=b.width+'%';const zero=node('span','');zero.className='group-signed-zero';zero.style.left=barsModel.zero+'%';track.append(fill,zero);line.append(node('span',x.name),track,node('strong',fmt(x.value)));bars.append(line)}
+    lc.append(valid.length?bars:node('p','Нет сопоставимых наблюдений.'));
+    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+    for(const label of ['Группа','Отрасль',String(y-1),String(y),'Изменение, млн руб.','Изменение, %','Определение / ограничение','Источник']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const x of r.rows){const tr=body.insertRow();for(const v of [x.name,x.sector,fmt(x.previous),fmt(x.value),fmt(x.delta),fmt(x.percent),[x.reason||x.current?.label,x.note].filter(Boolean).join(' · ')])tr.insertCell().textContent=v;const a=node('a','Документ');a.href=x.source;tr.insertCell().append(a)}
+    lt.replaceChildren(t);le.disabled=!r.rows.length;
+    le.onclick=()=>csv('group-levels-'+r.spec.id+'-'+y+'.csv',[['Группа','Отрасль','Стандарт','Показатель','Предыдущий год','Год','Предыдущий уровень, млн руб.','Уровень, млн руб.','Абсолютное изменение, млн руб.','Относительное изменение, %','Исходное значение','Исходная единица','Исходное предыдущее значение','Исходная предыдущая единица','Ограничение','Примечание','Источник','Раздел','Отпечаток манифеста'],...r.rows.map(x=>[x.name,x.sector,x.standard,r.spec.id,y-1,y,x.previous,x.value,x.delta,x.percent,x.current?.original,x.current?.unit,x.prior?.original,x.prior?.unit,x.reason,x.note,x.source,x.section,m.data_fingerprint])]);
+   }
+   ly.onchange=lm.onchange=ls.onchange=levelDraw;levelDraw();
   }
  }catch(e){status.textContent='Паспорта недоступны: '+String(e.message||e)}
 });
