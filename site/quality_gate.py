@@ -431,6 +431,11 @@ def check(out,previous,stamp):
         if (out/di.FILE).is_file():
             counts.update(di.quality(json.loads((out/di.FILE).read_text(encoding="utf-8")),out))
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Инфраструктура данных: "+str(e))
+    try:
+        import journal_evidence as je
+        if (out/je.FILE).is_file():
+            counts.update(je.quality(json.loads((out/je.FILE).read_text(encoding="utf-8")),data["literature.json"]))
+    except (ValueError,KeyError,TypeError,OSError) as e:issues.append("История журналов: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)

@@ -123,7 +123,9 @@ with m.connect() as db:
     journal_counts=Counter(r["journal"] for r in papers)
     journal_checks=[dict(r,journal=literature.JOURNALS.get(r["issn"],r["issn"]),count=journal_counts[literature.JOURNALS.get(r["issn"],r["issn"])]) for r in db.execute("select * from journal_checks")]
     write("literature.json",dict(articles=papers,checks=journal_checks,registry=literature.registry(),service=literature.service_status(db,m.now()),links=literature.audit_links(db,m.now(),"--refresh" in sys.argv)))
-    page("papers.html",Path("papers.html").read_text())
+    import journal_evidence
+    journal_evidence.publish(page,out,db,m.now())
+    page("papers.html",Path("papers.html").read_text().replace("<h1>","<p><a href=\"journal-evidence.html\">Классификация журналов и история редакций</a></p><h1>",1))
     active = {feed[2] for feed in m.FEEDS}
     failures=[r["url"] for r in checks if (r["url"] in active or "api.worldbank.org" in r["url"]) and r["status"].startswith("Ошибка")]
     failures.extend(r["journal"]+" · "+r["status"] for r in journal_checks if r["status"]!="Проверено")
