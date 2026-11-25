@@ -745,7 +745,9 @@ with sync_playwright() as p:
                 page.locator("#bank-common-export").click()
             with open(bank_common.value.path(),encoding="utf-8-sig",newline="") as f:
                 joint=list(csv.reader(f,delimiter=";"))
-            assert len(joint)>1 and all(len(r)==9 for r in joint)
+            assert len(joint)>1 and all(len(r)==11 for r in joint)
+            assert joint[0][-2:]==["Версия данных","Выгружено UTC"]
+            assert all(r[9] and r[10] for r in joint[1:])
             assert len({r[0] for r in joint[1:]})==len(joint)-1
             counts=[0,0,0,0]
             for r in joint[1:]:
