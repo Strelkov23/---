@@ -95,13 +95,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
   function toggle(r){const x=item(r);if(!x.url)return;if(basket.has(x.url))basket.delete(x.url);else basket.set(x.url,x);store();draw()}
   function citation(r){return [r.volume?'Т. '+r.volume:'',r.issue?'№ '+r.issue:'',r.pages?'С. '+r.pages:r.article_number?'Статья '+r.article_number:''].filter(Boolean).join(' · ')}
 
+  // Precompute immutable search text once per catalogue revision, not per keystroke.
+  const searchText=new Map(records.map(r=>[r,norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' '))]));
+  const themeIndex=new Map(records.map(r=>[r,themes(r)]));
+  const journalCounts=new Map();for(const r of records)journalCounts.set(r.journal,(journalCounts.get(r.journal)||0)+1);
   function draw(){
    const exact=exactDoi($('term').value);const words=norm($('term').value).trim().split(/\s+/).filter(Boolean).map(w=>/[\d/@.]/.test(w)?w:stem(w));
    const from=Number($('from').value)||1991,to=Number($('to').value)||2100,idx=$('index').value,ls=$('link-state').value;
    selected=records.filter(r=>{
     const y=Number(String(r.published||'').slice(0,4)),marks=meta(r).tags||[],mc=$('paper-meta').value;
-    const accessFilter=$('paper-access').value,lc=licenses(r).length,tc=textLinks(r).length;
-    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:accessFilter==='cc'?cc(r).length:accessFilter==='oa'?reportedOpen(r):accessFilter==='oa_closed'?reportedClosed(r):accessFilter==='oa_unknown'?oa(r).result!=='accepted':!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themes(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>norm([r.title,r.authors,r.doi,r.journal,r.topics].join(' ')).includes(w)))
+    const accessFilter=$('paper-access').value,lc=accessFilter?licenses(r).length:0,tc=accessFilter?textLinks(r).length:0;
+    return (!accessFilter||(accessFilter==='license'?lc:accessFilter==='text'?tc:accessFilter==='cc'?cc(r).length:accessFilter==='oa'?reportedOpen(r):accessFilter==='oa_closed'?reportedClosed(r):accessFilter==='oa_unknown'?oa(r).result!=='accepted':!lc&&!tc))&&(!mc||(mc==='complete'?complete(r):!complete(r)))&&y>=from&&y<=to&&(!$('journal').value||r.journal===$('journal').value)&&(!$('theme').value||themeIndex.get(r).includes($('theme').value))&&(!idx||(idx==='unknown'?!marks.length:marks.includes(idx)))&&(!ls||state(r)===ls)&&(exact?String(r.doi||'').toLowerCase()===exact:words.every(w=>searchText.get(r).includes(w)))
    });
    selected.sort((a,b)=>$('order').value==='cited'?(Number.isFinite(b.cited_by)?b.cited_by:-1)-(Number.isFinite(a.cited_by)?a.cited_by:-1):$('order').value==='title'?a.title.localeCompare(b.title,'ru'):$('order').value==='old'?String(a.published).localeCompare(String(b.published)):String(b.published).localeCompare(String(a.published)));
    $('found').textContent=from>to?'Начальный год позже конечного':'Найдено статей: '+fmt(selected.length);
@@ -159,7 +163,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const queue=new Map((data.queue?.rows||[]).map(r=>[r.journal,r]));
   for(const journal of [...new Set([...Object.keys(reg),...records.map(r=>r.journal),...byJournal.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'))){
    const m=reg[journal]||{},j=byJournal.get(journal)||{},card=node('article','');
-   card.append(node('h3',journal),node('p',[m.issn?'ISSN '+m.issn:'',...(m.tags||['Статус не подтверждён'])].filter(Boolean).join(' · ')),node('small','Статей: '+records.filter(r=>r.journal===journal).length+' · Загрузка: '+(j.status||'Нет проверки')+' · '+(j.checked||'')+' · Классификация: '+(m.verified||'нет даты')));
+   card.append(node('h3',journal),node('p',[m.issn?'ISSN '+m.issn:'',...(m.tags||['Статус не подтверждён'])].filter(Boolean).join(' · ')),node('small','Статей: '+(journalCounts.get(journal)||0)+' · Загрузка: '+(j.status||'Нет проверки')+' · '+(j.checked||'')+' · Классификация: '+(m.verified||'нет даты')));
    const q=queue.get(journal);if(q?.mode)card.append(node('p',(q.mode==='history'?'Исторический проход':'Индексное обновление')+' · следующий период с '+q.next_start+' по '+q.finish+' · окно до '+q.window_days+' суток. Это границы очереди, не гарантия полноты журнала.'));if(q?.watermark)card.append(node('small','Граница последнего завершённого прохода: '+q.watermark));
    if(m.note)card.append(node('p',m.note));
    if(m.white_history)card.append(node('p','Подтверждённые уровни Белого списка по редакциям: '+Object.entries(m.white_history).map(([y,v])=>y+' — уровень '+v).join('; ')+'. Не означает статус каждой статьи в год публикации.'));
