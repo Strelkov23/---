@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 40
     outputs:
       version: ${{ steps.archive.outputs.version }}
+      manifest_sha256: ${{ steps.archive.outputs.manifest_sha256 }}
     permissions:
       contents: write
       actions: read
@@ -294,6 +295,7 @@ jobs:
           PY
           git rev-parse HEAD > monitor/public/version.txt
           echo "version=$(cat monitor/public/version.txt)" >> "$GITHUB_OUTPUT"
+          echo "manifest_sha256=$(sha256sum monitor/public/data-manifest.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: monitor/public
@@ -314,6 +316,7 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
         run: |
           set -eu
           base="${PAGE_URL%/}/"
@@ -331,4 +334,33 @@ jobs:
           for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json group-passports.js group-passports.json; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route" > /dev/null
           done
+          for route in project-coverage.html project-search.js project-coverage.json project-coverage.csv project-breakdown.csv investment-projects.html investment-projects.json investment-projects.csv amur-projects.html amur-projects.json amur-projects.csv krasnodar-projects.html krasnodar-projects.json krasnodar-projects.csv; do
+            curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route?build=$EXPECTED_VERSION" > /dev/null
+          done
+          export VERIFY_BASE="$base"
+          python3 - <<'PY'
+          import hashlib,json,os,time
+          from urllib.request import urlopen,Request
+          from urllib.parse import urljoin
+          base=os.environ["VERIFY_BASE"]
+          version=os.environ["EXPECTED_VERSION"]
+          def get(name,expected_hash,expected_size=None):
+              for attempt in range(4):
+                  try:
+                      url=urljoin(base,name)+"?build="+version
+                      with urlopen(Request(url,headers={"Cache-Control":"no-cache"}),timeout=35) as response:
+                          if response.geturl().split("?")[0]!=url.split("?")[0]:raise ValueError("Unexpected redirect")
+                          raw=response.read(32*1024*1024+1)
+                      if len(raw)>32*1024*1024 or (expected_size is not None and len(raw)!=expected_size) or hashlib.sha256(raw).hexdigest()!=expected_hash:raise ValueError("Public content differs from build")
+                      return raw
+                  except (OSError,ValueError) as exc:
+                      if attempt==3:raise RuntimeError(name) from exc
+                      time.sleep(5)
+          manifest=json.loads(get("data-manifest.json",os.environ["EXPECTED_MANIFEST_SHA256"]))
+          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json")
+          for name in names:
+              entry=manifest["files"][name]
+              json.loads(get(name,entry["sha256"],entry["bytes"]))
+          print("Exact public manifest and atlas files verified:",len(names))
+          PY
           echo "Public version verified: $EXPECTED_VERSION"
