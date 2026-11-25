@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 FILE="group-passports.json"
-HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net","www.rusagrogroup.ru","www.aviaport.ru","www.alrosa.ru","reportcollection.inion.ru","ptport.ru","ar2025.nornickel.com","www.lentagroup.ru","ir.yandex.ru","ir.ozon.com"}
+HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net","www.rusagrogroup.ru","www.aviaport.ru","www.alrosa.ru","reportcollection.inion.ru","ptport.ru","ar2025.nornickel.com","www.lentagroup.ru","ir.yandex.ru","ir.ozon.com","www.novatek.ru","www.polyus.com"}
 def quality(d):
     if d.get("schema")!=1 or d.get("mode")!="documentary_snapshot":raise ValueError("Тип снимка")
     from datetime import date
@@ -19,7 +19,7 @@ def quality(d):
         if g["standard"]=="IFRS_based_disclosure" and not g.get("note"):raise ValueError("Оговорка о стандарте")
         mids=set()
         for m in g["metrics"]:
-            if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т","тыс. чел.","млн пасс.-км","млн долл. США","млн шт.","млн чел.") or not m["label"]:raise ValueError("Показатель")
+            if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т","тыс. чел.","млн пасс.-км","млн долл. США","млн шт.","млн чел.","тыс. тройских унций","долл. США/унция","тыс. м³","м³/т","раз") or not m["label"]:raise ValueError("Показатель")
             if "source" in m or "section" in m:
                 mu=urlsplit(m.get("source",""))
                 if mu.scheme!="https" or mu.hostname not in HOSTS or not m.get("section") or m.get("comparable") is not None or m["id"] in ("revenue","profit","assets","equity","liabilities","ppe","operating_profit","operating_cash_flow"):raise ValueError("Отдельный источник показателя")
