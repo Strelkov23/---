@@ -156,18 +156,19 @@ jobs:
           python3 -m http.server 8766 > /tmp/atlas-http.log 2>&1 &
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8766/ > /dev/null
-          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json; do
+          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json group-passports.js group-passports.json; do
             curl --fail --silent "http://localhost:8766/$route" > /dev/null
           done
           python3 - <<'PY'
           import json, hashlib
           from pathlib import Path
           manifest = json.loads(Path('data-manifest.json').read_text())
-          for name in ('bank-directory.json','bank-capital.json','bank-capital-history.json','bank-balance.json','bank-profit.json','sme-matrix.json','sme-finance.json'):
+          for name in ('bank-directory.json','bank-capital.json','bank-capital-history.json','bank-balance.json','bank-profit.json','sme-matrix.json','sme-finance.json','group-passports.json','company-index.json'):
               raw = Path(name).read_bytes()
               entry = manifest['files'][name]
               assert len(raw) == entry['bytes'] and hashlib.sha256(raw).hexdigest() == entry['sha256'], name
               assert isinstance(json.loads(raw), dict), name
+          assert Path('group-passports.json').read_bytes()==Path('../group-passports.json').read_bytes(), 'corporate snapshot differs from source'
           PY
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=15000 --dump-dom 'http://localhost:8766/banks.html' > /tmp/banks-dom.html
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=15000 --dump-dom 'http://localhost:8766/company-atlas.html' > /tmp/company-atlas-dom.html
@@ -192,6 +193,9 @@ jobs:
           for id,prefix in {'bank-source-status':'Системно значимые:', 'bank-capital-status':'Дата:', 'bank-balance-status':'Срез ', 'bank-profit-status':'I квартал 2026', 'bank-history-status':'Отдельные отчётные даты'}.items():
               assert b.get(id,'').startswith(prefix), (id,b.get(id))
           a=read('/tmp/company-atlas-dom.html')
+          assert a.get('group-status','').startswith('Документальный снимок'), a.get('group-status')
+          assert a.get('group-cross-status','').startswith('Сопоставимых расчётов:'), a.get('group-cross-status')
+          assert b.get('bank-coverage-status','').startswith(('Все три формы проверены','Общая выборка не подтверждена')), b.get('bank-coverage-status')
           for name,id,yes,no in [('sme-matrix.json','sme-matrix-status','Диагностический срез','Диагностическая матрица пока недоступна.'),('sme-finance.json','sme-finance-status','Финансовый год:','Финансово-отраслевая диагностика пока не опубликована.')]:
               d=json.loads(Path(name).read_text())
               assert a.get(id,'').startswith(yes if d['status']=='diagnostic' else no), (id,a.get(id))
@@ -319,7 +323,7 @@ jobs:
           for route in industrial-parks.html industrial-parks.js industrial-parks.json industrial-parks.csv park-certificates.js park-certificates.json park-certificates.csv regional-manufacturing.html regional-manufacturing.json regional-manufacturing.csv regional-manufacturing.js regional-mining-energy.json regional-mining-energy.csv federal-budget.html federal-budget.json federal-budget.csv federal-budget.svg finance-workbooks.html finance-workbooks.json finance-workbooks.csv finance-reconciliation.csv rosstat-workbooks.html rosstat-workbooks.json rosstat-workbooks.csv freshness.html freshness.json stat-revisions.html stat-revisions.json district-map.html district-meta.json sme-regions.json programmes.html programme-budget.json health-projects.json budget-diagnostics.html budget-diagnostics.json programme-evidence.html programme-evidence.json programme-evidence.csv programme-evidence.md labor.html labor-data.json labor-broad.csv labor-regional.csv labor-coefficients-template.csv labor-data.js labor-calibration.js prices.html price-data.json price-coefficients.csv labor-hours-template.csv price-model.js technology.html technology.js forecast.html forecast.js forecast.json forecast.csv forecast-backtests.csv capital.html capital-data.js capital-data.json fixed-assets.csv capacity-utilization.csv data-registry.html data-registry.js data-registry.json data-registry.csv method-passports.html method-passports.csv method-passports.json wdi-metadata.json data-manifest.json reproducibility.html provenance.js reproducibility.js source-version.txt index-builder.html index-builder.js composite-index.js report-builder.html report-builder.js finance.html finance-data.js finance-data.json finance-profitability.csv financial-state.html financial-state.js financial-state.json organization-debt.csv organization-results.csv cost-structure.html cost-structure.js cost-structure.json cost-structure.csv food-balance.html food-balance.js food-balance.json food-balance.csv economic-map.html news-map.html news-map.js archive.json regional-boundaries.geojson facility-map.html facility-energy.json search.html site-search.json glossary.html monitoring.html data-centre.html sectors.html analysis-centre.html research-centre.html quality-centre.html index.html statistics.html national.html historical.html historical.json industrial.html industrial.json industrial/ sector-passports.html sector-passports.json sector-passports/ papers.html atlas.html methodology.html links.html quality.json 404.html archive/ regions/ history/ budget/; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route" > /dev/null
           done
-          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json; do
+          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json group-passports.js group-passports.json; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route" > /dev/null
           done
           echo "Public version verified: $EXPECTED_VERSION"
