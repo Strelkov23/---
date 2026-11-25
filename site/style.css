@@ -260,3 +260,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #bank-history-pick{max-width:100%;min-width:0;width:100%;box-sizing:border-box}#bank-history-chart .rm-composition-row{grid-template-columns:minmax(65px,1fr) minmax(30px,2fr) minmax(60px,1fr)}#bank-history-chart strong{overflow-wrap:anywhere}
 
 #bank-balance-scope,#bank-balance-metric{max-width:100%;min-width:0;width:100%;box-sizing:border-box}
+
+#bank-profit-scope,#bank-profit-metric{max-width:100%;min-width:0;width:100%;box-sizing:border-box}
