@@ -103,3 +103,7 @@ class TestRosstat(unittest.TestCase):
         self.assertEqual([x["reason"] for x in diagnostics],["balance_mismatch","missing_component"])
         self.assertEqual(diagnostics[0]["residual"],-50)
         self.assertEqual(diagnostics[0]["row"],15)
+
+    def test_reviewed_rejects_unverified_edition(self):
+        with self.assertRaises(ValueError):w.reviewed_cost(b"changed",w.REVIEWED_COST_URL)
+        with self.assertRaises(ValueError):w.quality_reviewed(dict(url=w.REVIEWED_COST_URL,sha256="a"*64,rows=[],review={"kind":"reviewed_partial_cost"}))

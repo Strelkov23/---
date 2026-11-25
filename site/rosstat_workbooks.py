@@ -229,7 +229,7 @@ def parse_sheet(rows,group,sheet,url,now_year):
         if len(seen)>=10:found.append(result)
     if len(found)>1:raise ValueError("Несколько возможных заголовков")
     return found[0] if found else []
-def parse(raw,group,url,now_year):
+def workbook_sheets(raw):
     if raw[:4]==b"PK\x03\x04":
         import openpyxl
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -251,15 +251,48 @@ def parse(raw,group,url,now_year):
                 sheets.append((s.name,[s.row_values(i) for i in range(s.nrows)]))
         finally:book.release_resources()
     else:raise ValueError("Не XLS/XLSX")
+    return sheets
+
+def parse(raw,group,url,now_year):
+    sheets=workbook_sheets(raw)
     result=[r for name,rows in sheets for r in parse_sheet(rows,group,name,url,now_year)]
     if not result:raise ValueError("Нет однозначной таблицы нужного показателя, периода и охвата")
     keys=[(r["metric"],h.norm(r["title"]),r.get("period",str(r["year"]))) for r in result]
     if len(keys)!=len(set(keys)):raise ValueError("Неоднозначные повторные наблюдения между листами")
     return result
+
+# Only this exact reviewed edition is eligible for partial acceptance.
+REVIEWED_COST_URL="https://rosstat.gov.ru/storage/mediabank/Zatraty_god_2025.xls"
+REVIEWED_COST_SHA="15d29b71c618687541009e44647dc511e5fdbf382a3e3f4cf219d59c90c021e7"
+REVIEWED_COUNTS={2017:114,2018:114,2019:102,2020:114,2021:114,2022:0,2023:114,2024:114,2025:114}
+def reviewed_cost(raw,url):
+    if url!=REVIEWED_COST_URL or hashlib.sha256(raw).hexdigest()!=REVIEWED_COST_SHA:raise ValueError("Непроверенная редакция денежных затрат")
+    rows=[];excluded=[]
+    for name,sheet in workbook_sheets(raw):
+        rows.extend(cost_amount_sheet(sheet,name,url,2025,excluded))
+    coverage=[dict(year=y,expected=114,accepted=sum(r["year"]==y for r in rows)) for y in REVIEWED_COUNTS]
+    if {r["year"]:r["accepted"] for r in coverage}!=REVIEWED_COUNTS:raise ValueError("Изменилось проверенное покрытие затрат")
+    if len(excluded)!=18 or sum(e["year"]==2019 for e in excluded)!=2 or sum(e["year"]==2022 for e in excluded)!=16:raise ValueError("Изменился журнал исключений")
+    meta=dict(schema=1,kind="reviewed_partial_cost",sha256=REVIEWED_COST_SHA,coverage=coverage,excluded=excluded,policy="2017–2025; 19 позиций на год, 6 показателей. 2022 полностью исключён: менее 10 согласованных строк. 2019 исключены 2 строки. Пропуск не ноль. Новая редакция требует отдельной приёмки.")
+    return rows,meta
+def quality_reviewed(f):
+    meta=f.get("review")
+    monetary=[r for r in f["rows"] if r["metric"] in AMOUNT_FIELDS]
+    if not meta:return
+    if meta.get("kind")!="reviewed_partial_cost" or f["url"]!=REVIEWED_COST_URL or f["sha256"]!=REVIEWED_COST_SHA or meta.get("sha256")!=f["sha256"]:raise ValueError("Некорректный паспорт частичного импорта")
+    coverage=meta["coverage"]
+    if len(coverage)!=len(REVIEWED_COUNTS) or {r["year"]:r["accepted"] for r in coverage}!=REVIEWED_COUNTS or any(r["expected"]!=114 for r in coverage):raise ValueError("Некорректное покрытие")
+    if len(monetary)!=len(f["rows"]) or len(monetary)!=sum(REVIEWED_COUNTS.values()) or any(sum(r["year"]==y for r in monetary)!=n for y,n in REVIEWED_COUNTS.items()):raise ValueError("Наблюдения не совпадают с паспортом")
+    excluded=meta["excluded"]
+    if len(excluded)!=18 or sum(e["year"]==2019 for e in excluded)!=2 or sum(e["year"]==2022 for e in excluded)!=16:raise ValueError("Некорректные исключения")
+    positions={(r["sheet"],r["row"]) for r in monetary}
+    if any((e["sheet"],e["row"]) in positions for e in excluded):raise ValueError("Исключённая строка опубликована")
+
 def sync(db,stamp,refresh,out):
     db.execute("create table if not exists rosstat_workbooks(url text primary key,grp text,checked text,success text,status text,sha text,rows text)")
     db.execute("create table if not exists rosstat_workbook_catalog(grp text primary key,checked text,success text,status text,files text)")
     db.execute("create table if not exists rosstat_catalog_versions(grp text primary key,version integer not null)")
+    db.execute("create table if not exists rosstat_workbook_review(url text primary key,meta text not null)")
     historical=json.loads((out/"historical.json").read_text(encoding="utf-8"))
     for group,url in CATALOGS.items():
         source=next((s for s in historical["sources"] if s["url"]==url),None)
@@ -292,11 +325,23 @@ def sync(db,stamp,refresh,out):
         queue.extend(x for x in sorted(options,key=lambda r:r[:3]) if x not in queue)
         for _,__,url,group,old in queue[:3]:
             try:
-                raw,_=h.get(url,12_000_000);rows=parse(raw,group,url,int(stamp[:4]))
-                db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,stamp,"Импортировано",hashlib.sha256(raw).hexdigest(),json.dumps(rows,ensure_ascii=False,allow_nan=False)))
+                raw,_=h.get(url,12_000_000)
+                digest=hashlib.sha256(raw).hexdigest();meta=None
+                if group=="cost" and url==REVIEWED_COST_URL and digest==REVIEWED_COST_SHA:rows,meta=reviewed_cost(raw,url)
+                else:rows=parse(raw,group,url,int(stamp[:4]))
+                candidate=dict(url=url,group=group,success=stamp,sha256=digest,rows=rows,review=meta)
+                quality(dict(schema=1,files=[candidate]))
+                if old and old[3]:
+                    keys=lambda rr:{(r["metric"],h.norm(r["title"]),r.get("period",str(r["year"]))) for r in rr}
+                    if keys(json.loads(old[3]))-keys(rows):raise ValueError("Новая редакция теряет ранее принятые наблюдения")
+                with db:
+                    db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,stamp,"Частично импортировано: см. паспорт" if meta else "Импортировано",digest,json.dumps(rows,ensure_ascii=False,allow_nan=False)))
+                    if meta:db.execute("insert or replace into rosstat_workbook_review values(?,?)",(url,json.dumps(meta,ensure_ascii=False,allow_nan=False)))
+                    else:db.execute("delete from rosstat_workbook_review where url=?",(url,))
             except Exception as e:
                 db.execute("insert or replace into rosstat_workbooks values(?,?,?,?,?,?,?)",(url,group,stamp,old[1] if old else None,"Ошибка: "+str(e)[:180],old[2] if old else None,old[3] if old else "[]"))
-    return dict(schema=1,built=stamp,catalogs=catalogs,files=[dict(url=u,group=g,checked=c,success=s,status=t,sha256=sha,rows=json.loads(r)) for u,g,c,s,t,sha,r in db.execute("select url,grp,checked,success,status,sha,rows from rosstat_workbooks order by grp,url")])
+    reviews={u:json.loads(m) for u,m in db.execute("select url,meta from rosstat_workbook_review")}
+    return dict(schema=1,built=stamp,catalogs=catalogs,files=[dict(url=u,group=g,checked=c,success=s,status=t,sha256=sha,rows=json.loads(r),**({"review":reviews[u]} if u in reviews else {})) for u,g,c,s,t,sha,r in db.execute("select url,grp,checked,success,status,sha,rows from rosstat_workbooks order by grp,url")])
 def quality(d):
     if d.get("schema")!=1:raise ValueError("schema")
     urls=set();count=0
@@ -312,6 +357,7 @@ def quality(d):
         groups={}
         for r in f["rows"]:
             if f["group"] in ("cost","debt"):groups.setdefault((r["title"],r.get("period",str(r["year"])),r["metric"] in AMOUNT_FIELDS),{})[r["metric"]]=r["value"]
+        quality_reviewed(f)
         for v in groups.values():
             if not (complete_amount(v) if set(v)&set(AMOUNT_FIELDS) else complete_cost(v) if f["group"]=="cost" else complete_debt(v)):raise ValueError("Balance not reproducible")
     return dict(rosstat_workbook_files=sum(bool(f["rows"]) for f in d["files"]),rosstat_workbook_observations=count)
@@ -331,5 +377,13 @@ def publish(page,out,d):
             body+="</ul></details>"
         for f in d["files"]:
             if f["group"]==group:body+="<p>"+escape(f["url"].rsplit("/",1)[-1])+" · "+escape(f["status"])+" · наблюдений: "+str(len(f["rows"]))+" · последний успех: "+escape(str(f["success"] or "—"))+"</p>"
+        for f in d["files"]:
+            if f["group"]!=group or not f.get("review"):continue
+            review=f["review"]
+            body+="<h3>Паспорт частичного импорта денежных затрат</h3><p>"+escape(review["policy"])+"</p><table><thead><tr><th>Год</th><th>Принято</th><th>Ожидается</th></tr></thead><tbody>"
+            for r in review["coverage"]:body+="<tr><td>"+str(r["year"])+"</td><td>"+str(r["accepted"])+"</td><td>"+str(r["expected"])+"</td></tr>"
+            body+="</tbody></table><details><summary>Исключённые строки: "+str(len(review["excluded"]))+"</summary><ul>"
+            for e in review["excluded"]:body+="<li>"+escape(str(e["year"])+" · "+e["title"]+" · "+e["reason"]+" · невязка: "+str(e.get("residual","—")))+"</li>"
+            body+="</ul></details>"
         body+="</section>"
     page("rosstat-workbooks.html",body)
