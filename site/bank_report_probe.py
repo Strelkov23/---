@@ -10,6 +10,7 @@ import bank_disclosure as d
 import bank_registry as registry
 CATALOG="https://www.cbr.ru/banking_sector/otchetnost-kreditnykh-organizaciy/"
 METHOD="Data123FormFullXML"
+METHODS={METHOD,"Data135FormFullXML","Data135MetaFullXML"}
 MAX_PAGE=4*1024*1024
 MAX_ARCHIVE=30*1024*1024
 def allowed(url):
@@ -23,12 +24,15 @@ def get(url,limit,body=None,headers=None):
         raw=r.read(limit+1)
     if not 0<len(raw)<=limit:raise ValueError("Размер ответа")
     return raw
-def request(code,on_date):
+def request(code,on_date,method=METHOD):
+    if method not in METHODS:raise ValueError("Метод")
     if type(code) is not int or code<=0:raise ValueError("Внутренний код")
     if date.fromisoformat(on_date).isoformat()!=on_date:raise ValueError("Дата")
-    return (f'<soap:Envelope xmlns:soap="{d.SOAP}"><soap:Body><{METHOD} xmlns="{d.NS}"><CredorgNumber>{code}</CredorgNumber><OnDate>{on_date}T00:00:00</OnDate></{METHOD}></soap:Body></soap:Envelope>').encode()
-def inspect_xml(raw):
-    root=d.result(raw,METHOD)
+    return (f'<soap:Envelope xmlns:soap="{d.SOAP}"><soap:Body><{method} xmlns="{d.NS}"><CredorgNumber>{code}</CredorgNumber><OnDate>{on_date}T00:00:00</OnDate></{method}></soap:Body></soap:Envelope>').encode()
+def inspect_xml(raw,method=METHOD):
+    if method not in METHODS:raise ValueError("Метод")
+    root=d.result(raw,method)
+    if not len(root) and not (root.text or "").strip():raise ValueError("Пустой результат формы")
     # Treat escaped XML and nested XML equally, but never interpret an unknown field as capital.
     if not len(root) and root.text and root.text.strip():
         import xml.etree.ElementTree as ET
@@ -101,17 +105,32 @@ def main():
             reg=bank["registration_number"];entry=dict(registration_number=reg,name=bank["name"])
             try:
                 mapping_raw=d.fetch("RegNumToIntCode","RegNumber",reg);code=d.mapping(mapping_raw)
-                entry.update(internal_code=code,mapping_sha256=d.hash_raw(mapping_raw))
-                dates_raw=d.fetch("GetDatesForF123","CredprgNumber",code);dates=d.dates(dates_raw,"123",stamp)
-                entry["dates_sha256"]=d.hash_raw(dates_raw);entry["date_count"]=len(dates)
-                if dates:
-                    entry["report_date"]=dates[0];data=get(d.SOURCE,d.MAX,request(code,dates[0]),{"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+d.NS+METHOD+'"'})
-                    entry["structure"]=inspect_xml(data)
-                    (out/("form123-"+reg+".xml")).write_bytes(data)
+                reverse=d.fetch("IntCodeToRegNum","IntNumber",code)
+                if d.reverse_mapping(reverse)!=int(reg):raise ValueError("Обратное сопоставление не совпало")
+                entry.update(internal_code=code,mapping_sha256=d.hash_raw(mapping_raw),reverse_sha256=d.hash_raw(reverse))
+                entry["forms"]={}
+                for form,methods in [("123",[METHOD]),("135",["Data135FormFullXML","Data135MetaFullXML"])]:
+                    item={};entry["forms"][form]=item
+                    try:
+                        dates_raw=d.fetch("GetDatesForF"+form,"CredprgNumber",code);dates=d.dates(dates_raw,form,stamp)
+                        item["dates_sha256"]=d.hash_raw(dates_raw);item["date_count"]=len(dates)
+                        if not dates:continue
+                        item["report_date"]=dates[0];item["methods"]={}
+                        for method in methods:
+                            try:
+                                data=get(d.SOURCE,d.MAX,request(code,dates[0],method),{"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+d.NS+method+'"'})
+                                structure=inspect_xml(data,method)
+                                item["methods"][method]=structure
+                                (out/(method+"-"+reg+".xml")).write_bytes(data)
+                                if form=="123":
+                                    entry["structure"]=structure
+                                    (out/("form123-"+reg+".xml")).write_bytes(data)
+                            except Exception as e:item["methods"][method]={"error":str(e)[:300]}
+                    except Exception as e:item["error"]=str(e)[:300]
             except Exception as e:entry["error"]=str(e)[:300]
             report["soap"].append(entry)
     except Exception as e:report["errors"].append("soap: "+str(e)[:300])
     (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False),flush=True)
-    if not any("members" in x for x in report["archives"]) and not any("structure" in x for x in report["soap"]):raise SystemExit("Не получена проверенная структура формы 123")
+    if not any("members" in x for x in report["archives"]) and not any("structure" in x for x in report["soap"]) and not any("sha256" in m for x in report["soap"] for v in x.get("forms",{}).values() for m in v.get("methods",{}).values()):raise SystemExit("Не получена структура форм 123 или 135")
 if __name__=="__main__":main()
