@@ -1,7 +1,7 @@
 name: Rosstat isolated network acceptance
 on:
   push:
-    branches: [stage-f-rosstat-network, stage-f-rosstat-candidate-recovery]
+    branches: [stage-f-rosstat-network, stage-f-rosstat-candidate-recovery, stage-f-rosstat-probe-evidence]
     paths: ['site/rosstat_network_probe.py', 'site/test_rosstat_network_probe.py', '.github/workflows/rosstat-network-probe.yml']
   workflow_dispatch:
 permissions:
@@ -23,7 +23,7 @@ jobs:
           python -m pip install openpyxl==3.1.5 xlrd==2.0.2
           cd site
           python -m unittest test_rosstat_network_probe.py
-          if [ "$GITHUB_REF_NAME" = "stage-f-rosstat-candidate-recovery" ]; then
+          if [ "$GITHUB_REF_NAME" = "stage-f-rosstat-candidate-recovery" ] || [ "$GITHUB_REF_NAME" = "stage-f-rosstat-probe-evidence" ]; then
             python rosstat_network_probe.py --alternatives --output ../rosstat-network-probe.json
           else
             python rosstat_network_probe.py --output ../rosstat-network-probe.json

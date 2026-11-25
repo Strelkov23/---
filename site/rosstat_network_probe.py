@@ -59,12 +59,14 @@ def probe(fetcher=fetch,year=None,parser=w.parse,alternatives=False):
             cat=fetcher(url,"catalogue")
             links=h.discover(cat.raw.decode(cat.charset,errors="replace"),cat.final_url)
             item.update(catalogue_sha256=cat.sha256,candidates=len(w.candidates(group,links)),status="no_matching_candidate")
-            candidate=select(group,links)
+            candidates=shortlist(group,links) if alternatives else None
+            candidate=(candidates[0] if candidates else None) if alternatives else select(group,links)
+            if alternatives:item["eligible_candidates"]=len(candidates)
             if not candidate:continue
             item.update(workbook=candidate["url"],title=candidate["title"],status="workbook_failed")
             attempts=[]
             if alternatives:
-                options=shortlist(group,links)[:3]
+                options=candidates[:3]
                 item["attempts"]=attempts
                 for option in options:
                     try:
@@ -73,7 +75,7 @@ def probe(fetcher=fetch,year=None,parser=w.parse,alternatives=False):
                         attempts.append(dict(url=option["url"],status=e.code))
                         if e.code==404:continue
                         raise
-                    attempts.append(dict(url=option["url"],status="downloaded",sha256=payload.sha256))
+                    attempts.append(dict(url=option["url"],status="downloaded",sha256=payload.sha256,final_url=payload.final_url))
                     candidate=option
                     item.update(workbook=option["url"],title=option["title"])
                     break
@@ -84,11 +86,13 @@ def probe(fetcher=fetch,year=None,parser=w.parse,alternatives=False):
             item.update(workbook_sha256=payload.sha256,final_url=payload.final_url,status="parse_rejected")
             rows=parser(payload.raw,group,candidate["url"],year)
             if not rows:raise ValueError("Empty accepted workbook")
+            if alternatives:attempts[-1]["status"]="accepted"
             item.update(status="accepted",observations=len(rows),metrics=sorted(set(r["metric"] for r in rows)))
         except HTTPError as e:
             item.update(http_status=e.code,error=type(e).__name__)
             if e.code in (401,403,429):blocked=True
         except Exception as e:
+            if item["status"]=="parse_rejected" and item.get("attempts"):item["attempts"][-1]["status"]="parse_rejected"
             item.update(error=type(e).__name__,detail=str(e)[:220])
     return {"schema":1,"scope":"read_only_isolated_network_probe","built":datetime.now(timezone.utc).isoformat(),"results":report}
 def main():
