@@ -199,6 +199,12 @@ def check(out,previous,stamp):
             import corporate_watch
             counts.update(corporate_watch.quality(json.loads((out/"corporate-watch.json").read_text(encoding="utf-8")),json.loads((out/"group-passports.json").read_text(encoding="utf-8"))))
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Контроль корпоративных документов: "+str(e))
+    if (out/"corporate-discovery.json").is_file():
+        try:
+            import corporate_discovery
+            counts.update(corporate_discovery.quality(json.loads((out/"corporate-discovery.json").read_text(encoding="utf-8")),json.loads((out/"group-passports.json").read_text(encoding="utf-8"))))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Поиск корпоративных публикаций: "+str(e))
+
 
     try:
         import company_sources
