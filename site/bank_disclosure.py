@@ -3,24 +3,29 @@ import hashlib,json,re,xml.etree.ElementTree as ET
 from decimal import Decimal,InvalidOperation
 from datetime import date,timedelta
 from urllib.request import Request,urlopen
+from urllib.error import HTTPError
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 SOURCE="https://www.cbr.ru/CreditInfoWebServ/CreditOrgInfo.asmx"
 NS="http://web.cbr.ru/"
 SOAP="http://schemas.xmlsoap.org/soap/envelope/"
+SOAP12="http://www.w3.org/2003/05/soap-envelope"
+PROBE_VERSION=2
 FORMS=("101","102","123","135")
 FILE="bank-disclosure.json"
 LIMIT=3
 MAX=1024*1024
-def envelope(method,parameter,value):
+def envelope(method,parameter,value,protocol=SOAP):
+    if protocol not in (SOAP,SOAP12):raise ValueError("Версия SOAP")
     if method not in {"RegNumToIntCode","IntCodeToRegNum",*("GetDatesForF"+k for k in FORMS)} or not str(value).isdigit():raise ValueError("Некорректный запрос")
     if parameter!=({"RegNumToIntCode":"RegNumber","IntCodeToRegNum":"IntNumber"}.get(method,"CredprgNumber")):raise ValueError("Параметр")
-    return (f'<soap:Envelope xmlns:soap="{SOAP}"><soap:Body><{method} xmlns="{NS}"><{parameter}>{value}</{parameter}></{method}></soap:Body></soap:Envelope>').encode()
+    return (f'<soap:Envelope xmlns:soap="{protocol}"><soap:Body><{method} xmlns="{NS}"><{parameter}>{value}</{parameter}></{method}></soap:Body></soap:Envelope>').encode()
 def result(raw,method):
     if not 0<len(raw)<=MAX or re.search(br"<!\s*(?:DOCTYPE|ENTITY)",raw,re.I):raise ValueError("Недопустимый XML")
     root=ET.fromstring(raw)
-    if root.tag!="{"+SOAP+"}Envelope":raise ValueError("SOAP envelope")
-    body=root.find("{"+SOAP+"}Body")
+    protocol=next((ns for ns in (SOAP,SOAP12) if root.tag=="{"+ns+"}Envelope"),None)
+    if protocol is None:raise ValueError("SOAP envelope")
+    body=root.find("{"+protocol+"}Body")
     if body is None or len(body)!=1:raise ValueError("SOAP body")
     response=body[0]
     if response.tag!="{"+NS+"}"+method+"Response":raise ValueError("SOAP fault или неожиданный ответ")
@@ -28,12 +33,26 @@ def result(raw,method):
     if x is None:raise ValueError("Нет результата")
     return x
 def fetch(method,parameter,value):
-    req=Request(SOURCE,data=envelope(method,parameter,value),headers={"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+NS+method+'"',"User-Agent":"EconomicMonitor/1.0"})
-    with urlopen(req,timeout=8) as r:
-        from urllib.parse import urlsplit
-        u=urlsplit(r.geturl())
-        if u.scheme!='https' or u.hostname not in ('www.cbr.ru','cbr.ru') or u.path.lower()!=urlsplit(SOURCE).path.lower() or u.query or u.fragment:raise ValueError("Неожиданный URL")
-        return r.read(MAX+1)
+    def request(protocol):
+        headers={"User-Agent":"EconomicMonitor/1.0"}
+        if protocol==SOAP:headers.update({"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+NS+method+'"'})
+        else:headers["Content-Type"]='application/soap+xml; charset=utf-8; action="'+NS+method+'"'
+        req=Request(SOURCE,data=envelope(method,parameter,value,protocol),headers=headers)
+        with urlopen(req,timeout=8) as r:
+            from urllib.parse import urlsplit
+            u=urlsplit(r.geturl())
+            if u.scheme!='https' or u.hostname not in ('www.cbr.ru','cbr.ru') or u.path.lower()!=urlsplit(SOURCE).path.lower() or u.query or u.fragment:raise ValueError("Неожиданный URL")
+            raw=r.read(MAX+1)
+        result(raw,method)
+        return raw
+    try:return request(SOAP)
+    except HTTPError as e:
+        # Do not retry rate limits, access denials or transport outages.
+        if e.code not in (400,415,500):raise
+    except (ET.ParseError,ValueError) as e:
+        # Only retry a response-format failure, never an unexpected redirect.
+        if str(e)=="Неожиданный URL":raise
+    return request(SOAP12)
 def numeric_code(raw,method):
     x=result(raw,method)
     v=(x.text or "").strip()
@@ -79,6 +98,7 @@ def quality(d):
     if d.get("schema")!=1 or d.get("source")!=SOURCE or d.get("status") not in ("not_loaded","ok","partial","cached","unavailable"):raise ValueError("Паспорт раскрытия")
     rows=d["rows"]
     if not isinstance(rows,list) or len(rows)>LIMIT or len({r["registration_number"] for r in rows})!=len(rows):raise ValueError("Охват пилота")
+    if "probe_version" in d and (type(d["probe_version"]) is not int or d["probe_version"]!=PROBE_VERSION):raise ValueError("Версия проверки")
     if rows and (not d["checked"] or not d["edition"]):raise ValueError("Дата пилота")
     if d["edition"]:date.fromisoformat(d["edition"])
     if d["checked"]:date.fromisoformat(d["checked"][:10])
@@ -106,11 +126,11 @@ def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
             if d["rows"] and quality(d)["bank_disclosure_verified_forms"]:d["status"]="cached"
     except (OSError,ValueError,KeyError,TypeError):pass
     last=d.get("last_attempt") or d["checked"]
-    due=not last or date.fromisoformat(stamp[:10])>=date.fromisoformat(last[:10])+timedelta(days=7)
+    due=not last or date.fromisoformat(stamp[:10])>=date.fromisoformat(last[:10])+timedelta(days=7) or (d.get("probe_version")!=PROBE_VERSION and not quality(d)["bank_disclosure_verified_forms"])
     if refresh and selected and due:
         with ThreadPoolExecutor(max_workers=LIMIT) as pool:
             rows=list(pool.map(lambda b:one(b,stamp,fetcher),selected))
-        candidate=dict(schema=1,source=SOURCE,checked=stamp,edition=edition,status="partial",rows=rows)
+        candidate=dict(schema=1,source=SOURCE,checked=stamp,edition=edition,status="partial",rows=rows,probe_version=PROBE_VERSION)
         n=quality(candidate)["bank_disclosure_verified_forms"]
         if n==len(rows)*len(FORMS):candidate["status"]="ok"
         elif n==0:candidate["status"]="unavailable"
