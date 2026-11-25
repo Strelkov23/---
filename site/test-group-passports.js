@@ -32,3 +32,9 @@ assert.throws(()=>G.ratioComparison(groups,2025.5,'net_margin'));
 
 assert.equal(G.ratioComparison({groups:[{...rg,id:'alrosa',name:'АЛРОСА'}]},2025,'net_margin').eligible,0);
 assert.equal(G.ratioComparison({groups:[{...rg,id:'alrosa',name:'АЛРОСА'}]},2025,'asset_return').eligible,1);
+
+const disclosure={...rg,id:'nlmk',name:'НЛМК',standard:'IFRS_based_disclosure'};
+assert.equal(G.ratios(disclosure,2025).every(x=>x.value===null),true);
+assert.equal(G.revenueComparison({groups:[disclosure]},2025).eligible,0);
+assert.equal(G.ratioComparison({groups:[disclosure]},2025,'equity_share').eligible,0);
+assert.equal(G.revenueComparison({groups:[disclosure]},2025).rows[0].reason,'Несопоставимый стандарт отчётности');
