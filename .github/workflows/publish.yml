@@ -38,16 +38,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p /tmp/sme-source
-          # Only completed runs of our own workflow on main. Older runs may be expired.
-          ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sme-full-import.yml --branch main --status completed --limit 12 --json databaseId --jq '.[].databaseId') || ids=""
+          # Select a consistent pair from successful runs, preferring a newer edition
+          # and, for the same edition, the richer validated schema.
+          ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sme-full-import.yml --branch main --status success --limit 12 --json databaseId --jq '.[].databaseId') || ids=""
+          best=""
           for id in $ids; do
             folder=$(mktemp -d)
             if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name sme-full-classification --dir "$folder" &&
-               test -s "$folder/classification.json" && test -s "$folder/finance-join.json"; then
-              cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
-              echo "Selected diagnostic artifact from run $id"
-              rm -rf "$folder"
-              break
+               score=$(python3 site/sme_artifact.py "$folder"); then
+              if [[ -z "$best" || "$score" > "$best" ]]; then
+                cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
+                best="$score"
+                echo "Selected diagnostic artifact from run $id ($score)"
+              fi
+              # A current-edition enriched candidate is sufficient.
+              if [[ "$score" == "$(date -u +%Y-%m)-10 2" ]]; then
+                rm -rf "$folder"
+                break
+              fi
             fi
             rm -rf "$folder"
           done
@@ -66,7 +74,7 @@ jobs:
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2
-          python3 -m unittest test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_bank_disclosure.py test_bank_report_probe.py test_bank_capital.py test_bank_capital_history.py test_bank_balance.py test_bank_profit.py test_company_sources.py test_company_import.py test_company_index.py test_company_names.py test_sme_finance_public.py test_group_passports.py
+          python3 -m unittest test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_bank_disclosure.py test_bank_report_probe.py test_bank_capital.py test_bank_capital_history.py test_bank_balance.py test_bank_profit.py test_company_sources.py test_company_import.py test_company_index.py test_company_names.py test_sme_finance_public.py test_sme_artifact.py test_group_passports.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           node test-regional-disparities.js
