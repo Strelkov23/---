@@ -1,5 +1,6 @@
 """Pilot: official CBR reporting date inventory, not financial observations."""
 import hashlib,json,re,xml.etree.ElementTree as ET
+from decimal import Decimal,InvalidOperation
 from datetime import date,timedelta
 from urllib.request import Request,urlopen
 from pathlib import Path
@@ -12,8 +13,8 @@ FILE="bank-disclosure.json"
 LIMIT=3
 MAX=1024*1024
 def envelope(method,parameter,value):
-    if method not in {"RegNumToIntCode",*("GetDatesForF"+k for k in FORMS)} or not str(value).isdigit():raise ValueError("Некорректный запрос")
-    if parameter!=("RegNumber" if method=="RegNumToIntCode" else "CredprgNumber"):raise ValueError("Параметр")
+    if method not in {"RegNumToIntCode","IntCodeToRegNum",*("GetDatesForF"+k for k in FORMS)} or not str(value).isdigit():raise ValueError("Некорректный запрос")
+    if parameter!=({"RegNumToIntCode":"RegNumber","IntCodeToRegNum":"IntNumber"}.get(method,"CredprgNumber")):raise ValueError("Параметр")
     return (f'<soap:Envelope xmlns:soap="{SOAP}"><soap:Body><{method} xmlns="{NS}"><{parameter}>{value}</{parameter}></{method}></soap:Body></soap:Envelope>').encode()
 def result(raw,method):
     if not 0<len(raw)<=MAX or re.search(br"<!\s*(?:DOCTYPE|ENTITY)",raw,re.I):raise ValueError("Недопустимый XML")
@@ -33,10 +34,18 @@ def fetch(method,parameter,value):
         u=urlsplit(r.geturl())
         if u.scheme!='https' or u.hostname not in ('www.cbr.ru','cbr.ru') or u.path.lower()!=urlsplit(SOURCE).path.lower() or u.query or u.fragment:raise ValueError("Неожиданный URL")
         return r.read(MAX+1)
-def mapping(raw):
-    x=result(raw,"RegNumToIntCode")
-    if len(x) or not re.fullmatch(r"[1-9]\d{0,8}(?:\.0+)?",x.text or ""):raise ValueError("Нет однозначного внутреннего кода")
-    return int((x.text or "").split(".")[0])
+def numeric_code(raw,method):
+    x=result(raw,method)
+    v=(x.text or "").strip()
+    if len(x) or not v:raise ValueError("Пустой или структурированный ответ сопоставления")
+    if len(v)>40 or not re.fullmatch(r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d{1,3})?",v):raise ValueError("Нечисловой ответ сопоставления")
+    try:n=Decimal(v)
+    except InvalidOperation:raise ValueError("Некорректный числовой ответ")
+    if n<=0:raise ValueError("ЦБ вернул неположительный код")
+    if n>999999999 or n!=n.to_integral_value():raise ValueError("Код не является допустимым целым числом")
+    return int(n)
+def mapping(raw):return numeric_code(raw,"RegNumToIntCode")
+def reverse_mapping(raw):return numeric_code(raw,"IntCodeToRegNum")
 def dates(raw,form,stamp):
     x=result(raw,"GetDatesForF"+form);out=set()
     for child in x:
@@ -54,7 +63,10 @@ def one(bank,stamp,fetcher):
     r=dict(registration_number=bank["registration_number"],name=bank["name"],internal_code=None,mapping_sha256=None,forms={},error=None)
     try:
         raw=fetcher("RegNumToIntCode","RegNumber",r["registration_number"])
-        r["internal_code"]=mapping(raw);r["mapping_sha256"]=hash_raw(raw)
+        code=mapping(raw)
+        reverse=fetcher("IntCodeToRegNum","IntNumber",code)
+        if reverse_mapping(reverse)!=int(r["registration_number"]):raise ValueError("Обратное сопоставление не совпало")
+        r["internal_code"]=code;r["mapping_sha256"]=hash_raw(raw);r["reverse_sha256"]=hash_raw(reverse)
     except Exception as e:r["error"]=str(e)[:180];return r
     for form in FORMS:
         try:
@@ -77,6 +89,7 @@ def quality(d):
             if r["forms"] or r["mapping_sha256"] is not None or not r["error"]:raise ValueError("Неподтверждённый код")
             continue
         if type(r["internal_code"]) is not int or r["internal_code"]<=0 or not re.fullmatch(r"[a-f0-9]{64}",r["mapping_sha256"] or "") or set(r["forms"])!=set(FORMS):raise ValueError("Код/формы")
+        if r.get("reverse_sha256") is not None and not re.fullmatch(r"[a-f0-9]{64}",r["reverse_sha256"]):raise ValueError("Хеш обратной сверки")
         for x in r["forms"].values():
             if x["status"]=="ok":
                 if not re.fullmatch(r"[a-f0-9]{64}",x["sha256"] or "") or x["dates"]!=sorted(set(x["dates"]),reverse=True):raise ValueError("Даты/хеш")
