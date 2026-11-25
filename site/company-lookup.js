@@ -4,6 +4,13 @@ const CompanyLookup=(()=>{
  function validInn(s){return /^\d{10}$/.test(s)&&[2,4,10,3,5,9,4,6,8].reduce((a,w,i)=>a+w*Number(s[i]),0)%11%10===Number(s[9])}
  function path(s){if(!validInn(s))throw Error('Неверный контрольный разряд ИНН');return 'company-index/inn-'+String(Number(s)%512).padStart(3,'0')+'.json.gz'}
  function row(rows,inn){const found=rows.filter(r=>Array.isArray(r)&&r[0]===inn);if(found.length>1)throw Error('Повтор ИНН');if(!found.length)return null;if(found[0].length!==columns.length)throw Error('Некорректная строка');return Object.fromEntries(columns.map((k,i)=>[k,found[0][i]]))}
+ function smeProfile(data,index,inn){
+  if(!validInn(inn))throw Error('Некорректный ИНН');
+  if(index?.status!=='ready'||data?.status!=='diagnostic'||data.financial_fingerprint!==index.fingerprint||data.financial_year!==index.year||!Array.isArray(data.profiles?.rows))return {status:'unavailable'};
+  const matches=data.profiles.rows.filter(r=>r.inn===inn);
+  if(matches.length>1)throw Error('Повтор ИНН в пилоте МСП');
+  return matches.length?{...matches[0],edition:data.sme_edition,archive:data.sme_archive_sha256}:{status:'outside_pilot'};
+ }
  function rankMatches(report,inn){
   if(!validInn(inn))throw Error('Неверный ИНН');
   const matches={};let record=null;
@@ -119,7 +126,7 @@ const CompanyLookup=(()=>{
   }
   return nameMatches(rows,key);
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,metrics,comparisonBars,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
+ return {validInn,path,row,smeProfile,rankMatches,validateBlock,lookup,parseSelection,calculate,metrics,comparisonBars,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -133,6 +140,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   status.textContent=full?'Полный индекс двух открытых архивов: '+index.count.toLocaleString('ru')+' ИНН, '+index.year+' год.':rankReady?'Поиск по опубликованным рейтингам: '+unique.toLocaleString('ru')+' уникальных ИНН, '+rank.report.year+' год. Полный индекс пока не развёрнут.':'Данные для поиска пока не опубликованы. Ни отсутствие результата, ни пустая база не означают отсутствие организации.';
   if(!full&&rank.index_error)status.textContent+=' Причина последней попытки: '+rank.index_error;
   if(!full&&rank.index_attempt)status.textContent+=' Последняя попытка восстановления индекса: '+rank.index_attempt+'.';
+  const smePromise=full?Provenance.get(m,'sme-finance.json',root).then(x=>x.data).catch(()=>null):Promise.resolve(null);
   button.disabled=!(full||rankReady);
   form.onsubmit=async e=>{
    e.preventDefault();const token=++serial,inn=input.value.trim();result.replaceChildren();exp.disabled=true;
@@ -155,6 +163,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     }
     result.append(node('h4','Финансовые и трудовые показатели'),indicators,node('p','Доходы минус расходы — не чистая прибыль. Доходы на работника — не добавленная стоимость на работника. Доля расходов рассчитывается только при положительных доходах и неотрицательных расходах. Пропуск не равен нулю.'));
     const method=node('a','Методика расчёта');method.href='methodology.html#company-compare-method';result.append(method);
+    const sme=CompanyLookup.smeProfile(await smePromise,index,inn);if(token!==serial)return;
+    result.append(node('h4','Отраслевая принадлежность: пилот реестра МСП'));
+    if(sme.status==='matched'){
+     result.append(node('p','Дата среза: '+sme.edition+' · ОГРН: '+sme.ogrn+' · код региона регистрации: '+sme.region),node('p','Заявительный основной ОКВЭД: '+(sme.declared??'—')+' (редакция '+(sme.dver??'—')+')'),node('p','Отчётный основной ОКВЭД: '+(sme.reported??'—')+' (редакция '+(sme.rver??'—')+')'),node('p','XML: '+sme.member+' · номер принятой записи '+sme.accepted_ordinal+' · SHA-256: '+sme.sha256),node('p','Это сведения реестра МСП на дату среза, не подтверждение текущего статуса ЕГРЮЛ, фактической деятельности или отрасли в финансовом году.'));
+    }else result.append(node('p',({unavailable:'Пилотная классификация пока недоступна.',outside_pilot:'ИНН вне ограниченной пилотной выборки.',not_matched:'В обработанных записях МСП совпадение по ИНН не найдено.',region_excluded:'Запись найдена, но территория исключена из сверенной выборки.'})[sme.status]||'Нет подтверждённых данных.'));
+    const sm=node('a','Методика пилотной классификации');sm.href='methodology.html#company-sme-profile-method';result.append(sm);
     result.append(official);
     const labels={income:'Доходы',expense:'Расходы',employment:'Численность'};
     const ranks=Object.entries(ranking.matches);
