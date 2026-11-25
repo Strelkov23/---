@@ -29,3 +29,6 @@ assert.equal(G.ratioComparison(groups,2025,'net_margin','Б').eligible,0);
 assert.equal(G.ratioComparison(groups,2024,'asset_return').eligible,0);
 assert.throws(()=>G.ratioComparison(groups,2025,'unknown'));
 assert.throws(()=>G.ratioComparison(groups,2025.5,'net_margin'));
+
+assert.equal(G.ratioComparison({groups:[{...rg,id:'alrosa',name:'АЛРОСА'}]},2025,'net_margin').eligible,0);
+assert.equal(G.ratioComparison({groups:[{...rg,id:'alrosa',name:'АЛРОСА'}]},2025,'asset_return').eligible,1);
