@@ -1,0 +1,38 @@
+name: Full SME profile index diagnostic
+on:
+  push:
+    branches: [stage-f-sme-profile-index]
+    paths: ['site/sme_profile_index.py','site/sme_full_import.py','.github/workflows/sme-profile-index-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sme-profile-index-diagnostic
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate synthetic profiles before any full download
+        run: |
+          cd site
+          python -m unittest test_sme_profile_index.py test_sme_full_import.py test_sme_finance_join.py
+      - name: Generate and reconcile full diagnostic profile index
+        run: |
+          cd site
+          python sme_full_import.py --output ../sme-profile-probe --financial-index ../history/published --allow-diagnostic --profile-index
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: sme-profile-index-diagnostic
+          path: |
+            sme-profile-probe/sme-profile-index.json
+            sme-profile-probe/sme-profile-index/
+            sme-profile-probe/finance-join.json
+            sme-profile-probe/classification.json
+          retention-days: 14

@@ -48,12 +48,17 @@ jobs:
             if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name sme-full-classification --dir "$folder" &&
                score=$(python3 site/sme_artifact.py "$folder" --financial-index history/published/company-index.json); then
               if [[ -z "$best" || "$score" > "$best" ]]; then
+                rm -rf /tmp/sme-source/sme-profile-index /tmp/sme-source/sme-profile-index.json
                 cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
+                if test "${score##* }" -ge 4; then
+                  cp "$folder/sme-profile-index.json" /tmp/sme-source/
+                  cp -a "$folder/sme-profile-index" /tmp/sme-source/
+                fi
                 best="$score"
                 echo "Selected diagnostic artifact from run $id ($score)"
               fi
               # A current-edition enriched candidate is sufficient.
-              if [[ "$score" == "$(date -u +%Y-%m)-10 2" ]]; then
+              if [[ "$score" == "$(date -u +%Y-%m)-10 6" ]]; then
                 rm -rf "$folder"
                 break
               fi
@@ -77,6 +82,7 @@ jobs:
           BANK_ARCHIVE_SOURCE: /tmp/bank-archive-source
           SME_FINANCE_REPORT: /tmp/sme-source/finance-join.json
           SME_MATRIX_REPORT: /tmp/sme-source/classification.json
+          SME_PROFILE_SOURCE: /tmp/sme-source
         run: |
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/
@@ -196,7 +202,7 @@ jobs:
           python3 -m http.server 8766 > /tmp/atlas-http.log 2>&1 &
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8766/ > /dev/null
-          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json group-passports.js group-passports.json corporate-watch.json corporate-discovery.json; do
+          for route in banks.html company-atlas.html bank-directory.js bank-directory.json bank-capital.js bank-capital.json bank-capital-history.js bank-capital-history.json bank-balance.js bank-balance.json bank-profit.js bank-profit.json sme-matrix.js sme-matrix.json sme-finance.js sme-finance.json company-lookup.js company-index.json sme-profile-index.json group-passports.js group-passports.json corporate-watch.json corporate-discovery.json; do
             curl --fail --silent "http://localhost:8766/$route" > /dev/null
           done
           python3 - <<'PY'
@@ -289,6 +295,11 @@ jobs:
           if [ -d monitor/public/company-index ]; then
             cp -a monitor/public/company-index history/published/company-index
           fi
+          # Keep optional SME profile shards together with their exact manifest.
+          rm -rf history/published/sme-profile-index
+          if [ -d monitor/public/sme-profile-index ]; then
+            cp -a monitor/public/sme-profile-index history/published/sme-profile-index
+          fi
           # SQLite is restored losslessly at the next build. Do not commit a raw database over GitHub's 100 MiB limit.
           gzip -n -c history/monitor.db > history/monitor.db.gz.tmp
           gzip -t history/monitor.db.gz.tmp
@@ -334,6 +345,14 @@ jobs:
               for name,entry in names['files'].items():
                   data=subprocess.check_output(['git','show','HEAD:history/published/'+name])
                   assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'],name
+          profiles=json.loads(Path('monitor/public/sme-profile-index.json').read_text())
+          if profiles['status']=='diagnostic':
+              for name,entry in profiles['files'].items():
+                  data=subprocess.check_output(['git','show','HEAD:history/published/'+name])
+                  assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'],name
+              print('Exact archived SME profile shards verified:',len(profiles['files']))
+          else:
+              assert profiles['status']=='not_deployed' and not Path('history/published/sme-profile-index').exists()
           print('Exact archived files verified:',len(manifest['files']))
           PY
           git rev-parse HEAD > monitor/public/version.txt
@@ -412,13 +431,25 @@ jobs:
                       if attempt==3:raise RuntimeError(name) from exc
                       time.sleep(5)
           manifest=json.loads(get("data-manifest.json",os.environ["EXPECTED_MANIFEST_SHA256"]))
-          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","corporate-watch.json","corporate-discovery.json","bank-archive-summary.json")
+          names=("project-coverage.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","bank-directory.json","bank-capital.json","bank-balance.json","bank-profit.json","group-passports.json","company-index.json","sme-finance.json","sme-profile-index.json","corporate-watch.json","corporate-discovery.json","bank-archive-summary.json")
           for name in names:
               entry=manifest["files"][name]
               json.loads(get(name,entry["sha256"],entry["bytes"]))
           for name in ("normalized-observations.json","source-journal.json","source-pipeline.json","data-infrastructure.json","journal-evidence.json","literature-quality.json"):
               entry=manifest["files"][name]
               json.loads(get(name,entry["sha256"],entry["bytes"]))
+          entry=manifest["files"]["sme-profile-index.json"]
+          profiles=json.loads(get("sme-profile-index.json",entry["sha256"],entry["bytes"]))
+          if profiles["status"]=="diagnostic":
+              # Sample deterministic edge/middle blocks and largest compressed block.
+              files=profiles["files"];keys=sorted(files)
+              assert len(keys)==512
+              sample={keys[0],keys[255],keys[-1],max(keys,key=lambda name:files[name]["bytes"])}
+              for name in sorted(sample):
+                  info=files[name];get(name,info["sha256"],info["bytes"])
+              print("Public SME profile sample verified:",len(sample))
+          else:
+              assert profiles["status"]=="not_deployed"
           entry=manifest["files"]["federal-budget.csv"]
           get("federal-budget.csv",entry["sha256"],entry["bytes"])
           analytics=json.loads(os.environ["EXPECTED_ANALYTICS_SHA256"])
