@@ -20,6 +20,9 @@ def quality(d):
         mids=set()
         for m in g["metrics"]:
             if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т","тыс. чел.","млн пасс.-км") or not m["label"]:raise ValueError("Показатель")
+            if "source" in m or "section" in m:
+                mu=urlsplit(m.get("source",""))
+                if mu.scheme!="https" or mu.hostname not in HOSTS or not m.get("section") or m.get("comparable") is not None or m["id"] in ("revenue","profit","assets","equity","liabilities","ppe","operating_profit","operating_cash_flow"):raise ValueError("Отдельный источник показателя")
             if m.get("comparable") is not None and (g["standard"]!="IFRS" or m["comparable"]!="annual_consolidated_revenue_rub" or m["id"]!="revenue" or m["unit"] not in ("млн руб.","млрд руб.")):raise ValueError("Несопоставимый показатель")
             mids.add(m["id"]);years=[]
             for r in m["observations"]:
