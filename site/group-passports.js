@@ -7,7 +7,7 @@ const GroupPassports=(()=>{
  function revenueComparison(d,year,sector=""){
   const rows=filterGroups(d,sector).map(g=>{
    const m=g.metrics.find(x=>x.id==='revenue'&&x.comparable==='annual_consolidated_revenue_rub'&&['млн руб.','млрд руб.'].includes(x.unit)),r=m?.observations.find(x=>x.year===year);
-   if(!r||g.scope!=='consolidated'||g.standard!=='IFRS')return {id:g.id,name:g.name,sector:g.sector,source:g.source,value:null,original:null,unit:null};
+   if(!r||g.scope!=='consolidated'||g.standard!=='IFRS')return {id:g.id,name:g.name,sector:g.sector,source:g.source,value:null,original:null,unit:null,reason:g.standard!=='IFRS'?'Несопоставимый стандарт отчётности':'Нет сопоставимого значения'};
    const value=Number(r.value)*(m.unit==='млрд руб.'?1000:1);
    if(!Number.isFinite(value)||value<0)throw Error('Некорректная выручка');
    return {id:g.id,name:g.name,sector:g.sector,source:g.source,value,original:r.value,unit:m.unit};
@@ -82,7 +82,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   function draw(){
    const g=d.groups.find(x=>x.id===pick.value);if(!g)return;
-   detail.replaceChildren(node('h3',g.name+' · '+g.sector),node('p',g.role),node('p','Периметр: консолидированная группа. Стандарт: МСФО. Определения показателей — по эмитенту.'));
+   detail.replaceChildren(node('h3',g.name+' · '+g.sector),node('p',g.role),node('p','Периметр: консолидированная группа. Стандарт: '+(g.standard==='IFRS'?'МСФО':'раскрываемая отчётность на основе МСФО, не полный комплект МСФО')+'. Определения показателей — по эмитенту.'));
    const source=node('a',(g.source_kind==='republished_issuer_release'?'Перепубликация пресс-релиза · ':'Документ эмитента · ')+g.section);source.href=g.source;detail.append(source);if(g.note)detail.append(node('p',g.note));
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
    for(const v of ['Показатель','Единица','Год','Значение','Изменение к предыдущему году']){const th=node('th',v);th.scope='col';h.append(th)}
@@ -93,7 +93,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    ry.replaceChildren(...years.map(y=>new Option(String(y),String(y))));ry.disabled=false;
    function drawRatios(){
     const y=Number(ry.value),rows=GroupPassports.ratios(g,y),available=rows.filter(x=>x.value!==null).length;
-    rs.textContent='Рассчитано '+available+' из '+rows.length+' коэффициентов · '+g.name+' · '+y+' год. Это не кредитный рейтинг.';
+    rs.textContent=g.standard!=='IFRS'?'Автоматические коэффициенты не рассчитываются: раскрываемый комплект не является полным МСФО.':'Рассчитано '+available+' из '+rows.length+' коэффициентов · '+g.name+' · '+y+' год. Это не кредитный рейтинг.';
     const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
     for(const label of ['Коэффициент','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Основание']){const th=node('th',label);th.scope='col';h.append(th)}
     for(const x of rows){const tr=b.insertRow(),note=x.value===null?'Нет необходимых сопоставимых данных или знаменатель ≤ 0':x.average?'Среднее начала и конца года':'Значения одного отчётного года';for(const v of [x.label,x.value===null?'—':fmt(x.value)+' '+x.unit,fmt(x.numerator?.value),fmt(x.denominator),note])tr.insertCell().textContent=v}
@@ -121,7 +121,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     cs.textContent='Сопоставимая выручка: '+r.eligible+' из '+r.rows.length+' групп выбранной отраслевой выборки. Не рейтинг всех компаний России; география выручки и состав групп различаются.';
     const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
     for(const label of ['Место в выборке','Группа','Отрасль','Выручка, млн руб.','Исходное значение','Источник']){const th=node('th',label);th.scope='col';h.append(th)}
-    for(const x of r.rows){const tr=b.insertRow();for(const v of [x.rank??'—',x.name,x.sector,x.value===null?'Нет сопоставимого значения':fmt(x.value),x.original===null?'—':x.original+' '+x.unit])tr.insertCell().textContent=v;const a=node('a','Отчёт');a.href=x.source;tr.insertCell().append(a)}
+    for(const x of r.rows){const tr=b.insertRow();for(const v of [x.rank??'—',x.name,x.sector,x.value===null?(x.reason||'Нет сопоставимого значения'):fmt(x.value),x.original===null?'—':x.original+' '+x.unit])tr.insertCell().textContent=v;const a=node('a','Отчёт');a.href=x.source;tr.insertCell().append(a)}
     comparison.replaceChildren(t);ce.disabled=!r.eligible;ce.onclick=()=>csv('group-revenue-'+y+'.csv',[['Год','Группа','Отрасль','Место в выборке','Охват','Выручка, млн руб.','Исходное значение','Единица','Источник','Отпечаток манифеста'],...r.rows.map(x=>[y,x.name,x.sector,x.rank,r.eligible,x.value,x.original,x.unit,x.source,m.data_fingerprint])]);
    }
    year.onchange=sectorCompare.onchange=compare;compare();
