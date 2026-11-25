@@ -103,3 +103,27 @@ class Groups(unittest.TestCase):
                 self.assertEqual(v(target),sum(v(k) for k in terms))
         self.assertEqual(next(m for m in p["metrics"] if m["id"]=="revenue")["unit"],"млн долл. США")
         self.assertEqual(next(m for m in p["metrics"] if m["id"]=="gold_output")["unit"],"тыс. тройских унций")
+
+    def test_identity_units(self):
+        def field(id,unit,value):
+            return dict(id=id,unit=unit,observations=[dict(year=2025,value=value)])
+        group=dict(metrics=[field("assets","млрд руб.","1.5"),field("equity","млн руб.","1000"),field("liabilities","млн руб.","500")])
+        g.identity(group,"assets",("equity","liabilities"),True)
+        wrong=copy.deepcopy(group);wrong["metrics"][2]["unit"]="млн долл. США"
+        with self.assertRaises(ValueError):g.identity(wrong,"assets",("equity","liabilities"),True)
+        wrong=copy.deepcopy(group);wrong["metrics"][2]["unit"]="%"
+        with self.assertRaises(ValueError):g.identity(wrong,"assets",("equity","liabilities"),True)
+        wrong=copy.deepcopy(group);wrong["metrics"][2]["observations"][0]["year"]=2024
+        with self.assertRaises(ValueError):g.identity(wrong,"assets",("equity","liabilities"),True)
+        wrong=copy.deepcopy(group);wrong["metrics"][2]["observations"][0]["value"]="499.999"
+        with self.assertRaises(ValueError):g.identity(wrong,"assets",("equity","liabilities"),True)
+        wrong=copy.deepcopy(group);wrong["metrics"].pop()
+        with self.assertRaises(ValueError):g.identity(wrong,"assets",("equity","liabilities"),True)
+
+    def test_published_identity_guards(self):
+        d=json.loads(Path(g.__file__).with_name(g.FILE).read_text())
+        for ident,metric in (("novatek","cash_fx"),("ozon","interest_revenue"),("nornickel","net_debt"),("mmk","cash_fx")):
+            bad=copy.deepcopy(d)
+            group=next(x for x in bad["groups"] if x["id"]==ident)
+            next(m for m in group["metrics"] if m["id"]==metric)["observations"][0]["value"]="999999999"
+            with self.subTest(issuer=ident),self.assertRaises(ValueError):g.quality(bad)
