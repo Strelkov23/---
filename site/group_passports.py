@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 FILE="group-passports.json"
-HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net"}
+HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru","rspp.ru","storage.yandexcloud.net","www.rusagrogroup.ru","www.aviaport.ru"}
 def quality(d):
     if d.get("schema")!=1 or d.get("mode")!="documentary_snapshot":raise ValueError("Тип снимка")
     from datetime import date
@@ -15,9 +15,10 @@ def quality(d):
         ids.add(g["id"])
         u=urlsplit(g["source"])
         if u.scheme!="https" or u.hostname not in HOSTS or not all(g[k] for k in ("name","sector","role","section")):raise ValueError("Паспорт источника")
+        if g.get("source_kind") not in (None,"issuer_statement","republished_issuer_release") or g.get("source_kind") and not g.get("note"):raise ValueError("Тип источника")
         mids=set()
         for m in g["metrics"]:
-            if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т") or not m["label"]:raise ValueError("Показатель")
+            if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т","тыс. чел.","млн пасс.-км") or not m["label"]:raise ValueError("Показатель")
             if m.get("comparable") is not None and (m["comparable"]!="annual_consolidated_revenue_rub" or m["id"]!="revenue" or m["unit"] not in ("млн руб.","млрд руб.")):raise ValueError("Несопоставимый показатель")
             mids.add(m["id"]);years=[]
             for r in m["observations"]:

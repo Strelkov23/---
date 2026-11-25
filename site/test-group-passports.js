@@ -5,3 +5,5 @@ const r=G.revenueComparison({groups:[{...g,id:'a',name:'А'},{...g,id:'b',name:'
 assert.equal(r.eligible,2);assert.equal(r.rows[0].value,2000);assert.equal(r.rows[1].rank,1);assert.equal(r.rows[2].rank,null);
 const signed=G.signedBars([-20,10,0]);
 assert.equal(signed.zero,50);assert.equal(signed.bars[0].left,0);assert.equal(signed.bars[1].width,25);assert.equal(signed.bars[2].width,0);assert.equal(G.signedBars([10,20]).bars[0].width,50);
+const filtered={groups:[{...g,id:'a',name:'Альфа',sector:'Связь'},{...g,id:'b',name:'Бета',sector:'Транспорт'}]};
+assert.equal(G.filterGroups(filtered,'Связь','альфа').length,1);assert.equal(G.filterGroups(filtered,'Связь','Бета').length,0);assert.equal(G.revenueComparison(filtered,2025,'Транспорт').eligible,1);assert.equal(G.revenueComparison(filtered,2025,'Транспорт').rows[0].rank,1);

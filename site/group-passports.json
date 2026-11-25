@@ -799,6 +799,336 @@
           ]
         }
       ]
+    },
+    {
+      "id": "rusagro",
+      "name": "Русагро",
+      "sector": "Сельское хозяйство и пищевая промышленность",
+      "role": "Растениеводство, свиноводство, производство сахара и переработка масличных культур.",
+      "source": "https://www.rusagrogroup.ru/fileadmin/files/financial_statements/12M2025ENG_FinancialStatements.pdf",
+      "section": "Консолидированная отчётность за 2025 г., печатные стр. 1–2, примечание 25",
+      "note": "Сравнительные данные 2024 года взяты из редакции 2025 года (пересчёт; см. примечание 25). Исходные тыс. руб. переведены в млн руб. без потери разрядов.",
+      "source_kind": "issuer_statement",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка от продаж",
+          "unit": "млн руб.",
+          "comparable": "annual_consolidated_revenue_rub",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "340089.483"
+            },
+            {
+              "year": 2025,
+              "value": "396450.473"
+            }
+          ]
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "74048.939"
+            },
+            {
+              "year": 2025,
+              "value": "74456.871"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "47406.491"
+            },
+            {
+              "year": 2025,
+              "value": "37284.923"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "41175.248"
+            },
+            {
+              "year": 2025,
+              "value": "19956.647"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров головной компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "36106.698"
+            },
+            {
+              "year": 2025,
+              "value": "18530.403"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "508837.421"
+            },
+            {
+              "year": 2025,
+              "value": "551166.166"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "240422.022"
+            },
+            {
+              "year": 2025,
+              "value": "260378.671"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "268415.399"
+            },
+            {
+              "year": 2025,
+              "value": "290787.495"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "191164.953"
+            },
+            {
+              "year": 2025,
+              "value": "210637.858"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aeroflot",
+      "name": "Аэрофлот",
+      "sector": "Воздушный транспорт",
+      "role": "Пассажирские и грузовые авиаперевозки; группа включает авиакомпании Аэрофлот, Россия и Победа.",
+      "source": "https://www.aviaport.ru/news/aeroflot-obyavlyaet-finansovye-rezultaty-po-msfo-za-2025-god/",
+      "section": "Годовые столбцы 12М 2024 и 12М 2025 в опубликованном пресс-релизе",
+      "note": "Перепубликация пресс-релиза эмитента на АвиаПорт, а не полный аудированный отчёт. Скорректированные показатели приведены по определению компании.",
+      "source_kind": "republished_issuer_release",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "comparable": "annual_consolidated_revenue_rub",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "856785"
+            },
+            {
+              "year": 2025,
+              "value": "902261"
+            }
+          ]
+        },
+        {
+          "id": "ebitda",
+          "label": "EBITDA (методика эмитента)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "214075"
+            },
+            {
+              "year": 2025,
+              "value": "253650"
+            }
+          ]
+        },
+        {
+          "id": "adj_ebitda",
+          "label": "Скорректированная EBITDA",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "237593"
+            },
+            {
+              "year": 2025,
+              "value": "185036"
+            }
+          ]
+        },
+        {
+          "id": "adj_ebitda_margin",
+          "label": "Рентабельность скорректированной EBITDA",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "27.7"
+            },
+            {
+              "year": 2025,
+              "value": "20.5"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за период",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "55020"
+            },
+            {
+              "year": 2025,
+              "value": "105505"
+            }
+          ]
+        },
+        {
+          "id": "adj_profit",
+          "label": "Скорректированная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "64235"
+            },
+            {
+              "year": 2025,
+              "value": "22610"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "99537"
+            },
+            {
+              "year": 2025,
+              "value": "138638"
+            }
+          ]
+        },
+        {
+          "id": "netdebt",
+          "label": "Чистый долг",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "598091"
+            },
+            {
+              "year": 2025,
+              "value": "535492"
+            }
+          ]
+        },
+        {
+          "id": "passengers",
+          "label": "Пассажиропоток",
+          "unit": "тыс. чел.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "55289"
+            },
+            {
+              "year": 2025,
+              "value": "55340"
+            }
+          ]
+        },
+        {
+          "id": "passenger_km",
+          "label": "Пассажирооборот",
+          "unit": "млн пасс.-км",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "149073"
+            },
+            {
+              "year": 2025,
+              "value": "154089"
+            }
+          ]
+        },
+        {
+          "id": "load_factor",
+          "label": "Занятость кресел",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "89.6"
+            },
+            {
+              "year": 2025,
+              "value": "90.2"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
