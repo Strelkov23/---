@@ -71,7 +71,10 @@ def collect(literature,stamp):
     total=counts(papers,audit,as_of)
     if sum(v for k,v in total.items() if k.startswith("oa_"))!=total["total"]:raise ValueError("Баланс результатов OpenAlex")
     if any(sum(r["counts"][k] for r in rows)!=v for k,v in total.items()):raise ValueError("Баланс научного каталога")
-    return dict(schema=1,built=stamp,note=NOTE,total=total,journals=rows)
+    import literature_coverage as coverage
+    import literature_resume as resume
+    queue=resume.quality(literature["queue"],registry) if "queue" in literature else None
+    return dict(schema=1,built=stamp,note=NOTE,total=total,journals=rows,coverage=coverage.collect(literature,stamp),queue=queue)
 
 def quality(data,literature):
     if data!=collect(literature,data["built"]):raise ValueError("Сводка качества не воспроизводится")
@@ -86,11 +89,15 @@ def render(data):
     for r in data["journals"]:
         c=r["counts"]
         body+='<tr><td>'+e(r["journal"])+' · '+e(r["issn"] or "—")+'</td>'+''.join('<td>'+e(v)+'</td>' for v in (c["total"],c["complete_bibliography"],c["with_license"],c["with_reading_link"],c["with_cc_evidence"],c["oa_reported_open"],c["link_ok"],c["link_missing"]+c["link_restricted"]+c["link_error"]))+'</tr>'
-    return body+'</tbody></table></div></section>'
+    import literature_coverage as coverage
+    return body+'</tbody></table></div></section>'+coverage.render(data["coverage"])
 
 def publish(page,out,stamp):
     lit=json.loads((out/"literature.json").read_text(encoding="utf-8"))
     d=collect(lit,stamp);quality(d,lit)
     (out/FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False,separators=(",",":")),encoding="utf-8")
+    import literature_coverage as coverage
+    for name,fields,rows in (("literature-years.csv",coverage.FIELDS,d["coverage"]["rows"]),("literature-topics.csv",coverage.TOPIC_FIELDS,d["coverage"]["topics"])):
+        coverage.save_csv(out/name,fields,rows);coverage.verify_csv(out/name,fields,rows)
     page("literature-quality.html",render(d))
     return d

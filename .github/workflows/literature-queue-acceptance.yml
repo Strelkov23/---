@@ -1,0 +1,48 @@
+name: Scientific catalogue bounded source acceptance
+on:
+  push:
+    branches: [stage-f-literature-queue-passport]
+    paths: ['.github/workflows/literature-queue-acceptance.yml','site/literature_resume.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify archived catalogue and bounded update in disposable copy
+        run: |
+          mkdir -p /tmp/science-check
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz >/tmp/science-check/monitor.db; else cp history/monitor.db /tmp/science-check/monitor.db; fi
+          cd site
+          python - <<'PY'
+          import sqlite3,json
+          from datetime import datetime,timezone
+          import literature as l,literature_resume as r,literature_coverage as cov
+          db=sqlite3.connect("/tmp/science-check/monitor.db")
+          db.row_factory=sqlite3.Row
+          stamp=datetime.now(timezone.utc).isoformat(timespec="seconds")
+          l.sync(db,stamp,False)
+          before={x[0] for x in db.execute("select doi from literature")}
+          # A single normal refresh, with persisted cooldown and ordinary budget.
+          l.sync(db,stamp,True)
+          l.reclassify(db)
+          papers=l.enrich(db,[dict(x) for x in db.execute("select * from literature")])
+          after={x["doi"] for x in papers}
+          assert before<=after
+          d=cov.collect(dict(articles=papers,registry=l.registry()),stamp)
+          q=r.passport(db,l.JOURNALS)
+          result=dict(before=len(before),after=len(after),new=len(after-before),coverage_rows=len(d["rows"]),topic_rows=len(d["topics"]),queue=r.quality(q,l.registry()),service=l.service_status(db,stamp))
+          print("LITERATURE_QUEUE_ACCEPTANCE",json.dumps(result,ensure_ascii=False),flush=True)
+          open("/tmp/science-check/result.json","w").write(json.dumps(dict(result=result,queue=q,coverage=d),ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: literature-queue-diagnostic
+          path: /tmp/science-check/result.json
