@@ -279,6 +279,16 @@ with sync_playwright() as p:
             page.locator("#geo-comparison summary").click()
             page.locator("#geo-dashboard summary").click()
             page.wait_for_function("document.querySelector('#gd-status').textContent.startsWith('Год:')",timeout=45000)
+            assert page.locator("#gd-table tbody tr").count()>70
+            page.locator("#gd-query").fill("RU-MOW")
+            assert page.locator("#gd-table tbody tr").count()==1
+            page.locator("#gd-query").fill("")
+            page.locator("#gd-sort").select_option("0")
+            page.locator("#gd-view").select_option("rank")
+            with page.expect_download() as wide:
+                page.locator("#gd-wide-export").click()
+            assert wide.value.suggested_filename.startswith("regional-multivariate-matrix-")
+            page.locator("#gd-mode").select_option("selected")
             assert page.locator("#gd-table tbody tr").count()==8
             page.locator("#gd-scope").check()
             assert "общая выборка" in page.locator("#gd-status").inner_text()

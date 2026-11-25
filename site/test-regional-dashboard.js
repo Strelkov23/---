@@ -10,3 +10,10 @@ assert.equal(D.summarize(a,2025,['москва'],S.sample,S.stats).median,null);
 assert.equal(D.summarize(a,2024,['москва'],S.sample,S.stats,new Set()).n,0);
 assert.equal(D.matches({code:D.specs[0][1],title:D.specs[0][2],unit:'wrong'},D.specs[0]),false);
 console.log('Regional dashboard: exact year, independent medians, balanced sample and ties OK');
+
+const opts=[{name:'Москва',iso:'RU-MOW',key:'москва'},{name:'Томская область',iso:'RU-TOM',key:'томская область'},{name:'Омская область',iso:'RU-OMS',key:'омская область'},{name:'Нет данных',key:'unknown'}];
+const calc=[{result:D.summarize(a,2024,opts.map(o=>o.key),S.sample,S.stats)}];
+assert.deepEqual(D.matrixRows(opts,calc,'','0','asc').map(x=>x.key),['томская область','москва','омская область','unknown']);
+assert.equal(D.matrixRows(opts,calc,'RU-MOW').length,1);
+assert.equal(D.matrixRows(opts,calc,'','name','desc','value',common).length,2);
+assert.equal(D.matrixRows(opts,calc,'','name','desc','value',new Set()).length,0);
