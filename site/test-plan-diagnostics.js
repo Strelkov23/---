@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict'),R=require('./plan-register.js'),D=require('./plan-diagnostics.js');
+const row={dataset:'wdi',title:'ВВП',territory:'Россия',frequency:'annual',unit:'% за год',kind:'fact',source:'https://example.org/gdp'},gdp='NY.GDP.MKTP.KD.ZG',man='NV.IND.MANF.KD.ZG';
+const rows=Array.from({length:12},(_,i)=>[{...row,series:gdp,period:String(2010+i),value:String(i%3)},{...row,title:'Обработка',source:'https://example.org/man',series:man,period:String(2010+i),value:String(i===11?20:i%4)}]).flat();
+const groups=R.facts({schema:1,rows}),s=[...groups.values()].find(x=>x.series===gdp),p=R.create(s,{name:'План',note:'Гипотеза',baseYear:2020,endYear:2022,endValue:4,direction:'higher'},{id:'a',created:'2026-11-26T00:00:00Z',sha256:'a'.repeat(64),manifest:'b'.repeat(64)});
+let r=D.analyse(p,groups,2021,10,3.5);assert.equal(r.target.fact,2);assert.equal(r.rows.find(x=>x.rule.id==='manufacturing').current.value,18);assert.equal(r.rows.find(x=>x.rule.id==='manufacturing').signal.status,'signal');assert.equal(r.rows.find(x=>x.rule.id==='investment-growth').compatible,false);
+r=D.analyse(p,groups,2022,10,3.5);assert.equal(r.target.fact,null);assert.equal(r.rows.find(x=>x.rule.id==='manufacturing').signal.status,'missing');
+const wrong=R.facts({schema:1,rows:rows.map(x=>x.series===man?{...x,unit:'руб.'}:x)});assert.equal(D.analyse(p,wrong,2021,10,3.5).rows.find(x=>x.rule.id==='manufacturing').compatible,false);
+assert.throws(()=>D.analyse(p,groups,2019,10,3.5));console.log('Plan diagnostics: exact codes, same year, incompatible inputs, missing facts and historical signal OK');

@@ -165,6 +165,14 @@ with sync_playwright() as p:
             plan_rows=list(csv.reader(f,delimiter=";"))
         assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
+        page.goto("http://localhost:8765/plan-diagnostics.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pd-result tbody tr').length===1",timeout=45000)
+        with page.expect_download() as pd:
+            page.locator("#pd-export").click()
+        with open(pd.value.path(),encoding="utf-8-sig",newline="") as f:
+            pd_rows=list(csv.reader(f,delimiter=";"))
+        assert len(pd_rows)>1 and len({len(r) for r in pd_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/plan-comparison.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#pc-results tbody tr').length===2",timeout=45000)
         assert page.locator("#pc-summary tbody tr").count()==4
