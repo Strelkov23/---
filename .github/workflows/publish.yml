@@ -45,7 +45,7 @@ jobs:
           for id in $ids; do
             folder=$(mktemp -d)
             if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name sme-full-classification --dir "$folder" &&
-               score=$(python3 site/sme_artifact.py "$folder"); then
+               score=$(python3 site/sme_artifact.py "$folder" --financial-index history/published/company-index.json); then
               if [[ -z "$best" || "$score" > "$best" ]]; then
                 cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
                 best="$score"
