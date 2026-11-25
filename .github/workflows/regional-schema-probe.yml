@@ -1,0 +1,28 @@
+name: Regional archive schema diagnostic
+on:
+  push:
+    branches: [stage-f-regional-schema]
+    paths: ['site/regional_schema_probe.py','site/test_regional_schema_probe.py','.github/workflows/regional-schema-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect configured regional archives
+        run: |
+          cd site
+          python -m unittest test_regional_schema_probe.py
+          python regional_schema_probe.py --output ../regional-schema-probe.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regional-schema-probe
+          path: regional-schema-probe.json
+          if-no-files-found: ignore
