@@ -158,7 +158,9 @@ regional_geo.publish(out,Path("../history/published"),m.now(),"--refresh" in sys
 facility_data.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 enterprise_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 amur_enterprises.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
-bank_registry.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+bank_directory=bank_registry.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+import bank_disclosure
+bank_disclosure.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv,bank_directory)
 company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_import.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

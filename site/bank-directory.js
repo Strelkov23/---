@@ -82,3 +82,19 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   pick.onchange=query.oninput=()=>{page=0;draw()};prev.onclick=()=>{page--;draw()};next.onclick=()=>{page++;draw()};draw();
  }catch(e){status.textContent='Рейтинг недоступен: '+String(e.message||e)}
 });
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),status=$('bank-disclosure-status');if(!status)return;
+ try{
+  const m=await Provenance.validateManifest(await load('data-manifest.json')),e=await Provenance.get(m,'bank-disclosure.json',root),d=e.data;
+  const forms=['101','102','123','135'],verified=d.rows.reduce((n,r)=>n+forms.filter(k=>r.forms[k]?.status==='ok').length,0);
+  status.textContent='Проверено форм: '+verified+' из '+(d.rows.length*4)+' · дата данных '+(d.checked||'—')+' · редакция перечня '+(d.edition||'—')+' · '+({ok:'проверено',partial:'частично',cached:'сохранённая редакция',unavailable:'недоступно',not_loaded:'не загружено'}[d.status]||d.status)+(d.last_attempt?' · последняя неуспешная попытка '+d.last_attempt:'');
+  const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
+  for(const x of ['Банк / рег. номер',...forms.map(k=>'Форма '+k)]){const th=node('th',x);th.scope='col';h.append(th)}
+  for(const r of d.rows){const tr=body.insertRow();tr.insertCell().textContent=r.name+' · '+r.registration_number;
+   for(const k of forms){const x=r.forms[k],td=tr.insertCell();if(x?.status==='ok'){td.textContent=x.dates.length?'Последняя дата '+x.dates[0]+' · периодов '+x.dates.length:'Сервис вернул пустой список';if(x.dates.length){const details=node('details',''),summary=node('summary','Все даты');details.append(summary,node('p',x.dates.join(', ')));td.append(details)}}else td.textContent='Не проверено: '+(x?.error||r.error||'нет ответа')}
+  }
+  $('bank-disclosure-table').replaceChildren(table);const exp=$('bank-disclosure-export');exp.disabled=!d.rows.length;
+  exp.onclick=()=>csv('bank-disclosure.csv',[['Рег. номер','Банк','Внутренний код ЦБ','SHA-256 сопоставления','Форма','Дата отчёта','Статус','Причина','Дата проверки','Редакция перечня','SHA-256 ответа','Источник','Отпечаток манифеста'],...d.rows.flatMap(r=>forms.flatMap(k=>{const x=r.forms[k];return (x?.dates?.length?x.dates:['']).map(v=>[r.registration_number,r.name,r.internal_code,r.mapping_sha256,k,v,x?.status||'unavailable',x?.error||r.error,d.checked,d.edition,x?.sha256,d.source,m.data_fingerprint])}))]);
+ }catch(e){status.textContent='Данные раскрытия недоступны: '+String(e.message||e)}
+});
