@@ -19,3 +19,12 @@ assert.throws(()=>P.records(spec,data,{...ref,records:3}));
 assert.throws(()=>P.records(spec,data,{...ref,edition:'2025-09-30'}));
 assert.throws(()=>P.select(rows,{numeric:'unknown'}));
 assert.deepEqual(P.records(spec,{edition:null,sha256:null,rows:[]},{iso:'RU-BU',edition:null,sha256:null,records:null}),[]);
+
+assert.equal(P.decimalSum(['0.1','0.02','0.003']),'0.123');
+assert.equal(P.decimalSum(['999999999999.99','0.01']),'1000000000000.00');
+assert.equal(P.decimalSum([]),null);
+assert.throws(()=>P.decimalSum(['-1']));
+assert.throws(()=>P.decimalSum(['1e2']));
+assert.deepEqual(P.numericSummary(rows,'RU-BU'),{iso:'RU-BU',records:2,costCount:1,jobsCount:1,both:1,cost:'0',jobs:'0'});
+assert.equal(P.numericSummary(rows,'RU-AMU').cost,null);
+assert.throws(()=>P.numericSummary(rows,''));
