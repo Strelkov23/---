@@ -68,6 +68,14 @@ def quality(d,index=None,matrix=None):
                 if (v is None)!=(ver is None) or v is not None and (not isinstance(v,str) or not re.fullmatch(r"\d{2}(?:\.\d{1,2}){0,2}",v) or ver not in ("2001","2014")):raise ValueError("ОКВЭД")
             if not isinstance(r["member"],str) or not r["member"].lower().endswith(".xml") or not re.fullmatch(r"[0-9a-f]{64}",r["sha256"]) or type(r["accepted_ordinal"]) is not int or r["accepted_ordinal"]<1:raise ValueError("Источник паспорта")
     return {"sme_finance_matched":i,"sme_finance_cells":total}
+def prefer(current,candidate):
+    """Do not downgrade a validated compatible diagnostic to an older schema."""
+    if candidate.get("status")!="diagnostic":return current
+    if current.get("status")!="diagnostic":return candidate
+    features=lambda d:{k for k,ok in (("paired",d.get("paired_sums_version")==1),("profiles","profiles" in d)) if ok}
+    if not features(current)<=features(candidate):return current
+    return candidate
+
 def publish(out,previous):
     index=json.loads((out/"company-index.json").read_text());matrix=json.loads((out/"sme-matrix.json").read_text());d=empty()
     for path in [previous/FILE,Path(os.environ["SME_FINANCE_REPORT"]) if os.environ.get("SME_FINANCE_REPORT") else None]:
@@ -75,6 +83,6 @@ def publish(out,previous):
         try:
             if path.stat().st_size>16*1024*1024:raise ValueError("Размер отчёта")
             candidate=json.loads(path.read_text());quality(candidate,index,matrix)
-            if candidate["status"]=="diagnostic":d=candidate
+            d=prefer(d,candidate)
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:print("SME_FINANCE_NOT_IMPORTED",str(e)[:180],flush=True)
     quality(d,index,matrix);(out/FILE).write_text(json.dumps(d,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
