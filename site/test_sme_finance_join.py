@@ -34,3 +34,24 @@ class Join(unittest.TestCase):
         heap=[]
         for inn,value in [("7707083893","5"),("7704211201","5"),("7700000000",None)]:j.retain(heap,value,inn,1)
         self.assertEqual(heap[0][2],"7704211201")
+
+    def test_batched_lookup_equivalence(self):
+        with sqlite3.connect(":memory:") as db:
+            s.setup(db)
+            ids=[str(i).zfill(10) for i in range(1,2*j.JOIN_BATCH+5)]
+            for i,inn in enumerate(ids):
+                if i%3==0:continue
+                db.execute("INSERT INTO org VALUES(?,?,?,?,?,?,?,?,?,?)",(inn,"123","77" if i%2 else None,"64.19","2014",None,None,"1",1,1))
+            rows=[[inn] for inn in ids]
+            expected={inn:row for inn in ids if (row:=db.execute("SELECT region,declared,dver,reported,rver FROM org WHERE inn=?",(inn,)).fetchone()) is not None}
+            calls=[]
+            db.set_trace_callback(lambda sql:calls.append(sql))
+            actual={}
+            for pos in range(0,len(rows),j.JOIN_BATCH):
+                actual.update(j.lookup_batch(db,rows[pos:pos+j.JOIN_BATCH]))
+            db.set_trace_callback(None)
+            self.assertEqual(actual,expected)
+            self.assertEqual(len(calls),3)
+            self.assertEqual(j.lookup_batch(db,[]),{})
+            with self.assertRaises(ValueError):j.lookup_batch(db,rows[:j.JOIN_BATCH+1])
+            with self.assertRaises(ValueError):j.lookup_batch(db,[rows[0],rows[0]])
