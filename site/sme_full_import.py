@@ -64,9 +64,29 @@ def full(db,z,edition):
     if any(sum(r["count"] for r in m)!=unique for m in (declared,reported)) or sum(regions.values())!=unique:raise ValueError("Баланс классификации")
     return dict(mode="full",edition=edition,note=NOTE,xml_total=len(members),xml_processed=len(members),counts=dict(totals),quarantine=quarantined,unique_legal=unique,region_counts=regions,declared_matrix=declared,reported_matrix=reported,members=[dict(id=i,member=f,sha256=h,documents=n) for i,f,h,n in db.execute("SELECT * FROM members ORDER BY id")])
 
+def select_reference(folder,edition,archived=None):
+    """Use a validated same-edition aggregate already captured independently, or fetch it."""
+    def validated(path):
+        data=json.loads(path.read_text(encoding="utf-8"))
+        regional.quality(data)
+        if not data["rows"] or data.get("period")!=edition:
+            raise ValueError("Нет подтверждённого агрегата ФНС за дату среза "+edition)
+        return data
+    if archived is not None:
+        try:
+            result=validated(archived)
+            print("SME_REFERENCE_ARCHIVED",edition,result["sha256"],flush=True)
+            return result
+        except (OSError,ValueError,KeyError,TypeError,AttributeError):
+            pass
+    regional.publish(folder,folder,edition+"T12:00:00Z",True)
+    result=validated(folder/"sme-regions.json")
+    print("SME_REFERENCE_FETCHED",edition,result["sha256"],flush=True)
+    return result
+
 def reconcile(report,reference):
     regional.quality(reference)
-    if reference["period"]!=report["edition"]:raise ValueError("Разные даты срезов")
+    if not reference["rows"] or reference.get("period")!=report["edition"]:raise ValueError("Нет независимой сверки за ту же дату")
     official={r["code"]:r["legal"] for r in reference["rows"]}
     actual=report["region_counts"]
     rows=[dict(region=k,official=official.get(k),imported=actual.get(k,0),difference=actual.get(k,0)-official[k] if k in official else None) for k in sorted(set(official)|set(actual))]
@@ -80,12 +100,10 @@ def main():
     stamp=datetime.now(timezone.utc).isoformat()
     with tempfile.TemporaryDirectory() as folder:
         folder=Path(folder);archive=folder/"sme.zip"
+        reference=select_reference(folder,meta["release"],a.financial_index/"sme-regions.json" if a.financial_index else None)
         sha,size=download(meta["archive"],archive)
         with sqlite3.connect(folder/"org.sqlite") as db,zipfile.ZipFile(archive) as z:
             setup(db);result=full(db,z,meta["release"])
-        # Fetch the official independent aggregate for the same edition, not today's date.
-        regional.publish(folder,folder,meta["release"]+"T12:00:00Z",True)
-        reference=json.loads((folder/"sme-regions.json").read_text())
         result.update(meta,**schema,archive_sha256=sha,archive_bytes=size,checked=stamp)
         try:result["reconciliation"]=reconcile(result,reference)
         except (ValueError,KeyError,TypeError) as e:result["reconciliation_error"]=str(e)
