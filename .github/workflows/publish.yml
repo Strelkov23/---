@@ -364,7 +364,7 @@ jobs:
           analytics_sha256=$(python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
-          names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js"]
+          names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json"]
           print(json.dumps({n:hashlib.sha256((Path("monitor/public")/n).read_bytes()).hexdigest() for n in names},separators=(",",":")))
           PY
           )
