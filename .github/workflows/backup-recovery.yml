@@ -1,0 +1,81 @@
+name: Archive recovery acceptance
+on:
+  push:
+    branches: [stage-g-backup-recovery]
+    paths: ['.github/workflows/backup-recovery.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate saved database and restore to isolated directory
+        run: |
+          set -eu
+          mkdir -p recovery
+          python - <<'PY'
+          import gzip, hashlib, json, sqlite3, subprocess
+          from pathlib import Path
+          root=Path("recovery")
+          source=Path("history/monitor.db.gz")
+          if not source.is_file():
+              raise RuntimeError("Compressed archive missing")
+          def digest(path):
+              h=hashlib.sha256()
+              with path.open("rb") as f:
+                  for block in iter(lambda:f.read(1024*1024),b""):h.update(block)
+              return h.hexdigest()
+          archive_hash=digest(source)
+          restored=root/"restored.db"
+          size=0
+          with gzip.open(source,"rb") as src,restored.open("xb") as dst:
+              for block in iter(lambda:src.read(1024*1024),b""):
+                  size+=len(block)
+                  if size>8*1024**3:raise ValueError("Unpacked archive exceeds recovery budget")
+                  dst.write(block)
+          def check(path):
+              with sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True) as db:
+                  db.execute("PRAGMA query_only=ON")
+                  integrity=[r[0] for r in db.execute("PRAGMA integrity_check")]
+                  if integrity!=["ok"]:raise ValueError(integrity)
+                  schema=db.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").fetchall()
+                  counts={}
+                  for kind,name,_,sql in schema:
+                      if kind=="table" and not name.startswith("sqlite_"):
+                          ident='"'+name.replace('"','""')+'"'
+                          counts[name]=db.execute("SELECT count(*) FROM "+ident).fetchone()[0]
+                  return {"schema_sha256":hashlib.sha256(json.dumps(schema,ensure_ascii=False).encode()).hexdigest(),"tables":counts}
+          before=check(restored)
+          if not before["tables"]:raise ValueError("Empty economic database")
+          replica=root/"replica.db"
+          with sqlite3.connect(restored.resolve().as_uri()+"?mode=ro",uri=True) as src,sqlite3.connect(replica) as dst:
+              src.backup(dst)
+          after=check(replica)
+          assert before==after,"Restored schema or table counts differ"
+          # SQLite's SQL dump provides a logical content check, beyond row counts.
+          def logical_hash(path):
+              h=hashlib.sha256()
+              with sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True) as db:
+                  for line in db.iterdump():
+                      h.update(line.encode("utf-8"));h.update(b"\n")
+              return h.hexdigest()
+          original_content=logical_hash(restored)
+          assert original_content==logical_hash(replica),"Restored content differs"
+          assert digest(source)==archive_hash,"Source archive changed"
+          report={"revision":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"archive_sha256":archive_hash,"archive_bytes":source.stat().st_size,"restored_bytes":size,"logical_sha256":original_content,"integrity":"ok",**before}
+          (root/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+          print("Verified tables:",len(before["tables"]),"rows:",sum(before["tables"].values()),flush=True)
+          PY
+      - name: Save recovery report (not database)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-report
+          path: recovery/report.json
+          if-no-files-found: error
