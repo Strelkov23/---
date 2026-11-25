@@ -49,3 +49,15 @@ const zero=M.regionalProfile(full,'свердловская область',2024
 assert.equal(zero.find(r=>r.group==='light').observation.localization,0);
 assert.ok(!M.profileFilter(zero,'','missing').some(r=>r.group==='light'));
 console.log('Full regional profile: section scope, specialization, missing and zero OK');
+
+const past=full.rows.map(x=>({...x,year:2022,row:++row,value:x.group==='light'&&x.region===a?20:x.value}));
+const dset={groups,rows:[...full.rows,...past]};
+const territories=[{key:'московская область',name:a,code:'RU-MOS'},{key:'свердловская область',name:b,code:'RU-SVE'},{key:'unknown',name:'Нет данных'}];
+const changes=M.regionalChanges(dset,'light',2022,2024,territories,S.sample);
+assert.equal(changes[0].delta.shareDelta,10);
+assert.equal(changes[1].delta.shareDelta,0);
+assert.equal(changes[2].delta,null);
+assert.equal(M.orderChanges(changes,'shareDelta','asc')[0].key,'свердловская область');
+assert.equal(M.orderChanges(changes,'shareDelta','desc','RU-MOS',true).length,1);
+assert.equal(M.orderChanges(changes,'shareDelta','desc','',true).length,2);
+assert.equal(M.regionalChanges(dset,'light',2024,2022,territories,S.sample).length,0);

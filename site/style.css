@@ -182,3 +182,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #gd-table table{min-width:1050px}#gd-table th small{display:block;font-size:.75rem;font-weight:400;white-space:normal}#gd-table td,#gd-table th{overflow-wrap:anywhere}#gd-table td:first-child{min-width:145px}
 [data-gd-band="0"]{background:#e8f2f7;color:#173e52}[data-gd-band="1"]{background:#c8e0eb;color:#173e52}[data-gd-band="2"]{background:#91c2d4;color:#173e52}[data-gd-band="3"]{background:#4e91aa;color:#102b38}[data-gd-band="4"]{background:#215c78;color:#fff}[data-gd-band="missing"]{background:#e5e7e9;color:#4d575c}
 .gd-legend{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}.gd-legend span{padding:.22rem .45rem;border-radius:.25rem}#gd-matrix-controls[hidden],#gd-selected-controls[hidden],#gd-heat-legend[hidden]{display:none}#gd-pair-chart{max-width:100%;overflow-x:auto}
+
+#rm-delta-table table{min-width:1180px}#rm-delta-table td,#rm-delta-table th{overflow-wrap:anywhere}#rm-delta-table td:first-child{min-width:150px}#rm-delta-chart{max-width:100%;overflow-x:auto}

@@ -670,6 +670,21 @@ with sync_playwright() as p:
             assert "SHA-256 ZIP" in profile_csv[0]
             assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
             if len({r["year"] for r in manufacturing["rows"]})>=2:
+                assert page.locator("#rm-delta-table tbody tr").count()>65
+                page.locator("#rm-delta-query").fill("RU-MOS")
+                assert page.locator("#rm-delta-table tbody tr").count()==1
+                page.locator("#rm-delta-metric").select_option("localizationDelta")
+                with page.expect_download() as regional_delta:
+                    page.locator("#rm-delta-export").click()
+                assert regional_delta.value.suggested_filename=="regional-structure-all-light-2022-2024.csv"
+                with open(regional_delta.value.path(),encoding="utf-8-sig",newline="") as f:
+                    all_delta=list(csv.reader(f,delimiter=";"))
+                assert len(all_delta)==2 and len(all_delta[0])==len(all_delta[1])
+                page.locator("#rm-delta-query").fill("")
+                page.locator("#rm-delta-start").select_option("2024")
+                assert page.locator("#rm-delta-export").is_disabled()
+                page.locator("#rm-delta-start").select_option("2022")
+                assert page.locator("#rm-delta-export").is_enabled()
                 assert page.locator("#rm-change-table tbody tr").count()==14
                 assert "Изменение доли" in page.locator("#rm-change-table").inner_text()
                 with page.expect_download() as delta:

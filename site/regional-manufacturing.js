@@ -36,6 +36,22 @@ const ManufacturingAtlas=(()=>{
   if(!a||!b||a.year>=b.year||a.group!==b.group||a.region!==b.region||a.level!==b.level||a.okato!==b.okato||a.oktmo!==b.oktmo||a.version!==b.version)return null;
   return {from:a.year,to:b.year,valueDelta:finite(a.value)&&finite(b.value)?b.value-a.value:null,nominalChange:finite(a.value)&&a.value>0&&finite(b.value)?100*(b.value/a.value-1):null,shareDelta:finite(a.share)&&finite(b.share)?b.share-a.share:null,localizationDelta:finite(a.localization)&&finite(b.localization)?b.localization-a.localization:null}
  }
+ function regionalChanges(data,group,start,end,territories,sample){
+  if(!Number.isInteger(start)||!Number.isInteger(end)||start>=end)return [];
+  const a=calculate(data,group,start,sample),b=calculate(data,group,end,sample);
+  return territories.map(t=>{
+   const first=a.rows.get(t.key)||null,last=b.rows.get(t.key)||null,delta=changeBetween(first,last);
+   return {...t,first,last,delta,status:!first||!last?'Нет пары наблюдений':!delta?'Несопоставимые территориальные коды или версии':'Пара проверена'};
+  });
+ }
+ function orderChanges(rows,metric,direction='desc',query='',knownOnly=false){
+  const q=String(query).trim().toLocaleLowerCase('ru'),sign=direction==='asc'?1:-1;
+  return rows.filter(r=>(!knownOnly||Number.isFinite(r.delta?.[metric]))&&(!q||[r.name,r.code,r.key].some(v=>String(v||'').toLocaleLowerCase('ru').includes(q)))).sort((a,b)=>{
+   const x=a.delta?.[metric],y=b.delta?.[metric],ax=Number.isFinite(x),by=Number.isFinite(y);
+   if(ax!==by)return ax?-1:1;
+   return ax&&x!==y?sign*(x-y):a.name.localeCompare(b.name,'ru');
+  });
+ }
  function localizationBin(v){return !finite(v)?-1:v<.5?0:v<1?1:v<1.5?2:v<2?3:4}
  function regionalProfile(data,key,year,sample){
   return (data.groups||[]).map(g=>{
@@ -46,7 +62,7 @@ const ManufacturingAtlas=(()=>{
  function profileFilter(rows,section='',mode='all'){
   return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
  }
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -99,6 +115,48 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   select.replaceChildren(new Option('Выберите регион',''),...mapped.map(f=>new Option(f.name,f.code)));
   for(const id of ['rm-section','rm-group','rm-year','rm-region'])$(id).disabled=false;
   restore(['rm-year','rm-metric','rm-region']);
+  const deltaTerritories=mapped.map(f=>({key:f.key,code:f.code,name:f.name}));
+  for(const [key,name] of [['архангельская область без автономного округа','Архангельская область (без АО)'],['тюменская область без автономных округов','Тюменская область (без АО)']])if(!deltaTerritories.some(t=>t.key===key))deltaTerritories.push({key,name,code:null});
+  const startPick=$('rm-delta-start'),endPick=$('rm-delta-end'),deltaMetric=$('rm-delta-metric'),deltaOrder=$('rm-delta-order'),deltaQuery=$('rm-delta-query'),deltaKnown=$('rm-delta-known'),deltaHost=$('rm-delta-table'),deltaChart=$('rm-delta-chart'),deltaStatus=$('rm-delta-status'),deltaExport=$('rm-delta-export');
+  const changeLabels={shareDelta:'Изменение доли, п. п.',localizationDelta:'Изменение локализации',nominalChange:'Номинальное изменение отгрузки, %',valueDelta:'Изменение отгрузки, млн руб.'};
+  function syncDeltaYears(group){
+   const available=[...new Set(combined.rows.filter(r=>r.group===group.id).map(r=>r.year))].sort((a,b)=>a-b);
+   const oldA=Number(startPick.value),oldB=Number(endPick.value);
+   for(const el of [startPick,endPick])el.replaceChildren(...available.map(y=>new Option(String(y),String(y))));
+   startPick.value=available.includes(oldA)?String(oldA):String(available[0]||'');
+   endPick.value=available.includes(oldB)?String(oldB):String(available.at(-1)||'');
+   startPick.disabled=endPick.disabled=available.length<2;
+  }
+  function drawDelta(){
+   deltaHost.replaceChildren();deltaChart.replaceChildren();deltaExport.disabled=true;
+   const group=groups.find(g=>g.id===groupPick.value),start=Number(startPick.value),end=Number(endPick.value),metric=deltaMetric.value;
+   if(!group||startPick.disabled||!start||!end||start>=end){deltaStatus.textContent='Выберите два разных года: начальный должен быть раньше конечного.';return}
+   const all=ManufacturingAtlas.regionalChanges(combined,group.id,start,end,deltaTerritories,RegionalStats.sample);
+   const known=all.filter(r=>Number.isFinite(r.delta?.[metric])),rows=ManufacturingAtlas.orderChanges(all,metric,deltaOrder.value,deltaQuery.value,deltaKnown.checked);
+   const pos=known.filter(r=>r.delta[metric]>0).length,neg=known.filter(r=>r.delta[metric]<0).length;
+   deltaStatus.textContent=group.title+' · '+start+'–'+end+' · сопоставимый показатель: '+known.length+' из '+all.length+' территорий · рост: '+pos+' · снижение: '+neg+' · без изменения: '+(known.length-pos-neg)+' · в таблице: '+rows.length+'.';
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+   for(const label of ['Территория','Отгрузка '+start+', млн руб.','Отгрузка '+end+', млн руб.','Доля '+start+', %','Доля '+end+', %','Изменение доли, п. п.','Локализация '+start,'Локализация '+end,'Изменение локализации','Номинальное изменение, %','Статус']){const th=node('th',label);th.scope='col';h.append(th)}
+   const signed=v=>Number.isFinite(v)&&v>0?'+'+number(v):number(v);
+   for(const r of rows){const a=r.first,b=r.last,d=r.delta,tr=body.insertRow();tr.insertCell().textContent=r.name;
+    for(const v of [number(a?.value),number(b?.value),number(a?.share),number(b?.share),signed(d?.shareDelta),number(a?.localization),number(b?.localization),signed(d?.localizationDelta),signed(d?.nominalChange),r.status])tr.insertCell().textContent=v;
+   }
+   deltaHost.append(t);
+   const numeric=rows.filter(r=>Number.isFinite(r.delta?.[metric]));
+   const descending=[...numeric].sort((a,b)=>b.delta[metric]-a.delta[metric]);
+   const extremes=[...new Set([...descending.filter(r=>r.delta[metric]>0).slice(0,6),...descending.filter(r=>r.delta[metric]<0).slice(-6)])];
+   if(extremes.length){
+    const w=900,h=75+extremes.length*29,svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('width',w);svg.setAttribute('role','img');svg.setAttribute('aria-label',changeLabels[metric]+' — наибольшие положительные и отрицательные изменения');
+    shape(svg,'rect',{width:w,height:h,fill:'#fff'});shape(svg,'text',{x:16,y:24,fill:'#203943','font-size':16},changeLabels[metric]+' · крайние изменения в показанной выборке');
+    const max=Math.max(...extremes.map(r=>Math.abs(r.delta[metric])),1e-10),zero=560;shape(svg,'line',{x1:zero,x2:zero,y1:37,y2:h-16,stroke:'#52696e'});
+    for(const [i,r] of extremes.entries()){const y=44+i*29,v=r.delta[metric],width=Math.abs(v)/max*200;shape(svg,'text',{x:16,y:y+14,fill:'#203943','font-size':12},r.name);shape(svg,'rect',{x:v<0?zero-width:zero,y,width,height:18,fill:v<0?'#b26c43':'#327b97'});shape(svg,'text',{x:785,y:y+14,fill:'#203943','font-size':12},signed(v))}
+    deltaChart.append(svg);
+   }else deltaChart.append(node('p','Нет ненулевых сопоставимых изменений в показанной выборке.'));
+   const src=bySection[group.section];
+   deltaExport.disabled=!rows.length;deltaExport.onclick=()=>csv('regional-structure-all-'+group.id+'-'+start+'-'+end+'.csv',[
+    ['Раздел','Группа','ОКВЭД2','Территория','ISO','Начало','Конец','Отгрузка начало','Отгрузка конец','Итог раздела начало','Итог раздела конец','Доля начало','Доля конец','Локализация начало','Локализация конец','Отгрузка РФ начало','Отгрузка РФ конец','Итог РФ начало','Итог РФ конец','Изменение отгрузки, млн руб.','Номинальное изменение, %','Изменение доли, п. п.','Изменение локализации','Статус','ОКАТО начало','ОКАТО конец','ОКТМО начало','ОКТМО конец','Издание начало','Издание конец','Лист начало','Лист конец','Строка начало','Строка конец','Строка итога начало','Строка итога конец','Строка РФ начало','Строка РФ конец','Строка итога РФ начало','Строка итога РФ конец','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...rows.map(r=>{const a=r.first,b=r.last,d=r.delta;return [group.section,group.title,group.okved,r.name,r.code,start,end,a?.value,b?.value,a?.total,b?.total,a?.share,b?.share,a?.localization,b?.localization,a?.national,b?.national,a?.nationalTotal,b?.nationalTotal,d?.valueDelta,d?.nominalChange,d?.shareDelta,d?.localizationDelta,r.status,a?.okato,b?.okato,a?.oktmo,b?.oktmo,a?.edition,b?.edition,a?.sheet,b?.sheet,a?.row,b?.row,a?.totalRow,b?.totalRow,a?.nationalRow,b?.nationalRow,a?.nationalTotalRow,b?.nationalTotalRow,src?.data.source,src?.data.sha256,src?.sha256,manifest.data_fingerprint]})]);
+  }
+  for(const el of [startPick,endPick,deltaMetric,deltaOrder,deltaKnown])el.onchange=drawDelta;deltaQuery.oninput=drawDelta;
   const shape=(svg,tag,attrs,label)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;svg.append(e);return e};
   function renderMap(items,metric,group){
    const host=$('rm-map');host.replaceChildren();
@@ -208,7 +266,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const r of ordered){const tr=body.insertRow();tr.insertCell().textContent=Number.isFinite(r[metric])?1+known.filter(x=>x[metric]>r[metric]).length:'—';const b=node('button',r.name);b.type='button';b.onclick=()=>{select.value=r.code;draw();detail.scrollIntoView({block:'start'})};tr.insertCell().append(b);for(const v of [r.value,r.total,r.share,r.localization,r.countryShare])tr.insertCell().textContent=number(v)}
    $('rm-table').replaceChildren(table);exporter.disabled=false;
    exporter.onclick=()=>csv('regional-manufacturing-'+group.id+'-'+year+'.csv',[['Группа','Раздел ОКВЭД2','ОКВЭД2','Год','Регион','ISO геометрии','Территория источника','ОКАТО','ОКТМО','Отгрузка, млн руб.','Итог региона, млн руб.','Доля, %','Локализация','Доля РФ, %','Отгрузка РФ, млн руб.','Итог РФ, млн руб.','Доля отрасли в разделе '+group.section+' РФ, %','Подраздел','Издание','Лист','Строка отгрузки','Строка итога','Строка отгрузки РФ','Строка итога РФ','Примечание','Источник','SHA-256 исходника','SHA-256 JSON','Отпечаток манифеста'],...ordered.map(r=>[group.title,group.section,group.okved,year,r.name,r.code,r.region,r.okato,r.oktmo,r.value,r.total,r.share,r.localization,r.countryShare,result.national,result.nationalTotal,result.nationalShare,r.subsection,r.edition,r.sheet,r.row,r.totalRow,r.nationalRow,r.nationalTotalRow,r.note,selected.data.source,selected.data.sha256,selected.sha256,manifest.data_fingerprint])]);
-   save(fields);
+   syncDeltaYears(group);drawDelta();save(fields);
   }
   $('rm-form').addEventListener('change',e=>{if(e.target===sectionPick)setGroups('');draw()});$('rm-form').addEventListener('submit',e=>e.preventDefault());draw();
  }catch(e){console.error(e);status.textContent='Не удалось проверить архив: '+String(e.message||e);exporter.disabled=true}
