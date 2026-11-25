@@ -65,6 +65,10 @@ with sync_playwright() as p:
         with page.expect_download() as joint:
             page.locator("#global-joint-csv").click()
         assert joint.value.suggested_filename=="global-joint-sensitivity.csv"
+        assert page.locator("#global-robust-period-table tbody tr").count()==5
+        with page.expect_download() as periods:
+            page.locator("#global-robust-period-csv").click()
+        assert periods.value.suggested_filename=="global-fixed-calendar-periods.csv"
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>{const r=e.getBoundingClientRect();return r.right>innerWidth+2&&!e.closest('.table-scroll,.atlas-table,.regional-figure-scroll')}).slice(0,20).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
         with page.expect_download() as download:
             page.locator("#global-csv").click()
@@ -74,6 +78,8 @@ with sync_playwright() as p:
         assert page.locator("#global-investment-csv").is_disabled()
         assert page.locator("#global-sens-csv").is_disabled()
         assert page.locator("#global-joint-csv").is_disabled()
+        assert page.locator("#global-robust-period-csv").is_disabled()
+        assert page.locator("#global-robust-period-table tbody tr").count()==0
         assert page.locator("#global-joint-table tbody tr").count()==0
         assert page.locator("#global-robustness-table tbody tr").count()==0
         assert page.locator("#global-sens-table tbody tr").count()==0

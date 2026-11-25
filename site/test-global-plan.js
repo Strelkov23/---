@@ -69,3 +69,10 @@ assert.ok(joint.robustness.fixedInvalid>0);
 assert.ok(joint.rows.every(x=>x.regret===null||x.regret>=0));
 near(joint.rows[4].regret,0);
 assert.equal(G.robustness([{a:1,b:2,score:10,allBinding:['A']},{a:1,b:2,score:10,allBinding:['A']}]).counts[0].count,1);
+
+const kept=G.jointSensitivity(m,p,'cumulative','investment',25,'importLimit',25,'relative',()=>{},baseCalendar);
+near(kept.rows[4].fixed.score,schedulePlan.score);
+assert.equal(kept.rows[4].fixed.rows.length,p.years);
+near(kept.rows[4].fixed.rows.reduce((s,t)=>s+t.demand,0),schedulePlan.score);
+assert.ok(kept.rows[4].fixed.rows.every(t=>t.demand<=t.requiredDemand+1e-6&&t.imports<=p.importLimit+1e-6));
+assert.throws(()=>G.jointSensitivity(m,p,'cumulative','investment',25,'importLimit',25,'relative',()=>{},baseCalendar.map(row=>row.map(()=>0))));

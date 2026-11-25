@@ -121,7 +121,7 @@ const GlobalPlan=(()=>{
    const q=periods[t],available=extra.map((v,i)=>v+spare[i]),caps=q.required.map((v,i)=>v>0?available[i]/v:Infinity),imp=q.imports>0?p.importLimit/q.imports:Infinity;
    const alpha=Math.max(0,Math.min(1,imp,q.laborUpper,...caps)),binding=[];
    if(alpha<1-1e-8){if(q.imports>0&&Math.abs(imp-alpha)<1e-7)binding.push('Импорт');if(q.laborNeed>0&&Math.abs(q.laborUpper-alpha)<1e-7)binding.push('Трудовые ресурсы');for(let i=0;i<n;i++)if(q.required[i]>0&&Math.abs(caps[i]-alpha)<1e-7)binding.push(m.names[i])}
-   rows.push({year:t+1,alpha,demand:q.totalDemand*alpha,binding});
+   rows.push({year:t+1,alpha,demand:q.totalDemand*alpha,requiredDemand:q.totalDemand,investment:sum(plan[t]),imports:q.imports*alpha,labor:q.laborNeed===null?null:q.laborNeed*alpha,binding});
    extra=extra.map((v,i)=>retention*v+plan[t][i]/k);
   }
   return {feasible:true,budgetGap,score:objective==='terminal'?rows.at(-1).demand:sum(rows.map(r=>r.demand)),alpha:rows.at(-1).alpha,binding:[...new Set(rows.flatMap(r=>r.binding))],rows,reason:'Календарь допустим'};
@@ -132,9 +132,10 @@ const GlobalPlan=(()=>{
   for(const r of known)for(const name of new Set(r.allBinding||r.binding||[]))counts.set(name,(counts.get(name)||0)+1);
   return {unique:unique.length,verified:known.length,fixedFeasible:fixed.length,fixedInvalid:unique.filter(r=>r.fixed?.feasible===false).length,adaptiveMin:min(known.map(r=>r.score)),adaptiveMax:max(known.map(r=>r.score)),fixedMin:min(fixed.map(r=>r.fixed.score)),maxRegret:max(fixed.filter(r=>finite(r.score)).map(r=>Math.max(0,r.score-r.fixed.score))),counts:[...counts].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'ru'))};
  }
- function jointSensitivity(m,p,objective,keyA,stepA,keyB,stepB,mode,progress=()=>{}){
+ function jointSensitivity(m,p,objective,keyA,stepA,keyB,stepB,mode,progress=()=>{},originalPlan=null){
   const cases=jointCases(p,keyA,stepA,keyB,stepB,mode),cache=new Map(),rows=[];
-  const baseline=solve(m,p,objective),plan=baseline.rows.map(r=>r.groups.map(g=>g.investment)),center=cases[4],baseKey=JSON.stringify([center.a,center.b]);
+  const baseline=solve(m,p,objective),plan=originalPlan??baseline.rows.map(r=>r.groups.map(g=>g.investment)),center=cases[4],baseKey=JSON.stringify([center.a,center.b]);
+  const check=fixedSchedule(m,p,objective,plan);if(!check.feasible||Math.abs(check.score-baseline.score)>baseline.tolerance)throw Error('Исходный календарь не соответствует базовому оптимуму');
   for(const c of cases){
    const key=JSON.stringify([c.a,c.b]);
    if(!cache.has(key)){
@@ -155,10 +156,10 @@ const GlobalPlan=(()=>{
   const timeline=$('global-timeline'),investmentHost=$('global-investment-heat'),investmentStatus=$('global-investment-status'),investmentCsv=$('global-investment-csv'),investmentFocus=$('global-investment-focus');
   const sensKey=$('global-sens-key'),sensMode=$('global-sens-mode'),sensStep=$('global-sens-step'),sensRun=$('global-sens-run'),sensStatus=$('global-sens-status'),sensTable=$('global-sens-table'),sensChart=$('global-sens-chart'),sensCsv=$('global-sens-csv');
   const jointA=$('global-joint-a'),jointB=$('global-joint-b'),jointStepA=$('global-joint-step-a'),jointStepB=$('global-joint-step-b'),jointMode=$('global-joint-mode'),jointRun=$('global-joint-run'),jointStatus=$('global-joint-status'),jointGrid=$('global-joint-grid'),jointTable=$('global-joint-table'),jointCsv=$('global-joint-csv');
-  const robustHost=$('global-robustness'),robustTable=$('global-robustness-table');
+  const robustHost=$('global-robustness'),robustTable=$('global-robustness-table'),robustPeriod=$('global-robust-period'),robustPeriodTable=$('global-robust-period-table'),robustPeriodCsv=$('global-robust-period-csv');
   let params=null,worker=null,answer=null,serial=0,sensWorker=null,sensSerial=0,jointWorker=null,jointSerial=0;
   function clearJoint(){
-   jointSerial++;if(jointWorker){jointWorker.terminate();jointWorker=null}jointGrid.replaceChildren();jointTable.replaceChildren();robustHost.replaceChildren();robustTable.replaceChildren();jointCsv.disabled=true;jointRun.disabled=!answer;
+   jointSerial++;if(jointWorker){jointWorker.terminate();jointWorker=null}jointGrid.replaceChildren();jointTable.replaceChildren();robustHost.replaceChildren();robustTable.replaceChildren();robustPeriodTable.replaceChildren();robustPeriod.replaceChildren();robustPeriod.disabled=true;robustPeriodCsv.disabled=true;jointCsv.disabled=true;jointRun.disabled=!answer;
    jointStatus.textContent=answer?'Выберите два разных параметра.':'Сначала рассчитайте основной план.';
   }
   function showJoint(r,p){
@@ -179,13 +180,22 @@ const GlobalPlan=(()=>{
    robustHost.append(grid,make('p','Уникальных сочетаний: '+u.unique+' · оптимум подтверждён: '+u.verified+' · исходный календарь допустим: '+u.fixedFeasible+' · превышает инвестиционный лимит: '+u.fixedInvalid+'. При недопустимости календаря его результат не рассчитывается; он не заменяется нулём.'));
    if(u.counts.length){const bars=document.createElement('div');bars.className='rm-composition';for(const c of u.counts){const line=document.createElement('div');line.className='rm-composition-row';const track=document.createElement('div');track.className='rm-composition-track';const fill=document.createElement('div');fill.className='rm-composition-fill';fill.style.width=(100*c.count/u.verified)+'%';track.append(fill);line.append(make('span',c.name),track,make('strong',c.count+' / '+u.verified));bars.append(line)}robustHost.append(make('h4','Связывающие ограничения по всему горизонту'),make('p','Число уникальных подтверждённых сочетаний, где ограничение активно хотя бы в одном периоде. Не вероятность и не оценка реального риска.'),bars)}
    table(robustTable,['Параметр A','Параметр B','Оптимум, млрд ₽','Фиксированный календарь, млрд ₽','Выигрыш переоптимизации, млрд ₽','Превышение инвестиционного лимита, млрд ₽','Статус календаря'],r.rows.map(x=>[fmt(x.a),fmt(x.b),fmt(x.score),fmt(x.fixed?.score),fmt(x.regret),fmt(x.fixed?.budgetGap),x.fixed?.reason||'Нет расчёта']));
+   robustPeriod.replaceChildren(...r.rows.map((x,i)=>new Option((i+1)+'. '+fmt(x.a)+' / '+fmt(x.b)+' · '+(x.fixed?.feasible?'допустим':'нет допустимого календаря'),String(i))));
+   robustPeriod.value='4';robustPeriod.disabled=false;
+   function showPeriods(){
+    const x=r.rows[Number(robustPeriod.value)],periods=x?.fixed?.feasible?x.fixed.rows:[];
+    table(robustPeriodTable,['Период','Требуемый спрос, млрд ₽','Реализуемый спрос, млрд ₽','Доля, %','Инвестиции, млрд ₽','Импорт, млрд ₽','Доп. человеко-лет','Ограничения'],periods.map(t=>[t.year,fmt(t.requiredDemand),fmt(t.demand),fmt(t.alpha*100),fmt(t.investment),fmt(t.imports),fmt(t.labor),t.binding.join('; ')||'—']));
+    if(!periods.length){const note=document.createElement('p');note.textContent=x?.fixed?.reason||'Нет подтверждённого расчёта';robustPeriodTable.append(note)}
+   }
+   robustPeriod.onchange=showPeriods;showPeriods();robustPeriodCsv.disabled=false;
+   robustPeriodCsv.onclick=()=>csv('global-fixed-calendar-periods.csv',[['Цель',r.objective],['Параметр A',r.keyA],['Параметр B',r.keyB],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['A','Единица A','B','Единица B','Статус','Период','Требуемый спрос, млрд руб.','Реализуемый спрос, млрд руб.','Доля спроса','Инвестиции, млрд руб.','Импорт, млрд руб.','Доп. человеко-лет','Ограничения','Источник'],...r.rows.flatMap(x=>(x.fixed?.feasible?x.fixed.rows:[{}]).map(t=>[x.a,a.unit,x.b,b.unit,x.fixed?.reason,t.year,t.requiredDemand,t.demand,t.alpha,t.investment,t.imports,t.labor,t.binding?.join('; '),'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])),['Исходный календарь','Группа','Инвестиции, млрд руб.'],...answer.rows.flatMap(t=>t.groups.map(g=>[t.year,g.name,g.investment]))]);
    jointCsv.disabled=false;jointCsv.onclick=()=>csv('global-joint-sensitivity.csv',[['Цель',r.objective],['Параметр A',r.keyA],['Шаг A',r.stepA],['Параметр B',r.keyB],['Шаг B',r.stepB],['Режим',r.mode],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['A','Единица A','B','Единица B','Направление A','Направление B','Ограничено A','Ограничено B','Цель, млрд руб.','Δ цели','Доля спроса','Δ доли, п.п.','Инвестиции','Верхняя граница','Разрыв двойственности','Допуск','Ограничения','Ограничения всего горизонта','Фиксированный календарь: цель','Фиксированный календарь: допустимость','Превышение лимита','Выигрыш переоптимизации','Статус календаря','Ошибка','Источник'],...r.rows.map(x=>[x.a,a.unit,x.b,b.unit,x.dirA,x.dirB,x.clampedA,x.clampedB,x.score,x.delta,x.alpha,x.deltaPP,x.investment,x.upper,x.gap,x.tolerance,x.binding?.join('; '),x.allBinding?.join('; '),x.fixed?.score,x.fixed?.feasible,x.fixed?.budgetGap,x.regret,x.fixed?.reason,x.error,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
   }
   jointRun.onclick=()=>{
    if(!params||!answer)return;clearJoint();const keyA=jointA.value,keyB=jointB.value,stepA=jointStepA.valueAsNumber,stepB=jointStepB.valueAsNumber,mode=jointMode.value,goal=objective.value,p={...params,growth:[...params.growth]};
    try{jointCases(p,keyA,stepA,keyB,stepB,mode)}catch(e){jointStatus.textContent=String(e.message||e);return}
    const token=jointSerial;jointRun.disabled=true;jointStatus.textContent='Проверка девяти сочетаний…';
-   try{jointWorker=new Worker('global-plan-worker.js');jointWorker.onmessage=e=>{if(token!==jointSerial)return;if(e.data.progress){jointStatus.textContent='Проверено сочетаний: '+e.data.progress.done+' из '+e.data.progress.total;return}jointWorker.terminate();jointWorker=null;jointRun.disabled=false;if(e.data.error){jointStatus.textContent=e.data.error;return}showJoint(e.data.result,p)};jointWorker.onerror=()=>{if(token!==jointSerial)return;jointWorker.terminate();jointWorker=null;jointRun.disabled=false;jointStatus.textContent='Не удалось выполнить расчёт сочетаний.'};jointWorker.postMessage({m,p,objective:goal,joint:{keyA,keyB,stepA,stepB,mode}})}
+   try{jointWorker=new Worker('global-plan-worker.js');jointWorker.onmessage=e=>{if(token!==jointSerial)return;if(e.data.progress){jointStatus.textContent='Проверено сочетаний: '+e.data.progress.done+' из '+e.data.progress.total;return}jointWorker.terminate();jointWorker=null;jointRun.disabled=false;if(e.data.error){jointStatus.textContent=e.data.error;return}showJoint(e.data.result,p)};jointWorker.onerror=()=>{if(token!==jointSerial)return;jointWorker.terminate();jointWorker=null;jointRun.disabled=false;jointStatus.textContent='Не удалось выполнить расчёт сочетаний.'};jointWorker.postMessage({m,p,objective:goal,joint:{keyA,keyB,stepA,stepB,mode,originalPlan:answer.rows.map(t=>t.groups.map(g=>g.investment))}})}
    catch(e){jointRun.disabled=false;jointStatus.textContent='Вычислитель недоступен.'}
   };
   for(const e of [jointA,jointB,jointStepA,jointStepB,jointMode])e.onchange=clearJoint;
