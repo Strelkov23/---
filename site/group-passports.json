@@ -1563,6 +1563,454 @@
           ]
         }
       ]
+    },
+    {
+      "id": "interrao",
+      "name": "Интер РАО",
+      "sector": "Электроэнергетика",
+      "role": "Электро- и теплогенерация, сбыт, энерготрейдинг, строительство и энергомашиностроение.",
+      "source": "https://reportcollection.inion.ru/reports/download/?reportId=4886",
+      "section": "Годовой отчёт за 2025 год, раздел 6.1.1, с. 77",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Таблица ключевых финансовых результатов из годового отчёта эмитента; не полный комплект финансовой отчётности. Чистые активы не подменяют строку капитала, определения EBITDA, свободного денежного потока и чистого долга — по эмитенту.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "1359799"
+            },
+            {
+              "year": 2024,
+              "value": "1548447"
+            },
+            {
+              "year": 2025,
+              "value": "1760626"
+            }
+          ],
+          "comparable": "annual_consolidated_revenue_rub"
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "124884"
+            },
+            {
+              "year": 2024,
+              "value": "108005"
+            },
+            {
+              "year": 2025,
+              "value": "106800"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Чистая прибыль группы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "135927"
+            },
+            {
+              "year": 2024,
+              "value": "147462"
+            },
+            {
+              "year": 2025,
+              "value": "133834"
+            }
+          ]
+        },
+        {
+          "id": "ebitda",
+          "label": "EBITDA (определение эмитента)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "182425"
+            },
+            {
+              "year": 2024,
+              "value": "173303"
+            },
+            {
+              "year": 2025,
+              "value": "181544"
+            }
+          ]
+        },
+        {
+          "id": "ebitda_margin",
+          "label": "Маржа EBITDA (по эмитенту)",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "13.4"
+            },
+            {
+              "year": 2024,
+              "value": "11.2"
+            },
+            {
+              "year": 2025,
+              "value": "10.3"
+            }
+          ]
+        },
+        {
+          "id": "capex",
+          "label": "Капитальные расходы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "66857"
+            },
+            {
+              "year": 2024,
+              "value": "115026"
+            },
+            {
+              "year": 2025,
+              "value": "189944"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Денежный поток от операционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "122610"
+            },
+            {
+              "year": 2024,
+              "value": "115518"
+            },
+            {
+              "year": 2025,
+              "value": "99421"
+            }
+          ]
+        },
+        {
+          "id": "fcf",
+          "label": "Свободный денежный поток (по эмитенту)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "71768"
+            },
+            {
+              "year": 2024,
+              "value": "-10193"
+            },
+            {
+              "year": 2025,
+              "value": "-72354"
+            }
+          ]
+        },
+        {
+          "id": "net_assets",
+          "label": "Чистые активы (по эмитенту)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "929397"
+            },
+            {
+              "year": 2024,
+              "value": "1039136"
+            },
+            {
+              "year": 2025,
+              "value": "1138805"
+            }
+          ]
+        },
+        {
+          "id": "borrowings",
+          "label": "Кредиты и займы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "19233"
+            },
+            {
+              "year": 2024,
+              "value": "11102"
+            },
+            {
+              "year": 2025,
+              "value": "5559"
+            }
+          ]
+        },
+        {
+          "id": "netdebt_adjusted",
+          "label": "Чистый долг с корректировками (по эмитенту)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2023,
+              "value": "-428714"
+            },
+            {
+              "year": 2024,
+              "value": "-414800"
+            },
+            {
+              "year": 2025,
+              "value": "-348292"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transneft",
+      "name": "Транснефть",
+      "sector": "Трубопроводный транспорт",
+      "role": "Транспортировка нефти и нефтепродуктов по системе магистральных трубопроводов.",
+      "source": "https://ptport.ru/upload/iblock/775/qzbvwnpceqo1lixwpw3rc8imi9k0ydqi/Finansovaya-otchetnost.pdf",
+      "section": "Раскрываемая консолидированная финансовая отчётность за 2025 год, с. 3–6",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Аудиторское заключение от 26.03.2026: раскрываемый комплект согласуется с проаудированной отчётностью согласно примечанию 3, но не содержит всех раскрытий МСФО. Вне автоматического сравнения МСФО.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1423904"
+            },
+            {
+              "year": 2025,
+              "value": "1440281"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "282207"
+            },
+            {
+              "year": 2025,
+              "value": "249681"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за отчётный год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "299976"
+            },
+            {
+              "year": 2025,
+              "value": "241127"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров головной компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "287662"
+            },
+            {
+              "year": 2025,
+              "value": "226073"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль до налогообложения",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "423833"
+            },
+            {
+              "year": 2025,
+              "value": "389996"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3691024"
+            },
+            {
+              "year": 2025,
+              "value": "3702383"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2927953"
+            },
+            {
+              "year": 2025,
+              "value": "3003155"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "763071"
+            },
+            {
+              "year": 2025,
+              "value": "699228"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2663277"
+            },
+            {
+              "year": 2025,
+              "value": "2702741"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Оборотные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "712275"
+            },
+            {
+              "year": 2025,
+              "value": "672259"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Краткосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "343661"
+            },
+            {
+              "year": 2025,
+              "value": "364145"
+            }
+          ]
+        },
+        {
+          "id": "inventories",
+          "label": "Запасы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "57030"
+            },
+            {
+              "year": 2025,
+              "value": "47423"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "115559"
+            },
+            {
+              "year": 2025,
+              "value": "223527"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_liabilities",
+          "label": "Долгосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "419410"
+            },
+            {
+              "year": 2025,
+              "value": "335083"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
