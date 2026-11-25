@@ -34,3 +34,13 @@ assert.equal(P.displayDecimal('0.999'),'1,00');
 assert.equal(P.displayDecimal('0'),'0,00');
 assert.equal(P.displayDecimal(null),'—');
 assert.throws(()=>P.displayDecimal('-1'));
+
+const ns=P.naoSpecs[0], nr={iso:'RU-NEN',key:ns.key,group:ns.group,records:1,cost_numeric:1,edition:'2025-01-01',sha256:'a',source:'https://example.org',register_type:'Реализованные'};
+const nd={schema:1,report:{groups:{completed:[{group:'completed',record:'completed:7',row:7,region:'НАО',name:'Тест',sector:'Тест',status:'Реализованные',edition:nr.edition,sha256:nr.sha256,source:nr.source,cost_mln_rub:'1.25',jobs:null}]}}};
+const nrows=P.naoRecords(ns,nd,nr);
+assert.equal(P.select(nrows,{iso:'RU-NEN'}).length,1);
+assert.equal(P.select(nrows,{iso:'RU-NEN:planned'}).length,0);
+assert.equal(P.numericSummary(nrows,ns.key).cost,'1.25');
+assert.throws(()=>P.numericSummary(nrows,'RU-NEN'));
+assert.throws(()=>P.naoRecords(ns,nd,{...nr,sha256:'b'}));
+assert.throws(()=>P.naoRecords(ns,nd,{...nr,cost_numeric:0}));

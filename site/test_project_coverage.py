@@ -72,6 +72,17 @@ class CoverageTests(unittest.TestCase):
             self.assertEqual(d["rows"]["RU-ROS"],old["rows"]["RU-ROS"])
             self.assertEqual(d["rows"]["RU-PER"],old["rows"]["RU-PER"])
             self.assertEqual(d["rows"]["RU-NEN"]["status"],"waiting")
+    def test_nao_registers_separate_when_unavailable(self):
+        import nao_project_public as np
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            for _,_,_,mod,_,_ in p.SPECS:mod.publish(lambda *a:None,root,root,"2026-11-26",False)
+            np.publish(lambda *a:None,root,root,"2026-11-26",False)
+            d=p.collect(root,"2026-11-26")
+            self.assertEqual(len(d["nao_registers"]),3)
+            self.assertEqual(p.quality(d,root)["project_registers_configured"],6)
+            self.assertTrue(all(r["records"] is None for r in d["nao_registers"]))
+            self.assertIn("Ненецкий автономный округ",p.render(d))
     def test_offline_discovery_accepts_date_without_network(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

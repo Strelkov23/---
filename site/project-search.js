@@ -1,6 +1,20 @@
 /* Cross-register navigation; source categories and reporting dates remain separate. */
 const ProjectSearch=(()=>{
  const specs=[{iso:'RU-BU',slug:'investment-projects',kind:'Региональный реестр'},{iso:'RU-AMU',slug:'amur-projects',kind:'Региональный реестр'},{iso:'RU-KDA',slug:'krasnodar-projects',kind:'Перечень сопровождения'}];
+ const naoSpecs=['completed','implementation','planned'].map(group=>({iso:'RU-NEN',key:'RU-NEN:'+group,group,slug:'nao-projects',kind:'Реестр НАО'}));
+ const key=r=>r.key||r.iso;
+ function naoRecords(spec,data,ref){
+  if(!ref||ref.iso!=='RU-NEN'||ref.key!==spec.key||ref.group!==spec.group||data.schema!==1)throw Error('Паспорт НАО');
+  if(!data.report){if(ref.records!==null)throw Error('Нет редакции НАО');return []}
+  const rows=data.report.groups?.[spec.group];
+  if(!Array.isArray(rows)||rows.length!==ref.records||rows.filter(r=>r.cost_mln_rub!==null).length!==ref.cost_numeric)throw Error('Охват НАО');
+  const seen=new Set();
+  return rows.map(r=>{
+   if(r.group!==spec.group||r.edition!==ref.edition||r.sha256!==ref.sha256||r.source!==ref.source||r.jobs!==null||r.record!==spec.group+':'+r.row||seen.has(r.record))throw Error('Несовместимая запись НАО');
+   seen.add(r.record);
+   return {iso:spec.iso,key:spec.key,region:r.region,kind:ref.register_type,page:spec.slug+'.html#nao-'+spec.group,record:r.record,name:r.name,investor:null,investorAvailability:null,sector:r.sector,location:r.location,status:r.status,stage:r.stage,period:r.period,cost:r.cost_mln_rub,jobs:null,edition:r.edition,source:r.source,sha256:r.sha256,sheet:r.sheet,row:r.row};
+  });
+ }
  const norm=s=>String(s??'').toLocaleLowerCase('ru').replaceAll('ё','е').trim();
  function displayDecimal(value){
   if(value===null)return '—';
@@ -18,7 +32,7 @@ const ProjectSearch=(()=>{
  function select(rows,{iso='',sector='',status='',query='',numeric=''}={}){
   if(!['','cost','jobs','both'].includes(numeric))throw Error('Параметр числового отбора');
   const q=norm(query).split(/\s+/).filter(Boolean);
-  return rows.filter(r=>(!iso||r.iso===iso)&&(!sector||(sector==='__missing__'?!r.sector:r.sector===sector))&&(!status||(status==='__missing__'?!r.status:r.status===status))&&(!numeric||(numeric==='both'?r.cost!==null&&r.jobs!==null:r[numeric]!==null))&&q.every(t=>norm([r.name,r.investor,r.investorAvailability,r.location,r.sector,r.status,r.stage,r.region].join(' ')).includes(t)));
+  return rows.filter(r=>(!iso||key(r)===iso||r.iso===iso)&&(!sector||(sector==='__missing__'?!r.sector:r.sector===sector))&&(!status||(status==='__missing__'?!r.status:r.status===status))&&(!numeric||(numeric==='both'?r.cost!==null&&r.jobs!==null:r[numeric]!==null))&&q.every(t=>norm([r.name,r.investor,r.investorAvailability,r.location,r.sector,r.status,r.stage,r.region].join(' ')).includes(t)));
  }
  function counts(rows){return specs.map(s=>({iso:s.iso,records:rows.filter(r=>r.iso===s.iso).length,cost:rows.filter(r=>r.iso===s.iso&&r.cost!==null).length,jobs:rows.filter(r=>r.iso===s.iso&&r.jobs!==null).length}));}
  function decimalSum(values){
@@ -30,12 +44,12 @@ const ProjectSearch=(()=>{
   return scale?sum.slice(0,-scale)+'.'+sum.slice(-scale):sum;
  }
  function numericSummary(rows,iso){
-  if(!specs.some(s=>s.iso===iso))throw Error('Выберите один источник');
-  const selected=rows.filter(r=>r.iso===iso),costs=selected.filter(r=>r.cost!==null),jobs=selected.filter(r=>r.jobs!==null);
+  if(![...specs,...naoSpecs].some(s=>key(s)===iso))throw Error('Выберите один источник');
+  const selected=rows.filter(r=>key(r)===iso),costs=selected.filter(r=>r.cost!==null),jobs=selected.filter(r=>r.jobs!==null);
   if(jobs.some(r=>!Number.isSafeInteger(r.jobs)||r.jobs<0))throw Error('Численность');
-  return {iso,records:selected.length,costCount:costs.length,jobsCount:jobs.length,both:selected.filter(r=>r.cost!==null&&r.jobs!==null).length,cost:decimalSum(costs.map(r=>r.cost)),jobs:jobs.length?jobs.reduce((n,r)=>n+BigInt(r.jobs),0n).toString():null};
+  return {iso:naoSpecs.some(s=>s.key===iso)?'RU-NEN':iso,records:selected.length,costCount:costs.length,jobsCount:jobs.length,both:selected.filter(r=>r.cost!==null&&r.jobs!==null).length,cost:decimalSum(costs.map(r=>r.cost)),jobs:jobs.length?jobs.reduce((n,r)=>n+BigInt(r.jobs),0n).toString():null};
  }
- return {specs,records,select,counts,decimalSum,numericSummary,displayDecimal};
+ return {specs,naoSpecs,key,naoRecords,records,select,counts,decimalSum,numericSummary,displayDecimal};
 })();
 if(typeof module!=='undefined')module.exports=ProjectSearch;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -44,12 +58,15 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  let page=0;const size=40;
  try{
   const m=await Provenance.validateManifest(await load('data-manifest.json')),coverage=(await Provenance.get(m,'project-coverage.json',root)).data;
-  const settled=await Promise.allSettled(ProjectSearch.specs.map(async s=>({spec:s,rows:ProjectSearch.records(s,(await Provenance.get(m,s.slug+'.json',root)).data,coverage.rows.find(r=>r.iso===s.iso))})));
+  const refs=[...coverage.rows,...(coverage.nao_registers||[])],key=ProjectSearch.key;
+  const nao=coverage.nao_registers?.length?Provenance.get(m,'nao-projects.json',root):null;
+  const active=[...ProjectSearch.specs,...(nao?ProjectSearch.naoSpecs:[])];
+  const settled=await Promise.allSettled(active.map(async s=>({spec:s,rows:s.group?ProjectSearch.naoRecords(s,(await nao).data,refs.find(r=>key(r)===key(s))):ProjectSearch.records(s,(await Provenance.get(m,s.slug+'.json',root)).data,refs.find(r=>key(r)===key(s)))})));
   const ok=settled.filter(x=>x.status==='fulfilled').map(x=>x.value),all=ok.flatMap(x=>x.rows),failed=settled.length-ok.length;
-  iso.replaceChildren(new Option('Все подключённые регионы',''),...coverage.rows.map(r=>new Option(r.region,r.iso)));
-  const requested=new URLSearchParams(location.search).get('project-region');if(requested&&/^RU-[A-Z0-9-]{2,8}$/.test(requested)&&![...iso.options].some(o=>o.value===requested))iso.add(new Option(requested+' · источник не подключён',requested));if([...iso.options].some(o=>o.value===requested))iso.value=requested;
+  iso.replaceChildren(new Option('Все подключённые регионы',''),...refs.map(r=>new Option(r.region+(r.group?' · '+r.register_type:''),key(r))));
+  const requested=new URLSearchParams(location.search).get('project-region');if(requested==='RU-NEN'&&nao)iso.add(new Option('НАО · все три реестра','RU-NEN'));if(requested&&/^RU-[A-Z0-9-]{2,8}$/.test(requested)&&![...iso.options].some(o=>o.value===requested))iso.add(new Option(requested+' · источник не подключён',requested));if([...iso.options].some(o=>o.value===requested))iso.value=requested;
   function options(){
-   const rows=all.filter(r=>!iso.value||r.iso===iso.value);
+   const rows=all.filter(r=>!iso.value||key(r)===iso.value||r.iso===iso.value);
    for(const [el,key] of [[sector,'sector'],[state,'status']]){
     const old=el.value,values=[...new Set(rows.map(r=>r[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
     el.replaceChildren(new Option('Все',''),...values.map(v=>new Option(v,v)),new Option('Не указано в источнике','__missing__'));
@@ -62,21 +79,22 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    page=Math.min(page,Math.max(0,Math.ceil(rows.length/size)-1));
    status.textContent='Записи источников: '+rows.length+' · '+(rows.length?page*size+1:0)+'–'+Math.min(rows.length,(page+1)*size)+'. Не число уникальных проектов.'+(failed?' Недоступно наборов: '+failed+'.':'');
    summary.replaceChildren();
-   for(const c of ProjectSearch.counts(rows)){
-    if(iso.value&&iso.value!==c.iso)continue;
-    const ref=coverage.rows.find(r=>r.iso===c.iso),loaded=ok.some(x=>x.spec.iso===c.iso)&&ref.records!==null;
-    const article=node('div','');article.className='metric';article.append(node('b',loaded?String(c.records):'—'),node('span',ref.region+(loaded?' · стоимость: '+(ref.cost_numeric===null?'—':c.cost)+' · места: '+(ref.jobs_numeric===null?'—':c.jobs):' · нет подтверждённого набора')));summary.append(article);
+   for(const ref of refs){
+    if(iso.value&&iso.value!==key(ref)&&iso.value!==ref.iso)continue;
+    const selected=rows.filter(r=>key(r)===key(ref)),c={records:selected.length,cost:selected.filter(r=>r.cost!==null).length,jobs:selected.filter(r=>r.jobs!==null).length};
+    const loaded=ok.some(x=>key(x.spec)===key(ref))&&ref.records!==null;
+    const article=node('div','');article.className='metric';article.append(node('b',loaded?String(c.records):'—'),node('span',ref.region+(ref.group?' · '+ref.register_type:'')+(loaded?' · стоимость: '+(ref.cost_numeric===null?'—':c.cost)+' · места: '+(ref.jobs_numeric===null?'—':c.jobs):' · нет подтверждённого набора')));summary.append(article);
    }
    const totals=$('project-search-totals'),totalsExport=$('project-search-totals-export');
    if(totals&&totalsExport){
-    totals.replaceChildren();const ref=coverage.rows.find(r=>r.iso===iso.value);
-    const loaded=ref&&ref.records!==null&&ok.some(x=>x.spec.iso===iso.value);
+    totals.replaceChildren();const ref=refs.find(r=>key(r)===iso.value);
+    const loaded=ref&&ref.records!==null&&ok.some(x=>key(x.spec)===iso.value);
     totalsExport.disabled=!loaded||!rows.length;
-    if(!loaded)totals.append(node('p',iso.value?'Нет подтверждённого набора выбранного региона.':'Выберите один регион для расчёта заявленных параметров.'));
+    if(!loaded)totals.append(node('p',iso.value==='RU-NEN'?'Выберите один из трёх реестров НАО для расчёта финансирования.':iso.value?'Нет подтверждённого набора выбранного источника.':'Выберите один реестр для расчёта заявленных параметров.'));
     else{
      const n=ProjectSearch.numericSummary(rows,iso.value),fmt=ProjectSearch.displayDecimal;
      const cards=node('div','');cards.className='metrics';
-     for(const [label,v] of [['Записей в выборке',String(n.records)],['Стоимость: числовых записей',ref.cost_numeric===null?'Поле отсутствует':String(n.costCount)],['Сумма заявленной стоимости, млн руб.',fmt(n.cost)],['Рабочие места: числовых записей',ref.jobs_numeric===null?'Поле отсутствует':String(n.jobsCount)],['Сумма заявленных мест',n.jobs===null?'—':BigInt(n.jobs).toLocaleString('ru')],['Оба поля заполнены',ref.cost_numeric===null||ref.jobs_numeric===null?'—':String(n.both)]]){
+     for(const [label,v] of [['Записей в выборке',String(n.records)],['Стоимость: числовых записей',ref.cost_numeric===null?'Поле отсутствует':String(n.costCount)],[ref.group?'Сумма финансирования по источнику, млн руб.':'Сумма заявленной стоимости, млн руб.',fmt(n.cost)],['Рабочие места: числовых записей',ref.jobs_numeric===null?'Поле отсутствует':String(n.jobsCount)],['Сумма заявленных мест',n.jobs===null?'—':BigInt(n.jobs).toLocaleString('ru')],['Оба поля заполнены',ref.cost_numeric===null||ref.jobs_numeric===null?'—':String(n.both)]]){
       const item=node('div','');item.className='metric';item.append(node('b',v),node('span',label));cards.append(item)
      }
      totals.append(cards,node('p','Стоимость отображается с округлением до 0,01 млн руб.; CSV сохраняет исходную десятичную сумму. Суммы только по заполненным полям выбранных записей одного источника. Возможны пересечения проектов и разные сроки; это не фактические вложения, не созданные места и не общий итог региона.'));
@@ -84,7 +102,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     }
    }
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
-   for(const label of ['Проект / запись','Регион и дата','Отрасль источника','Место','Статус / стадия','Инвестор / наличие','Заявленная стоимость, млн руб.','Заявленные места','Источник']){const th=node('th',label);th.scope='col';h.append(th);}
+   for(const label of ['Проект / запись','Регион и дата','Отрасль источника','Место','Статус / стадия','Инвестор / наличие','Стоимость / финансирование, млн руб.','Заявленные места','Источник']){const th=node('th',label);th.scope='col';h.append(th);}
    for(const r of rows.slice(page*size,(page+1)*size)){
     const tr=b.insertRow();for(const v of [r.name+' · № '+r.record,r.region+' · '+r.edition,r.sector,r.location,[r.status,r.stage].filter(Boolean).join(' / '),r.investor||r.investorAvailability,r.cost,r.jobs])tr.insertCell().textContent=v??'—';
     const td=tr.insertCell(),a=node('a','Документ');a.href=r.source;const l=node('a','Реестр');l.href=r.page;td.append(a,document.createTextNode(' · '),l);
