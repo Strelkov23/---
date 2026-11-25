@@ -85,7 +85,96 @@ def render(d):
     body+='</section><section><h2>Связанные данные</h2><p><a href="frp-snapshot.html">Фонд развития промышленности</a> — документальные агрегаты. <a href="https://invest.nalog.gov.ru/public-registry-szpk">Реестр СЗПК</a> — отдельный федеральный источник, импорт не подключён.</p><p><a href="facility-map.html">Карта площадок</a> · <a href="industrial-parks.html">Парки и ОЭЗ</a> · <a href="capital.html">Основные фонды и загрузка мощностей</a>.</p></section>'
     return body+'<script defer src="provenance.js"></script><script defer src="project-search.js"></script>'
 
-def publish(page,out,stamp):
+
+# These are source-discovery candidates, not integrated registers.
+DISCOVERY_FILE="project-source-discovery.json"
+DISCOVERY_NOTE="Кандидаты файлов региональных реестров. Число ссылок не число проектов. Содержимое файлов и поля ещё не проверены."
+DISCOVERY={
+    "RU-ROS":("Ростовская область","https://invest-don.com/ru/register_investment_projects/",".xlsx"),
+    "RU-PER":("Пермский край","https://investinperm.permkrai.ru/investoram/realizuemye-proekty/",".pdf"),
+}
+def discovery_allowed(key,url):
+    from urllib.parse import urlsplit
+    try:
+        p=urlsplit(url);expected=urlsplit(DISCOVERY[key][1])
+        return p.scheme=="https" and p.hostname==expected.hostname and p.port in (None,443) and not p.username and not p.password and not p.fragment and len(url)<=1500
+    except (ValueError,KeyError):return False
+def discovery_parse(key,raw):
+    from corporate_discovery import Links
+    from urllib.parse import urljoin,urldefrag,urlsplit,unquote
+    if not 0<len(raw)<=4*1024*1024:raise ValueError("Размер HTML")
+    p=Links();p.feed(raw.decode("utf-8",errors="strict"));p.close()
+    rows={}
+    for href,title in p.links:
+        if not href:continue
+        url=urldefrag(urljoin(DISCOVERY[key][1],href))[0]
+        if not discovery_allowed(key,url) or not unquote(urlsplit(url).path).lower().endswith(DISCOVERY[key][2]):continue
+        rows[url]=dict(url=url,title=(title or unquote(urlsplit(url).path).rsplit("/",1)[-1])[:300])
+    if not 0<len(rows)<=100:raise ValueError("Нет однозначной ограниченной выборки ссылок")
+    return [rows[k] for k in sorted(rows)]
+def discovery_fetch(key):
+    from corporate_discovery import Redirect
+    from urllib.request import Request,build_opener
+    req=Request(DISCOVERY[key][1],headers={"User-Agent":"EconomicMonitor/1.0","Accept-Encoding":"identity"})
+    with build_opener(Redirect()).open(req,timeout=12) as response:
+        if not discovery_allowed(key,response.geturl()) or response.headers.get_content_type()!="text/html":raise ValueError("Не HTML каталога")
+        return discovery_parse(key,response.read(4*1024*1024+1))
+def discovery_blank(key):
+    name,url,ext=DISCOVERY[key]
+    return dict(region=name,source=url,format=ext[1:],checked=None,success=None,status="waiting",error=None,candidates=[])
+def discovery_quality(d):
+    from corporate_watch import time
+    from urllib.parse import urlsplit,unquote
+    if d["schema"]!=1 or d["note"]!=DISCOVERY_NOTE or set(d["rows"])!=set(DISCOVERY):raise ValueError("Паспорт поиска")
+    for key,r in d["rows"].items():
+        base=discovery_blank(key)
+        if any(r[k]!=base[k] for k in ("region","source","format")) or r["status"] not in ("waiting","ok","unavailable"):raise ValueError("Источник")
+        checked=time(r["checked"]) if r["checked"] else None
+        success=time(r["success"]) if r["success"] else None
+        if success and (not checked or success>checked):raise ValueError("Даты")
+        if r["status"]=="waiting" and r!=base or r["status"]=="ok" and (not success or success!=checked or r["error"]) or r["status"]=="unavailable" and (not checked or not r["error"]):raise ValueError("Состояние")
+        rows=r["candidates"]
+        if bool(rows)!=bool(success) or len(rows)>100 or len({x["url"] for x in rows})!=len(rows):raise ValueError("Охват")
+        for x in rows:
+            if not discovery_allowed(key,x["url"]) or not unquote(urlsplit(x["url"]).path).lower().endswith(DISCOVERY[key][2]) or not isinstance(x["title"],str) or not 0<len(x["title"])<=300:raise ValueError("Ссылка")
+    return {"project_discovery_sources":len(DISCOVERY),"project_discovery_success":sum(bool(r["success"]) for r in d["rows"].values()),"project_discovery_candidates":sum(len(r["candidates"]) for r in d["rows"].values())}
+def discover(out,previous,stamp,refresh,fetcher=discovery_fetch):
+    from datetime import timedelta
+    from corporate_watch import time
+    from concurrent.futures import ThreadPoolExecutor
+    d=dict(schema=1,note=DISCOVERY_NOTE,rows={k:discovery_blank(k) for k in DISCOVERY})
+    try:
+        old=json.loads((previous/DISCOVERY_FILE).read_text(encoding="utf-8"));discovery_quality(old);d=old
+    except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
+    now=time(stamp)
+    todo=[k for k,r in d["rows"].items() if refresh and (not r["checked"] or now>=time(r["checked"])+timedelta(days=2 if r["status"]=="unavailable" else 7))]
+    def one(k):
+        row=dict(d["rows"][k],checked=stamp)
+        try:
+            row.update(status="ok",success=stamp,error=None,candidates=fetcher(k))
+            discovery_quality(dict(d,rows={**d["rows"],k:row}))
+        except Exception as exc:
+            row=dict(d["rows"][k],checked=stamp,status="unavailable",error=(str(exc) or type(exc).__name__)[:180])
+        return row
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        for k,r in zip(todo,pool.map(one,todo)):d["rows"][k]=r
+    discovery_quality(d);(out/DISCOVERY_FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8")
+    return d
+def discovery_render(d):
+    discovery_quality(d)
+    e=lambda x:escape(str(x),quote=True)
+    body='<section id="project-discovery"><h2>Новые источники региональных реестров</h2><p>'+e(DISCOVERY_NOTE)+'</p><p>Автоматический поиск ссылок на официальных страницах раз в семь суток, при сбое — через двое суток. Файлы не импортируются до проверки формата и единиц.</p>'
+    labels={"waiting":"Ожидает проверки","ok":"Ссылки обнаружены","unavailable":"Источник недоступен или формат не распознан"}
+    for r in d["rows"].values():
+        body+='<article><h3>'+e(r["region"])+'</h3><p><a href="'+e(r["source"])+'">Страница реестра</a> · '+e(r["format"].upper())+' · '+e(labels[r["status"]])+'</p>'
+        if r["checked"]:body+='<p>Проверка: '+e(r["checked"])+'</p>'
+        if r["error"]:body+='<p>'+e(r["error"])+'</p>'
+        if r["candidates"]:
+            body+='<p>Последняя успешная проверка: '+e(r["success"])+'</p><ul>'+''.join('<li><a href="'+e(x["url"])+'">'+e(x["title"])+'</a></li>' for x in r["candidates"])+'</ul>'
+        body+='</article>'
+    return body+'<p><a href="'+DISCOVERY_FILE+'">Протокол JSON</a></p></section>'
+
+def publish(page,out,stamp,previous=None,refresh=False):
     d=collect(out,stamp);quality(d,out)
     (out/"project-coverage.json").write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     with (out/"project-coverage.csv").open("w",encoding="utf-8-sig",newline="") as f:
@@ -93,4 +182,6 @@ def publish(page,out,stamp):
     with (out/"project-breakdown.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=BREAKDOWN_FIELDS);w.writeheader();w.writerows({k:bu.csv_cell(r[k]) for k in BREAKDOWN_FIELDS} for r in d["breakdown"])
     verify_breakdown_csv(out/"project-breakdown.csv",d)
-    verify_csv(out/"project-coverage.csv",d);page("project-coverage.html",render(d));return d
+    verify_csv(out/"project-coverage.csv",d)
+    candidates=discover(out,previous or out,stamp,refresh)
+    page("project-coverage.html",render(d)+discovery_render(candidates));return d

@@ -44,4 +44,20 @@ class CoverageTests(unittest.TestCase):
             with self.assertRaises(ValueError):p.verify_breakdown_csv(path/"project-breakdown.csv",d)
             with (path/"project-coverage.csv").open("a",encoding="utf-8") as f:f.write("bad\n")
             with self.assertRaises(ValueError):p.verify_csv(path/"project-coverage.csv",d)
+
+    def test_discovery_retains_verified_links(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t)
+            samples={"RU-ROS":b'<a href="/docs/register.xlsx">Download</a><a href="https://example.org/fake.xlsx">Other</a>',"RU-PER":b'<a href="/docs/register.pdf">Register</a><a href="/docs/register.xlsx">Other format</a>'}
+            d=p.discover(root,root,"2026-11-25T04:00:00+00:00",True,lambda k:p.discovery_parse(k,samples[k]))
+            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],2)
+            self.assertIn("Ростовская область",p.discovery_render(d))
+            self.assertIn("Пермский край",p.discovery_render(d))
+            def fail(k):raise OSError("offline")
+            d=p.discover(root,root,"2026-12-02T04:00:00+00:00",True,fail)
+            self.assertEqual(p.discovery_quality(d)["project_discovery_candidates"],2)
+            self.assertEqual(d["rows"]["RU-ROS"]["status"],"unavailable")
+            self.assertFalse(p.discovery_allowed("RU-PER","https://example.org/a.pdf"))
+            self.assertFalse(p.discovery_allowed("RU-ROS","https://user@invest-don.com/a.xlsx"))
+            with self.assertRaises(ValueError):p.discovery_parse("RU-ROS",b'<a href="https://example.org/a.xlsx">Bad</a>')
 if __name__=="__main__":unittest.main()
