@@ -21,6 +21,7 @@ import enterprise_sources
 import amur_enterprises
 import bank_registry
 import company_sources
+import company_import
 import industrial_parks
 import park_certificates
 import sme_regions
@@ -158,6 +159,7 @@ enterprise_sources.publish(out,Path("../history/published"),m.now(),"--refresh" 
 amur_enterprises.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 bank_registry.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
+company_import.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

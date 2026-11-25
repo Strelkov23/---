@@ -18,3 +18,17 @@ class TestImport(unittest.TestCase):
     def test_employment(self):
         raw='<Файл><Документ><СведНП ИННЮЛ="7707083893" НаимОрг="ПАО Тест"/><СведССЧР КолРаб="0"/></Документ></Файл>'.encode()
         self.assertEqual(list(c.parse_xml(raw,"employment")),[("7707083893","ПАО Тест",0)])
+
+    def test_rankings(self):
+        with sqlite3.connect(":memory:") as db:
+            c.setup(db)
+            db.execute("INSERT INTO income VALUES(?,?,?,?,?,?,?)",("7707083893",2025,"ПАО Тест",9007199254740993,100,"a",1))
+            db.execute("INSERT INTO employment VALUES(?,?,?,?,?,?)",("7707083893",2025,"ПАО Другое",3,"b",1))
+            db.execute("INSERT INTO employment VALUES(?,?,?,?,?,?)",("7704211201",2025,"Другая",8,"b",2))
+            ranks,paired,diff=c.rankings(db,2025)
+            self.assertEqual(ranks["income"]["rows"][0]["income_cents"],"9007199254740993")
+            self.assertEqual(ranks["employment"]["rows"][0]["workers"],8)
+            self.assertEqual(paired,1);self.assertEqual(diff,1)
+    def test_empty_quality(self):
+        self.assertEqual(c.quality(c.empty())["corporate_income_records"],0)
+        with self.assertRaises(ValueError):c.quality(dict(c.empty(),status="ok"))

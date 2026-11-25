@@ -288,6 +288,13 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/company-atlas.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#company-source-status').textContent.startsWith('Проверка')",timeout=30000)
         assert page.locator("#company-source-table tbody tr").count()==2
+        page.wait_for_function("!document.querySelector('#company-rank-status').textContent.startsWith('Проверка')",timeout=30000)
+        if page.locator("#company-rank-export").is_enabled():
+            assert page.locator("#company-rank-table tbody tr").count()>0
+            page.locator("#company-rank-kind").select_option("employment")
+            with page.expect_download() as rankcsv:
+                page.locator("#company-rank-export").click()
+            assert rankcsv.value.suggested_filename.startswith("company-ranking-employment-")
         page.goto("http://localhost:8765/banks.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#bank-source-status').textContent.startsWith('Проверка')",timeout=30000)
         assert page.locator("#bank-metrics .metric").count()==3

@@ -1,4 +1,4 @@
-name: FNS corporate archive pilot import
+name: FNS corporate archive complete import
 on:
   push:
     branches: [main]
@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify source schemas and bounded sample import
+      - name: Verify source schemas and complete archive import
         run: |
           cd site
           python -m unittest test_company_import.py
@@ -26,13 +26,14 @@ jobs:
           d=c.publish(Path(".."),Path("/nonexistent"),datetime.now(timezone.utc).isoformat(),True)
           assert all(r["schema_verified"] for r in d["rows"])
           PY
-          python company_import.py --sources ../company-sources.json --output ../corporate-pilot --limit-members 1000
+          python company_import.py --sources ../company-sources.json --output ../corporate-pilot --full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: corporate-archive-pilot
           path: |
             corporate-pilot/company-pilot.json
+            corporate-pilot/company-rankings.json
             corporate-pilot/company-pilot.sqlite
             company-sources.json
           if-no-files-found: ignore

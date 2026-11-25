@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 ROOT=sys.argv[1] if len(sys.argv)>1 else "http://localhost:8765/"
 OUT=Path(sys.argv[2] if len(sys.argv)>2 else "/tmp/layout-audit")
 OUT.mkdir(parents=True,exist_ok=True)
-PAGES=["index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","freshness.html","stat-revisions.html","statistics.html","national.html","historical.html","economic-map.html","regional-manufacturing.html","news-map.html","facility-map.html","district-map.html","search.html","glossary.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html","index-builder.html","report-builder.html","finance.html","financial-state.html","cost-structure.html","food-balance.html"]
+PAGES=["banks.html","company-atlas.html","index.html","monitoring.html","data-centre.html","sectors.html","analysis-centre.html","research-centre.html","quality-centre.html","freshness.html","stat-revisions.html","statistics.html","national.html","historical.html","economic-map.html","regional-manufacturing.html","news-map.html","facility-map.html","district-map.html","search.html","glossary.html","industrial.html","sector-passports.html","compare.html","diagnostics.html","scenario.html","atlas.html","papers.html","desk.html","methodology.html","links.html","laws.html","week.html","programmes.html","budget-diagnostics.html","programme-evidence.html","labor.html","prices.html","technology.html","forecast.html","capital.html","data-registry.html","method-passports.html","reproducibility.html","index-builder.html","report-builder.html","finance.html","financial-state.html","cost-structure.html","food-balance.html"]
 AUDIT="""() => {
  const root=document.documentElement;
  const isVisible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden'};
@@ -15,6 +15,7 @@ AUDIT="""() => {
  const outside=[...document.querySelectorAll('main h1, main h2, main h3, main button, main label, main article, .primary-nav a, .section-nav')]
    .filter(isVisible).filter(e=>!e.closest('.atlas-table,.table-scroll,.regional-figure-scroll')&&(e.getBoundingClientRect().right>root.clientWidth+3||e.getBoundingClientRect().left< -3))
    .slice(0,10).map(e=>({tag:e.tagName,text:e.textContent.trim().slice(0,90)}));
+ const overflowCandidates=[...document.querySelectorAll('main *')].filter(isVisible).filter(e=>!e.closest('.atlas-table,.table-scroll,.regional-figure-scroll')&&e.getBoundingClientRect().right>root.clientWidth+3).slice(0,15).map(e=>({tag:e.tagName,id:e.id,className:typeof e.className==='string'?e.className:'svg',right:Math.round(e.getBoundingClientRect().right)}));
  const svgIssues=[];
  for(const svg of document.querySelectorAll('main svg[viewBox]')){
   if(!isVisible(svg))continue;
@@ -26,7 +27,7 @@ AUDIT="""() => {
    if(w>3&&h>Math.min(a.h,b.h)*.5)svgIssues.push({kind:'overlapping labels',chart:svg.getAttribute('aria-label'),texts:[a.t,b.t]});
   }
  }
- return {viewport:root.clientWidth,documentWidth:root.scrollWidth,uncontainedTables:uncontained,outside,svgIssues:svgIssues.slice(0,40)};
+ return {viewport:root.clientWidth,documentWidth:root.scrollWidth,uncontainedTables:uncontained,outside,overflowCandidates,svgIssues:svgIssues.slice(0,40)};
 }"""
 def run():
     report=[]

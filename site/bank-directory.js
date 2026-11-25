@@ -48,3 +48,36 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   status.textContent='Паспортов: '+d.rows.filter(r=>r.archive).length+' / '+d.rows.length+' · схем: '+d.rows.filter(r=>r.schema_verified).length+' / '+d.rows.length+'. Числовые наблюдения не импортированы.';
  }catch(e){status.textContent='Протокол недоступен: '+String(e.message||e)}
 });
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),status=$('company-rank-status');if(!status)return;
+ const pick=$('company-rank-kind'),query=$('company-rank-query'),prev=$('company-rank-prev'),next=$('company-rank-next'),exp=$('company-rank-export'),host=$('company-rank-table'),chart=$('company-rank-chart'),detail=$('company-rank-detail');
+ const money=s=>{if(s==null)return '—';const n=BigInt(s),a=n<0n?-n:n;return (n<0n?'−':'')+(a/100n).toLocaleString('ru')+','+(a%100n).toString().padStart(2,'0')};
+ const rub=s=>s==null?null:(BigInt(s)<0n?'-':'')+((BigInt(s)<0n?-BigInt(s):BigInt(s))/100n).toString()+'.'+((BigInt(s)<0n?-BigInt(s):BigInt(s))%100n).toString().padStart(2,'0');
+ const textNum=n=>Number.isFinite(n)?n.toLocaleString('ru'):'—';
+ let page=0;
+ try{
+  const m=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(m,'company-rankings.json',root),d=entry.data,r=d.report;
+  if(!r){status.textContent='Полные архивы ещё не импортированы. '+(d.error||'');return}
+  status.textContent='Отчётный год '+r.year+' · '+(d.status==='cached'?'сохранённая редакция':'импортировано')+' · дата импорта '+d.success+'. '+(d.error||'');
+  const sources=Object.fromEntries(r.sources.map(s=>[s.kind,s]));
+  const a=sources.income_expense,b=sources.employment,labels={income:'Доходы',expense:'Расходы',employment:'Среднесписочная численность'};
+  for(const [label,v] of [['Финансовых записей',a.unique],['Записей занятости',b.unique],['Совпали по ИНН',r.paired]]){const c=node('div','');c.className='metric';c.append(node('b',textNum(v)),node('span',label));$('company-rank-metrics').append(c)}
+  function show(v){detail.replaceChildren(node('h3',v.name),node('p','ИНН '+v.inn+' · год '+r.year),node('p','Доходы: '+money(v.income_cents)+' руб. · расходы: '+money(v.expense_cents)+' руб. · работники: '+textNum(v.workers)),node('p','Наименование в финансовом источнике: '+(v.income_name||'—')+'; в источнике занятости: '+(v.employment_name||'—')),node('p','Регистрация, ОКВЭД, продукция и текущий статус деятельности ещё не подтверждены.'));
+   for(const [label,s,member,doc] of [['Финансы',a,v.income_member,v.income_doc],['Занятость',b,v.employment_member,v.employment_doc]])if(member){const link=node('a',label+' · ZIP ФНС');link.href=s.source;detail.append(node('p',member+' · документ '+doc),link)}
+  }
+  function draw(){
+   const x=r.rankings[pick.value],q=query.value.trim().toLocaleLowerCase('ru'),rows=x.rows.filter(v=>!q||[v.name,v.inn,v.income_name,v.employment_name].some(z=>String(z||'').toLocaleLowerCase('ru').includes(q)));
+   page=Math.max(0,Math.min(page,Math.ceil(rows.length/50)-1));detail.replaceChildren();
+   $('company-rank-count').textContent=labels[pick.value]+' · числовых наблюдений в архиве '+textNum(x.eligible)+' · в рейтинге '+x.rows.length+' · найдено '+rows.length+' · места сохраняются при фильтрации.';
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();for(const label of ['Место','Организация','ИНН','Доходы, руб.','Расходы, руб.','Работники']){const th=node('th',label);th.scope='col';h.append(th)}
+   for(const v of rows.slice(page*50,(page+1)*50)){const tr=body.insertRow();tr.insertCell().textContent=v.rank;const btn=node('button',v.name);btn.type='button';btn.className='rm-region-link';btn.onclick=()=>show(v);tr.insertCell().append(btn);for(const z of [v.inn,money(v.income_cents),money(v.expense_cents),textNum(v.workers)])tr.insertCell().textContent=z}
+   host.replaceChildren(t);prev.disabled=page===0;next.disabled=(page+1)*50>=rows.length;exp.disabled=!rows.length;
+   chart.replaceChildren(node('p','Первые десять положительных значений текущей выборки. Шкала относительно максимума, не доля экономики.'));
+   const val=v=>pick.value==='employment'?v.workers:Number(v[pick.value+'_cents']),top=rows.filter(v=>val(v)>0).slice(0,10),max=Math.max(1,...top.map(val)),bars=node('div','');bars.className='rm-composition';
+   for(const v of top){const line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=100*val(v)/max+'%';track.append(fill);line.append(node('span',v.name),track,node('strong',pick.value==='employment'?textNum(v.workers):money(v[pick.value+'_cents'])));bars.append(line)}chart.append(bars);
+   exp.onclick=()=>csv('company-ranking-'+pick.value+'-'+r.year+'.csv',[['Год','Критерий','Место','ИНН','Организация','Доходы, руб.','Расходы, руб.','Работники','Название в финансовом наборе','Название в наборе занятости','XML финансов','Документ финансов','XML занятости','Документ занятости','Источник финансов','SHA-256 ZIP финансов','Источник занятости','SHA-256 ZIP занятости','SHA-256 JSON','Отпечаток манифеста'],...rows.map(v=>[r.year,pick.value,v.rank,v.inn,v.name,rub(v.income_cents),rub(v.expense_cents),v.workers,v.income_name,v.employment_name,v.income_member,v.income_doc,v.employment_member,v.employment_doc,a.source,a.sha256,b.source,b.sha256,entry.sha256,m.data_fingerprint])]);
+  }
+  pick.onchange=query.oninput=()=>{page=0;draw()};prev.onclick=()=>{page--;draw()};next.onclick=()=>{page++;draw()};draw();
+ }catch(e){status.textContent='Рейтинг недоступен: '+String(e.message||e)}
+});

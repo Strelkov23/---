@@ -145,6 +145,8 @@ def collect(out,stamp):
     corporate=read("company-sources.json")
     for r in corporate["rows"]:
         add("company-source-"+r["kind"],"Предприятия","ФНС · "+("Доходы и расходы" if r["kind"]=="income_expense" else "Среднесписочная численность"),r["catalog"],r,str(r["report_year"]) if r["report_year"] else None,days=7,available=bool(r["archive"]),policy="Проверка паспорта и XSD; наблюдения ещё не импортированы",href="company-atlas.html#company-source-check",failure_days=2)
+    ranks=read("company-rankings.json")
+    add("company-rankings","Предприятия","ФНС · рейтинги полных открытых архивов",corporate["rows"][0]["catalog"],ranks,str(ranks["report"]["year"]) if ranks["report"] else None,days=7,available=bool(ranks["report"]),policy="Импорт при смене выпуска; повтор через 2 суток после ошибки",href="company-atlas.html#company-rankings",failure_days=2)
     enterprise=read("enterprise-sources.json")
     for r in enterprise["rows"]:
         title={"organizations":"Организации","entrepreneurs":"ИП"}[r["kind"]]
