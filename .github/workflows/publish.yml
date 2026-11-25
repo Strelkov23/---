@@ -85,7 +85,10 @@ jobs:
           SME_PROFILE_SOURCE: /tmp/sme-source
         run: |
           unzip -q EconomicsPages.zip -d monitor
-          cp site/* monitor/
+          # The artifact preflight imports Python modules and can create site/__pycache__.
+          # Copy only top-level regular source files, never generated directories.
+          find site -maxdepth 1 -type f -exec cp -t monitor/ -- {} +
+          test -f monitor/build.py
           mkdir -p history monitor/data
           if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
