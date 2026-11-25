@@ -1,0 +1,45 @@
+name: Expanded interface audit
+on:
+  push:
+    branches: [stage-g-accessibility-audit]
+    paths: ['site/layout_audit.py', '.github/workflows/expanded-interface-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rebuild saved archive without updating sources
+        run: |
+          unzip -q EconomicsPages.zip -d monitor
+          find site -maxdepth 1 -type f -exec cp -t monitor/ -- {} +
+          mkdir -p monitor/data
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db
+          elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db
+          else exit 1; fi
+          python -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2 playwright==1.51.0
+          cd monitor
+          ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python build.py
+          python -c 'import json; from pathlib import Path; assert not json.loads(Path("public/quality.json").read_text())["errors"]'
+      - name: Audit navigation routes at four widths in two themes
+        working-directory: monitor/public
+        env:
+          AUDIT_BOTH_THEMES: '1'
+        run: |
+          python -m http.server 8765 >/tmp/interface-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/index.html >/dev/null
+          CHROME_BIN=$(command -v google-chrome) python ../layout_audit.py http://localhost:8765/ /tmp/expanded-interface-audit
+      - name: Preserve findings and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expanded-interface-audit
+          path: /tmp/expanded-interface-audit/
+          if-no-files-found: error
