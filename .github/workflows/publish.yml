@@ -386,6 +386,11 @@ jobs:
           for name in names:
               entry=manifest["files"][name]
               json.loads(get(name,entry["sha256"],entry["bytes"]))
-          print("Exact public manifest and atlas files verified:",len(names))
+          for name in ("normalized-observations.json","source-journal.json","source-pipeline.json","data-infrastructure.json"):
+              entry=manifest["files"][name]
+              json.loads(get(name,entry["sha256"],entry["bytes"]))
+          entry=manifest["files"]["federal-budget.csv"]
+          get("federal-budget.csv",entry["sha256"],entry["bytes"])
+          print("Exact public manifest and atlas files verified:",len(names)+5)
           PY
           echo "Public version verified: $EXPECTED_VERSION"

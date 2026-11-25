@@ -10,6 +10,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
   $('repro-fingerprint').textContent='Отпечаток данных: '+m.data_fingerprint;
   const select=$('repro-file');for(const k of Object.keys(m.files).sort())select.add(new Option(k,k));
   select.value='data-registry.json';$('repro-verify').disabled=false;
-  $('repro-verify').onclick=async()=>{const key=select.value;$('repro-verify').disabled=true;$('repro-result').textContent='Проверка…';try{const r=await Provenance.get(m,key,root);$('repro-result').textContent='Совпадает: '+key+' · SHA-256 '+r.sha256}catch(e){$('repro-result').textContent='Не подтверждено: '+e.message}finally{$('repro-verify').disabled=false}};
+  $('repro-verify').onclick=async()=>{const key=select.value;$('repro-verify').disabled=true;$('repro-result').textContent='Проверка…';try{const r=await Provenance.getBytes(m,key,root);$('repro-result').textContent='Совпадает: '+key+' · SHA-256 '+r.sha256}catch(e){$('repro-result').textContent='Не подтверждено: '+e.message}finally{$('repro-verify').disabled=false}};
  }catch(e){$('repro-status').textContent='Манифест не подтверждён: '+e.message}
 });
