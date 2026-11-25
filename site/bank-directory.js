@@ -6,7 +6,13 @@ const BankDirectory=(()=>{
   const q=String(query||'').trim().toLocaleLowerCase('ru');
   return base.filter(r=>(mode!=='active'||r.license_status==='Действующая')&&(!license||(license==='__unknown__'?!r.license_status:r.license_status===license))&&(!q||[r.name,r.registration_number,r.ogrn].some(v=>String(v||'').toLocaleLowerCase('ru').includes(q)))).sort((a,b)=>a.name.localeCompare(b.name,'ru')||a.registration_number.localeCompare(b.registration_number));
  }
- return {rows};
+ function commonDates(data,form){
+  const lists=data.rows.map(r=>r.forms[form]);
+  if(!lists.length||lists.some(x=>x?.status!=='ok'))return null;
+  const sets=lists.slice(1).map(x=>new Set(x.dates));
+  return [...new Set(lists[0].dates)].filter(v=>sets.every(x=>x.has(v))).sort().reverse();
+ }
+ return {rows,commonDates};
 })();
 if(typeof module!=='undefined')module.exports=BankDirectory;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -89,6 +95,8 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const m=await Provenance.validateManifest(await load('data-manifest.json')),e=await Provenance.get(m,'bank-disclosure.json',root),d=e.data;
   const forms=['101','102','123','135'],verified=d.rows.reduce((n,r)=>n+forms.filter(k=>r.forms[k]?.status==='ok').length,0);
   status.textContent='Проверено форм: '+verified+' из '+(d.rows.length*4)+' · дата данных '+(d.checked||'—')+' · редакция перечня '+(d.edition||'—')+' · '+({ok:'проверено',partial:'частично',cached:'сохранённая редакция',unavailable:'недоступно',not_loaded:'не загружено'}[d.status]||d.status)+(d.last_attempt?' · последняя неуспешная попытка '+d.last_attempt:'');
+  const common=$('bank-disclosure-common');common.replaceChildren();
+  for(const k of forms){const dates=BankDirectory.commonDates(d,k),card=node('div','');card.className='metric';card.append(node('b',dates===null?'—':dates[0]||'Нет общей даты'),node('span','Форма '+k+' · '+(dates===null?'не все ответы подтверждены':dates.length+' общих периодов пилота')));common.append(card)}
   const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
   for(const x of ['Банк / рег. номер',...forms.map(k=>'Форма '+k)]){const th=node('th',x);th.scope='col';h.append(th)}
   for(const r of d.rows){const tr=body.insertRow();tr.insertCell().textContent=r.name+' · '+r.registration_number;

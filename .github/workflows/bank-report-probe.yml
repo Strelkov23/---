@@ -1,0 +1,29 @@
+name: CBR form 123 source structure
+on:
+  push:
+    branches: [main]
+    paths: ['site/bank_report_probe.py','site/test_bank_report_probe.py','site/bank_disclosure.py','.github/workflows/bank-report-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests and official source probe
+        run: |
+          cd site
+          python -m unittest test_bank_report_probe.py test_bank_disclosure.py
+          python bank_report_probe.py --output ../bank-report-probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank-form-123-source-structure
+          path: bank-report-probe/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -29,7 +29,9 @@ def result(raw,method):
 def fetch(method,parameter,value):
     req=Request(SOURCE,data=envelope(method,parameter,value),headers={"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+NS+method+'"',"User-Agent":"EconomicMonitor/1.0"})
     with urlopen(req,timeout=8) as r:
-        if r.geturl()!=SOURCE:raise ValueError("Неожиданный URL")
+        from urllib.parse import urlsplit
+        u=urlsplit(r.geturl())
+        if u.scheme!='https' or u.hostname not in ('www.cbr.ru','cbr.ru') or u.path.lower()!=urlsplit(SOURCE).path.lower() or u.query or u.fragment:raise ValueError("Неожиданный URL")
         return r.read(MAX+1)
 def mapping(raw):
     x=result(raw,"RegNumToIntCode")

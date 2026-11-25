@@ -1,0 +1,117 @@
+"""Inspect actual official report XML and archive metadata before mapping numbers."""
+import argparse,hashlib,json,re,zipfile,io
+from collections import Counter
+from datetime import date,datetime,timezone
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urljoin,urlsplit
+from urllib.request import Request,urlopen
+import bank_disclosure as d
+import bank_registry as registry
+CATALOG="https://www.cbr.ru/banking_sector/otchetnost-kreditnykh-organizaciy/"
+METHOD="Data123FormFullXML"
+MAX_PAGE=4*1024*1024
+MAX_ARCHIVE=30*1024*1024
+def allowed(url):
+    p=urlsplit(url)
+    return p.scheme=="https" and p.hostname in ("cbr.ru","www.cbr.ru") and p.port in (None,443) and not p.username and not p.password and not p.fragment
+def get(url,limit,body=None,headers=None):
+    if not allowed(url):raise ValueError("Неофициальный источник")
+    req=Request(url,data=body,headers={"User-Agent":"EconomicMonitor/1.0",**(headers or {})})
+    with urlopen(req,timeout=20) as r:
+        if not allowed(r.geturl()):raise ValueError("Неофициальный адрес ответа")
+        raw=r.read(limit+1)
+    if not 0<len(raw)<=limit:raise ValueError("Размер ответа")
+    return raw
+def request(code,on_date):
+    if type(code) is not int or code<=0:raise ValueError("Внутренний код")
+    if date.fromisoformat(on_date).isoformat()!=on_date:raise ValueError("Дата")
+    return (f'<soap:Envelope xmlns:soap="{d.SOAP}"><soap:Body><{METHOD} xmlns="{d.NS}"><CredorgNumber>{code}</CredorgNumber><OnDate>{on_date}T00:00:00</OnDate></{METHOD}></soap:Body></soap:Envelope>').encode()
+def inspect_xml(raw):
+    root=d.result(raw,METHOD)
+    # Treat escaped XML and nested XML equally, but never interpret an unknown field as capital.
+    if not len(root) and root.text and root.text.strip():
+        import xml.etree.ElementTree as ET
+        payload=root.text.strip()
+        if re.search(r"<!\s*(?:DOCTYPE|ENTITY)",payload,re.I):raise ValueError("Недопустимый XML")
+        root=ET.fromstring(payload)
+    tags=Counter();structures=Counter();stack=[(root,0)]
+    while stack:
+        n,depth=stack.pop()
+        if depth>40:raise ValueError("Глубина XML")
+        tags[n.tag]+=1
+        signature=json.dumps([n.tag,sorted(n.attrib),sorted(set(ch.tag for ch in n))],ensure_ascii=False)
+        structures[signature]+=1
+        if len(tags)>500 or len(structures)>1000:raise ValueError("Слишком много структур")
+        stack.extend((ch,depth+1) for ch in n)
+    return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),root=root.tag,tags=dict(sorted(tags.items())),structures=[{"shape":json.loads(k),"count":v} for k,v in sorted(structures.items())])
+class Links(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True);self.links=set()
+    def handle_starttag(self,tag,attrs):
+        for key,val in attrs:
+            if key not in ("href","data-href","data-url","data-link","value") or not val:continue
+            url=urljoin(CATALOG,val)
+            if allowed(url) and re.search(r"\.(zip|rar|7z|dbf)$",urlsplit(url).path,re.I):self.links.add(url)
+def archive_links(raw):
+    p=Links();p.feed(raw.decode("utf-8"));p.close()
+    return sorted(p.links)
+def inspect_dbf(raw):
+    import struct
+    if len(raw)<33:raise ValueError("Короткий DBF")
+    rows,head,record=struct.unpack_from("<IHH",raw,4)
+    if head<33 or head>len(raw) or record<1 or raw[head-1]!=13 or (head-33)%32 or head+rows*record>len(raw):raise ValueError("Структура DBF")
+    fields=[]
+    for pos in range(32,head-1,32):
+        name=raw[pos:pos+11].split(b"\0",1)[0].decode("ascii")
+        if not re.fullmatch(r"[A-Za-z0-9_]+",name):raise ValueError("Имя поля")
+        fields.append(dict(name=name,type=chr(raw[pos+11]),length=raw[pos+16],decimals=raw[pos+17]))
+    if len({f["name"] for f in fields})!=len(fields) or sum(f["length"] for f in fields)+1!=record:raise ValueError("Длина записи DBF")
+    return dict(rows=rows,fields=fields,sha256=hashlib.sha256(raw).hexdigest())
+def inspect_zip(raw):
+    out=[]
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        members=z.infolist()
+        if len(members)>100 or sum(x.file_size for x in members)>100*1024*1024:raise ValueError("Размер распаковки")
+        for member in members:
+            if member.filename.lower().endswith(".dbf"):
+                out.append(dict(member=member.filename,**inspect_dbf(z.read(member))))
+    if not out:raise ValueError("Нет DBF")
+    return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),members=out)
+def main():
+    p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True);args=p.parse_args()
+    out=args.output;out.mkdir(parents=True,exist_ok=True)
+    stamp=datetime.now(timezone.utc).isoformat()
+    report=dict(checked=stamp,catalog=CATALOG,archives=[],soap=[],errors=[])
+    try:
+        raw=get(CATALOG,MAX_PAGE);report["catalog_sha256"]=hashlib.sha256(raw).hexdigest()
+        links=archive_links(raw);report["archive_links"]=links
+        # Restrict the probe to explicit form-123 ZIP links, at most two; never guess archive URLs.
+        candidates=[x for x in links if re.search(r"(?:^|[^0-9])123(?:[^0-9]|$)",urlsplit(x).path,re.I) and urlsplit(x).path.lower().endswith(".zip")]
+        # Prefer current year if it occurs in the archive name; otherwise deterministic bounded probe.
+        candidates.sort(key=lambda x:(str(date.today().year) in x,x),reverse=True)
+        for url in candidates[:2]:
+            try:
+                data=get(url,MAX_ARCHIVE);report["archives"].append(dict(url=url,**inspect_zip(data)))
+            except Exception as e:report["archives"].append(dict(url=url,error=str(e)[:300]))
+    except Exception as e:report["errors"].append("catalog: "+str(e)[:300])
+    try:
+        raw,enc=registry.fetch();system=registry.parse(raw,enc)
+        for bank in sorted(system["rows"],key=lambda r:int(r["registration_number"]))[:2]:
+            reg=bank["registration_number"];entry=dict(registration_number=reg,name=bank["name"])
+            try:
+                mapping_raw=d.fetch("RegNumToIntCode","RegNumber",reg);code=d.mapping(mapping_raw)
+                entry.update(internal_code=code,mapping_sha256=d.hash_raw(mapping_raw))
+                dates_raw=d.fetch("GetDatesForF123","CredprgNumber",code);dates=d.dates(dates_raw,"123",stamp)
+                entry["dates_sha256"]=d.hash_raw(dates_raw);entry["date_count"]=len(dates)
+                if dates:
+                    entry["report_date"]=dates[0];data=get(d.SOURCE,d.MAX,request(code,dates[0]),{"Content-Type":"text/xml; charset=utf-8","SOAPAction":'"'+d.NS+METHOD+'"'})
+                    entry["structure"]=inspect_xml(data)
+                    (out/("form123-"+reg+".xml")).write_bytes(data)
+            except Exception as e:entry["error"]=str(e)[:300]
+            report["soap"].append(entry)
+    except Exception as e:report["errors"].append("soap: "+str(e)[:300])
+    (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+    print(json.dumps(report,ensure_ascii=False),flush=True)
+    if not any("members" in x for x in report["archives"]) and not any("structure" in x for x in report["soap"]):raise SystemExit("Не получена проверенная структура формы 123")
+if __name__=="__main__":main()
