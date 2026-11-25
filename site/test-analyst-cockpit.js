@@ -1,0 +1,7 @@
+const assert=require('node:assert/strict'),R=require('./plan-register.js'),A=require('./analyst-cockpit.js');
+const row={dataset:'wdi',series:'X',title:'Тест',territory:'Россия',frequency:'annual',unit:'%',kind:'fact',source:'https://example.org/x'};
+const groups=R.facts({schema:1,rows:[{...row,period:'2021',value:'10'},{...row,period:'2022',value:'12'}]}),s=[...groups.values()][0],meta={id:'a',created:'2026-11-26T00:00:00Z',sha256:'a'.repeat(64),manifest:'b'.repeat(64)},p={name:'План',note:'Гипотеза',baseYear:2021,endYear:2023,endValue:14,direction:'higher'};
+const a=R.create(s,p,meta),b=R.create(s,{...p,parent:'a',endValue:16},{...meta,id:'b'}),c=R.create(s,{...p,endValue:12},{...meta,id:'c'});
+const official={rows:[{id:'x',year:2022,plan:8,actual:7,direction:'le',plan_source:'s',plan_vintage:'v',actual_source:'f',favorable_gap:1}]};
+let r=A.summarize([a,b,c],groups,official,2022);assert.equal(r.versions,3);assert.equal(r.local.total,2);assert.equal(r.local.met,1);assert.equal(r.local.deviation,1);assert.equal(r.public.met,1);assert.deepEqual(r.rows.map(x=>x.id),['b','c']);
+r=A.summarize([a,b,c],groups,official,2024);assert.equal(r.local.outside,2);assert.equal(r.public.total,0);assert.throws(()=>A.summarize([b],groups,official,2022));console.log('Analyst cockpit: terminal versions, independent scopes, missing and out-of-range goals OK');

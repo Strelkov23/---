@@ -9,3 +9,5 @@ assert.equal(I.matches('Ёмкость','Модели','емкость','Кар�
 console.log('Interface mode and glossary tests passed');
 assert.deepEqual(I.filterTools(['Валовой региональный продукт','Региональные инвестиции','Труд'],'регион инвест'),[false,true,false]);
 assert.deepEqual(I.filterTools(['А','Б'],''),[true,true]);
+
+assert.equal(I.theme('bogus'),'light');assert.equal(I.effectiveTheme('system',true),'dark');assert.equal(I.effectiveTheme('system',false),'light');assert.equal(I.effectiveTheme('light',true),'light');assert.equal(I.effectiveTheme('dark',false),'dark');

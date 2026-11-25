@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),R=require('./plan-register.js');
+const row={dataset:'wdi',series:'X',title:'Тест',territory:'Россия',frequency:'annual',unit:'%',kind:'fact',source:'https://example.org/x'};
+const data={schema:1,rows:[{...row,period:'2021',value:'10'},{...row,period:'2022',value:'12'},{...row,period:'2023',value:'0'}]};
+const groups=R.facts(data),s=[...groups.values()][0],meta={id:'a',created:'2026-11-26T00:00:00Z',sha256:'a'.repeat(64),manifest:'b'.repeat(64)};
+const p=R.create(s,{name:'План',note:'Гипотеза',baseYear:2021,endYear:2024,endValue:16,direction:'higher'},meta);
+assert.deepEqual(p.targets.map(x=>x.value),[12,14,16]);let r=R.compare(p,groups);assert.deepEqual(r.rows.map(x=>x.status),['Цель достигнута','Отклонение от цели','Нет факта']);assert.equal(r.rows[1].fact,0);
+const updated=R.facts({...data,rows:data.rows.map(x=>x.period==='2021'?{...x,value:'11'}:x)});assert.equal(R.compare(p,updated).baselineRevision,1);assert.equal(p.base.value,10);
+assert.equal(R.compare(p,R.facts({...data,rows:data.rows.map(x=>({...x,unit:'руб.'}))})).compatible,false);
+const v=R.create(s,{name:'Новая',note:'Гипотеза',baseYear:2021,endYear:2023,endValue:0,direction:'lower',parent:'a'},{...meta,id:'b'});assert.equal(R.compare(v,groups).rows[1].relative,null);
+assert.equal(R.validateRegister([p,v]).length,2);assert.throws(()=>R.validateRegister([v,p]));assert.throws(()=>R.validateRegister([p,p]));assert.throws(()=>R.validate({...p,targets:[{year:2022,value:999}]}));assert.throws(()=>R.facts({...data,rows:[...data.rows,data.rows[0]]}));
+console.log('Plan register: immutable baseline, revisions, zero/missing facts, exact series identity, version order OK');

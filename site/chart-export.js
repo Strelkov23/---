@@ -42,9 +42,17 @@ function chartAdjacent(a,b,monthly=false){
   }
   return Number(b)-Number(a)===1;
 }
+function chartCoverage(years,series){
+  return series.map(s=>({name:s.name,observed:years.filter((_,i)=>Number.isFinite(s.values[i])).length,expected:years.length}));
+}
+// Align export data to the displayed period; absent positions remain missing.
+function chartAlignedSeries(years,series){
+  return series.map(s=>({...s,values:years.map((_,i)=>Number.isFinite(s.values[i])?s.values[i]:null)}));
+}
 function chartTools(host,title,unit,years,series,options={}){
+  series=chartAlignedSeries(years,series);
   const toolbar=document.createElement('div'),status=document.createElement('span');
-  toolbar.className='actions';status.setAttribute('role','status');
+  toolbar.className='actions chart-export-toolbar';status.setAttribute('role','status');
   if(!years.length||!series.some(s=>s.values.some(Number.isFinite)))return;
   const source=options.source||'Всемирный банк, World Development Indicators';
   const url=typeof options.url==='string'?options.url:'';
@@ -52,6 +60,18 @@ function chartTools(host,title,unit,years,series,options={}){
   const period=options.periodLabel||(options.monthly?'Месяц':'Год');
   const palette=['#006c69','#a24724','#365e95','#775395','#806315','#246d39'];
   const dashes=['none','9 5','3 4','12 4 3 4','5 3','2 5'];
+  const context=document.createElement('aside');context.className='chart-context';context.setAttribute('aria-label','Паспорт графика');
+  const make=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;return e};
+  context.append(make('strong',title));
+  const meta=make('p',(options.territory||'Россия')+' · '+years[0]+'–'+years.at(-1)+' · '+unit);
+  meta.className='chart-context-meta';context.append(meta);
+  const src=make('p','Источник: '+source);
+  if(/^https?:\/\//i.test(url)){const link=make('a','Открыть источник');link.href=url;link.rel='noopener noreferrer';src.append(document.createTextNode(' · '),link)}
+  context.append(src);
+  const coverage=make('ul','');coverage.className='chart-context-coverage';
+  for(const item of chartCoverage(years,series)){const li=make('li',item.name+': '+item.observed+' / '+item.expected+' наблюдений');coverage.append(li)}
+  context.append(coverage,make('small','Пропущенные значения не считаются нулями. Покрытие относится к отображаемым позициям ряда.'));
+
   function vector(){
     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
     function shape(tag,attrs,text){const e=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;svg.append(e);return e}
@@ -61,7 +81,7 @@ function chartTools(host,title,unit,years,series,options={}){
     const wrap=(v,size,max=width-2*margin,weight='normal')=>chartWrap(v,max,t=>measure(t,size,weight));
     const header=wrap(title,26,width-2*margin,'bold'),sub=wrap((options.territory||'Россия')+' · '+years[0]+'–'+years.at(-1)+' · '+unit,19);
     const legends=series.map(s=>wrap(s.name,19,width-125));
-    const footer=[...wrap('Источник: '+source+' · '+series.map(s=>s.code).filter(Boolean).join(' / '),17),...(url?wrap(url,15):[]),...wrap('Версия: '+snapshot()+' · экспорт UTC '+new Date().toISOString().slice(0,10),14)];
+    const footer=[...chartCoverage(years,series).flatMap(s=>wrap('Покрытие: '+s.name+' — '+s.observed+' / '+s.expected,15)),...wrap('Источник: '+source+' · '+series.map(s=>s.code).filter(Boolean).join(' / '),17),...(url?wrap(url,15):[]),...wrap('Версия: '+snapshot()+' · экспорт UTC '+new Date().toISOString().slice(0,10),14)];
     const top=32+header.length*32+sub.length*25+26,bottom=top+330,legendTop=bottom+67;
     const footerTop=legendTop+legends.reduce((n,v)=>n+v.length*25+12,0)+15;
     const height=footerTop+footer.length*22+25;
@@ -114,9 +134,9 @@ function chartTools(host,title,unit,years,series,options={}){
     await navigator.clipboard.writeText(rows.map(r=>r.map(v=>String(v??'').replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n'));status.textContent='Таблица скопирована для вставки в Excel или Word.';
   });
   if(options.display){const figure=vector().svg;figure.style.display='block';figure.style.width='100%';figure.style.height='auto';host.append(figure)}
-  toolbar.append(status);host.append(toolbar);
+  toolbar.append(status);host.append(context,toolbar);
 }
-if(typeof module!=='undefined')module.exports={chartTickIndices,chartWrap,chartAdjacent};
+if(typeof module!=='undefined')module.exports={chartTickIndices,chartWrap,chartAdjacent,chartCoverage,chartAlignedSeries};
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const payload=document.getElementById('figure-data');
  if(payload){if(!version){try{const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}catch{}}const d=JSON.parse(payload.textContent);chartTools(payload.parentElement,d.name,d.unit,d.years,[d])}

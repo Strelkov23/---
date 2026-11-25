@@ -123,6 +123,13 @@ jobs:
           node test-reproduction-plan.js
           node test-resource-plan.js
           node test-plan-feasibility.js
+          node test-plan-register.js
+          node test-public-plan-fact.js
+          node test-deviation-monitor.js
+          node test-plan-comparison.js
+          node test-plan-diagnostics.js
+          node test-analyst-cockpit.js
+          node test-plan-report.js
           node test-horizon-feasibility.js
           node test-dynamic-plan.js
           node test-global-plan.js
@@ -247,6 +254,7 @@ jobs:
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
           CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_visual_system.py
           CHROME_BIN=$(command -v google-chrome) python3 ../layout_audit.py http://localhost:8765/ /tmp/layout-audit
       - name: Retain validation reports
         if: always()

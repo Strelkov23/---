@@ -134,6 +134,88 @@ with sync_playwright() as p:
         assert backtest.value.suggested_filename=="diagnostic-sensitivity.csv"
         assert len(list(csv.reader(io.StringIO(backtest.value.path().read_text(encoding="utf-8-sig")))))==145
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/public-plan-fact.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#ppf-goals tbody tr').length>0",timeout=45000)
+        page.locator("#ppf-year").select_option("2025")
+        assert page.locator("#ppf-budget tbody tr").count()>0
+        page.locator("#ppf-basis").select_option("initial_law")
+        assert "Нет выбранного плана" in page.locator("#ppf-budget").inner_text()
+        with page.expect_download() as public_plan:
+            page.locator("#ppf-export").click()
+        with open(public_plan.value.path(),encoding="utf-8-sig",newline="") as f:
+            public_rows=list(csv.reader(f,delimiter=";"))
+        assert len(public_rows)>1 and len({len(r) for r in public_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-register.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pr-series option').length>0",timeout=45000)
+        page.locator("#pr-name").fill("Проверка плана")
+        page.locator("#pr-note").fill("Сценарное допущение")
+        year=int(page.locator("#pr-base").input_value())
+        page.locator("#pr-end-year").fill(str(year+2))
+        page.locator("#pr-end-value").fill("5")
+        page.locator("#pr-save").click()
+        assert page.locator("#pr-result tbody tr").count()==2
+        page.locator("#pr-revise").click()
+        page.locator("#pr-end-value").fill("6")
+        page.locator("#pr-save").click()
+        assert page.locator("#pr-pick option").count()==2
+        with page.expect_download() as plan:
+            page.locator("#pr-csv").click()
+        with open(plan.value.path(),encoding="utf-8-sig",newline="") as f:
+            plan_rows=list(csv.reader(f,delimiter=";"))
+        assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
+        page.goto("http://localhost:8765/plan-report.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pre-plan option').length===2",timeout=45000)
+        page.locator("#pre-alt").select_option(index=1)
+        page.locator("#pre-run").click()
+        assert page.locator("#pre-json").is_enabled()
+        with page.expect_download() as report:
+            page.locator("#pre-json").click()
+        page.locator("#pre-replay").set_input_files(str(report.value.path()))
+        page.wait_for_function("document.querySelector('#pre-status').textContent.includes('повторный расчёт совпал')")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/analyst-cockpit.html",wait_until="load")
+        page.wait_for_function("document.querySelector('#ac-versions').textContent==='2'",timeout=45000)
+        page.locator("#ac-year").select_option(str(year+1))
+        assert page.locator("#ac-table tbody tr").count()==1
+        assert page.locator(".ac-route a").count()==5
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-diagnostics.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pd-result tbody tr').length===1",timeout=45000)
+        with page.expect_download() as pd:
+            page.locator("#pd-export").click()
+        with open(pd.value.path(),encoding="utf-8-sig",newline="") as f:
+            pd_rows=list(csv.reader(f,delimiter=";"))
+        assert len(pd_rows)>1 and len({len(r) for r in pd_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/plan-comparison.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pc-results tbody tr').length===2",timeout=45000)
+        assert page.locator("#pc-summary tbody tr").count()==4
+        assert page.locator("#pc-chart svg").count()==1
+        assert page.locator("#pc-chart .chart-context-coverage li").count()==3
+        assert page.locator("#pc-chart svg path[stroke-dasharray='9 5']").count()==1
+        with page.expect_download() as chart_svg:
+            page.locator("#pc-chart button",has_text="Скачать SVG").click()
+        assert "План А" in chart_svg.value.path().read_text(encoding="utf-8")
+        with page.expect_download() as comparison:
+            page.locator("#pc-export").click()
+        with open(comparison.value.path(),encoding="utf-8-sig",newline="") as f:
+            comparison_rows=list(csv.reader(f,delimiter=";"))
+        assert len(comparison_rows)==3 and len({len(r) for r in comparison_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/deviation-monitor.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#dm-series option').length>=3",timeout=45000)
+        page.locator("#dm-series").select_option("0")
+        assert page.locator("#dm-results tbody tr").count()==2
+        page.locator("#dm-asof").fill(str(year+2))
+        page.locator("#dm-mode").select_option("relative")
+        with page.expect_download() as deviation:
+            page.locator("#dm-export").click()
+        with open(deviation.value.path(),encoding="utf-8-sig",newline="") as f:
+            deviation_rows=list(csv.reader(f,delimiter=";"))
+        assert len(deviation_rows)==3 and len({len(r) for r in deviation_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/territorial-plan.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#tp-controls tbody input').length>0",timeout=45000)
         page.locator("#tp-target").fill("0")
