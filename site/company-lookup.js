@@ -58,6 +58,20 @@ const CompanyLookup=(()=>{
   const diff=inc===null||exp===null?null:inc-exp;
   return {difference:diff?.toString()??null,incomePerWorker:inc===null||inc<0n||workers===null?null:divideRounded(inc,workers).toString(),expenseShare:inc===null||inc<=0n||exp===null||exp<0n?null:divideRounded(exp*10000n,inc).toString()};
  }
+ function metrics(r){
+  const c=calculate(r);
+  return [{id:'income_cents',label:'Доходы',unit:'руб.',value:r.income_cents??null},{id:'expense_cents',label:'Расходы',unit:'руб.',value:r.expense_cents??null},{id:'workers',label:'Среднесписочная численность',unit:'чел.',value:r.workers??null},{id:'difference',label:'Доходы минус расходы',unit:'руб.',value:c.difference},{id:'incomePerWorker',label:'Доходы на работника',unit:'руб.',value:c.incomePerWorker},{id:'expenseShare',label:'Расходы / доходы',unit:'%',value:c.expenseShare}];
+ }
+ function comparisonBars(records,key){
+  const values=records.map(r=>r?metrics(r).find(m=>m.id===key)?.value??null:null);
+  const abs=v=>v<0n?-v:v;
+  const max=values.reduce((a,v)=>v!==null&&abs(BigInt(v))>a?abs(BigInt(v)):a,0n),signed=values.some(v=>v!==null&&BigInt(v)<0n),zero=signed?50:0;
+  return {signed,zero,bars:values.map(v=>{
+   if(v===null)return null;
+   const n=BigInt(v),width=max?Number(abs(n)*1000000n/max)/10000*(signed?.5:1):0;
+   return {value:v,left:n<0n?zero-width:zero,width,negative:n<0n};
+  })};
+ }
  function barWidths(records,key){
   const values=records.map(r=>r&&r[key]!=null?BigInt(r[key]):null);
   const max=values.reduce((a,v)=>v!==null&&v>a?v:a,0n);
@@ -105,7 +119,7 @@ const CompanyLookup=(()=>{
   }
   return nameMatches(rows,key);
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
+ return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,metrics,comparisonBars,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -133,6 +147,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const year=full?index.year:rank.report.year,name=r.income_name||r.employment_name||r.name;
     const official=node('a','Проверить юридический статус в ЕГРЮЛ');official.href='https://egrul.nalog.ru/';
     result.append(node('h3',name),node('p','ИНН '+inn+' · отчётный '+year+' год'),node('p','Доходы: '+money(r.income_cents)+' руб. · расходы: '+money(r.expense_cents)+' руб. · среднесписочная численность: '+(r.workers??'—')),node('p','Юридический статус, отрасль и фактическое производство не подтверждены этими наборами.'));
+    const indicators=node('div','');indicators.className='metrics company-passport-metrics';
+    for(const v of CompanyLookup.metrics(r)){
+     const card=node('div','');card.className='metric';
+     const value=v.value===null?'—':v.unit==='чел.'?Number(v.value).toLocaleString('ru')+' чел.':money(v.value)+' '+v.unit;
+     card.append(node('b',value),node('span',v.label));indicators.append(card);
+    }
+    result.append(node('h4','Финансовые и трудовые показатели'),indicators,node('p','Доходы минус расходы — не чистая прибыль. Доходы на работника — не добавленная стоимость на работника. Доля расходов рассчитывается только при положительных доходах и неотрицательных расходах. Пропуск не равен нулю.'));
+    const method=node('a','Методика расчёта');method.href='methodology.html#company-compare-method';result.append(method);
     result.append(official);
     const labels={income:'Доходы',expense:'Расходы',employment:'Численность'};
     const ranks=Object.entries(ranking.matches);
@@ -144,7 +166,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const member=(kind,v)=>full&&v!=null?index.members[kind][v]:v;
     const im=member('income',r.income_member),em=member('employment',r.employment_member);
     for(const [kind,file,doc] of [['income_expense',im,r.income_doc],['employment',em,r.employment_doc]])if(file){const a=node('a',kind==='income_expense'?'Архив доходов и расходов':'Архив занятости');a.href=sources[kind].source;result.append(node('p',file+' · документ '+doc),a)}
-    exp.disabled=false;exp.onclick=()=>csv('company-'+inn+'-'+year+'.csv',[['ИНН','Отчётный год','Название доходов','Название занятости','Доходы, копейки','Расходы, копейки','Работники','XML финансов','Документ финансов','XML занятости','Документ занятости','Источник финансов','SHA-256 архива финансов','Источник занятости','SHA-256 архива занятости','Отпечаток манифеста','Область поиска','Место по доходам','Охват по доходам','Место по расходам','Охват по расходам','Место по численности','Охват по численности'],[inn,year,r.income_name,r.employment_name,r.income_cents,r.expense_cents,r.workers,im,r.income_doc,em,r.employment_doc,sources.income_expense.source,sources.income_expense.sha256,sources.employment.source,sources.employment.sha256,m.data_fingerprint,full?'Полные архивы':'Рейтинги',...['income','expense','employment'].flatMap(k=>[ranking.matches[k]?.rank??'',ranking.matches[k]?.eligible??''])]]);
+    exp.disabled=false;exp.onclick=()=>csv('company-'+inn+'-'+year+'.csv',[['ИНН','Отчётный год','Название доходов','Название занятости','Доходы, копейки','Расходы, копейки','Работники','XML финансов','Документ финансов','XML занятости','Документ занятости','Источник финансов','SHA-256 архива финансов','Источник занятости','SHA-256 архива занятости','Отпечаток манифеста','Область поиска','Место по доходам','Охват по доходам','Место по расходам','Охват по расходам','Место по численности','Охват по численности','Разность, копейки','Доходы на работника, копейки','Расходы / доходы, сотые доли процента'],[inn,year,r.income_name,r.employment_name,r.income_cents,r.expense_cents,r.workers,im,r.income_doc,em,r.employment_doc,sources.income_expense.source,sources.income_expense.sha256,sources.employment.source,sources.employment.sha256,m.data_fingerprint,full?'Полные архивы':'Рейтинги',...['income','expense','employment'].flatMap(k=>[ranking.matches[k]?.rank??'',ranking.matches[k]?.eligible??'']),...CompanyLookup.metrics(r).slice(3).map(v=>v.value)]]);
    }catch(err){if(token===serial)result.replaceChildren(node('p','Поиск недоступен: '+String(err.message||err)))}finally{if(token===serial)button.disabled=false}
   };
   const requested=new URLSearchParams(location.search).get('inn');if(requested&&CompanyLookup.validInn(requested)){input.value=requested;if(full||rankReady)form.requestSubmit();}
@@ -155,15 +177,22 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const $=id=>document.getElementById(id),form=$('company-compare-form');if(!form)return;
  const status=$('company-compare-status'),input=$('company-compare-ids'),submit=$('company-compare-submit'),out=$('company-compare-table'),chart=$('company-compare-chart'),exportButton=$('company-compare-export'),metric=$('company-compare-metric'),share=$('company-compare-link');
  const fixed=(s,unit='')=>{if(s==null)return '—';const n=BigInt(s),a=n<0n?-n:n;return (n<0n?'−':'')+(a/100n).toLocaleString('ru')+','+(a%100n).toString().padStart(2,'0')+unit};
- const descriptors={income_cents:'Доходы, руб.',expense_cents:'Расходы, руб.',workers:'Среднесписочная численность, чел.'};
+ const descriptors={income_cents:'Доходы, руб.',expense_cents:'Расходы, руб.',workers:'Среднесписочная численность, чел.',difference:'Доходы минус расходы, руб.',incomePerWorker:'Доходы на работника, руб.',expenseShare:'Расходы / доходы, %'};
  let serial=0,last=[];
  const label=r=>r.income_name||r.employment_name||r.name||r.inn;
  function drawChart(){
   chart.replaceChildren();if(!last.length)return;
-  const key=metric.value,widths=CompanyLookup.barWidths(last.map(x=>x.record),key);
-  chart.append(node('h3',descriptors[key]),node('p','Длина полосы относительно максимального положительного значения в выбранной группе. Отрицательные значения и пропуски не отображаются полосой.'));
+  const key=metric.value,model=CompanyLookup.comparisonBars(last.map(x=>x.record),key);
+  chart.append(node('h3',descriptors[key]),node('p','Единый масштаб максимального абсолютного значения в выборке. '+(model.signed?'Отрицательные значения слева от нуля, положительные справа. ':'')+'Отсутствие показателя не означает нулевое значение.'));
   const bars=node('div','');bars.className='rm-composition';
-  last.forEach((x,i)=>{if(!x.record)return;const v=x.record[key],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=(widths[i]??0)+'%';track.append(fill);line.append(node('span',label(x.record)),track,node('strong',key==='workers'?(v??'—'):fixed(v)));bars.append(line)});chart.append(bars);
+  last.forEach((x,i)=>{
+   const b=model.bars[i],line=node('div','');line.className='rm-composition-row';
+   const track=node('div','');track.className='group-signed-track';track.setAttribute('aria-hidden','true');
+   if(b){const fill=node('div','');fill.className='group-signed-fill'+(b.negative?' negative':'');fill.style.width=b.width+'%';fill.style.left=b.left+'%';track.append(fill);const zero=node('span','');zero.className='group-signed-zero';zero.style.left=model.zero+'%';track.append(zero);}
+   else track.className='company-chart-missing';
+   const v=b?.value??null;
+   line.append(node('span',x.record?label(x.record):x.inn),track,node('strong',v===null?'Нет данных':key==='workers'?Number(v).toLocaleString('ru'):fixed(v,key==='expenseShare'?' %':'')));bars.append(line);
+  });chart.append(bars);
  }
  try{
   const manifest=await Provenance.validateManifest(await load('data-manifest.json'));
