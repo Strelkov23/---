@@ -65,12 +65,9 @@ def parse(raw,year,url):
     if len(results)!=1:raise ValueError("Не найдена единственная однозначная годовая таблица")
     return results[0]
 def fetch(url):
+    from source_transport import download
     if not valid_url(url):raise ValueError("Неподтверждённый URL")
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.5"}),timeout=20) as f:
-        if not valid_url(f.geturl()):raise ValueError("Неожиданное перенаправление")
-        raw=f.read(MAX+1)
-    if len(raw)>MAX:raise ValueError("Превышен лимит")
-    return raw
+    return download(url,hosts={"data.nalog.ru"},max_bytes=MAX,path_check=lambda p:p.lower().endswith((".xls",".xlsx"))).raw
 def observation_keys(rows):
     # Normalise only the explicitly verified punctuation variant; retain exact
     # original hashes and labels in the published data.

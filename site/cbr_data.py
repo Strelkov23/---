@@ -11,8 +11,8 @@ KEY_PAGE="https://www.cbr.ru/hd_base/KeyRate/"
 FX_PAGE="https://www.cbr.ru/development/sxml/"
 FX_URL="https://www.cbr.ru/scripts/XML_dynamic.asp"
 def get(url):
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.0"}),timeout=15) as response:
-        return response.read(6_000_001)
+    from source_transport import download
+    return download(url,hosts={"www.cbr.ru","cbr.ru"},max_bytes=6_000_000,timeout=15,path_check=lambda p:p.lower() in ("/hd_base/keyrate/","/scripts/xml_dynamic.asp")).raw
 
 def number(s):
     return float(s.replace("\u00a0","").replace(" ","").replace(",","."))

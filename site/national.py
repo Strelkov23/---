@@ -90,10 +90,9 @@ def parse_money(raw):
         if result:break
     return result
 def get(url):
-    with urlopen(Request(url,headers={"User-Agent":"EconomicsMonitor/2.2"}),timeout=20) as r:
-        raw=r.read(8_000_001)
-        if len(raw)>8_000_000:raise ValueError("Превышен лимит")
-        return raw.decode(r.headers.get_content_charset() or "utf-8",errors="replace")
+    from source_transport import download
+    raw=download(url,hosts={"www.cbr.ru","cbr.ru"},max_bytes=8_000_000,path_check=lambda p:p in ("/hd_base/infl/","/hd_base/mrrf/mrrf_m/","/statistics/macro_itm/dkfs/monetary_agg/"))
+    return raw.raw.decode(raw.charset,errors="strict")
 def publish(db,stamp,out,refresh):
     db.execute("create table if not exists national_obs(code text,period text,value real,seen text,source text,primary key(code,period,seen))")
     db.execute("create table if not exists national_checks(code text primary key,checked text,success text,status text)")

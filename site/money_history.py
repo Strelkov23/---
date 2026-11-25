@@ -100,7 +100,5 @@ def parse(raw):
     return data
 
 def fetch():
-    with urlopen(Request(URL,headers={"User-Agent":"EconomicsMonitor/2.3"}),timeout=25) as r:
-        raw=r.read(16_000_001)
-    if len(raw)>16_000_000:raise ValueError("Превышен размер XLSX")
-    return parse(raw)
+    from source_transport import download
+    return parse(download(URL,hosts={"www.cbr.ru","cbr.ru"},max_bytes=16_000_000,timeout=25,path_check=lambda p:p=="/vfs/statistics/credit_statistics/monetary_agg.xlsx").raw)

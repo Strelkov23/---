@@ -410,6 +410,12 @@ def check(out,previous,stamp):
         if name=="literature.json":old=old.get("articles",[])
         removed={r[key] for r in old}-{r[key] for r in current}
         if removed:issues.append(f"{name}: исчезло {len(removed)} архивных записей")
+    try:
+        import observation_contract as oc
+        path=out/oc.FILE
+        if path.is_file():
+            counts.update(oc.quality(oc.json_load(oc.bounded(path)),out))
+    except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Единый формат наблюдений: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)
