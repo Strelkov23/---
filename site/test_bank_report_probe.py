@@ -70,3 +70,21 @@ class BankReportProbeTests(unittest.TestCase):
         self.assertEqual(result["coverage"]["unmatched_regn"],["3"])
         self.assertEqual(result["coverage"]["source_codes"],["A","B"])
         with self.assertRaises(ValueError):p.raw_report("123",entry,info,{"123B":tables["123B"]})
+
+    def test_mapped135_documented_values(self):
+        fields=[dict(name=n,type=k,length=l,decimals=d) for n,k,l,d in [("REGN","N",4,0),("C1_3","C",6,0),("C2_3","N",19,3),("C3_3","N",19,3),("C4_3","C",12,0)]]
+        bank=dict(REGN="1",DT="20261001",REGN_S="1",OGRN="1027700132195",source_row=1)
+        def row(i,code,actual="10.000",control="8.000",reg="1"):
+            return dict(REGN=reg,C1_3=code,C2_3=actual,C3_3=control,C4_3=None,source_row=i)
+        raw=dict(form="135",status="raw_unmapped",date="2026-10-01",url="https://www.cbr.ru/vfs/credit/forms/135-20261001.rar",archive_sha256="a",tables={"135B":dict(rows=[bank],sha256="b"),"135_3":dict(fields=fields,language_driver=101,sha256="c",rows=[row(1,{"hex":"8d312e30"}),row(2,"X","0",None),row(3,"D"),row(4,"D"),row(5,"B","not-a-number"),row(6,"M",None,None),row(7,"U",reg="2")] )})
+        result=p.mapped135(raw)
+        self.assertEqual(result["counts"]["observations"],2)
+        self.assertEqual(result["counts"]["raw_byte_codes"],1)
+        self.assertEqual(result["rows"][0]["actual_percent"],"10.000")
+        self.assertEqual(result["rows"][1]["actual_percent"],"0")
+        self.assertIsNone(result["rows"][1]["control_percent"])
+        self.assertEqual(sum(result["counts"]["excluded"].values()),5)
+        bank["DT"]="20260901"
+        self.assertEqual(p.mapped135(raw)["counts"]["observations"],0)
+        fields[2]["decimals"]=2
+        with self.assertRaises(ValueError):p.mapped135(raw)

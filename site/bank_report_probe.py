@@ -75,7 +75,7 @@ def inspect_dbf(raw):
 # Exact source columns; these are deliberately not interpreted as financial measures.
 TABLES={
     "123":{"123B":("REGN",),"123D":("REGN","C1","C3"),"123N":("C0","C1","C2_1","C2_2","C2_3")},
-    "135":{"135B":("REGN",),"135_3":("REGN","C1_3","C2_3","C3_3","C4_3")},
+    "135":{"135B":("REGN","DT","REGN_S","OGRN"),"135_3":("REGN","C1_3","C2_3","C3_3","C4_3")},
 }
 def selected_rows(raw,fields):
     import struct
@@ -131,6 +131,50 @@ def raw_report(form,entry,info,tables):
     code="C1" if form=="123" else "C1_3"
     codes=sorted({r[code] for r in values if isinstance(r[code],str)})
     return dict(schema=1,status="raw_unmapped",note="Исходные поля DBF без установленных единиц и экономической интерпретации; число строк не число банков. Не использовать для расчёта нормативов.",**entry,archive_sha256=info["sha256"],tables=tables,coverage=dict(directory_unique_regn=len(bank_ids),values_unique_regn=len(value_ids),matched_unique_regn=len(bank_ids&value_ids),unmatched_regn=sorted(value_ids-bank_ids,key=int),invalid_directory_regn=sum(reg(r) is None for r in bank),invalid_values_regn=sum(reg(r) is None for r in values),source_codes=codes))
+
+FORM135_FORMAT="https://www.cbr.ru/Content/Document/File/149491/135-20230601.pdf"
+def mapped135(diagnostic):
+    """Documented section 3 values, no regulatory compliance inference."""
+    if diagnostic["form"]!="135" or diagnostic["status"]!="raw_unmapped":raise ValueError("Не форма 135")
+    table=diagnostic["tables"]["135_3"]
+    directory=diagnostic["tables"]["135B"]
+    expected={"REGN":("N",4,0),"C1_3":("C",6,0),"C2_3":("N",19,3),"C3_3":("N",19,3),"C4_3":("C",12,0)}
+    if {f["name"]:(f["type"],f["length"],f["decimals"]) for f in table["fields"]}!=expected:raise ValueError("Формат 135 изменился")
+    def reg(v):
+        return str(int(v)) if isinstance(v,str) and re.fullmatch(r"\d{1,6}",v) and int(v)>0 else None
+    def percent(v):
+        if v is None:return None
+        if not isinstance(v,str) or not re.fullmatch(r"[+-]?\d+(?:\.\d{1,3})?",v):raise ValueError("Некорректное процентное поле")
+        return v
+    def code(v):
+        if isinstance(v,str) and v:return v
+        if isinstance(v,dict) and set(v)=={"hex"} and re.fullmatch(r"(?:[0-9a-f]{2}){1,6}",v["hex"]):return "hex:"+v["hex"]
+        raise ValueError("Код норматива отсутствует")
+    banks={}
+    for r in directory["rows"]:
+        key=reg(r["REGN"])
+        if key is None:continue
+        banks.setdefault(key,[]).append(r)
+    candidates=[];excluded=Counter()
+    for r in table["rows"]:
+        try:
+            key=reg(r["REGN"])
+            if key is None or len(banks.get(key,[]))!=1:raise ValueError("Неоднозначный номер")
+            bank=banks[key][0]
+            dt=bank["DT"]
+            if not isinstance(dt,str) or not re.fullmatch(r"\d{8}",dt):raise ValueError("Нет отчётной даты")
+            period=datetime.strptime(dt,"%Y%m%d").date().isoformat()
+            if period!=diagnostic["date"]:raise ValueError("Дата отличается от архива")
+            c=code(r["C1_3"]);actual=percent(r["C2_3"]);control=percent(r["C3_3"])
+            if actual is None and control is None:raise ValueError("Оба значения отсутствуют")
+            candidates.append(dict(registration_number=key,registration_number_source=bank["REGN_S"],ogrn=bank["OGRN"],date=period,code=c,actual_percent=actual,control_percent=control,note_code=r["C4_3"],source_row=r["source_row"],directory_row=bank["source_row"]))
+        except (ValueError,KeyError,TypeError) as e:excluded[str(e)]+=1
+    counts=Counter((r["registration_number"],r["code"]) for r in candidates)
+    rows=[r for r in candidates if counts[(r["registration_number"],r["code"])]==1]
+    duplicates=len(candidates)-len(rows)
+    if duplicates:excluded["Неоднозначная пара банк–код"]+=duplicates
+    if len(rows)+sum(excluded.values())!=len(table["rows"]):raise ValueError("Баланс нормализованных строк")
+    return dict(schema=1,status="documented_fields",form="0409135",section=3,date=diagnostic["date"],source=diagnostic["url"],format_source=FORM135_FORMAT,archive_sha256=diagnostic["archive_sha256"],table_sha256=table["sha256"],directory_sha256=directory["sha256"],language_driver=table["language_driver"],note="Фактическое и контрольное значения в процентах; направление ограничения и расшифровка кодов не установлены. hex: сохраняет исходные байты кода. Не рейтинг и не вывод о нарушении.",counts=dict(source_active_rows=len(table["rows"]),observations=len(rows),organizations=len({r["registration_number"] for r in rows}),codes=len({r["code"] for r in rows}),raw_byte_codes=sum(r["code"].startswith("hex:") for r in rows),excluded=dict(excluded)),rows=rows)
 
 def inspect_zip(raw,on_member=None):
     out=[]
@@ -217,7 +261,14 @@ def main():
                 diagnostic=raw_report(entry["form"],entry,info,tables)
                 filename="form-"+entry["form"]+"-raw.json"
                 (out/filename).write_text(json.dumps(diagnostic,ensure_ascii=False,indent=2),encoding="utf-8")
-                report["archives"].append(dict(entry,**info,raw_file=filename,raw_coverage=diagnostic["coverage"]))
+                details=dict(entry,**info,raw_file=filename,raw_coverage=diagnostic["coverage"])
+                if entry["form"]=="135":
+                    try:
+                        mapped=mapped135(diagnostic)
+                        (out/"form-135-documented.json").write_text(json.dumps(mapped,ensure_ascii=False,indent=2),encoding="utf-8")
+                        details.update(mapped_file="form-135-documented.json",mapped_counts=mapped["counts"],language_driver=mapped["language_driver"])
+                    except (ValueError,KeyError,TypeError) as e:details["mapping_error"]=str(e)[:300]
+                report["archives"].append(details)
             except Exception as e:report["archives"].append(dict(entry,error=str(e)[:300]))
     except Exception as e:report["errors"].append("catalog: "+str(e)[:300])
     try:
