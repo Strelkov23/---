@@ -25,3 +25,18 @@ class Public(unittest.TestCase):
         with self.assertRaises(ValueError):p.quality(bad,idx,m)
         d["reported"][0]["expense_sum"]="0"
         with self.assertRaises(ValueError):p.quality(d,idx,m)
+
+    def test_prefer_compatible_schema(self):
+        old=dict(status="diagnostic")
+        paired=dict(old,paired_sums_version=1)
+        profiles=dict(old,profiles={"rows":[]})
+        both=dict(paired,profiles={"rows":[]})
+        self.assertIs(p.prefer(p.empty(),old),old)
+        self.assertIs(p.prefer(old,both),both)
+        self.assertIs(p.prefer(both,old),both)
+        self.assertIs(p.prefer(both,paired),both)
+        self.assertIs(p.prefer(both,profiles),both)
+        self.assertIs(p.prefer(paired,profiles),paired)
+        self.assertIs(p.prefer(both,p.empty()),both)
+        new=dict(both,edition="new")
+        self.assertIs(p.prefer(both,new),new)
