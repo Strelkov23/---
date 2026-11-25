@@ -274,6 +274,7 @@ def check(out,previous,stamp):
         coverage=data["project-coverage.json"]
         counts.update(pcov.quality(coverage,out))
         pcov.verify_csv(out/"project-coverage.csv",coverage)
+        pcov.verify_breakdown_csv(out/"project-breakdown.csv",coverage)
     except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Охват проектов: "+str(e))
     for day in status.get("days",[]):
         if not day.get("error") and day.get("expected")!=day.get("stored"):

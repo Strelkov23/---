@@ -520,6 +520,12 @@ with sync_playwright() as p:
         coverage=json.loads(Path("project-coverage.json").read_text())
         assert page.locator("#project-coverage-cards article").count()==len(coverage["rows"])==3
         assert page.locator("#project-coverage-rows tr").count()==3
+        assert page.locator("[data-project-breakdown]").count()==len(coverage["breakdown"])
+        if coverage["breakdown"]:
+            group=page.locator("details").filter(has=page.locator("[data-project-breakdown]")).first
+            group.locator("summary").click()
+            assert group.locator("[data-project-breakdown]:visible").count()>0
+            assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
