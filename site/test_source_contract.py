@@ -214,4 +214,30 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(rows[0]["value"],"1234567890.123456789")
         with self.assertRaises(ValueError):oc.wdi_rows(raw,b'{}')
         with self.assertRaises(ValueError):oc.wdi_rows(raw,meta.replace(b"USD",b"EUR"))
+class InfrastructureTests(unittest.TestCase):
+    def test_summary_and_missing_state(self):
+        import data_infrastructure as di,source_journal as sj,source_pipeline as sp,company_import,sme_matrix
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);db=root/"monitor.db"
+            budget.publish(lambda *a:None,root,ContractTests.stamp)
+            (root/"national.json").write_text(json.dumps(ContractTests().series()),encoding="utf-8")
+            (root/"cbr.json").write_text("{}",encoding="utf-8")
+            oc.publish(lambda *a:None,root,ContractTests.stamp)
+            j=sj.BufferedJournal(db);buf=sp.Buffer(db)
+            url="https://www.cbr.ru/hd_base/KeyRate/"
+            j(url,None,ValueError("network"))
+            buf.record(url,"KEY","commit",error=ValueError("bad batch"))
+            j.flush();buf.flush()
+            sj.publish(lambda *a:None,root,db,ContractTests.stamp)
+            sp.publish(lambda *a:None,root,db,ContractTests.stamp)
+            (root/"company-rankings.json").write_text(json.dumps(company_import.empty()),encoding="utf-8")
+            (root/"sme-matrix.json").write_text(json.dumps(sme_matrix.empty()),encoding="utf-8")
+            data=di.publish(lambda *a:None,root,ContractTests.stamp)
+            self.assertEqual(di.quality(data,root),dict(infrastructure_loaders=9,infrastructure_bulk_published=0))
+            key=next(x for x in data["loaders"] if x["id"]=="cbr_key")
+            self.assertEqual(key["transport_failed"],1)
+            self.assertEqual(key["processing_rejected"],1)
+            self.assertIsNone(data["bulk"][0]["records"])
+            data["bulk"][0]["records"]=0
+            with self.assertRaises(ValueError):di.quality(data,root)
 if __name__=="__main__":unittest.main()

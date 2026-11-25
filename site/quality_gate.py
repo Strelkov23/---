@@ -426,6 +426,11 @@ def check(out,previous,stamp):
         if (out/sp.FILE).is_file():
             counts.update(sp.quality(json.loads((out/sp.FILE).read_text(encoding="utf-8"))))
     except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Реестр импорта: "+str(e))
+    try:
+        import data_infrastructure as di
+        if (out/di.FILE).is_file():
+            counts.update(di.quality(json.loads((out/di.FILE).read_text(encoding="utf-8")),out))
+    except (ValueError,KeyError,TypeError,OSError,ArithmeticError) as e:issues.append("Инфраструктура данных: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)
     counts["internal_link_errors"]=len(internal)
@@ -451,6 +456,9 @@ def publish(out,previous,stamp):
     # Include the new report itself in link resolution before writing it.
     target=out/"quality.json";target.write_text("{}",encoding="utf-8")
     report=check(out,previous,stamp)
+    # A fresh production build must contain every new stage-A output.
+    for name in ("normalized-observations.json","source-journal.json","source-pipeline.json","data-infrastructure.json"):
+        if not (out/name).is_file():report["errors"].append("Отсутствует обязательный набор этапа А: "+name)
     target.write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False),encoding="utf-8")
     print("Quality gate:",json.dumps({"errors":report["errors"],"warnings":report["warnings"],"counts":report["counts"]},ensure_ascii=False))
     if report["errors"]:raise SystemExit("Quality gate rejected the build; previous site is unchanged.")

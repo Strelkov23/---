@@ -14,6 +14,7 @@ def fingerprint(files):
 def create(out,stamp):
     paths=[p for p in out.glob("*.json") if p.name not in EXCLUDED]
     paths+=list((out/"regional-data").glob("*.json"))
+    if (out/"federal-budget.csv").is_file():paths.append(out/"federal-budget.csv")
     if (out/"regional-boundaries.geojson").is_file():paths.append(out/"regional-boundaries.geojson")
     entries={p.relative_to(out).as_posix():file_info(p) for p in sorted(paths)}
     if not {"data-registry.json","method-passports.json","compare.json","capital-data.json","forecast.json","price-data.json","sectors.json"}<=entries.keys():raise ValueError("Incomplete provenance manifest")

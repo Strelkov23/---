@@ -262,6 +262,8 @@ transport_buffer.flush()
 import_buffer.flush()
 source_journal.publish(page,out,m.DB,m.now())
 source_pipeline.publish(page,out,m.DB,m.now())
+import data_infrastructure
+data_infrastructure.publish(page,out,m.now())
 provenance.publish(page,out,m.now())
 routes.publish(out)
 

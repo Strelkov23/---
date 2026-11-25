@@ -1,6 +1,6 @@
 /* Exact-byte verification of published data. Requires HTTPS or localhost. */
 const Provenance=(()=>{
- const validPath=name=>typeof name==='string'&&/^(?:regional-data\/)?[A-Za-z0-9_.-]+\.(?:json|geojson)$/.test(name)&&!name.split('/').some(x=>x==='..');
+ const validPath=name=>name==='federal-budget.csv'||typeof name==='string'&&/^(?:regional-data\/)?[A-Za-z0-9_.-]+\.(?:json|geojson)$/.test(name)&&!name.split('/').some(x=>x==='..');
  function hex(bytes){return Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('')}
  async function digest(bytes){if(!globalThis.crypto?.subtle)throw Error('SHA-256 недоступен: требуется защищённое соединение');return hex(await crypto.subtle.digest('SHA-256',bytes))}
  async function validateManifest(m){
@@ -17,12 +17,17 @@ const Provenance=(()=>{
   if(bytes.byteLength!==v.bytes||await digest(bytes)!==v.sha256)throw Error('Контрольная сумма или размер не совпадают: '+name+'. Обновите страницу.');
   return v.sha256;
  }
- async function get(m,name,base=''){
+ async function getBytes(m,name,base=''){
   if(!validPath(name)||!Object.prototype.hasOwnProperty.call(m.files,name))throw Error('Файл не входит в манифест: '+name);
   const response=await fetch(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Файл недоступен: '+name);
   const bytes=await response.arrayBuffer(),sha256=await verify(m,name,bytes);
+  return {bytes,sha256};
+ }
+ async function get(m,name,base=''){
+  if(!/\.(?:json|geojson)$/.test(name))throw Error('Ожидается JSON-набор');
+  const {bytes,sha256}=await getBytes(m,name,base);
   return {data:JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),sha256};
  }
- return {digest,validateManifest,verify,get,validPath};
+ return {digest,validateManifest,verify,get,getBytes,validPath};
 })();
 if(typeof module!=='undefined')module.exports=Provenance;

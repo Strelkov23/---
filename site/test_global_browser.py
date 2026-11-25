@@ -659,7 +659,16 @@ with sync_playwright() as p:
         assert len(methods)>=33
         assert page.locator("main .portal-grid article").count()==len(methods)
         assert page.locator("main .portal-grid a[href=\"methodology.html#metallurgy-output-method\"]").count()==1
+        for route,title in (("data-infrastructure.html","Инфраструктура экономических данных"),("normalized-data.html","Единый формат наблюдений"),("source-journal.html","Журнал загрузок и редакций"),("source-pipeline.html","Реестр загрузчиков и карантин")):
+            page.goto("http://localhost:8765/"+route,wait_until="load")
+            assert page.locator("h1").inner_text()==title
+            assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+            assert page.locator("main table").count()>=1
         page.goto("http://localhost:8765/reproducibility.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#repro-verify').disabled",timeout=30000)
+        page.locator("#repro-file").select_option("federal-budget.csv")
+        page.locator("#repro-verify").click()
+        page.wait_for_function("document.querySelector('#repro-result').textContent.includes('Совпадает: federal-budget.csv')",timeout=30000)
         page.wait_for_function("document.querySelector('#repro-status').textContent.includes('отпечаток проверен')")
         page.locator("#repro-verify").click()
         page.wait_for_function("document.querySelector('#repro-result').textContent.includes('Совпадает:')")
