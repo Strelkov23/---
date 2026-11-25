@@ -18,6 +18,11 @@ class CapitalDataTests(unittest.TestCase):
         self.assertAlmostEqual(tractor["theoretical_extra_vs_output_pct"],136.4066193853428)
         self.assertEqual(tractor["page"],365)
         self.assertTrue(all(0<=x["wear_pct"]<=100 for x in a))
+        condensed={x["year"]:x for x in b if x["code"]=="condensed"}
+        self.assertIsNone(condensed[2023]["change_pp"])
+        self.assertEqual(condensed[2023]["comparison_status"],"definition_changed")
+        self.assertEqual(condensed[2024]["change_pp"],3.1)
+        self.assertEqual(condensed[2022]["comparison_status"],"first_year")
     def test_publish(self):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d);pages={}

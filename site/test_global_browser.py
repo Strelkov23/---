@@ -136,9 +136,24 @@ with sync_playwright() as p:
         page.locator("#capacity-trend").select_option("machine-tools")
         assert "40,5" in page.locator("#capacity-trend-chart tbody tr").last.inner_text()
         assert page.locator("#capacity-table tbody tr").count()==72
+        assert page.locator("#capacity-distribution progress").count()==5
+        page.locator("#capacity-sort").select_option("low")
+        vals=page.locator("#capacity-table tbody tr td:nth-child(3)").all_text_contents()
+        nums=[float(v.replace(",", ".")) for v in vals]
+        assert nums==sorted(nums)
+        page.locator("#capacity-trend").select_option("condensed")
+        assert page.locator("#capacity-trend-chart svg").count()==0
+        assert "изменилась формулировка" in page.locator("#capacity-trend-chart").inner_text()
         page.locator("#capacity-query").fill("тракторы")
         assert page.locator("#capacity-table tbody tr").count()==1
         assert page.locator("#capacity-table tbody tr").inner_text().find("42,3")>=0
+        with page.expect_download() as cap:
+            page.locator("#capacity-export").click()
+        assert cap.value.suggested_filename=="capacity-selection.csv"
+        page.locator("#capacity-query").fill("zzzz_no_such_product")
+        assert page.locator("#capacity-export").is_disabled()
+        assert page.locator("#capacity-distribution progress").count()==0
+        page.locator("#capacity-query").fill("тракторы")
         page.locator("#capacity-year").select_option("2023")
         assert page.locator("#capacity-table tbody tr").inner_text().find("58,2")>=0
         page.goto("http://localhost:8765/data-registry.html",wait_until="load")

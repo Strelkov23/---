@@ -1,3 +1,19 @@
+const CapacityAnalysis=(()=>{
+ const ranges=[["Менее 25%",0,25],["25–менее 50%",25,50],["50–менее 75%",50,75],["75–менее 90%",75,90],["90–100%",90,101]];
+ function distribution(rows){
+  const valid=rows.filter(r=>Number.isFinite(r.utilization_pct)&&r.utilization_pct>=0&&r.utilization_pct<=100);
+  return {total:rows.length,valid:valid.length,missing:rows.length-valid.length,bins:ranges.map(([label,lo,hi])=>({label,count:valid.filter(r=>r.utilization_pct>=lo&&r.utilization_pct<hi).length})),min:valid.length?Math.min(...valid.map(r=>r.utilization_pct)):null,max:valid.length?Math.max(...valid.map(r=>r.utilization_pct)):null};
+ }
+ function sorted(rows,mode){
+  const byName=(a,b)=>a.title.localeCompare(b.title,'ru')||a.code.localeCompare(b.code);
+  if(mode==='name')return [...rows].sort(byName);
+  const key=mode==='change'||mode==='fall'?'change_pp':'utilization_pct',sign=mode==='low'||mode==='fall'?1:-1;
+  return [...rows].sort((a,b)=>{const av=Number.isFinite(a[key]),bv=Number.isFinite(b[key]);return av!==bv?(av?-1:1):av?sign*(a[key]-b[key])||byName(a,b):byName(a,b)});
+ }
+ return {distribution,sorted};
+})();
+if(typeof module!=='undefined')module.exports=CapacityAnalysis;
+if(typeof document!=='undefined')
 document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);if(!$('capital-year'))return;
  const fmt=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:2}):'—';
@@ -14,6 +30,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
    host.replaceChildren();if(!seriesRows.length)return;
    const t=seriesRows[0].title,years=seriesRows.map(x=>x.year);
    table(host,['Год',...metrics.map(x=>x[1])],seriesRows.map(r=>[r.year,...metrics.map(([key])=>fmt(r[key]))]));
+   if(id==='capacity-trend'&&seriesRows.some(r=>r.comparison_status==='definition_changed')){
+    const note=document.createElement('p');note.textContent='В 2023 году изменилась формулировка продукта. Значения разных определений показаны в таблице; линия динамики не строится, изменение 2023/2022 не рассчитывается.';host.append(note);return;
+   }
    // Use the shared renderer for export, and display the same data in an accessible chart.
    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
    svg.setAttribute('viewBox','0 0 640 260');svg.setAttribute('role','img');svg.setAttribute('aria-label',title+': '+t);
@@ -38,12 +57,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
    bars($('capital-chart'),[...rows].sort((a,b)=>b.wear_pct-a.wear_pct),'wear_pct','Наибольшая степень износа');
   }
   function capacity(){
-   const y=Number($('capacity-year').value),g=$('capacity-group').value,q=$('capacity-query').value.trim().toLocaleLowerCase('ru'),rows=c.filter(x=>x.year===y&&(!g||x.group===g)&&x.title.toLocaleLowerCase('ru').includes(q)).sort((a,b)=>b.utilization_pct-a.utilization_pct);
+   const y=Number($('capacity-year').value),g=$('capacity-group').value,q=$('capacity-query').value.trim().toLocaleLowerCase('ru'),rows=CapacityAnalysis.sorted(c.filter(x=>x.year===y&&(!g||x.group===g)&&x.title.toLocaleLowerCase('ru').includes(q)),$('capacity-sort').value);
    $('capacity-status').textContent='Показано продуктов: '+rows.length+' · '+y+' · охват: без малого предпринимательства.';
-   table($('capacity-table'),['Продукт','Группа','Загрузка, %','Незагруженная доля, %','Условный прирост к выпуску, %','Изменение загрузки, п.п.'],rows.map(x=>[x.title,x.group,...[x.utilization_pct,x.unused_share_pct,x.theoretical_extra_vs_output_pct,x.change_pp].map(fmt)]));
-   bars($('capacity-chart'),rows,'utilization_pct','Наиболее загруженные продукты в выбранном срезе');
+   const dist=CapacityAnalysis.distribution(rows),host=$('capacity-distribution'),h=document.createElement('h3'),note=document.createElement('p');
+   h.textContent='Распределение продуктов по загрузке';note.textContent=dist.valid?'Диапазон: '+fmt(dist.min)+'–'+fmt(dist.max)+'%. Числовых значений: '+dist.valid+' из '+dist.total+'. Каждый продукт считается один раз; доли не взвешены по выпуску или мощности.':'Нет числовых значений по выбранным условиям.';
+   host.replaceChildren(h,note);
+   if(dist.valid)for(const b of dist.bins){const row=document.createElement('div'),label=document.createElement('p'),bar=document.createElement('progress');label.textContent=b.label+' · '+b.count+' из '+dist.valid+' ('+fmt(100*b.count/dist.valid)+'%)';bar.max=dist.valid;bar.value=b.count;bar.setAttribute('aria-label',label.textContent);row.append(label,bar);host.append(row)}
+   table($('capacity-table'),['Продукт','Группа','Загрузка, %','Незагруженная доля, %','Условный прирост к выпуску, %','Изменение загрузки, п.п.','Сопоставимость'],rows.map(x=>[x.title,x.group,...[x.utilization_pct,x.unused_share_pct,x.theoretical_extra_vs_output_pct,x.change_pp].map(fmt),x.comparison_status==='definition_changed'?'Изменилось определение':x.comparison_status==='first_year'?'Нет предыдущего года':'Одинаковая формулировка источника']));
+   const exportButton=$('capacity-export');exportButton.disabled=!rows.length;exportButton.onclick=()=>csv('capacity-selection.csv',[['Код','Продукт','Группа','Год','Загрузка, %','Незагруженная доля, %','Условный прирост, %','Изменение, п.п.','Сопоставимость','Охват','Таблица','Страница','Источник','Примечание'],...rows.map(x=>[x.code,x.title,x.group,x.year,x.utilization_pct,x.unused_share_pct,x.theoretical_extra_vs_output_pct,x.change_pp,x.comparison_status,x.coverage,x.table,x.page,x.source,x.note])]);
+   bars($('capacity-chart'),CapacityAnalysis.sorted(rows,'high'),'utilization_pct','Наиболее загруженные продукты в выбранном срезе');
   }
   $('capital-year').addEventListener('change',assets);$('capital-sort').addEventListener('change',assets);
-  $('capacity-year').addEventListener('change',capacity);$('capacity-group').addEventListener('change',capacity);$('capacity-query').addEventListener('input',capacity);assets();capacity();assetTrend();capacityTrend();
+  $('capacity-year').addEventListener('change',capacity);$('capacity-group').addEventListener('change',capacity);$('capacity-query').addEventListener('input',capacity);$('capacity-sort').addEventListener('change',capacity);assets();capacity();assetTrend();capacityTrend();
  }catch(e){console.error(e);$('capital-status').textContent='Не удалось загрузить данные.'}
 });
