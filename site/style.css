@@ -396,3 +396,6 @@ html[data-theme=dark] .section-nav{background:#1b3142;color:#dceaf2;border-color
 
 /* D.8.5: compact mobile navigation; without JavaScript the full menu remains available. */
 .mobile-nav-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:.55rem .8rem;background:#233b4c;color:#eef6fa;border:1px solid #6d8899;border-radius:.4rem;font:inherit;text-align:left}.mobile-nav-toggle::after{content:'+';font-size:1.3rem;line-height:1}.mobile-nav-toggle[aria-expanded=true]::after{content:'−'}.mobile-nav-toggle[hidden],.primary-nav[hidden]{display:none!important}@media print{.mobile-nav-toggle{display:none!important}}
+
+/* D.9 release blocker: native file controls have an intrinsic minimum width. */
+main label:has(input[type=file]){min-width:0;max-width:100%;grid-template-columns:minmax(0,1fr);overflow-wrap:anywhere}main input[type=file]{display:block;box-sizing:border-box;min-width:0;width:100%;max-width:100%;overflow:hidden}main input[type=file]::file-selector-button{max-width:100%;white-space:normal;overflow-wrap:anywhere}

@@ -57,5 +57,17 @@ with sync_playwright() as p:
             page.wait_for_function("document.documentElement.dataset.theme==='dark'")
             assert page.locator("#theme-mode").input_value()=="dark"
         page.close()
+    # The production audit includes 320px, which the prior visual matrix missed.
+    for route,control in (("scenario.html","#dyn-calibration-file"),("desk.html","#project-restore"),("prices.html","#price-hour-file")):
+        page=browser.new_page(viewport={"width":320,"height":800})
+        page.goto("http://localhost:8765/"+route,wait_until="load")
+        page.wait_for_function("document.documentElement.dataset.theme !== undefined")
+        for theme in ("light","dark"):
+            page.locator("#theme-mode").select_option(theme)
+            field=page.locator(control)
+            assert field.count()==1 and field.get_attribute("type")=="file",(route,control)
+            assert field.evaluate("e=>e.getBoundingClientRect().right<=innerWidth+2"),(route,control,theme)
+            assert page.evaluate("document.documentElement.scrollWidth<=innerWidth+2"),(route,theme)
+        page.close()
     browser.close()
-print("Visual system: 72 captures, 3 widths, 2 themes, shared header contrast and persistence OK")
+print("Visual system: 72 captures, 3 widths, 2 themes, shared header contrast, persistence and 320px file inputs OK")
