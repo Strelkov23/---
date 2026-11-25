@@ -1,0 +1,28 @@
+name: NAO investment exact edition column audit
+on:
+  push:
+    branches: [stage-f-nao-column-audit]
+    paths: ['site/nao_column_audit.py','site/test_nao_column_audit.py','.github/workflows/nao-column-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install openpyxl==3.1.5
+          cd site
+          python -m unittest test_nao_column_audit.py test_nao_project_schema.py
+          python nao_column_audit.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nao-column-audit
+          path: nao-column-audit.json
+          if-no-files-found: ignore
