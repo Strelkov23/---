@@ -33,6 +33,36 @@ with sync_playwright() as p:
         page.locator("#hub-query").fill("")
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/research-projects.html",wait_until="load")
+        page.locator("#rp-title").fill("Тестовый проект")
+        page.locator("#rp-note").fill("Проверка библиографии")
+        page.locator("#rp-create").click()
+        project_id=page.locator("#rp-select").input_value()
+        assert project_id and page.locator("#rp-save").is_enabled()
+        page.goto("http://localhost:8765/papers.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#paper-project option').length>1",timeout=30000)
+        page.locator("#paper-project").select_option(project_id)
+        page.locator("#papers .paper-project-add").first.click()
+        assert "Сохранено в проекте: 1" in page.locator("#paper-project-status").inner_text()
+        page.locator("#papers .paper-project-add").first.click()
+        assert "Сохранено в проекте: 1" in page.locator("#paper-project-status").inner_text()
+        page.goto("http://localhost:8765/research-projects.html",wait_until="load")
+        page.locator("#rp-select").select_option(project_id)
+        assert page.locator("#rp-items tbody tr").count()==1
+        assert page.locator("#rp-note").input_value()=="Проверка библиографии"
+        for button,filename,signature in (("rp-bibtex","research-project.bib","@article"),("rp-ris","research-project.ris","TY  - JOUR"),("rp-csv","research-project-bibliography.csv","Название проекта")):
+            with page.expect_download() as bib:
+                page.locator("#"+button).click()
+            assert bib.value.suggested_filename==filename
+            assert signature in bib.value.path().read_text(encoding="utf-8-sig")
+        with page.expect_download() as backup:
+            page.locator("#rp-export").click()
+        page.locator("#rp-import").set_input_files(str(backup.value.path()))
+        page.wait_for_function("document.querySelectorAll('#rp-select option').length===3")
+        assert page.locator("#rp-items tbody tr").count()==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/journal-evidence.html",wait_until="load")
+        assert page.locator("main article").count()>=13
         page.goto("http://localhost:8765/diagnostics.html#diag-overview",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#diag-overview-cards article').length===6",timeout=45000)
         assert page.locator("#diag-overview-export").is_enabled()
