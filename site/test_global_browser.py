@@ -383,6 +383,21 @@ with sync_playwright() as p:
                 ratio_rows=list(csv.reader(f,delimiter=";"))
             assert len(ratio_rows)==expected+1 and len({len(r) for r in ratio_rows})==1
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.wait_for_function("document.querySelector('#bank-profit-ratio-status').textContent.startsWith('Сопоставимых отношений:')",timeout=45000)
+        profit_data=json.loads(Path("bank-profit.json").read_text())
+        profit_target=set(profit_data["cohort"])
+        profit_expected=sum(r["registration_number"] in profit_target for r in profit_data["rows"])
+        assert page.locator("#bank-profit-ratio-table tbody tr").count()==profit_expected
+        page.locator("#bank-profit-ratio-metric").select_option("fee_cost")
+        assert page.locator("#bank-profit-paired .metric").count()>=4
+        if profit_expected:
+            for selector in ("#bank-profit-ratio-export","#bank-profit-paired-export"):
+                with page.expect_download() as profit_csv:
+                    page.locator(selector).click()
+                with open(profit_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                    profit_rows=list(csv.reader(f,delimiter=";"))
+                assert len(profit_rows)==profit_expected+1 and len({len(r) for r in profit_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#amur-ent-export").is_enabled():
