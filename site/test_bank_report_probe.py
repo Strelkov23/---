@@ -17,3 +17,11 @@ class BankReportProbeTests(unittest.TestCase):
         raw=bytearray(69);struct.pack_into("<IHH",raw,4,1,65,4);raw[32:36]=b"CODE";raw[43]=ord("C");raw[48]=3;raw[64]=13;raw[65:69]=b" 000"
         x=p.inspect_dbf(bytes(raw));self.assertEqual(x["rows"],1);self.assertEqual(x["fields"][0]["name"],"CODE")
         with self.assertRaises(ValueError):p.inspect_dbf(bytes(raw[:-1]))
+
+    def test_form135_metadata(self):
+        for method in ["Data135FormFullXML","Data135MetaFullXML"]:
+            self.assertIn(method.encode(),p.request(12,"2026-10-01",method))
+            raw=(f'<s:Envelope xmlns:s="{d.SOAP}"><s:Body><{method}Response xmlns="{d.NS}"><{method}Result><rows><row/></rows></{method}Result></{method}Response></s:Body></s:Envelope>').encode()
+            self.assertEqual(p.inspect_xml(raw,method)["bytes"],len(raw))
+            with self.assertRaises(ValueError):p.inspect_xml(raw.replace(b"<rows><row/></rows>",b""),method)
+        with self.assertRaises(ValueError):p.request(1,"2026-10-01","UnknownMethod")
