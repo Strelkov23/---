@@ -254,6 +254,7 @@ jobs:
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
           CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_visual_system.py
           CHROME_BIN=$(command -v google-chrome) python3 ../layout_audit.py http://localhost:8765/ /tmp/layout-audit
       - name: Retain validation reports
         if: always()
