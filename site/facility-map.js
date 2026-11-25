@@ -61,17 +61,22 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
 
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),host=$('amur-ent-table');if(!host)return;
- const status=$('amur-ent-status'),query=$('amur-ent-query'),town=$('amur-ent-town'),exp=$('amur-ent-export');
+ const status=$('amur-ent-status'),query=$('amur-ent-query'),town=$('amur-ent-town'),exp=$('amur-ent-export'),category=$('amur-ent-category'),metrics=$('amur-ent-metrics'),chart=$('amur-ent-chart'),group=$('amur-ent-group');
  try{
   const manifest=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(manifest,'amur-enterprises.json',root),d=entry.data;
   if(!d.rows.length){status.textContent='Подтверждённые карточки пока не загружены. '+(d.error||'');return}
   town.replaceChildren(new Option('Все',''),...[...new Set(d.rows.map(r=>r.locality))].sort((a,b)=>a.localeCompare(b,'ru')).map(v=>new Option(v,v)));
+  category.replaceChildren(new Option('Все категории',''),...[...new Set(d.rows.map(r=>r.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru')).map(v=>new Option(v,v)),new Option('Категория не указана','__missing__'));
   function draw(){
-   const q=query.value.trim().toLocaleLowerCase('ru'),rows=d.rows.filter(r=>(!town.value||town.value===r.locality)&&(!q||[r.name,r.category,r.locality].some(v=>String(v||'').toLocaleLowerCase('ru').includes(q)))).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+   const q=query.value.trim().toLocaleLowerCase('ru'),rows=d.rows.filter(r=>(!category.value||(category.value==='__missing__'?!r.category:r.category===category.value))&&(!town.value||town.value===r.locality)&&(!q||[r.name,r.category,r.locality].some(v=>String(v||'').toLocaleLowerCase('ru').includes(q)))).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
    status.textContent='Карточек: '+rows.length+' из '+d.rows.length+' · последняя успешная загрузка: '+d.success+' · '+(d.status==='cached'?'сохранённая редакция':'загруженная редакция')+'. Дата актуальности самих карточек не установлена.';
+   metrics.replaceChildren();for(const [label,value] of [['Карточки в выборке',rows.length],['Населённые пункты',new Set(rows.map(r=>r.locality)).size],['Категории источника',new Set(rows.map(r=>r.category).filter(Boolean)).size]]){const card=node('div','');card.className='metric';card.append(node('b',String(value)),node('span',label));metrics.append(card)}
+   const counts=new Map();for(const r of rows){const k=r[group.value]||'Не указано';counts.set(k,(counts.get(k)||0)+1)}
+   chart.replaceChildren(node('p','Распределение карточек текущей выборки, не число действующих предприятий. Показано до 12 крупнейших категорий или населённых пунктов.'));
+   const bars=node('div','');bars.className='rm-composition';for(const [name,n] of [...counts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ru')).slice(0,12)){const line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=(100*n/rows.length)+'%';track.append(fill);line.append(node('span',name),track,node('strong',String(n)));bars.append(line)}chart.append(bars);
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();for(const label of ['Организация','Категория каталога','Населённый пункт','Карточка (порядок в HTML)']){const th=node('th',label);th.scope='col';h.append(th)}
    for(const r of rows){const tr=b.insertRow();for(const v of [r.name,r.category,r.locality,r.source_card])tr.insertCell().textContent=v??'—'}host.replaceChildren(t);
    exp.disabled=!rows.length;exp.onclick=()=>csv('amur-enterprise-directory.csv',[['ID карточки','Организация','Категория каталога','Населённый пункт','Порядок заголовка','Дата получения','Источник','SHA-256 HTML','SHA-256 JSON','Статус деятельности'],...rows.map(r=>[r.id,r.name,r.category,r.locality,r.source_card,d.success,d.source,d.sha256,entry.sha256,'Не подтверждён'])]);
-  }query.oninput=draw;town.onchange=draw;draw();
+  }query.oninput=draw;town.onchange=category.onchange=group.onchange=draw;draw();
  }catch(e){status.textContent='Каталог недоступен для выбранной версии: '+String(e.message||e)}
 });

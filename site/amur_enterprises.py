@@ -51,10 +51,15 @@ def parse(raw,encoding="utf-8"):
 def quality(d):
     if d.get("schema")!=1 or d.get("source")!=SOURCE or d.get("note")!=NOTE or d.get("status") not in ("not_loaded","unavailable","ok","cached"):raise ValueError("Паспорт каталога")
     rows=d["rows"];ids=set()
+    if not isinstance(rows,list) or type(d.get("matched")) is not int or d["matched"]<0:raise ValueError("Состав каталога")
+    if not rows and (d.get("success") or d.get("sha256") or d["matched"]):raise ValueError("Пустая редакция с метаданными успеха")
     if rows and (len(rows)<20 or d["status"] not in ("ok","cached") or not d.get("success") or not re.fullmatch("[a-f0-9]{64}",d.get("sha256") or "") or d["matched"]<len(rows)):raise ValueError("Неподтверждённая редакция")
     if not rows and d["status"] in ("ok","cached"):raise ValueError("Пустой успех")
     for r in rows:
         if set(r)!={"id","name","category","locality","source_card"} or not re.fullmatch("[a-f0-9]{24}",r["id"]) or r["id"] in ids or not r["name"] or not r["locality"] or type(r["source_card"]) is not int or r["source_card"]<=0:raise ValueError("Карточка")
+        if not re.match(r'^(?:ООО|АО|ПАО|ОАО|ЗАО|ГУП|МУП|ФГУП)(?=[\s"«])',r["name"],re.I) or any("@" in str(r[k] or "") for k in ("name","category","locality")):raise ValueError("Неподходящие поля")
+        key=hashlib.sha256((r["name"].casefold()+"\t"+r["locality"].casefold()+"\t"+(r["category"] or "").casefold()).encode()).hexdigest()[:24]
+        if key!=r["id"]:raise ValueError("Несовпадение ID карточки")
         ids.add(r["id"])
     return {"amur_enterprise_cards":len(rows),"amur_enterprise_localities":len({r["locality"] for r in rows})}
 def fetch():

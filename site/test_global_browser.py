@@ -289,6 +289,9 @@ with sync_playwright() as p:
         page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#amur-ent-export").is_enabled():
             assert page.locator("#amur-ent-table tbody tr").count()>=20
+            assert page.locator("#amur-ent-metrics .metric").count()==3
+            page.locator("#amur-ent-group").select_option("category")
+            assert page.locator("#amur-ent-chart .rm-composition-row").count()>0
             page.locator("#amur-ent-query").fill("zzzz_no_such_company")
             assert page.locator("#amur-ent-table tbody tr").count()==0
             page.locator("#amur-ent-query").fill("")

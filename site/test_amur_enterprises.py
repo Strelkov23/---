@@ -9,3 +9,18 @@ class Test(unittest.TestCase):
         self.assertNotIn("test@example.com",str(rows))
     def test_short(self):
         with self.assertRaises(ValueError):a.parse(b"<h6>empty</h6>")
+
+    def test_cache_and_retry(self):
+        import tempfile,json
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);out=root/"out";prev=root/"prev";out.mkdir();prev.mkdir()
+            d=a.publish(out,prev,"2026-11-25",True,lambda:(fixture(),"utf-8"))
+            self.assertEqual(d["status"],"ok");self.assertEqual(len(d["rows"]),21)
+            (prev/a.FILE).write_bytes((out/a.FILE).read_bytes())
+            def fail():raise OSError("unavailable")
+            d=a.publish(out,prev,"2026-12-02",True,fail)
+            self.assertEqual(d["status"],"cached");self.assertEqual(len(d["rows"]),21)
+            self.assertEqual(d["success"],"2026-11-25");self.assertEqual(d["checked"],"2026-12-02")
+            bad=json.loads(json.dumps(d));bad["rows"][0]["name"]="ООО Changed"
+            with self.assertRaises(ValueError):a.quality(bad)

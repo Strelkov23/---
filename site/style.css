@@ -233,3 +233,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #rm-shift-table table{min-width:850px}#rm-shift-table td{overflow-wrap:anywhere}#rm-shift .project-controls label{min-width:0;max-width:100%}#rm-shift select{width:100%;min-width:0;max-width:100%}
 
 #rm-geoconc-table table{min-width:1100px}#rm-geoconc-detail table{min-width:650px}#rm-geoconcentration select{width:100%;min-width:0;max-width:100%}#rm-geoconc-table td{overflow-wrap:anywhere}
+
+#amur-ent-table table{min-width:650px}#amur-ent-table td{overflow-wrap:anywhere}#amur-enterprise-directory select{min-width:0;width:100%;max-width:100%}

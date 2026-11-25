@@ -24,4 +24,16 @@ jobs:
           raw,enc=a.fetch()
           rows,matched=a.parse(raw,enc)
           print("MATCHED",matched,"CORPORATE_CARDS",len(rows),"LOCALITIES",len({r["locality"] for r in rows}),"SHA256",hashlib.sha256(raw).hexdigest())
+          import json
+          from pathlib import Path
+          from datetime import datetime,timezone
+          stamp=datetime.now(timezone.utc).isoformat()
+          out=Path("../history/published")
+          d=a.publish(out,Path("/nonexistent"),stamp,True,lambda:(raw,enc))
+          assert d["status"]=="ok" and len(d["rows"])==len(rows)
+          print("VERIFIED_SNAPSHOT",a.quality(d))
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-amur-enterprises
+          path: history/published/amur-enterprises.json

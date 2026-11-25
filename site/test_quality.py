@@ -42,6 +42,8 @@ class QualityTests(unittest.TestCase):
         sr.publish(self.out,self.prev,"2026-11-24",False)
         import enterprise_sources
         enterprise_sources.publish(self.out,self.prev,"2026-11-24",False)
+        import amur_enterprises
+        amur_enterprises.publish(self.out,self.prev,"2026-11-24",False)
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})
@@ -118,6 +120,10 @@ class QualityTests(unittest.TestCase):
         p=self.out/"federal-budget.csv"
         with p.open("a",encoding="utf-8") as f:f.write("2025,fake\n")
         self.assertTrue(any("Документальный федеральный бюджет" in e for e in self.report()["errors"]))
+    def test_amur_catalog_bad_metadata(self):
+        d=json.loads((self.out/"amur-enterprises.json").read_text())
+        self.put("amur-enterprises.json",dict(d,status="ok"))
+        self.assertTrue(any("Амурский каталог" in x for x in self.report()["errors"]))
     def test_missing(self):
         (self.out/"cbr.json").unlink()
         self.assertTrue(self.report()["errors"])
