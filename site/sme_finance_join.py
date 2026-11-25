@@ -24,6 +24,14 @@ def profiles(db,heaps,eligible):
         if not member or not sha256 or type(ordinal) is not int or ordinal<1:raise ValueError("Нет ссылки на запись МСП")
         rows.append(dict(inn=inn,status="matched",ogrn=ogrn,region=region,declared=declared,dver=dver,reported=reported,rver=rver,member=member,sha256=sha256,accepted_ordinal=ordinal))
     return dict(limit_per_metric=PROFILE_LIMIT,rows=rows)
+JOIN_BATCH=400
+def lookup_batch(db,rows):
+    """Bounded indexed lookup; retain exact textual INN and missing rows."""
+    ids=[r[0] for r in rows]
+    if len(ids)>JOIN_BATCH or len(set(ids))!=len(ids):raise ValueError("Размер или дубликат пакета ИНН")
+    if not ids:return {}
+    placeholders=",".join("?" for _ in ids)
+    return {r[0]:r[1:] for r in db.execute("SELECT inn,region,declared,dver,reported,rver FROM org WHERE inn IN ("+placeholders+")",ids)}
 def join(db,root,report):
     index=json.loads((root/idx.FILE).read_text(encoding="utf-8"))
     idx.quality(index,root,deep=True)
@@ -34,29 +42,34 @@ def join(db,root,report):
     if not eligible:raise ValueError("Нет сверенных территорий")
     counts=Counter();cells=defaultdict(Counter);heaps={k:[] for k in ('income','expense','workers')}
     def code(v,version):return v[:2] if v and version=="2014" else "missing_or_other_version"
-    for name,entry in index["files"].items():
+    for block,(name,entry) in enumerate(index["files"].items(),1):
         raw=(root/name).read_bytes()
         if len(raw)!=entry["bytes"] or hashlib.sha256(raw).hexdigest()!=entry["sha256"]:raise ValueError("Изменился индекс")
         rows=json.loads(gzip.decompress(raw))
-        for r in rows:
-            counts["financial_index"]+=1
-            for k,v in zip(heaps,r[3:6]):retain(heaps[k],v,r[0])
-            found=db.execute("SELECT region,declared,dver,reported,rver FROM org WHERE inn=?",(r[0],)).fetchone()
-            if found is None:counts["not_in_sme"]+=1;continue
-            counts["matched_sme"]+=1
-            region,d,dv,p,pv=found
-            if region not in eligible:counts["excluded_region"]+=1;continue
-            counts["included"]+=1
-            for kind,cls in (("declared",code(d,dv)),("reported",code(p,pv))):
-                c=cells[(kind,region,cls)];c["matched"]+=1
-                for key,value in (("income",r[3]),("expense",r[4]),("workers",r[5])):
-                    if value is not None:c[key+"_observations"]+=1;c[key+"_sum"]+=int(value)
-                if r[3] is not None and r[4] is not None:
-                    c["paired_money"]+=1
-                    c["paired_income_sum"]+=int(r[3]);c["paired_expense_sum"]+=int(r[4])
-                if r[3] is not None and r[5] is not None:
-                    c["income_workers_pair"]+=1
-                    c["worker_pair_income_sum"]+=int(r[3]);c["worker_pair_workers_sum"]+=int(r[5])
+        for pos in range(0,len(rows),JOIN_BATCH):
+            batch=rows[pos:pos+JOIN_BATCH]
+            found_by_inn=lookup_batch(db,batch)
+            for r in batch:
+                counts["financial_index"]+=1
+                for k,v in zip(heaps,r[3:6]):retain(heaps[k],v,r[0])
+                found=found_by_inn.get(r[0])
+                if found is None:counts["not_in_sme"]+=1;continue
+                counts["matched_sme"]+=1
+                region,d,dv,p,pv=found
+                if region not in eligible:counts["excluded_region"]+=1;continue
+                counts["included"]+=1
+                for kind,cls in (("declared",code(d,dv)),("reported",code(p,pv))):
+                    c=cells[(kind,region,cls)];c["matched"]+=1
+                    for key,value in (("income",r[3]),("expense",r[4]),("workers",r[5])):
+                        if value is not None:c[key+"_observations"]+=1;c[key+"_sum"]+=int(value)
+                    if r[3] is not None and r[4] is not None:
+                        c["paired_money"]+=1
+                        c["paired_income_sum"]+=int(r[3]);c["paired_expense_sum"]+=int(r[4])
+                    if r[3] is not None and r[5] is not None:
+                        c["income_workers_pair"]+=1
+                        c["worker_pair_income_sum"]+=int(r[3]);c["worker_pair_workers_sum"]+=int(r[5])
+        if block%32==0 or block==len(index["files"]):
+            print("SME_JOIN_PROGRESS",block,len(index["files"]),counts["financial_index"],counts["included"],flush=True)
     if counts["financial_index"]!=index["count"] or counts["matched_sme"]+counts["not_in_sme"]!=index["count"] or counts["included"]+counts["excluded_region"]!=counts["matched_sme"]:raise ValueError("Баланс объединения")
     # Denominators from the full SME matrix; preserve cells with zero overlap.
     result={}
