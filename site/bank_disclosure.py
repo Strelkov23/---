@@ -92,7 +92,8 @@ def publish(out,previous,stamp,refresh,directory,fetcher=fetch):
             d=old
             if d["rows"] and quality(d)["bank_disclosure_verified_forms"]:d["status"]="cached"
     except (OSError,ValueError,KeyError,TypeError):pass
-    due=not d["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(d["checked"][:10])+timedelta(days=7)
+    last=d.get("last_attempt") or d["checked"]
+    due=not last or date.fromisoformat(stamp[:10])>=date.fromisoformat(last[:10])+timedelta(days=7)
     if refresh and selected and due:
         with ThreadPoolExecutor(max_workers=LIMIT) as pool:
             rows=list(pool.map(lambda b:one(b,stamp,fetcher),selected))

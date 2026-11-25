@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "period": "2026-01-01",
+  "checked": "2026-11-25",
+  "status": "documentary",
+  "rows": [
+    {
+      "registration_number": "2650",
+      "line": "59",
+      "capital": "1401603",
+      "opening": "1260495",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=2650",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "3545",
+      "line": "59",
+      "capital": "32112183",
+      "opening": "20786096",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=3545",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "3172",
+      "line": "59",
+      "capital": "1575086",
+      "opening": "1447353",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=3172",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "933",
+      "line": "14",
+      "capital": "412679",
+      "opening": "406875",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=933",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "2664",
+      "line": "59",
+      "capital": "5159191",
+      "opening": "4122479",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=2664",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "3161",
+      "line": "59",
+      "capital": "2409007",
+      "opening": "2389406",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=3161",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "3328",
+      "line": "59",
+      "capital": "35653556",
+      "opening": "31782608",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=3328",
+      "sha256": null,
+      "verification": "documentary"
+    },
+    {
+      "registration_number": "3554",
+      "line": "14",
+      "capital": "84954",
+      "opening": "0",
+      "source": "https://www.cbr.ru/banking_sector/credit/coinfo/f808/1904/?dt=202601&regnum=3554",
+      "sha256": null,
+      "verification": "documentary"
+    }
+  ],
+  "errors": []
+}
