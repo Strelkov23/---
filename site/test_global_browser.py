@@ -299,6 +299,28 @@ with sync_playwright() as p:
             with page.expect_download() as rankcsv:
                 page.locator("#company-rank-export").click()
             assert rankcsv.value.suggested_filename.startswith("company-ranking-employment-")
+        groups=json.loads(Path("group-passports.json").read_text())
+        page.wait_for_function("!document.querySelector('#group-coverage-export').disabled",timeout=45000)
+        assert page.locator("#group-coverage-table tbody tr").count()==len(groups["groups"])
+        assert page.locator("#group-cross-table tbody tr").count()==len(groups["groups"])
+        assert page.locator("#group-coverage-summary .metric").count()==6
+        with page.expect_download() as groups_csv:
+            page.locator("#group-coverage-export").click()
+        with open(groups_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+            coverage=list(csv.reader(f,delimiter=";"))
+        assert len(coverage)==len(groups["groups"])+1
+        assert len({len(r) for r in coverage})==1
+        page.locator("#group-cross-metric").select_option("equity_share")
+        assert page.locator("#group-cross-table tbody tr").count()==len(groups["groups"])
+        if any(g["id"]=="nlmk" for g in groups["groups"]):
+            page.locator("#group-pick").select_option("nlmk")
+            assert "не полный комплект" in page.locator("#group-detail").inner_text()
+            assert page.locator("#group-ratio-export").is_disabled()
+        page.locator("#group-query").fill("zzzz_no_such_group")
+        assert page.locator("#group-export").is_disabled()
+        page.locator("#group-query").fill("")
+        assert page.locator("#group-export").is_enabled()
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/banks.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#bank-source-status').textContent.startsWith('Проверка')",timeout=30000)
         assert page.locator("#bank-metrics .metric").count()==3
@@ -306,6 +328,14 @@ with sync_playwright() as p:
             assert page.locator("#bank-table tbody tr").count()>0
             page.locator("#bank-query").fill("zzzz_no_bank")
             assert page.locator("#bank-table tbody tr").count()==0
+        page.wait_for_function("document.querySelectorAll('#bank-coverage-table tbody tr').length===3",timeout=45000)
+        if page.locator("#bank-coverage-export").is_enabled():
+            with page.expect_download() as bank_cov:
+                page.locator("#bank-coverage-export").click()
+            with open(bank_cov.value.path(),encoding="utf-8-sig",newline="") as f:
+                coverage=list(csv.reader(f,delimiter=";"))
+            assert len(coverage)==4 and len({len(r) for r in coverage})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#amur-ent-export").is_enabled():
