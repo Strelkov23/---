@@ -82,13 +82,60 @@ const GlobalPlan=(()=>{
   const periods=rows.map((r,j)=>({year:r.year,invested:sum(groups.map(g=>g.values[j])),unused:r.unusedInvestment,alpha:r.alpha,binding:r.binding}));
   return {groups,periods,total,unused:sum(periods.slice(0,-1).map(r=>r.unused)),finalUnused:periods.at(-1)?.unused??0,max:Math.max(0,...groups.flatMap(g=>g.values))};
  }
+ const sensitivitySpecs={investment:{label:'Инвестиционный лимит',min:0,max:100000,unit:'млрд руб.'},importLimit:{label:'Импортный лимит',min:0,max:100000,unit:'млрд руб.'},spare:{label:'Исходный резерв мощности',min:0,max:100,unit:'%'},capitalRatio:{label:'Капиталоёмкость',min:.1,max:20,unit:'руб./руб.'},depreciation:{label:'Выбытие мощности',min:0,max:100,unit:'%'},laborCap:{label:'Лимит труда',min:0,max:1e9,unit:'человеко-лет'}};
+ function sensitivityCases(p,key,step,mode='relative'){
+  const spec=sensitivitySpecs[key],base=key==='laborCap'?p.labor?.cap:p[key];
+  if(!spec||!finite(base)||!finite(step)||step<=0||!['relative','absolute'].includes(mode)||mode==='relative'&&step>100)throw Error('Недопустимые параметры чувствительности');
+  const change=mode==='relative'?base*step/100:step;
+  return [-1,0,1].map(dir=>{
+   const requested=base+dir*change,value=Math.max(spec.min,Math.min(spec.max,requested));
+   return {dir,value,requested,changed:value!==base,clamped:value!==requested,params:key==='laborCap'?{...p,labor:{...p.labor,cap:value}}:{...p,[key]:value}};
+  });
+ }
+ function sensitivity(m,p,objective,key,step,mode,progress=()=>{}){
+  const cases=sensitivityCases(p,key,step,mode),cache=new Map(),rows=[];
+  for(const c of cases){
+   if(!cache.has(c.value))try{
+    const r=solve(m,c.params,objective),last=r.rows.at(-1);
+    cache.set(c.value,{score:r.score,terminal:last.actualDemand,alpha:last.alpha,investment:sum(r.rows.map(x=>x.investment)),binding:last.binding,upper:r.upper,gap:r.dualityGap,tolerance:r.tolerance});
+   }catch(e){cache.set(c.value,{error:String(e.message||e)})}
+   const {params,...meta}=c;rows.push({...meta,...cache.get(c.value)});progress(rows.length,cases.length);
+  }
+  const base=rows[1];
+  return {key,step,mode,objective,rows:rows.map(r=>({...r,delta:finite(r.score)&&finite(base.score)?r.score-base.score:null,deltaPP:finite(r.alpha)&&finite(base.alpha)?100*(r.alpha-base.alpha):null}))};
+ }
  function mount(m){
   const $=id=>document.getElementById(id),button=$('global-run'),status=$('global-status'),results=$('global-results'),details=$('global-detail'),comparison=$('global-comparison'),chart=$('global-chart'),metrics=$('global-metrics'),select=$('global-period'),download=$('global-csv'),objective=$('global-objective');
   const timeline=$('global-timeline'),investmentHost=$('global-investment-heat'),investmentStatus=$('global-investment-status'),investmentCsv=$('global-investment-csv'),investmentFocus=$('global-investment-focus');
-  let params=null,worker=null,answer=null,serial=0;
+  const sensKey=$('global-sens-key'),sensMode=$('global-sens-mode'),sensStep=$('global-sens-step'),sensRun=$('global-sens-run'),sensStatus=$('global-sens-status'),sensTable=$('global-sens-table'),sensChart=$('global-sens-chart'),sensCsv=$('global-sens-csv');
+  let params=null,worker=null,answer=null,serial=0,sensWorker=null,sensSerial=0;
+  function clearSensitivity(){
+   sensSerial++;if(sensWorker){sensWorker.terminate();sensWorker=null}sensTable.replaceChildren();sensChart.replaceChildren();sensCsv.disabled=true;sensRun.disabled=!answer;
+   sensStatus.textContent=answer?'Выберите параметр и величину изменения.':'Сначала рассчитайте основной оптимальный план.';
+  }
+  function showSensitivity(r,p){
+   const spec=sensitivitySpecs[r.key],base=r.rows[1],signed=v=>finite(v)?(v>0?'+':'')+fmt(v):'—';
+   sensStatus.textContent='Проверено вариантов: '+r.rows.filter(x=>!x.error).length+' из '+r.rows.length+' · '+spec.label+' ('+spec.unit+'). '+(base.value===0&&r.mode==='relative'?'Нулевая база: относительное изменение не меняет параметр. Используйте абсолютный шаг.':'Изменяется только выбранный параметр.');
+   table(sensTable,['Вариант','Значение параметра','Цель, млрд ₽','Δ цели, млрд ₽','Доля спроса последнего периода, %','Δ доли, п. п.','Инвестиции, млрд ₽','Ограничения последнего периода','Проверка'],r.rows.map(x=>[['Снижение','База','Повышение'][x.dir+1],fmt(x.value),fmt(x.score),signed(x.delta),fmt(finite(x.alpha)?100*x.alpha:null),signed(x.deltaPP),fmt(x.investment),x.binding?.join('; ')||'—',x.error||(!x.changed&&x.dir!==0?'Без изменения':x.clamped?'Ограничено диапазоном; оптимум проверен':'Оптимум проверен')]));
+   const max=Math.max(0,...r.rows.filter(x=>finite(x.delta)).map(x=>Math.abs(x.delta)));
+   const bars=document.createElement('div');bars.className='stress-signed-bars';
+   for(const x of r.rows){const line=document.createElement('div');line.className='stress-signed-row';const name=document.createElement('span'),track=document.createElement('div'),amount=document.createElement('strong'),bar=document.createElement('div');name.textContent=['Снижение','База','Повышение'][x.dir+1]+' · '+fmt(x.value);track.className='stress-signed-track';bar.className='stress-signed-fill';bar.dataset.sign=x.delta<0?'negative':'positive';bar.style.width=(max&&finite(x.delta)?50*Math.abs(x.delta)/max:0)+'%';track.append(bar);amount.textContent=signed(x.delta);line.append(name,track,amount);bars.append(line)}
+   sensChart.append(bars);sensCsv.disabled=false;
+   sensCsv.onclick=()=>csv('global-plan-sensitivity.csv',[['Цель',r.objective],['Параметр',r.key],['Режим шага',r.mode],['Шаг',r.step],['База','2021, млрд руб.'],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['Вариант','Запрошенное значение','Фактическое значение','Единица','Изменено','Ограничено диапазоном','Цель, млрд руб.','Δ цели, млрд руб.','Доля спроса последнего периода','Δ доли, п.п.','Инвестиции, млрд руб.','Двойственная граница','Разрыв двойственности','Допуск','Ограничения последнего периода','Ошибка','Источник'],...r.rows.map(x=>[x.dir,x.requested,x.value,spec.unit,x.changed,x.clamped,x.score,x.delta,x.alpha,x.deltaPP,x.investment,x.upper,x.gap,x.tolerance,x.binding?.join('; '),x.error,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
+  }
+  sensRun.onclick=()=>{
+   if(!answer||!params)return;
+   clearSensitivity();let cases;const key=sensKey.value,step=sensStep.valueAsNumber,mode=sensMode.value,goal=objective.value;
+   const p={...params,growth:[...params.growth],labor:params.labor?{...params.labor,intensity:[...params.labor.intensity]}:null};
+   try{cases=sensitivityCases(p,key,step,mode)}catch(e){sensStatus.textContent=String(e.message||e);return}
+   const token=sensSerial;sensRun.disabled=true;sensStatus.textContent='Пересчёт оптимума по альтернативам…';
+   try{sensWorker=new Worker('global-plan-worker.js');sensWorker.onmessage=e=>{if(token!==sensSerial)return;if(e.data.progress){sensStatus.textContent='Проверено вариантов: '+e.data.progress.done+' из '+e.data.progress.total;return}sensWorker.terminate();sensWorker=null;sensRun.disabled=false;if(e.data.error){sensStatus.textContent='Расчёт не подтверждён: '+e.data.error;return}showSensitivity(e.data.result,p)};sensWorker.onerror=()=>{if(token!==sensSerial)return;sensWorker.terminate();sensWorker=null;sensRun.disabled=false;sensStatus.textContent='Не удалось выполнить альтернативный расчёт.'};sensWorker.postMessage({m,p,objective:goal,sensitivity:{key,step,mode}})}
+   catch(e){sensStatus.textContent='Вычислитель недоступен.';sensRun.disabled=false}
+  };
+  for(const e of [sensKey,sensMode,sensStep])e.onchange=clearSensitivity;
   const fmt=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:4}):'—';
   const table=(host,headers,rows)=>{const t=document.createElement('table'),h=t.createTHead().insertRow(),b=t.createTBody();for(const v of headers){const th=document.createElement('th');th.scope='col';th.textContent=v;h.append(th)}for(const row of rows){const tr=b.insertRow();row.forEach(v=>tr.insertCell().textContent=String(v))}host.replaceChildren(t)};
-  function clear(){serial++;if(worker){worker.terminate();worker=null}answer=null;for(const e of [results,details,comparison,chart,metrics,timeline,investmentHost])e.replaceChildren();investmentStatus.textContent='';investmentCsv.disabled=true;investmentFocus.disabled=true;investmentFocus.replaceChildren();select.replaceChildren();select.disabled=true;download.disabled=true;button.disabled=!params;status.textContent=params?'Параметры готовы. Нажмите «Рассчитать оптимум».':'Сначала задайте допустимые параметры многолетней модели.'}
+  function clear(){serial++;if(worker){worker.terminate();worker=null}answer=null;clearSensitivity();for(const e of [results,details,comparison,chart,metrics,timeline,investmentHost])e.replaceChildren();investmentStatus.textContent='';investmentCsv.disabled=true;investmentFocus.disabled=true;investmentFocus.replaceChildren();select.replaceChildren();select.disabled=true;download.disabled=true;button.disabled=!params;status.textContent=params?'Параметры готовы. Нажмите «Рассчитать оптимум».':'Сначала задайте допустимые параметры многолетней модели.'}
   function setParams(p){params=p?{...p,growth:[...p.growth]}:null;clear()}
   function detail(){if(!answer)return;const r=answer.rows.find(r=>r.year===Number(select.value));if(!r)return;table(details,['Группа продукции','Требуемый прирост','Доступный прирост','Реализуемый прирост','Инвестиции','Мощность следующего периода'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.investment,g.nextExtra].map(fmt)]))}
   function renderSchedule(){
@@ -128,6 +175,7 @@ const GlobalPlan=(()=>{
   }
   function show(r,p){
    answer=r;button.disabled=false;select.disabled=false;download.disabled=false;
+   sensKey.replaceChildren(...Object.entries(sensitivitySpecs).filter(([key])=>key!=='laborCap'||p.labor).map(([key,spec])=>new Option(spec.label+' · '+spec.unit,key)));clearSensitivity();
    status.textContent='Оптимум проверен: '+r.variables+' переменных, '+r.constraints+' ограничений; '+r.iterations+' итераций. Условные расчёты, не прогноз.';
    for(const [label,value] of [['Значение цели, млрд ₽',fmt(r.score)],['Двойственная верхняя граница, млрд ₽',fmt(r.upper)],['Абсолютный разрыв двойственности, млрд ₽',fmt(r.dualityGap)],['Допуск проверки цели, млрд ₽',fmt(r.tolerance)]]){const d=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');d.className='metric';b.textContent=value;s.textContent=label;d.append(b,s);metrics.append(d)}
    table(results,['Период','Доля спроса, %','Реализуемый конечный спрос, млрд ₽','Прирост валового выпуска, млрд ₽','Импорт, млрд ₽','Доп. человеко-лет','Инвестиции, млрд ₽','Неисп. лимит, млрд ₽','Связывающие ограничения'],r.rows.map(x=>[x.year,...[100*x.alpha,x.actualDemand,x.realized,x.imports,x.labor,x.investment,x.unusedInvestment].map(fmt),x.binding.join('; ')||'—']));
@@ -145,6 +193,6 @@ const GlobalPlan=(()=>{
   });
   objective.addEventListener('change',clear);select.addEventListener('change',detail);investmentFocus.addEventListener('change',renderSchedule);clear();return {setParams};
  }
- return {problem,solve,mount,investmentSchedule};
+ return {problem,solve,mount,investmentSchedule,sensitivityCases,sensitivity};
 })();
 if(typeof module!=='undefined')module.exports=GlobalPlan;

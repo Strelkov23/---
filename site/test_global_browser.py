@@ -51,6 +51,12 @@ with sync_playwright() as p:
             page.locator("#global-investment-csv").click()
         assert calendar.value.suggested_filename=="global-investment-calendar.csv"
         page.locator("#global-investment-focus").select_option("")
+        page.locator("#global-sens-run").click()
+        page.wait_for_function("document.querySelectorAll('#global-sens-table tbody tr').length===3",timeout=90000)
+        assert page.locator("#global-results tbody tr").count()==5
+        with page.expect_download() as sensitivity:
+            page.locator("#global-sens-csv").click()
+        assert sensitivity.value.suggested_filename=="global-plan-sensitivity.csv"
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         with page.expect_download() as download:
             page.locator("#global-csv").click()
@@ -58,6 +64,8 @@ with sync_playwright() as p:
         page.locator("#global-objective").select_option("terminal")
         assert page.locator("#global-csv").is_disabled()
         assert page.locator("#global-investment-csv").is_disabled()
+        assert page.locator("#global-sens-csv").is_disabled()
+        assert page.locator("#global-sens-table tbody tr").count()==0
         assert page.locator("#global-investment-heat tbody tr").count()==0
         page.locator("#global-run").click()
         page.wait_for_function("document.querySelector('#global-status').textContent.includes('Оптимум проверен')",timeout=60000)

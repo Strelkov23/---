@@ -35,3 +35,15 @@ assert.ok(schedule.groups.every(g=>g.values.at(-1)===0));
 assert.equal(schedule.periods.length,3);
 assert.equal(schedule.finalUnused,p.investment);
 for(const [j,t] of schedule.periods.entries())near(t.invested,schedulePlan.rows[j].investment);
+
+const sensitiv=G.sensitivity(m,p,'cumulative','investment',25,'relative');
+assert.equal(sensitiv.rows.length,3);
+near(sensitiv.rows[1].score,schedulePlan.score);
+assert.ok(sensitiv.rows.every(x=>!x.error));
+assert.ok(sensitiv.rows[0].score<=sensitiv.rows[1].score+1e-6);
+assert.ok(sensitiv.rows[2].score>=sensitiv.rows[1].score-1e-6);
+assert.equal(G.sensitivityCases({...p,investment:0},'investment',25,'relative').filter(x=>x.changed).length,0);
+assert.equal(G.sensitivityCases({...p,investment:0},'investment',5,'absolute')[2].value,5);
+assert.equal(G.sensitivityCases({...p,spare:100},'spare',25,'relative')[2].clamped,true);
+assert.equal(G.sensitivityCases(laborP,'laborCap',10,'absolute')[2].params.labor.cap,110);
+assert.throws(()=>G.sensitivityCases(p,'laborCap',10,'absolute'));
