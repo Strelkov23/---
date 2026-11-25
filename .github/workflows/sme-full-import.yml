@@ -2,7 +2,7 @@ name: FNS full SME classification
 on:
   push:
     branches: [main]
-    paths: ['site/sme_full_import.py','site/stream_archive.py','site/source_transport.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','site/sme_finance_join.py','site/test_sme_finance_join.py','site/sme_artifact.py','site/test_sme_artifact.py','.github/workflows/sme-full-import.yml']
+    paths: ['site/sme_full_import.py','site/stream_archive.py','site/source_transport.py','site/test_sme_full_import.py','site/sme_classification.py','site/test_sme_classification.py','site/sme_finance_join.py','site/test_sme_finance_join.py','site/sme_profile_index.py','site/test_sme_profile_index.py','site/sme_artifact.py','site/test_sme_artifact.py','.github/workflows/sme-full-import.yml']
   workflow_dispatch:
   schedule:
     - cron: '45 1 12,19 * *'
@@ -22,8 +22,8 @@ jobs:
           python-version: '3.12'
       - run: |
           cd site
-          python -m unittest test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py test_sme_artifact.py
-          python sme_full_import.py --output ../sme-full --financial-index ../history/published --allow-diagnostic
+          python -m unittest test_sme_profile_index.py test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py test_sme_artifact.py
+          python sme_full_import.py --output ../sme-full --financial-index ../history/published --allow-diagnostic --profile-index-optional
           python sme_artifact.py ../sme-full --financial-index ../history/published/company-index.json
       - uses: actions/upload-artifact@v4
         if: always()

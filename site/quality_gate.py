@@ -236,6 +236,11 @@ def check(out,previous,stamp):
             import sme_finance_public
             counts.update(sme_finance_public.quality(json.loads((out/"sme-finance.json").read_text()),json.loads((out/"company-index.json").read_text()),json.loads((out/"sme-matrix.json").read_text())))
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Финансы МСП: "+str(e))
+    if (out/"sme-profile-index.json").is_file():
+        try:
+            import sme_profile_public
+            counts.update(sme_profile_public.quality(out))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Индекс профилей МСП: "+str(e))
     if (out/"sme-matrix.json").is_file():
         try:
             import sme_matrix

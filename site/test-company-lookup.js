@@ -75,3 +75,19 @@ assert.equal(C.smeProfile({...sd,profiles:{rows:[]}},si,'7707083893').status,'ou
 assert.equal(C.smeProfile(sd,{...si,fingerprint:'z'},'7707083893').status,'unavailable');
 assert.equal(C.smeProfile({...sd,profiles:undefined},si,'7707083893').status,'unavailable');
 assert.throws(()=>C.smeProfile({...sd,profiles:{rows:[sd.profiles.rows[0],sd.profiles.rows[0]]}},si,'7707083893'));
+
+const pi={schema:1,status:'diagnostic',buckets:512,columns:['inn','ogrn','region','declared','dver','reported','rver','member','accepted_ordinal'],financial_year:2025,financial_fingerprint:'a'.repeat(64),sme_edition:'2026-11-10',sme_archive_sha256:'b'.repeat(64),reference_sha256:'c'.repeat(64),fingerprint:'d'.repeat(64),count:1,regions:{'77':1},members:[{filename:'a.xml',sha256:'e'.repeat(64),documents:1}],files:{}};
+const pn=C.profilePath('7707083893');
+for(let i=0;i<512;i++){const n='sme-profile-index/inn-'+String(i).padStart(3,'0')+'.json.gz';pi.files[n]={count:n===pn?1:0,bytes:20,sha256:'f'.repeat(64)}}
+const ixp={status:'ready',year:2025,fingerprint:pi.financial_fingerprint};
+const lp={status:'diagnostic',financial_year:pi.financial_year,financial_fingerprint:pi.financial_fingerprint,sme_edition:pi.sme_edition,sme_archive_sha256:pi.sme_archive_sha256,reference_sha256:pi.reference_sha256,counts:{included:1},declared:[{region:'77',matched:1}]};
+const prow=['7707083893','1027700132195','77','64.19','2014',null,null,0,1];
+assert.equal(C.profileManifest(pi,ixp,lp),pi);
+assert.equal(C.profileBlock([prow],pi,pn,prow[0]).scope,'full_diagnostic');
+assert.equal(C.profileBlock([prow],pi,pn,prow[0]).member,'a.xml');
+assert.throws(()=>C.profileManifest(pi,{...ixp,year:2024},lp));
+assert.throws(()=>C.profileManifest({...pi,count:2},ixp,lp));
+assert.throws(()=>C.profileBlock([[...prow.slice(0,8),2]],pi,pn,prow[0]));
+assert.throws(()=>C.profileBlock([[prow[0],'1027700132196',...prow.slice(2)]],pi,pn,prow[0]));
+assert.throws(()=>C.profileBlock([],pi,pn,prow[0]));
+console.log('Diagnostic SME profile index validation passed');

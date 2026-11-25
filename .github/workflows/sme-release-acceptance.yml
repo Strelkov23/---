@@ -1,0 +1,61 @@
+name: SME release artifact acceptance
+on:
+  push:
+    branches: [stage-f-sme-release-integration]
+    paths: ['.github/workflows/sme-release-acceptance.yml','site/sme_profile_public.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download exact successful diagnostic artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test "$(gh run view 45716971171 --json conclusion --jq '.conclusion')" = success
+          test "$(gh run view 45716971171 --json headSha --jq '.headSha')" = dc4eaa91057839a6cfd7ce5557898862ba3dd08d
+          gh run download 45716971171 --name sme-profile-index-diagnostic --dir /tmp/sme-verified
+      - name: Reconcile and install into disposable snapshot
+        run: |
+          cd site
+          python - <<'PY'
+          import json,tempfile,shutil
+          from pathlib import Path
+          import sme_artifact as a,sme_matrix as m,sme_finance_public as f,sme_profile_public as p
+          source=Path("/tmp/sme-verified");previous=Path("../history/published")
+          score=a.inspect(source,previous/"company-index.json")
+          assert score==("2026-11-10",6),score
+          with tempfile.TemporaryDirectory() as tmp:
+              out=Path(tmp)
+              for name in ("company-index.json","company-names.json","sme-regions.json"):
+                  shutil.copyfile(previous/name,out/name)
+              (out/"company-index").symlink_to((previous/"company-index").resolve(),target_is_directory=True)
+              ref=json.loads((out/"sme-regions.json").read_text())
+              matrix=m.compact((source/"classification.json").read_bytes(),ref)
+              (out/"sme-matrix.json").write_text(json.dumps(matrix))
+              finance=json.loads((source/"finance-join.json").read_text())
+              f.quality(finance,json.loads((out/"company-index.json").read_text()),matrix)
+              (out/"sme-finance.json").write_text(json.dumps(finance))
+              d=p.publish(out,previous,source)
+              assert d["status"]=="diagnostic",d
+              q=p.quality(out,deep=True)
+              assert q["sme_profile_records"]==1823060 and q["sme_profile_regions"]==88,q
+              print("SME_RELEASE_ACCEPTANCE",json.dumps(q,ensure_ascii=False),flush=True)
+              # An invalid candidate must never erase an accepted, compatible archived snapshot.
+              with tempfile.TemporaryDirectory() as next_tmp:
+                  dest=Path(next_tmp)
+                  for name in ("company-index.json","company-names.json","sme-matrix.json","sme-finance.json"):
+                      shutil.copyfile(out/name,dest/name)
+                  (dest/"company-index").symlink_to((previous/"company-index").resolve(),target_is_directory=True)
+                  restored=p.publish(dest,out,Path("/nonexistent"))
+                  assert restored["fingerprint"]==d["fingerprint"]
+                  print("SME_RELEASE_RESTORE_OK",flush=True)
+          PY

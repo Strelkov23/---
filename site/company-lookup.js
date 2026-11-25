@@ -126,7 +126,43 @@ const CompanyLookup=(()=>{
   }
   return nameMatches(rows,key);
  }
- return {validInn,path,row,smeProfile,rankMatches,validateBlock,lookup,parseSelection,calculate,metrics,comparisonBars,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
+
+ const profileColumns=['inn','ogrn','region','declared','dver','reported','rver','member','accepted_ordinal'];
+ function profilePath(inn){return path(inn).replace('company-index/','sme-profile-index/')}
+ function profileManifest(d,index,linked){
+  if(d?.schema!==1||d.status!=='diagnostic'||index?.status!=='ready'||linked?.status!=='diagnostic'||d.buckets!==512||JSON.stringify(d.columns)!==JSON.stringify(profileColumns)||d.financial_year!==index.year||d.financial_fingerprint!==index.fingerprint||['financial_year','financial_fingerprint','sme_edition','sme_archive_sha256','reference_sha256'].some(k=>d[k]!==linked[k]))throw Error('Несовместимые редакции индексов');
+  if(!/^[a-f0-9]{64}$/.test(d.fingerprint||'')||!Array.isArray(d.members)||!d.members.length||d.members.length>30000||!d.files||!d.regions||!Number.isSafeInteger(d.count)||d.count!==linked.counts?.included)throw Error('Некорректный паспорт профилей');
+  const regions=new Map();for(const r of linked.declared||[]){if(!Number.isSafeInteger(r.matched)||r.matched<0)throw Error('Некорректный охват');regions.set(r.region,(regions.get(r.region)||0)+r.matched)}
+  if(Object.keys(d.regions).length!==regions.size||[...regions].some(([k,v])=>d.regions[k]!==v)||[...regions.values()].reduce((a,b)=>a+b,0)!==d.count)throw Error('Региональный баланс');
+  let count=0,bytes=0;
+  if(Object.keys(d.files).length!==512)throw Error('Неполный индекс');
+  for(let i=0;i<512;i++){const e=d.files['sme-profile-index/inn-'+String(i).padStart(3,'0')+'.json.gz'];if(!e||!Number.isSafeInteger(e.count)||e.count<0||!Number.isSafeInteger(e.bytes)||e.bytes<1||e.bytes>4*1024*1024||!/^[a-f0-9]{64}$/.test(e.sha256))throw Error('Некорректный блок профилей');count+=e.count;bytes+=e.bytes}
+  if(count!==d.count||bytes>96*1024*1024)throw Error('Баланс или размер профилей');
+  const names=new Set();for(const m of d.members){if(typeof m.filename!=='string'||!m.filename.toLowerCase().endsWith('.xml')||names.has(m.filename)||!/^[a-f0-9]{64}$/.test(m.sha256)||!Number.isSafeInteger(m.documents)||m.documents<1)throw Error('Некорректный XML');names.add(m.filename)}
+  return d;
+ }
+ function profileBlock(rows,d,name,inn){
+  if(!Array.isArray(rows)||rows.length!==d.files[name].count)throw Error('Число профилей');
+  let previous='',found=null;
+  for(const r of rows){
+   if(!Array.isArray(r)||r.length!==9||!validInn(r[0])||r[0]<=previous||profilePath(r[0])!==name||typeof r[1]!=='string'||!/^\d{13}$/.test(r[1])||BigInt(r[1].slice(0,12))%11n%10n!==BigInt(r[1][12])||!Object.hasOwn(d.regions,r[2]))throw Error('Некорректный профиль');
+   previous=r[0];
+   for(const [i,j] of [[3,4],[5,6]])if((r[i]===null)!==(r[j]===null)||r[i]!==null&&(typeof r[i]!=='string'||!/^\d{2}(?:\.\d{1,2}){0,2}$/.test(r[i])||!['2001','2014'].includes(r[j])))throw Error('Некорректный ОКВЭД');
+   const m=d.members[r[7]];if(!Number.isSafeInteger(r[7])||r[7]<0||!m||!Number.isSafeInteger(r[8])||r[8]<1||r[8]>m.documents)throw Error('Некорректная координата XML');
+   if(r[0]===inn)found={...Object.fromEntries(profileColumns.map((k,i)=>[k,r[i]])),member:m.filename,sha256:m.sha256,status:'matched',edition:d.sme_edition,archive:d.sme_archive_sha256,scope:'full_diagnostic'};
+  }
+  return found||{status:'outside_verified_index',scope:'full_diagnostic'};
+ }
+ async function profileLookup(d,inn,base='',fetcher=fetch){
+  const name=profilePath(inn),e=d.files[name];
+  const response=await fetcher(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Блок профилей недоступен');
+  const bytes=await response.arrayBuffer();if(bytes.byteLength!==e.bytes||await Provenance.digest(bytes)!==e.sha256)throw Error('Контрольная сумма профилей');
+  const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();let size=0;const chunks=[];
+  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>16*1024*1024)throw Error('Превышен размер распакованного блока');chunks.push(value)}}finally{await reader.cancel()}
+  const raw=new Uint8Array(size);let offset=0;for(const chunk of chunks){raw.set(chunk,offset);offset+=chunk.byteLength}
+  return profileBlock(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)),d,name,inn);
+ }
+ return {profilePath,profileManifest,profileBlock,profileLookup,validInn,path,row,smeProfile,rankMatches,validateBlock,lookup,parseSelection,calculate,metrics,comparisonBars,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -141,6 +177,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(!full&&rank.index_error)status.textContent+=' Причина последней попытки: '+rank.index_error;
   if(!full&&rank.index_attempt)status.textContent+=' Последняя попытка восстановления индекса: '+rank.index_attempt+'.';
   const smePromise=full?Provenance.get(m,'sme-finance.json',root).then(x=>x.data).catch(()=>null):Promise.resolve(null);
+  const profilePromise=full&&Object.hasOwn(m.files,'sme-profile-index.json')?Promise.all([Provenance.get(m,'sme-profile-index.json',root),smePromise]).then(([p,l])=>p.data.status==='diagnostic'?CompanyLookup.profileManifest(p.data,index,l):null).catch(()=>({invalid:true})):Promise.resolve(null);
   button.disabled=!(full||rankReady);
   form.onsubmit=async e=>{
    e.preventDefault();const token=++serial,inn=input.value.trim();result.replaceChildren();exp.disabled=true;
@@ -163,12 +200,16 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     }
     result.append(node('h4','Финансовые и трудовые показатели'),indicators,node('p','Доходы минус расходы — не чистая прибыль. Доходы на работника — не добавленная стоимость на работника. Доля расходов рассчитывается только при положительных доходах и неотрицательных расходах. Пропуск не равен нулю.'));
     const method=node('a','Методика расчёта');method.href='methodology.html#company-compare-method';result.append(method);
-    const sme=CompanyLookup.smeProfile(await smePromise,index,inn);if(token!==serial)return;
-    result.append(node('h4','Отраслевая принадлежность: пилот реестра МСП'));
+    const profileIndex=await profilePromise;let sme;
+    if(profileIndex?.invalid)sme={status:'index_error'};
+    else if(profileIndex){try{sme=await CompanyLookup.profileLookup(profileIndex,inn,root)}catch(e){sme={status:'index_error'}}}
+    else sme=CompanyLookup.smeProfile(await smePromise,index,inn);
+    if(token!==serial)return;
+    result.append(node('h4',profileIndex?'Отраслевая принадлежность: диагностический индекс МСП':'Отраслевая принадлежность: пилот реестра МСП'));
     if(sme.status==='matched'){
      result.append(node('p','Дата среза: '+sme.edition+' · ОГРН: '+sme.ogrn+' · код региона регистрации: '+sme.region),node('p','Заявительный основной ОКВЭД: '+(sme.declared??'—')+' (редакция '+(sme.dver??'—')+')'),node('p','Отчётный основной ОКВЭД: '+(sme.reported??'—')+' (редакция '+(sme.rver??'—')+')'),node('p','XML: '+sme.member+' · номер принятой записи '+sme.accepted_ordinal+' · SHA-256: '+sme.sha256),node('p','Это сведения реестра МСП на дату среза, не подтверждение текущего статуса ЕГРЮЛ, фактической деятельности или отрасли в финансовом году.'));
-    }else result.append(node('p',({unavailable:'Пилотная классификация пока недоступна.',outside_pilot:'ИНН вне ограниченной пилотной выборки.',not_matched:'В обработанных записях МСП совпадение по ИНН не найдено.',region_excluded:'Запись найдена, но территория исключена из сверенной выборки.'})[sme.status]||'Нет подтверждённых данных.'));
-    const sm=node('a','Методика пилотной классификации');sm.href='methodology.html#company-sme-profile-method';result.append(sm);
+    }else result.append(node('p',({index_error:'Массовый индекс не прошёл проверку или блок недоступен; отрасль не определена.',outside_verified_index:'ИНН отсутствует в сверенном индексе. Это не означает отсутствия организации в реестре МСП.',unavailable:'Пилотная классификация пока недоступна.',outside_pilot:'ИНН вне ограниченной пилотной выборки.',not_matched:'В обработанных записях МСП совпадение по ИНН не найдено.',region_excluded:'Запись найдена, но территория исключена из сверенной выборки.'})[sme.status]||'Нет подтверждённых данных.'));
+    const sm=node('a','Методика отраслевой классификации');sm.href='methodology.html#company-sme-profile-method';result.append(sm);
     result.append(official);
     const labels={income:'Доходы',expense:'Расходы',employment:'Численность'};
     const ranks=Object.entries(ranking.matches);
