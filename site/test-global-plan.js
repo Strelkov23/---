@@ -27,3 +27,11 @@ const fixtures=cases.map(([m,p,o])=>{
  return {A:z.A,b:z.b,c:z.c,objective:r.primal/z.objectiveScale,scale:z.objectiveScale,mode:o,periods:p.years,groups:m.names.length,score:r.score,iterations:r.iterations};
 });
 if(process.argv.includes('--reference'))process.stdout.write(JSON.stringify(fixtures));else console.log('Global plan: '+fixtures.length+' checked LPs, including 19 groups / 15 periods; '+fixtures.map(x=>x.iterations).join(', ')+' iterations');
+
+const schedulePlan=G.solve(m,p,'cumulative'),schedule=G.investmentSchedule(schedulePlan);
+near(schedule.total,schedulePlan.rows.reduce((s,x)=>s+x.investment,0));
+near(schedule.unused,schedulePlan.rows.slice(0,-1).reduce((s,x)=>s+x.unusedInvestment,0));
+assert.ok(schedule.groups.every(g=>g.values.at(-1)===0));
+assert.equal(schedule.periods.length,3);
+assert.equal(schedule.finalUnused,p.investment);
+for(const [j,t] of schedule.periods.entries())near(t.invested,schedulePlan.rows[j].investment);

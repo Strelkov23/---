@@ -72,14 +72,60 @@ const GlobalPlan=(()=>{
   variants.push({id:'global',label:'Оптимизация всего горизонта',score,terminal:rows.at(-1).actualDemand,investment:sum(rows.map(r=>r.investment)),fractions:rows.map(r=>r.alpha)});
   return {objective,rows,score,upper,primal,dualityGap:lp.gap*z.objectiveScale,normalizedGap:lp.gap,iterations:lp.iterations,variables:z.c.length,constraints:z.b.length,maxViolation,tolerance,variants};
  }
+ // Summarize the already verified solution, without changing the LP.
+ function investmentSchedule(result){
+  const rows=result.rows;
+  const names=rows[0]?.groups.map(g=>g.name)||[];
+  if(rows.some(r=>r.groups.length!==names.length||r.groups.some((g,i)=>g.name!==names[i]||!finite(g.investment)||g.investment<0)))throw Error('Invalid investment schedule');
+  const groups=names.map((name,i)=>({i,name,values:rows.map(r=>r.groups[i].investment),total:sum(rows.map(r=>r.groups[i].investment))})).sort((a,b)=>b.total-a.total||a.i-b.i);
+  const total=sum(groups.map(g=>g.total));
+  const periods=rows.map((r,j)=>({year:r.year,invested:sum(groups.map(g=>g.values[j])),unused:r.unusedInvestment,alpha:r.alpha,binding:r.binding}));
+  return {groups,periods,total,unused:sum(periods.slice(0,-1).map(r=>r.unused)),finalUnused:periods.at(-1)?.unused??0,max:Math.max(0,...groups.flatMap(g=>g.values))};
+ }
  function mount(m){
   const $=id=>document.getElementById(id),button=$('global-run'),status=$('global-status'),results=$('global-results'),details=$('global-detail'),comparison=$('global-comparison'),chart=$('global-chart'),metrics=$('global-metrics'),select=$('global-period'),download=$('global-csv'),objective=$('global-objective');
+  const timeline=$('global-timeline'),investmentHost=$('global-investment-heat'),investmentStatus=$('global-investment-status'),investmentCsv=$('global-investment-csv'),investmentFocus=$('global-investment-focus');
   let params=null,worker=null,answer=null,serial=0;
   const fmt=v=>Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:4}):'—';
   const table=(host,headers,rows)=>{const t=document.createElement('table'),h=t.createTHead().insertRow(),b=t.createTBody();for(const v of headers){const th=document.createElement('th');th.scope='col';th.textContent=v;h.append(th)}for(const row of rows){const tr=b.insertRow();row.forEach(v=>tr.insertCell().textContent=String(v))}host.replaceChildren(t)};
-  function clear(){serial++;if(worker){worker.terminate();worker=null}answer=null;for(const e of [results,details,comparison,chart,metrics])e.replaceChildren();select.replaceChildren();select.disabled=true;download.disabled=true;button.disabled=!params;status.textContent=params?'Параметры готовы. Нажмите «Рассчитать оптимум».':'Сначала задайте допустимые параметры многолетней модели.'}
+  function clear(){serial++;if(worker){worker.terminate();worker=null}answer=null;for(const e of [results,details,comparison,chart,metrics,timeline,investmentHost])e.replaceChildren();investmentStatus.textContent='';investmentCsv.disabled=true;investmentFocus.disabled=true;investmentFocus.replaceChildren();select.replaceChildren();select.disabled=true;download.disabled=true;button.disabled=!params;status.textContent=params?'Параметры готовы. Нажмите «Рассчитать оптимум».':'Сначала задайте допустимые параметры многолетней модели.'}
   function setParams(p){params=p?{...p,growth:[...p.growth]}:null;clear()}
   function detail(){if(!answer)return;const r=answer.rows.find(r=>r.year===Number(select.value));if(!r)return;table(details,['Группа продукции','Требуемый прирост','Доступный прирост','Реализуемый прирост','Инвестиции','Мощность следующего периода'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.investment,g.nextExtra].map(fmt)]))}
+  function renderSchedule(){
+   investmentHost.replaceChildren();investmentCsv.disabled=true;
+   if(!answer)return;
+   const d=investmentSchedule(answer),chosen=investmentFocus.value,groups=chosen===''?d.groups:d.groups.filter(g=>String(g.i)===chosen);
+   investmentStatus.textContent='Инвестиции до последнего выпуска: '+fmt(d.total)+' млрд ₽ · неиспользованный лимит до последнего выпуска: '+fmt(d.unused)+' млрд ₽. Последний период: инвестиции равны нулю по постановке задачи; его лимит не включён в показатель неиспользованных средств.';
+   const t=document.createElement('table'),h=t.createTHead().insertRow(),body=t.createTBody();
+   const th=label=>{const e=document.createElement('th');e.scope='col';e.textContent=label;h.append(e)};
+   th('Группа');for(const r of d.periods)th('Период '+r.year);th('Всего, млрд ₽');
+   for(const g of groups){const tr=body.insertRow(),name=document.createElement('th');name.scope='row';name.textContent=g.name;tr.append(name);
+    for(const v of g.values){const cell=tr.insertCell();cell.textContent=fmt(v);cell.dataset.planBand=v===0?'0':String(1+Math.min(4,Math.floor(5*v/d.max)));cell.title='Инвестиции, млрд ₽: '+fmt(v)}
+    tr.insertCell().textContent=fmt(g.total);
+   }
+   for(const [label,values,total] of [['Всего инвестировано',d.periods.map(r=>r.invested),d.total],['Неиспользованный лимит',d.periods.map((r,i)=>i===d.periods.length-1?null:r.unused),d.unused]]){
+    const tr=body.insertRow(),name=document.createElement('th');name.scope='row';name.textContent=label;tr.append(name);for(const v of [...values,total])tr.insertCell().textContent=fmt(v);
+   }
+   investmentHost.append(t);
+   investmentCsv.disabled=false;investmentCsv.onclick=()=>csv('global-investment-calendar.csv',[['Период','Группа','Инвестиции, млрд руб.','Всего по группе, млрд руб.','Инвестиции периода, млрд руб.','Неиспользованный лимит до последнего выпуска, млрд руб.','Доля реализуемого спроса','Связывающие ограничения','Цель','База','Источник'],...groups.flatMap(g=>d.periods.map((r,i)=>[r.year,g.name,g.values[i],g.total,r.invested,i===d.periods.length-1?null:r.unused,r.alpha,r.binding.join('; '),answer.objective,'2021','https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx']))]);
+  }
+  function renderTimeline(r){
+   timeline.replaceChildren();
+   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),w=900,h=320;svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('width',w);svg.setAttribute('role','img');svg.setAttribute('aria-label','Доля реализуемого спроса по периодам и стратегиям');
+   const add=(tag,attrs,text,parent=svg)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;parent.append(e);return e};
+   const colors=['#327b97','#ad7845','#8568a5','#006c69'],X=i=>70+775*i/Math.max(1,r.rows.length-1),Y=v=>245-200*v;
+   add('rect',{width:w,height:h,fill:'#fff'});add('text',{x:15,y:24,'font-size':16,'font-weight':'bold',fill:'#173e52'},'Реализуемая доля дополнительного спроса, %');
+   for(const v of [0,.25,.5,.75,1]){add('line',{x1:70,x2:845,y1:Y(v),y2:Y(v),stroke:'#d5e0e2'});add('text',{x:60,y:Y(v)+4,'text-anchor':'end','font-size':12,fill:'#405960'},100*v+'%')}
+   for(const [i,row] of r.rows.entries())add('text',{x:X(i),y:267,'text-anchor':'middle','font-size':11,fill:'#405960'},row.year);
+   for(const [j,v] of r.variants.entries()){
+    const color=colors[j%colors.length];add('polyline',{points:v.fractions.map((a,i)=>X(i)+','+Y(a)).join(' '),fill:'none',stroke:color,'stroke-width':v.id==='global'?3:2,'stroke-dasharray':v.id==='global'?'none':'6 3'});
+    for(const [i,a] of v.fractions.entries()){const point=add('circle',{cx:X(i),cy:Y(a),r:3,fill:color});add('title',{},v.label+' · период '+r.rows[i].year+' · '+fmt(a*100)+'%',point)}
+   }
+   add('text',{x:70,y:290,'font-size':12,fill:'#405960'},'Условные периоды, не календарные годы.');
+   timeline.append(svg);const legend=document.createElement('div');legend.className='global-timeline-legend';
+   for(const [j,v] of r.variants.entries()){const item=document.createElement('span'),key=document.createElement('b');key.style.background=colors[j%colors.length];item.append(key,document.createTextNode(v.label));legend.append(item)}
+   timeline.append(legend);
+  }
   function show(r,p){
    answer=r;button.disabled=false;select.disabled=false;download.disabled=false;
    status.textContent='Оптимум проверен: '+r.variables+' переменных, '+r.constraints+' ограничений; '+r.iterations+' итераций. Условные расчёты, не прогноз.';
@@ -87,6 +133,7 @@ const GlobalPlan=(()=>{
    table(results,['Период','Доля спроса, %','Реализуемый конечный спрос, млрд ₽','Прирост валового выпуска, млрд ₽','Импорт, млрд ₽','Доп. человеко-лет','Инвестиции, млрд ₽','Неисп. лимит, млрд ₽','Связывающие ограничения'],r.rows.map(x=>[x.year,...[100*x.alpha,x.actualDemand,x.realized,x.imports,x.labor,x.investment,x.unusedInvestment].map(fmt),x.binding.join('; ')||'—']));
    table(comparison,['Стратегия','Значение выбранной цели, млрд ₽','Спрос в последнем периоде, млрд ₽','Инвестиции до последнего выпуска, млрд ₽'],r.variants.map(v=>[v.label,...[v.score,v.terminal,v.investment].map(fmt)]));
    select.replaceChildren(...r.rows.map(x=>new Option('Период '+x.year,String(x.year))));select.value=String(r.rows.at(-1).year);detail();
+   investmentFocus.replaceChildren(new Option('Все группы',''),...m.names.map((n,i)=>new Option(n,String(i))));investmentFocus.disabled=false;renderSchedule();renderTimeline(r);
    for(const v of r.variants){const d=document.createElement('div'),text=document.createElement('p'),track=document.createElement('div'),fill=document.createElement('div');d.className='dyn-bars';text.textContent=v.label+': '+fmt(v.score)+' млрд ₽';track.className='budget-bar-track';fill.className='budget-bar-fill';fill.style.width=(r.score>0?Math.min(100,v.score/r.score*100):0)+'%';track.append(fill);d.append(text,track);chart.append(d)}
    if(typeof chartTools==='function')chartTools(chart,'Доля реализуемого спроса по стратегиям','%',r.rows.map(x=>x.year),r.variants.map(v=>({name:v.label,code:v.id,values:v.fractions.map(a=>a*100)})),{periodLabel:'Условный период',territory:'Россия · условные периоды от базы 2021',source:'Росстат, баланс 2021; условные параметры, не прогноз',url:'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'});
    download.onclick=()=>csv('global-investment-plan.csv',[['Модель','Условный баланс 2021, млрд руб.'],['Цель',r.objective],['Версия',typeof version!=='undefined'?version:''],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['Значение цели',r.score],['Двойственная граница',r.upper],['Разрыв двойственности',r.dualityGap],['Допуск цели',r.tolerance],['Макс. нарушение денежных ограничений, млрд руб.',r.maxViolation],['Период','Доля спроса','Импорт, млрд руб.','Доп. человеко-лет','Инвестиции, млрд руб.'],...r.rows.map(x=>[x.year,x.alpha,x.imports,x.labor,x.investment]),['Период','Группа','Требуемый прирост','Доступный прирост','Реализуемый прирост','Инвестиции','Доп. мощность','Мощность следующего периода'],...r.rows.flatMap(x=>x.groups.map(g=>[x.year,g.name,g.required,g.available,g.realized,g.investment,g.extra,g.nextExtra])),['Стратегия','Цель','Спрос в последнем периоде','Инвестиции до последнего выпуска'],...r.variants.map(v=>[v.label,v.score,v.terminal,v.investment])]);
@@ -96,8 +143,8 @@ const GlobalPlan=(()=>{
    try{worker=new Worker('global-plan-worker.js');worker.onmessage=e=>{if(token!==serial)return;worker.terminate();worker=null;if(e.data.error){status.textContent='Оптимум не подтверждён: '+e.data.error;button.disabled=false;return}show(e.data.result,p)};worker.onerror=()=>{if(token!==serial)return;worker.terminate();worker=null;status.textContent='Не удалось выполнить расчёт. Проверьте доступность скрипта и параметры.';button.disabled=false};worker.postMessage({m,p,objective:goal})}
    catch(e){status.textContent='В этом браузере не удалось запустить фоновый вычислитель.';button.disabled=false}
   });
-  objective.addEventListener('change',clear);select.addEventListener('change',detail);clear();return {setParams};
+  objective.addEventListener('change',clear);select.addEventListener('change',detail);investmentFocus.addEventListener('change',renderSchedule);clear();return {setParams};
  }
- return {problem,solve,mount};
+ return {problem,solve,mount,investmentSchedule};
 })();
 if(typeof module!=='undefined')module.exports=GlobalPlan;
