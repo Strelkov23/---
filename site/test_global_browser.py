@@ -1221,12 +1221,26 @@ with sync_playwright() as p:
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/project-coverage.html",wait_until="load")
         coverage=json.loads(Path("project-coverage.json").read_text())
-        assert page.locator("#project-coverage-cards article").count()==len(coverage["rows"])==3
-        assert page.locator("#project-coverage-rows tr").count()==3
+        sources=coverage["rows"]+coverage.get("nao_registers",[])
+        assert len(coverage["rows"])==3
+        assert len(coverage.get("nao_registers",[])) in (0,3)
+        assert page.locator("#project-coverage-cards article").count()==len(sources)
+        assert page.locator("#project-coverage-rows tr").count()==len(sources)
         assert page.locator("[data-project-breakdown]").count()==len(coverage["breakdown"])
         page.wait_for_function("document.querySelector('#project-search-status').textContent.startsWith('Записи источников:')",timeout=45000)
-        count=sum(r["records"] or 0 for r in coverage["rows"])
+        count=sum(r["records"] or 0 for r in sources)
         assert page.locator("#project-search-table tbody tr").count()==min(count,40)
+        if coverage.get("nao_registers"):
+            page.locator("#project-search-region").select_option("RU-NEN")
+            assert page.locator("#project-search-table tbody tr").count()==min(40,sum(r["records"] or 0 for r in coverage["nao_registers"]))
+            assert page.locator("#project-search-totals-export").is_disabled()
+            for ref in coverage["nao_registers"]:
+                page.locator("#project-search-region").select_option(ref["key"])
+                assert page.locator("#project-search-table tbody tr").count()==min(40,ref["records"] or 0)
+                if ref["records"]:
+                    assert page.locator("#project-search-totals-export").is_enabled()
+                else:
+                    assert page.locator("#project-search-totals-export").is_disabled()
         page.locator("#project-search-region").select_option("RU-BU")
         page.locator("#project-search-numeric").select_option("both")
         if page.locator("#project-search-export").is_enabled():
