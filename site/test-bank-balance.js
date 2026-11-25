@@ -1,3 +1,21 @@
 const assert=require('node:assert/strict'),B=require('./bank-balance.js');
 assert.deepEqual(B.compare([{registration_number:'1',current:{assets:null}},{registration_number:'2',current:{assets:'0'}},{registration_number:'3',current:{assets:'9007199254740993'}}],'assets').map(r=>r.registration_number),['3','2','1']);
 assert.equal(B.share('25','100'),25);assert.equal(B.share(null,'100'),null);assert.equal(B.share('1','0'),null);
+
+const sp=B.specs[0];
+assert.equal(B.ratio({equity:'1',assets:'3'},sp),'3333');
+assert.equal(B.ratio({equity:'-1',assets:'3'},sp),'-3333');
+assert.equal(B.ratio({equity:'0',assets:'3'},sp),'0');
+assert.equal(B.ratio({equity:'1',assets:'0'},sp),null);
+assert.equal(B.ratio({equity:null,assets:'3'},sp),null);
+assert.equal(B.ratio({loans:'-1',assets:'3'},B.specs[1]),null);
+assert.equal(B.ratio({equity:'9007199254740993',assets:'9007199254740993'},sp),'10000');
+assert.equal(B.percent('-1'),'−0,01');
+assert.equal(B.percent(null),'—');
+const d={cohort:['1','2'],rows:[{registration_number:'1',current:{equity:'1',assets:'4'},prior:{equity:'1',assets:'2'}},{registration_number:'2',current:{equity:null,assets:'4'},prior:{}},{registration_number:'3',current:{equity:'2',assets:'4'},prior:{}}]};
+const r=B.ratios(d,'equity_assets','active');
+assert.equal(r.eligible,1);assert.equal(r.paired,1);assert.equal(r.rows[0].delta,'-2500');
+assert.equal(r.rows[1].value,null);
+assert.equal(B.ratios(d,'equity_assets','system',['3']).eligible,1);
+assert.deepEqual(B.ratios(d,'equity_assets').rows.map(x=>x.registration_number),['3','1','2']);
+assert.throws(()=>B.ratios(d,'unknown'));
