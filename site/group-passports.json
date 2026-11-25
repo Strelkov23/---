@@ -4023,6 +4023,919 @@
           ]
         }
       ]
+    },
+    {
+      "id": "novatek",
+      "name": "НОВАТЭК",
+      "sector": "Нефтегазовая промышленность",
+      "role": "Разведка, добыча, переработка и реализация углеводородов.",
+      "source": "https://www.novatek.ru/common/upload/doc/Novatek_FS_12m2025_RUS.pdf",
+      "section": "Раскрываемая консолидированная финансовая отчетность за 2025 год, с. 7–10; примечание 2, принципы подготовки",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Аудиторское мнение относится к раскрываемой отчетности на основе МСФО с исключением чувствительной информации, а не к полному комплекту МСФО. Отрицательные расходы и оттоки сохранены со знаком отчета. Не включено в автоматическое рублевое сравнение.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка от реализации",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1545851"
+            },
+            {
+              "year": 2025,
+              "value": "1445593"
+            }
+          ]
+        },
+        {
+          "id": "hydrocarbon_revenue",
+          "label": "Выручка от углеводородов",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1502416"
+            },
+            {
+              "year": 2025,
+              "value": "1402293"
+            }
+          ]
+        },
+        {
+          "id": "other_revenue",
+          "label": "Прочая выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "43435"
+            },
+            {
+              "year": 2025,
+              "value": "43300"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "324782"
+            },
+            {
+              "year": 2025,
+              "value": "280957"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль до налога",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "573294"
+            },
+            {
+              "year": 2025,
+              "value": "239154"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль группы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "500211"
+            },
+            {
+              "year": 2025,
+              "value": "186033"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров материнской компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "493491"
+            },
+            {
+              "year": 2025,
+              "value": "183027"
+            }
+          ]
+        },
+        {
+          "id": "profit_noncontrolling",
+          "label": "Прибыль неконтролирующих акционеров",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "6720"
+            },
+            {
+              "year": 2025,
+              "value": "3006"
+            }
+          ]
+        },
+        {
+          "id": "income_tax",
+          "label": "Расходы по налогу на прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-73083"
+            },
+            {
+              "year": 2025,
+              "value": "-53121"
+            }
+          ]
+        },
+        {
+          "id": "taxes_other",
+          "label": "Налоги кроме налога на прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-222471"
+            },
+            {
+              "year": 2025,
+              "value": "-194478"
+            }
+          ]
+        },
+        {
+          "id": "depreciation",
+          "label": "Износ, истощение и амортизация",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-91429"
+            },
+            {
+              "year": 2025,
+              "value": "-107183"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3740785"
+            },
+            {
+              "year": 2025,
+              "value": "3589106"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2848001"
+            },
+            {
+              "year": 2025,
+              "value": "2842305"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "892784"
+            },
+            {
+              "year": 2025,
+              "value": "746801"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1274406"
+            },
+            {
+              "year": 2025,
+              "value": "1257823"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Текущие активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "635128"
+            },
+            {
+              "year": 2025,
+              "value": "770433"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_assets",
+          "label": "Долгосрочные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3105657"
+            },
+            {
+              "year": 2025,
+              "value": "2818673"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Текущие обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "495084"
+            },
+            {
+              "year": 2025,
+              "value": "423192"
+            }
+          ]
+        },
+        {
+          "id": "noncurrent_liabilities",
+          "label": "Долгосрочные обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "397700"
+            },
+            {
+              "year": 2025,
+              "value": "323609"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "178436"
+            },
+            {
+              "year": 2025,
+              "value": "337925"
+            }
+          ]
+        },
+        {
+          "id": "borrowings_noncurrent",
+          "label": "Долгосрочные заемные средства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "210274"
+            },
+            {
+              "year": 2025,
+              "value": "216915"
+            }
+          ]
+        },
+        {
+          "id": "borrowings_current",
+          "label": "Текущая часть долгосрочных заемных средств",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "109769"
+            },
+            {
+              "year": 2025,
+              "value": "81740"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый операционный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "357142"
+            },
+            {
+              "year": 2025,
+              "value": "503328"
+            }
+          ]
+        },
+        {
+          "id": "investment_cash_flow",
+          "label": "Чистый инвестиционный денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-260700"
+            },
+            {
+              "year": 2025,
+              "value": "-128871"
+            }
+          ]
+        },
+        {
+          "id": "financing_cash_flow",
+          "label": "Чистый финансовый денежный поток",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-76064"
+            },
+            {
+              "year": 2025,
+              "value": "-195920"
+            }
+          ]
+        },
+        {
+          "id": "cash_opening",
+          "label": "Денежные средства и эквиваленты на начало периода",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "157661"
+            },
+            {
+              "year": 2025,
+              "value": "178436"
+            }
+          ]
+        },
+        {
+          "id": "cash_fx",
+          "label": "Влияние курсов валют на денежные средства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "397"
+            },
+            {
+              "year": 2025,
+              "value": "-19048"
+            }
+          ]
+        },
+        {
+          "id": "cash_change",
+          "label": "Изменение денежных средств, нетто",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "20775"
+            },
+            {
+              "year": 2025,
+              "value": "159489"
+            }
+          ]
+        },
+        {
+          "id": "other_comprehensive_income",
+          "label": "Прочий совокупный доход",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-12306"
+            },
+            {
+              "year": 2025,
+              "value": "21584"
+            }
+          ]
+        },
+        {
+          "id": "comprehensive_income",
+          "label": "Совокупный доход",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "487905"
+            },
+            {
+              "year": 2025,
+              "value": "207617"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "polyus",
+      "name": "Полюс",
+      "sector": "Золотодобыча",
+      "role": "Добыча и переработка золотосодержащей руды, производство золота.",
+      "source": "https://www.polyus.com/upload/iblock/191/2026_03_16_press_reliz-2025-_tu_mda_rus.pdf",
+      "section": "Производственные и финансовые результаты за 2025 год, с. 5, 29",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Годовой релиз с натуральными и финансовыми показателями; денежные данные в млн долл. США, TCC/AISC в долл. на унцию, показатели альтернативной эффективности по определениям эмитента. Производство и реализация 2025 г. не включают 16,5 тыс. унций россыпного золота, капитализированных в отчетности. Показатели отдельных активов округлены, не суммируются как независимые группы. Не включено в автоматическое рублевое сравнение.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "7343"
+            },
+            {
+              "year": 2025,
+              "value": "8723"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Операционная прибыль",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "4743"
+            },
+            {
+              "year": 2025,
+              "value": "5133"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за период",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3214"
+            },
+            {
+              "year": 2025,
+              "value": "3789"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_profit",
+          "label": "Скорректированная чистая прибыль",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3408"
+            },
+            {
+              "year": 2025,
+              "value": "3307"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_ebitda",
+          "label": "Скорректированная EBITDA от продолжающейся деятельности",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "5677"
+            },
+            {
+              "year": 2025,
+              "value": "6347"
+            }
+          ]
+        },
+        {
+          "id": "capex",
+          "label": "Капитальные затраты",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1257"
+            },
+            {
+              "year": 2025,
+              "value": "2180"
+            }
+          ]
+        },
+        {
+          "id": "stripping_capex",
+          "label": "Капитальные затраты по вскрышным работам",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "368"
+            },
+            {
+              "year": 2025,
+              "value": "725"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1577"
+            },
+            {
+              "year": 2025,
+              "value": "1778"
+            }
+          ]
+        },
+        {
+          "id": "bank_deposits",
+          "label": "Банковские депозиты",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "932"
+            },
+            {
+              "year": 2025,
+              "value": "1210"
+            }
+          ]
+        },
+        {
+          "id": "net_debt_derivatives",
+          "label": "Чистый долг с учетом деривативов",
+          "unit": "млн долл. США",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "6233"
+            },
+            {
+              "year": 2025,
+              "value": "7099"
+            }
+          ]
+        },
+        {
+          "id": "adjusted_profit_margin",
+          "label": "Рентабельность по скорректированной чистой прибыли",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "46"
+            },
+            {
+              "year": 2025,
+              "value": "38"
+            }
+          ]
+        },
+        {
+          "id": "recovery",
+          "label": "Коэффициент извлечения золота",
+          "unit": "%",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "84.2"
+            },
+            {
+              "year": 2025,
+              "value": "84.6"
+            }
+          ]
+        },
+        {
+          "id": "net_debt_ebitda",
+          "label": "Чистый долг с деривативами / скорректированная EBITDA",
+          "unit": "раз",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1.1"
+            },
+            {
+              "year": 2025,
+              "value": "1.1"
+            }
+          ]
+        },
+        {
+          "id": "gold_output",
+          "label": "Общее производство золота",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3001.6"
+            },
+            {
+              "year": 2025,
+              "value": "2528.8"
+            }
+          ]
+        },
+        {
+          "id": "gold_sales",
+          "label": "Реализация золота",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "3107"
+            },
+            {
+              "year": 2025,
+              "value": "2535"
+            }
+          ]
+        },
+        {
+          "id": "refined_gold",
+          "label": "Производство аффинированного золота",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2790.6"
+            },
+            {
+              "year": 2025,
+              "value": "2529.3"
+            }
+          ]
+        },
+        {
+          "id": "dore_gold",
+          "label": "Производство лигатурного золота",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "2935.8"
+            },
+            {
+              "year": 2025,
+              "value": "2557.6"
+            }
+          ]
+        },
+        {
+          "id": "olimpiada_gold",
+          "label": "Аффинированное золото Олимпиады",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1265.7"
+            },
+            {
+              "year": 2025,
+              "value": "926.5"
+            }
+          ]
+        },
+        {
+          "id": "blagodatnoye_gold",
+          "label": "Аффинированное золото Благодатного",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "500.3"
+            },
+            {
+              "year": 2025,
+              "value": "434"
+            }
+          ]
+        },
+        {
+          "id": "natalka_gold",
+          "label": "Аффинированное золото Наталки",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "455.6"
+            },
+            {
+              "year": 2025,
+              "value": "567.4"
+            }
+          ]
+        },
+        {
+          "id": "verninskoye_gold",
+          "label": "Аффинированное золото Вернинского (включая опытную переработку Сухого Лога)",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "242.2"
+            },
+            {
+              "year": 2025,
+              "value": "271.7"
+            }
+          ]
+        },
+        {
+          "id": "kuranakh_gold",
+          "label": "Аффинированное золото Куранаха",
+          "unit": "тыс. тройских унций",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "326.8"
+            },
+            {
+              "year": 2025,
+              "value": "329.7"
+            }
+          ]
+        },
+        {
+          "id": "ore_mined",
+          "label": "Добыча руды",
+          "unit": "тыс. т",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "98026"
+            },
+            {
+              "year": 2025,
+              "value": "79381"
+            }
+          ]
+        },
+        {
+          "id": "ore_processed",
+          "label": "Переработка руды",
+          "unit": "тыс. т",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "50527"
+            },
+            {
+              "year": 2025,
+              "value": "52626"
+            }
+          ]
+        },
+        {
+          "id": "rock_mass",
+          "label": "Объем горной массы",
+          "unit": "тыс. м³",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "183549"
+            },
+            {
+              "year": 2025,
+              "value": "223269"
+            }
+          ]
+        },
+        {
+          "id": "stripping_volume",
+          "label": "Объем вскрыши",
+          "unit": "тыс. м³",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "144677"
+            },
+            {
+              "year": 2025,
+              "value": "189465"
+            }
+          ]
+        },
+        {
+          "id": "stripping_ratio",
+          "label": "Коэффициент вскрыши",
+          "unit": "м³/т",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1.5"
+            },
+            {
+              "year": 2025,
+              "value": "2.4"
+            }
+          ]
+        },
+        {
+          "id": "tcc",
+          "label": "Общие денежные затраты TCC",
+          "unit": "долл. США/унция",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "383"
+            },
+            {
+              "year": 2025,
+              "value": "739"
+            }
+          ]
+        },
+        {
+          "id": "aisc",
+          "label": "Затраты на производство и поддержание AISC",
+          "unit": "долл. США/унция",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "767"
+            },
+            {
+              "year": 2025,
+              "value": "1437"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
