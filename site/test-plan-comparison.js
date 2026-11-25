@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),R=require('./plan-register.js'),C=require('./plan-comparison.js');
+const row={dataset:'wdi',series:'X',title:'Тест',territory:'Россия',frequency:'annual',unit:'%',kind:'fact',source:'https://example.org/x'};
+const groups=R.facts({schema:1,rows:[{...row,period:'2021',value:'10'},{...row,period:'2022',value:'12'},{...row,period:'2023',value:'0'}]});
+const s=[...groups.values()][0],meta={id:'a',created:'2026-11-26T00:00:00Z',sha256:'a'.repeat(64),manifest:'b'.repeat(64)},p={name:'План',note:'Гипотеза',baseYear:2021,endYear:2024,endValue:16,direction:'higher'};
+const a=R.create(s,p,meta),b=R.create(s,{...p,endValue:19,parent:'a'},{...meta,id:'b'});
+let r=C.compare(a,b,groups);assert.equal(r.summary.known,2);assert.equal(r.summary.missing,1);assert.equal(r.summary.metA,1);assert.equal(r.summary.metB,0);assert.equal(r.summary.meanA,7);assert.equal(r.summary.meanB,8.5);assert.equal(r.summary.stricterB,3);assert.equal(r.sameBase,true);
+r=C.compare(a,b,new Map());assert.equal(r.summary.meanA,null);assert.equal(r.summary.known,0);
+const c=R.create(s,{...p,baseYear:2023,endYear:2025,endValue:5},{...meta,id:'c'});r=C.compare(a,c,groups);assert.equal(r.rows.length,1);assert.equal(r.sameBase,false);assert.equal(r.summary.known,0);
+assert.throws(()=>C.compare(a,a,groups));assert.throws(()=>C.compare(a,{...b,direction:'lower'},groups));
+console.log('Plan comparison: common period, same facts, adverse gaps, stricter goals and missing facts OK');

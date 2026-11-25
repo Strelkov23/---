@@ -165,6 +165,16 @@ with sync_playwright() as p:
             plan_rows=list(csv.reader(f,delimiter=";"))
         assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
+        page.goto("http://localhost:8765/plan-comparison.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pc-results tbody tr').length===2",timeout=45000)
+        assert page.locator("#pc-summary tbody tr").count()==4
+        assert page.locator("#pc-chart svg").count()==1
+        with page.expect_download() as comparison:
+            page.locator("#pc-export").click()
+        with open(comparison.value.path(),encoding="utf-8-sig",newline="") as f:
+            comparison_rows=list(csv.reader(f,delimiter=";"))
+        assert len(comparison_rows)==3 and len({len(r) for r in comparison_rows})==1
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/deviation-monitor.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#dm-series option').length>=3",timeout=45000)
         page.locator("#dm-series").select_option("0")
