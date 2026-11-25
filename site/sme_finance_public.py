@@ -18,6 +18,8 @@ def quality(d,index=None,matrix=None):
     if set(c)-set(keys) or any(type(v) is not int or v<0 for v in c.values()):raise ValueError("Счётчики")
     a,b,n,i,e=(c.get(k,0) for k in keys)
     if a!=index["count"] or a!=b+n or b!=i+e:raise ValueError("Баланс охвата")
+    version=d.get("paired_sums_version")
+    if version is not None and (type(version) is not int or version!=1):raise ValueError("Версия парных сумм")
     total=0
     for kind in ("declared","reported"):
         expected={(x["region"],x["class"]):x["count"] for x in matrix[kind]}
@@ -36,6 +38,14 @@ def quality(d,index=None,matrix=None):
             for p,l,r in (("paired_money","income","expense"),("income_workers_pair","income","workers")):
                 z=x[p];l=x[l+"_observations"];r=x[r+"_observations"]
                 if type(z) is not int or not max(0,l+r-v)<=z<=min(l,r):raise ValueError("Пересечение")
+            if version==1:
+                for count,fields in (("paired_money",("paired_income_sum","paired_expense_sum")),("income_workers_pair",("worker_pair_income_sum","worker_pair_workers_sum"))):
+                    for field in fields:
+                        val=x[field]
+                        if (val is None)!=(x[count]==0) or val is not None and (not isinstance(val,str) or not re.fullmatch(r"-?\d+",val)):raise ValueError("Парная сумма")
+                if x["worker_pair_workers_sum"] is not None and not 0<=int(x["worker_pair_workers_sum"])<=int(x["workers_sum"]):raise ValueError("Парная численность")
+                for count,field,metric in (("paired_money","paired_income_sum","income"),("paired_money","paired_expense_sum","expense"),("income_workers_pair","worker_pair_income_sum","income"),("income_workers_pair","worker_pair_workers_sum","workers")):
+                    if x[count]==x[metric+"_observations"] and x[field]!=x[metric+"_sum"]:raise ValueError("Полное пересечение не совпадает с суммой")
         if seen!=set(expected) or matched!=i:raise ValueError("Баланс ячеек")
         total+=len(seen)
     if "profiles" in d:
