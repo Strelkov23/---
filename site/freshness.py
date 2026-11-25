@@ -46,18 +46,30 @@ def historical_latest(record,series):
     urls.discard(None);urls.discard("")
     return latest(x.get("last") for x in series if x.get("source") in urls)
 
+def bank_progress(data,capital=False):
+    """Check timestamps are not successful import dates; only successful attempts count."""
+    rows=data.get("rows",[])
+    target=set(data.get("target_cohort" if capital else "cohort",[]))
+    verified={r["registration_number"] for r in rows if not capital or r.get("verification")=="html"}
+    attempts=data.get("attempts",{})
+    success=max((dt(v.get("checked")) for reg,v in attempts.items() if reg in verified and v.get("error") is None and dt(v.get("checked"))),default=None)
+    checked=iso(max((v for v in (dt(data.get("checked")),dt(data.get("last_attempt")),*(dt(a.get("checked")) for a in attempts.values())) if v is not None),default=None))
+    n=len(target&verified)
+    current="waiting" if not checked and not rows else "unavailable" if not rows else "partial" if not target or n<len(target) else "ok"
+    return dict(checked=checked,success=iso(success),state=current,status="Проверено в целевом перечне: "+(str(n)+" из "+str(len(target)) if target else "перечень не подтверждён")+". Дата последнего успеха только по протоколу попыток.")
+
 def collect(out,stamp):
     now=dt(stamp)
     if not now:raise ValueError("invalid build timestamp")
     result=[]
     def read(name):return json.loads((out/name).read_text(encoding="utf-8"))
-    def add(key,group,title,url,record,latest_period=None,days=None,policy="Ротация источников; срок не гарантирован",archive=False,available=True,not_before=None,href="sources.html",failure_days=1):
+    def add(key,group,title,url,record,latest_period=None,days=None,policy="Ротация источников; срок не гарантирован",archive=False,available=True,not_before=None,href="sources.html",failure_days=1,state_override=None):
         checked=dt(record.get("checked"));success=dt(record.get("success"))
         if archive:
             success=dt(record.get("downloaded")) if available else None
         status=str(record.get("status") or "")
         if record.get("error"):status+=" · "+str(record["error"])
-        current=state(checked,success,status,now,days,archive,available)
+        current=state_override or state(checked,success,status,now,days,archive,available)
         due=None
         if days and not archive:
             delay=timedelta(days=failure_days if current in ("cached","unavailable") else days)
@@ -142,6 +154,33 @@ def collect(out,stamp):
     for k,title,days in [("system","Системно значимые банки",7),("full","Кредитные организации: полный список",1)]:
         r=banks["datasets"][k]
         add("banks-"+k,"Предприятия",title,r["source"],r,r["edition"],days=days,available=bool(r["rows"]),policy="Официальный перечень ЦБ; не финансовая отчётность",href="banks.html",failure_days=2)
+    for name,title,capital in (("capital","Капитал банков · форма 808",True),("balance","Балансы банков · форма 806",False),("profit","Финансовые результаты банков · форма 807",False)):
+        path=out/("bank-"+name+".json")
+        if not path.is_file():continue
+        d=read(path.name);p=bank_progress(d,capital)
+        add("bank-form-"+name,"Банк России",title,"https://www.cbr.ru/banking_sector/credit/",p,d["period"],days=1,policy="До 20 запросов за сутки; повтор недоступной записи через 14 суток; период отчёта фиксирован",href="banks.html#bank-coverage",state_override=p["state"])
+    path=out/"bank-disclosure.json"
+    if path.is_file():
+        d=read(path.name)
+        verified=sum(v["status"]=="ok" for r in d["rows"] for v in r["forms"].values())
+        checked=d.get("last_attempt") or d.get("checked")
+        success=d.get("checked") if verified else None
+        r=dict(checked=checked,success=success,status="Доступность дат форм: "+str(verified)+". Не числовые нормативы.")
+        add("bank-disclosure-pilot","Банк России","Пилот раскрытия ЦБ",d["source"],r,None,days=7,policy="Пилот раз в 7 суток; только проверка дат и идентификаторов",href="banks.html",failure_days=7,state_override=("cached" if verified and checked!=success else "partial" if verified else "unavailable" if checked else "waiting"))
+    path=out/"group-passports.json"
+    if path.is_file():
+        d=read(path.name)
+        add("corporate-documentary","Предприятия","Корпоративные группы · документальные паспорта",None,dict(checked=d.get("checked"),status="Документальный снимок: "+str(len(d["groups"]))+" групп"),latest(o["year"] for g in d["groups"] for m in g["metrics"] for o in m["observations"]),archive=True,available=bool(d["groups"]),policy="Новые отчёты требуют документальной проверки; не автоматический импорт МСФО",href="company-atlas.html#group-passports")
+    path=out/"company-index.json"
+    if path.is_file():
+        d=read(path.name);ready=d["status"]=="ready"
+        add("company-full-index","Предприятия","ФНС · полный финансовый индекс",None,dict(status="Записей: "+str(d.get("count",0))+"; не ЕГРЮЛ"),str(d["year"]) if ready else None,policy="Перестраивается при смене выпуска финансовых архивов; при сбое сохраняется совместимый снимок",href="company-atlas.html#company-lookup",state_override="partial" if ready else "waiting")
+    path=out/"sme-finance.json"
+    if path.is_file():
+        d=read(path.name);ready=d.get("status")=="diagnostic"
+        paired=ready and d.get("paired_sums_version")==1
+        profiles=ready and "profiles" in d
+        add("sme-finance-join","Предприятия","МСП · финансово-отраслевое сопоставление",None,dict(status=("Парные суммы: "+("есть" if paired else "нет")+"; пилот паспортов: "+("есть" if profiles else "нет"))),str(d["financial_year"])+" / "+d["sme_edition"] if ready else None,policy="Полный импорт 12-го и 19-го числа; дата следующей успешной загрузки неизвестна",href="company-atlas.html#sme-finance",state_override="partial" if ready else "waiting")
     corporate=read("company-sources.json")
     for r in corporate["rows"]:
         add("company-source-"+r["kind"],"Предприятия","ФНС · "+("Доходы и расходы" if r["kind"]=="income_expense" else "Среднесписочная численность"),r["catalog"],r,str(r["report_year"]) if r["report_year"] else None,days=7,available=bool(r["archive"]),policy="Проверка паспорта и XSD; наблюдения ещё не импортированы",href="company-atlas.html#company-source-check",failure_days=2)
