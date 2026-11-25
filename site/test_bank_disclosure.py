@@ -39,3 +39,40 @@ class Disclosure(unittest.TestCase):
         row=b.one({"registration_number":"1","name":"А"},"2026-11-25",mismatch)
         self.assertIsNone(row["internal_code"]);self.assertEqual(row["forms"],{});self.assertIn("Обратное",row["error"])
         self.assertIn(b"IntNumber",b.envelope("IntCodeToRegNum","IntNumber",123))
+
+    def test_soap12_fallback(self):
+        from unittest.mock import patch,MagicMock
+        from urllib.error import HTTPError
+        raw=response("RegNumToIntCode","123").replace(b.SOAP.encode(),b.SOAP12.encode())
+        self.assertEqual(b.mapping(raw),123)
+        reply=MagicMock()
+        reply.__enter__.return_value=reply
+        reply.geturl.return_value=b.SOURCE
+        reply.read.return_value=raw
+        with patch.object(b,"urlopen",side_effect=[HTTPError(b.SOURCE,415,"format",{},None),reply]) as request:
+            self.assertEqual(b.mapping(b.fetch("RegNumToIntCode","RegNumber","1")),123)
+            self.assertEqual(request.call_count,2)
+            self.assertIn(b.SOAP12.encode(),request.call_args_list[1].args[0].data)
+            self.assertIn("application/soap+xml",request.call_args_list[1].args[0].headers["Content-type"])
+        with patch.object(b,"urlopen",side_effect=HTTPError(b.SOURCE,429,"limit",{},None)) as request:
+            with self.assertRaises(HTTPError):b.fetch("RegNumToIntCode","RegNumber","1")
+            self.assertEqual(request.call_count,1)
+
+    def test_probe_version_retry_once(self):
+        directory={"datasets":{"system":{"edition":"2026-10-07","rows":[{"registration_number":"1","name":"A"}]}}}
+        calls=[]
+        def fail(*args):
+            calls.append(args)
+            raise OSError("test")
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t)
+            d=b.publish(root,root,"2026-11-25",True,directory,fail)
+            self.assertEqual(d["probe_version"],b.PROBE_VERSION)
+            self.assertEqual(len(calls),1)
+            d.pop("probe_version")
+            (root/b.FILE).write_text(json.dumps(d))
+            d=b.publish(root,root,"2026-11-25",True,directory,fail)
+            self.assertEqual(len(calls),2)
+            self.assertEqual(d["probe_version"],b.PROBE_VERSION)
+            b.publish(root,root,"2026-11-26",True,directory,fail)
+            self.assertEqual(len(calls),2)
