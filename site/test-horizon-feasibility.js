@@ -12,3 +12,7 @@ r=H.calculate(m,{...p,spare:0,floors:[0,0,100],budgets:[20,0,0],lag:2,depreciati
 assert.throws(()=>H.calculate(m,{...p,lag:0},R.solve));
 r=H.calculate(real,{...p,growth:real.names.map(()=>3)},R.solve);assert.ok(r.beta>=0&&r.beta<=1);assert.equal(r.rows[0].groups.length,19);assert.ok(r.gap<1e-6);
 console.log('Horizon feasibility: lag, annual limits, depreciation, zero target and real balance OK');
+const resource={name:'Энергия',unit:'МВт·ч',source:'Эталон',intensity:[2],limits:[100,10,100]};
+r=H.calculate(m,{...p,spare:100,resources:[resource]},R.solve);near(r.beta,10/42);near(r.rows[1].resources[0].used,10);
+r=H.calculate(m,{...p,spare:100,resources:[{...resource,annualProductivity:20}]},R.solve);near(r.beta,10*1.2**2/42);
+assert.throws(()=>H.calculate(m,{...p,resources:[{...resource,intensity:[null]}]},R.solve));assert.throws(()=>H.calculate(m,{...p,resources:[{...resource,limits:[1]}]},R.solve));

@@ -199,6 +199,9 @@ with sync_playwright() as p:
         for field in card.locator("tbody input").all(): field.fill("1")
         assert "недопустим" in page.locator("#pf-status").inner_text()
         assert page.locator("#pf-checks tbody tr").count()==41
+        with page.expect_download() as package:
+            page.locator("#pf-resource-package").click()
+        package_path=package.value.path()
         assert "МВт·ч" in page.locator("#pf-checks tbody tr").last.inner_text()
         with page.expect_download() as natural:
             page.locator("#pf-export").click()
@@ -230,6 +233,17 @@ with sync_playwright() as p:
         assert len(labor_export_rows)==80 and len({len(r) for r in labor_export_rows})==1
         page.locator("#pf-labor-enabled").uncheck()
         assert page.locator("#pf-checks tbody tr").count()==40
+        page.goto("http://localhost:8765/horizon-feasibility.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#hf-results tbody tr').length===5",timeout=45000)
+        page.locator("#hf-resource-file").set_input_files(str(package_path))
+        page.wait_for_function("document.querySelector('#hf-resource-status').textContent.includes('Подключено ограничений: 1')")
+        page.locator("#hf-run").click()
+        assert page.locator("#hf-resource-results tbody tr").count()==5
+        assert page.locator("#hf-resource-export").is_enabled()
+        assert "0%" in page.locator("#hf-status").inner_text()
+        page.locator("#hf-resource-remove").click()
+        assert page.locator("#hf-resource-export").is_disabled()
+        page.locator("#hf-run").click()
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
