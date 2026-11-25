@@ -769,9 +769,14 @@ with sync_playwright() as p:
             assert page.locator("#rm-year").input_value()=="2024"
             assert page.locator("#rm-map svg path[data-region]").count()>70
             assert page.locator("#rm-table tbody tr").count()>65
-            assert page.locator(".rm-quick-nav a").count()==6
+            assert page.locator(".rm-quick-nav a").count()==7
             assert page.locator("#rm-conc-table tbody tr").count()>65
             assert page.locator("#rm-shift-table tbody tr").count()>65
+            assert page.locator("#rm-geoconc-table tbody tr").count()==14
+            page.locator("#rm-geoconc-group").select_option("light")
+            with page.expect_download() as geoconc:
+                page.locator("#rm-geoconc-export").click()
+            assert geoconc.value.suggested_filename.startswith("industry-geographic-concentration-")
             with page.expect_download() as shift:
                 page.locator("#rm-shift-export").click()
             assert shift.value.suggested_filename.startswith("regional-structural-shift-")

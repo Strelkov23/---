@@ -82,3 +82,9 @@ assert.equal(shifted.distance,20);assert.ok(Math.abs(shifted.hhiDelta)<1e-12);as
 assert.equal(M.structuralShift({...old,total:{...totalRow,year:2022}},{...next,total:{...totalRow,okato:'changed'}}).distance,null);
 assert.equal(M.structuralShift({...old,total:{...totalRow,year:2022}},{...next,total:totalRow,hhi:null}).distance,null);
 assert.equal(M.concentrationRows(full,'C',2024,territories,S.sample)[0].expected,13);
+
+const gc=M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',60),r(b,'light',20),r('Томская область','light',null)]},'light',2024,S.sample);
+assert.equal(gc.coverage,80);assert.equal(gc.known,2);assert.equal(gc.missing,1);assert.equal(gc.hhi,.625);assert.equal(gc.cr3,100);assert.equal(gc.ranked[0].nationalShare,60);assert.equal(gc.ranked[0].sampleShare,75);
+assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',101)]},'light',2024,S.sample).hhi,null);
+assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',50,{edition:'old'})]},'light',2024,S.sample).hhi,null);
+assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',30),r(a,'light',30)]},'light',2024,S.sample).ambiguous,1);

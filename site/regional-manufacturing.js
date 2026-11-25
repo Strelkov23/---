@@ -91,6 +91,20 @@ const ManufacturingAtlas=(()=>{
   const a=concentrationRows(data,section,start,territories,sample),b=concentrationRows(data,section,end,territories,sample);
   return territories.map((t,i)=>({...t,first:a[i],last:b[i],...structuralShift(a[i],b[i])}));
  }
+ // Geography rather than sector composition: use every conservative, disjoint
+ // statistical territory, not just those with a displayable map polygon.
+ function geographicConcentration(data,group,year,sample){
+  const rows=data.rows.filter(r=>r.group===group&&r.year===year),nat=unique(rows.filter(r=>r.level==='Страна'&&r.region==='Российская Федерация'));
+  const checked=sample(rows.filter(r=>r.level==='Регион').map(r=>({...r,originalValue:r.value,value:0})));
+  const observations=[...checked.out].map(([key,r])=>({...r,key,value:r.originalValue}));
+  const comparable=observations.filter(r=>finite(r.value)&&nat&&r.edition===nat.edition&&r.version===nat.version);
+  const total=comparable.reduce((s,r)=>s+r.value,0),national=nat?.value??null,coverage=finite(national)&&national>0?100*total/national:null;
+  const coherent=Number.isFinite(coverage)&&coverage<=100.5,known=coherent&&total>0;
+  const ranked=comparable.sort((a,b)=>b.value-a.value||a.key.localeCompare(b.key,'ru')).map(r=>({...r,sampleShare:known?100*r.value/total:null,nationalShare:coherent?share(r.value,national):null}));
+  const top=k=>known?ranked.slice(0,k).reduce((s,r)=>s+r.sampleShare,0):null;
+  const hhi=known?ranked.reduce((s,r)=>s+(r.sampleShare/100)**2,0):null;
+  return {national,nationalRow:nat?.row??null,nationalEdition:nat?.edition??null,total,coverage,hhi,effective:hhi>0?1/hhi:null,cr1:top(1),cr3:top(3),cr5:top(5),ranked,known:comparable.length,observed:observations.length,missing:observations.length-comparable.length,excluded:checked.excluded,ambiguous:checked.ambiguous,reason:!nat||!finite(national)||national<=0?'Нет положительного итога России':!coherent?'Сумма регионов превышает итог РФ (допуск 0,5%)':!total?'Нет положительной суммы сопоставимых наблюдений':'HHI только по доступной выборке'};
+ }
  function localizationBin(v){return !finite(v)?-1:v<.5?0:v<1?1:v<1.5?2:v<2?3:4}
  function regionalProfile(data,key,year,sample){
   return (data.groups||[]).map(g=>{
@@ -101,7 +115,7 @@ const ManufacturingAtlas=(()=>{
  function profileFilter(rows,section='',mode='all'){
   return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
  }
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows,geographicConcentration}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -259,6 +273,36 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    shiftExport.onclick=()=>csv('regional-structural-shift-'+section+'-'+start+'-'+end+'.csv',[['Раздел','Начало','Конец','Регион','ISO','Индекс сдвига, п. п.','HHI начало','HHI конец','Δ HHI','Охват начало, %','Охват конец, %','Статус','Группа','ОКВЭД2','Доля начало, %','Доля конец, %','Δ доли, п. п.','Отгрузка начало, млн руб.','Отгрузка конец, млн руб.','Строка начало','Строка конец','Итог начало','Итог конец','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...ordered.flatMap(r=>(r.parts.length?r.parts:[{}]).map(p=>[section,start,end,r.name,r.code,r.distance,r.first?.hhi,r.last?.hhi,r.hhiDelta,r.first?.coverage,r.last?.coverage,r.reason,p.title,p.okved,p.first?.shareOfSum,p.last?.shareOfSum,p.delta,p.first?.observation?.value,p.last?.observation?.value,p.first?.observation?.row,p.last?.observation?.row,r.first?.total?.row,r.last?.total?.row,src?.data.source,src?.data.sha256,src?.sha256,manifest.data_fingerprint]))]);
   }
   shiftStart.onchange=shiftEnd.onchange=shiftRegion.onchange=drawShift;
+  const geoGroup=$('rm-geoconc-group'),geoStatus=$('rm-geoconc-status'),geoTable=$('rm-geoconc-table'),geoChart=$('rm-geoconc-chart'),geoDetail=$('rm-geoconc-detail'),geoExport=$('rm-geoconc-export');
+  let geoCache=null;
+  function drawGeoConcentration(){
+   const section=sectionPick.value,year=Number($('rm-year').value),key=section+':'+year,gg=groups.filter(g=>g.section===section);
+   geoTable.replaceChildren();geoChart.replaceChildren();geoDetail.replaceChildren();geoExport.disabled=true;
+   if(!gg.length||!year)return;
+   if(geoCache?.key!==key)geoCache={key,rows:gg.map(g=>({g,...ManufacturingAtlas.geographicConcentration(combined,g.id,year,RegionalStats.sample)}))};
+   const rows=geoCache.rows,old=geoGroup.value,chosenId=gg.some(g=>g.id===old)?old:groupPick.value;
+   geoGroup.replaceChildren(...gg.map(g=>new Option(g.title,g.id)));geoGroup.value=chosenId;
+   const available=rows.filter(r=>Number.isFinite(r.hhi)),sorted=[...rows].sort((a,b)=>(b.hhi??-1)-(a.hhi??-1)||a.g.title.localeCompare(b.g.title,'ru'));
+   geoStatus.textContent='Раздел '+section+' · '+year+' · рассчитано '+available.length+' из '+rows.length+' групп (включая итог). HHI и CR относятся только к сопоставимой выборке. Охват — сумма выборки / опубликованный итог РФ.';
+   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
+   for(const label of ['Группа','Итог РФ, млн руб.','Сумма выборки, млн руб.','Охват РФ, %','Регионов с числами','HHI выборки','Эффективное число регионов','CR3, %','CR5, %','Статус']){const th=node('th',label);th.scope='col';h.append(th)}
+   for(const r of sorted){const tr=body.insertRow(),btn=node('button',r.g.title);btn.type='button';btn.className='rm-region-link';btn.onclick=()=>{geoGroup.value=r.g.id;drawGeoConcentration();geoChart.scrollIntoView({block:'nearest'})};tr.insertCell().append(btn);
+    for(const v of [number(r.national),number(r.total),number(r.coverage),r.known+' / '+r.observed,number(r.hhi),number(r.effective),number(r.cr3),number(r.cr5),r.reason])tr.insertCell().textContent=v}
+   geoTable.append(t);
+   const chosen=rows.find(r=>r.g.id===geoGroup.value);
+   if(chosen){
+    geoChart.append(node('h3',chosen.g.title+' · '+year),node('p','Доля трёх крупнейших в выборке: '+number(chosen.cr3)+'% · пяти: '+number(chosen.cr5)+'% · охват итога РФ: '+number(chosen.coverage)+'%. '+chosen.reason+'.'));
+    const bars=node('div','');bars.className='rm-composition';
+    for(const r of chosen.ranked.slice(0,10)){if(!Number.isFinite(r.sampleShare))continue;const line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=r.sampleShare+'%';track.append(fill);line.append(node('span',r.region),track,node('strong',number(r.sampleShare)+'%'));bars.append(line)}
+    geoChart.append(bars);
+    const tab=node('table',''),hh=tab.createTHead().insertRow(),bb=tab.createTBody();
+    for(const label of ['Регион источника','Отгрузка, млн руб.','Доля выборки, %','Доля итога РФ, %','Строка источника']){const th=node('th',label);th.scope='col';hh.append(th)}
+    for(const r of chosen.ranked){const tr=bb.insertRow();for(const v of [r.region,number(r.value),number(r.sampleShare),number(r.nationalShare),r.row])tr.insertCell().textContent=v??'—'}geoDetail.append(tab);
+   }
+   const src=bySection[section];geoExport.disabled=!rows.length;
+   geoExport.onclick=()=>csv('industry-geographic-concentration-'+section+'-'+year+'.csv',[['Раздел','Год','Группа','ОКВЭД2','Итог РФ, млн руб.','Строка итога РФ','Издание РФ','Сумма выборки, млн руб.','Охват РФ, %','Числовых регионов','Однозначных регионов','Без сопоставимых чисел','Исключено строк','Неоднозначных ключей','HHI выборки','Эффективное число регионов','CR1, %','CR3, %','CR5, %','Статус','Регион','Отгрузка, млн руб.','Доля выборки, %','Доля РФ, %','ОКАТО','ОКТМО','Издание','Лист','Строка','Примечание','Источник','SHA-256 ZIP','SHA-256 JSON','Отпечаток манифеста'],...sorted.flatMap(r=>(r.ranked.length?r.ranked:[{}]).map(v=>[section,year,r.g.title,r.g.okved,r.national,r.nationalRow,r.nationalEdition,r.total,r.coverage,r.known,r.observed,r.missing,r.excluded,r.ambiguous,r.hhi,r.effective,r.cr1,r.cr3,r.cr5,r.reason,v.region,v.value,v.sampleShare,v.nationalShare,v.okato,v.oktmo,v.edition,v.sheet,v.row,v.note,src?.data.source,src?.data.sha256,src?.sha256,manifest.data_fingerprint]))]);
+  }
+  geoGroup.onchange=drawGeoConcentration;
   const shape=(svg,tag,attrs,label)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;svg.append(e);return e};
   function renderMap(items,metric,group){
    const host=$('rm-map');host.replaceChildren();
@@ -368,7 +412,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const r of ordered){const tr=body.insertRow();tr.insertCell().textContent=Number.isFinite(r[metric])?1+known.filter(x=>x[metric]>r[metric]).length:'—';const b=node('button',r.name);b.type='button';b.onclick=()=>{select.value=r.code;draw();detail.scrollIntoView({block:'start'})};tr.insertCell().append(b);for(const v of [r.value,r.total,r.share,r.localization,r.countryShare])tr.insertCell().textContent=number(v)}
    $('rm-table').replaceChildren(table);exporter.disabled=false;
    exporter.onclick=()=>csv('regional-manufacturing-'+group.id+'-'+year+'.csv',[['Группа','Раздел ОКВЭД2','ОКВЭД2','Год','Регион','ISO геометрии','Территория источника','ОКАТО','ОКТМО','Отгрузка, млн руб.','Итог региона, млн руб.','Доля, %','Локализация','Доля РФ, %','Отгрузка РФ, млн руб.','Итог РФ, млн руб.','Доля отрасли в разделе '+group.section+' РФ, %','Подраздел','Издание','Лист','Строка отгрузки','Строка итога','Строка отгрузки РФ','Строка итога РФ','Примечание','Источник','SHA-256 исходника','SHA-256 JSON','Отпечаток манифеста'],...ordered.map(r=>[group.title,group.section,group.okved,year,r.name,r.code,r.region,r.okato,r.oktmo,r.value,r.total,r.share,r.localization,r.countryShare,result.national,result.nationalTotal,result.nationalShare,r.subsection,r.edition,r.sheet,r.row,r.totalRow,r.nationalRow,r.nationalTotalRow,r.note,selected.data.source,selected.data.sha256,selected.sha256,manifest.data_fingerprint])]);
-   syncDeltaYears(group);drawDelta();if(chosen&&concOptions.some(t=>t.code===chosen.code))concRegion.value=chosen.code;drawConcentration();if(chosen)shiftRegion.value=chosen.code;syncShift();save(fields);
+   syncDeltaYears(group);drawDelta();if(chosen&&concOptions.some(t=>t.code===chosen.code))concRegion.value=chosen.code;drawConcentration();if(chosen)shiftRegion.value=chosen.code;syncShift();drawGeoConcentration();save(fields);
   }
   $('rm-form').addEventListener('change',e=>{if(e.target===sectionPick)setGroups('');draw()});$('rm-form').addEventListener('submit',e=>e.preventDefault());draw();
  }catch(e){console.error(e);status.textContent='Не удалось проверить архив: '+String(e.message||e);exporter.disabled=true}
