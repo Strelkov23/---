@@ -85,7 +85,7 @@ for k in AMOUNT_FIELDS:RULES[k]=(k,r"млн\.?\s*руб","млн руб.","cost"
 def complete_amount(values):
     return (set(values)==set(AMOUNT_FIELDS) and all(type(v) in (int,float) and math.isfinite(v) and v>=0 for v in values.values()) and
             abs(values[AMOUNT_FIELDS[0]]-sum(values[k] for k in AMOUNT_FIELDS[1:]))<=3.00000001)
-def cost_amount_sheet(rows,sheet,url,now_year):
+def cost_amount_sheet(rows,sheet,url,now_year,diagnostics=None):
     # Only the observed modern section layout, with the original exclusion notes.
     if len(rows)<34 or len(rows[1])<1 or len(rows[2])<7 or len(rows[3])<3 or len(rows[4])<7:return []
     title=h.norm(rows[1][0])
@@ -110,8 +110,13 @@ def cost_amount_sheet(rows,sheet,url,now_year):
         label=str(line[0] or "").strip()
         if not label or not re.search(r"[а-яё]",label,re.I):continue
         values=dict(zip(AMOUNT_FIELDS,(h.numeric(v) for v in line[1:7])))
-        if any(v is None for v in values.values()):continue
-        if not complete_amount(values):raise ValueError("Не сходятся денежные затраты: "+label)
+        if any(v is None for v in values.values()):
+            if diagnostics is not None:diagnostics.append(dict(sheet=sheet,year=y,row=index+1,title=label,reason="missing_component",missing=[k for k,v in values.items() if v is None]))
+            continue
+        if not complete_amount(values):
+            if diagnostics is None:raise ValueError("Не сходятся денежные затраты: "+label)
+            diagnostics.append(dict(sheet=sheet,year=y,row=index+1,title=label,reason="balance_mismatch",residual=values[AMOUNT_FIELDS[0]]-sum(values[k] for k in AMOUNT_FIELDS[1:]),negative=[k for k,v in values.items() if v<0]))
+            continue
         key=h.norm(label)
         if key in seen:raise ValueError("Повтор вида деятельности")
         seen.add(key)

@@ -81,3 +81,25 @@ class TestRosstat(unittest.TestCase):
         with self.assertRaises(ValueError):w.parse_sheet(rows,"cost","21",url,2026)
         rows[33][0]=""
         self.assertEqual(w.parse_sheet(rows,"cost","21",url,2026),[])
+
+    def test_cost_diagnostic_keeps_strict_default(self):
+        from unittest.mock import patch
+        rows=[[None]*7 for _ in range(34)]
+        rows[1][0]="ЗАТРАТЫ НА ПРОИЗВОДСТВО И ПРОДАЖУ ПРОДУКЦИИ ОРГАНИЗАЦИЙ (ЮРИДИЧЕСКИХ ЛИЦ) ПО РОССИЙСКОЙ ФЕДЕРАЦИИ В 2025 ГОДУ В РАЗРЕЗЕ ВИДОВ ЭКОНОМИЧЕСКОЙ ДЕЯТЕЛЬНОСТИ"
+        rows[2][6]="млн.рублей"
+        rows[3][1]="Затраты на производство и продажу продукции (товаров, работ, услуг)"
+        rows[4][2:7]=["Материальные затраты","Расходы на оплату труда","Страховые взносы в Социальный фонд России (СФР), ФФОМС","Амортизация основных средств","Прочие затраты"]
+        rows[12]=["Всего по организациям (юридическим лицам)",100,60,20,5,5,10]
+        rows[13][0]="Из них с основным видом деятельности"
+        for i in range(14,32):rows[i]=[f"Отрасль {i}",100,60,20,5,5,10]
+        rows[32][0]="без субъектов малого предпринимательства, бюджетных организаций, банков, страховых и прочих финансово-кредитных организаций"
+        rows[33][0]="без учета статистической информации по Донецкой, Луганской, Запорожской, Херсонской"
+        rows[14][1]=50
+        rows[15][2]=None
+        with self.assertRaises(ValueError):w.cost_amount_sheet(rows,"21","https://rosstat.gov.ru/a.xls",2026)
+        diagnostics=[]
+        result=w.cost_amount_sheet(rows,"21","https://rosstat.gov.ru/a.xls",2026,diagnostics)
+        self.assertEqual(len(result),102)
+        self.assertEqual([x["reason"] for x in diagnostics],["balance_mismatch","missing_component"])
+        self.assertEqual(diagnostics[0]["residual"],-50)
+        self.assertEqual(diagnostics[0]["row"],15)
