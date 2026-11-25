@@ -26,8 +26,17 @@ jobs:
           d=b.parse(raw,enc)
           print("BANK_DIRECTORY",d["edition"],len(d["rows"]),d["sha256"])
           Path("../system-banks-verified.json").write_text(json.dumps(d,ensure_ascii=False),encoding="utf-8")
+          fr,fe=b.fetch_full()
+          full=b.parse_full(fr,fe)
+          print("FULL_BANK_DIRECTORY",full["edition"],len(full["rows"]),full["sha256"])
+          from datetime import datetime,timezone
+          snapshot=b.publish(Path(".."),Path("/nonexistent"),datetime.now(timezone.utc).isoformat(),True,{"system":lambda:(raw,enc),"full":lambda:(fr,fe)})
+          print("VERIFIED_BANK_COUNTS",b.quality(snapshot))
+          assert all(x["status"]=="ok" for x in snapshot["datasets"].values())
           PY
       - uses: actions/upload-artifact@v4
         with:
           name: verified-system-banks
-          path: system-banks-verified.json
+          path: |
+            system-banks-verified.json
+            bank-directory.json

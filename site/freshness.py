@@ -138,6 +138,10 @@ def collect(out,stamp):
     add("industrial-parks","Предприятия","Каталог индустриальных парков и ОЭЗ АИП",p["source"],p,(p.get("success") or "")[:10] or None,days=7,available=bool(p["rows"]),policy="Проверка каждые 7 суток; при ошибке повтор через 2 суток; текущая работа резидентов не подтверждается",href="industrial-parks.html",failure_days=2)
     ae=read("amur-enterprises.json")
     add("amur-enterprises","Предприятия","Амурская область · каталог организаций",ae["source"],ae,None,days=7,available=bool(ae["rows"]),policy="Проверка карточек каталога; не подтверждение действующего статуса",href="facility-map.html#amur-enterprise-directory",failure_days=2)
+    banks=read("bank-directory.json")
+    for k,title,days in [("system","Системно значимые банки",7),("full","Кредитные организации: полный список",1)]:
+        r=banks["datasets"][k]
+        add("banks-"+k,"Предприятия",title,r["source"],r,r["edition"],days=days,available=bool(r["rows"]),policy="Официальный перечень ЦБ; не финансовая отчётность",href="banks.html",failure_days=2)
     enterprise=read("enterprise-sources.json")
     for r in enterprise["rows"]:
         title={"organizations":"Организации","entrepreneurs":"ИП"}[r["kind"]]

@@ -285,6 +285,13 @@ with sync_playwright() as p:
             with page.expect_download() as debt:
                 page.locator("#ed-trend-export").click()
             assert debt.value.suggested_filename=="enterprise-debt-trend-payable.csv"
+        page.goto("http://localhost:8765/banks.html",wait_until="load")
+        page.wait_for_function("!document.querySelector('#bank-source-status').textContent.startsWith('Проверка')",timeout=30000)
+        assert page.locator("#bank-metrics .metric").count()==3
+        if page.locator("#bank-export").is_enabled():
+            assert page.locator("#bank-table tbody tr").count()>0
+            page.locator("#bank-query").fill("zzzz_no_bank")
+            assert page.locator("#bank-table tbody tr").count()==0
         page.goto("http://localhost:8765/facility-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#amur-ent-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#amur-ent-export").is_enabled():

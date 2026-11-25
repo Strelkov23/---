@@ -9,3 +9,24 @@ class BankRegistryTests(unittest.TestCase):
         with self.assertRaises(ValueError):b.parse(fixture().replace(b"<td>102</td>",b"<td>101</td>"))
     def test_missing_date(self):
         with self.assertRaises(ValueError):b.parse(fixture().replace(b"07.10.2026",b""))
+
+def full_fixture():
+    h="<h1>Список кредитных организаций по состоянию на 25.11.2026 (00:00 МСК)</h1><table><tr>"+"".join("<th>"+x+"</th>" for x in b.HEADERS)+"</tr>"
+    return (h+"".join(f"<tr><td>{i}</td><td></td><td>{i}</td><td>1027739043750</td><td>Тест {i}</td><td>АО</td><td>06.09.1994</td><td>{'Действующая' if i%2 else 'Ликвидация'}</td><td>адрес</td></tr>" for i in range(1,101))+"</table>").encode()
+class FullDirectoryTests(unittest.TestCase):
+    def test_full(self):
+        d=b.parse_full(full_fixture());self.assertEqual(len(d["rows"]),100)
+        self.assertNotIn("адрес",str(d))
+        self.assertEqual(d["rows"][1]["license_status"],"Ликвидация")
+    def test_cache(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);out=root/"out";old=root/"old";out.mkdir();old.mkdir()
+            d=b.publish(out,old,"2026-11-25",True,{"system":lambda:(fixture(),"utf-8"),"full":lambda:(full_fixture(),"utf-8")})
+            self.assertEqual(b.quality(d)["credit_organization_active_license"],50)
+            (old/b.FILE).write_bytes((out/b.FILE).read_bytes())
+            def fail():raise OSError("test")
+            d=b.publish(out,old,"2026-12-03",True,{"system":fail,"full":fail})
+            self.assertEqual(d["datasets"]["full"]["status"],"cached")
+            self.assertEqual(b.quality(d)["system_bank_records"],12)
