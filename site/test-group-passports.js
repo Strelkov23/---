@@ -38,3 +38,13 @@ assert.equal(G.ratios(disclosure,2025).every(x=>x.value===null),true);
 assert.equal(G.revenueComparison({groups:[disclosure]},2025).eligible,0);
 assert.equal(G.ratioComparison({groups:[disclosure]},2025,'equity_share').eligible,0);
 assert.equal(G.revenueComparison({groups:[disclosure]},2025).rows[0].reason,'Несопоставимый стандарт отчётности');
+
+const completeness=G.coverage({groups:[{...rg,id:'a',name:'А'},{...rg,id:'nlmk',name:'НЛМК',standard:'IFRS_based_disclosure'}]},2025);
+assert.equal(completeness.total,2);
+assert.equal(completeness.withObservations,2);
+assert.equal(completeness.ifrs,1);
+assert.equal(completeness.revenue,1);
+assert.equal(completeness.groups[1].coefficients,0);
+assert.equal(completeness.observations,10);
+assert.equal(G.coverage({groups:[]},2025).coefficients,0);
+assert.equal(G.coverage({groups:[rg]},2000).withObservations,0);
