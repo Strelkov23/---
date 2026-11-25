@@ -105,6 +105,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const full=index.status==='ready',rankReady=!!rank.report;const unique=new Set(Object.values(rank.report?.rankings||{}).flatMap(x=>x.rows.map(r=>r.inn))).size;
   status.textContent=full?'Полный индекс двух открытых архивов: '+index.count.toLocaleString('ru')+' ИНН, '+index.year+' год.':rankReady?'Поиск по опубликованным рейтингам: '+unique.toLocaleString('ru')+' уникальных ИНН, '+rank.report.year+' год. Полный индекс пока не развёрнут.':'Данные для поиска пока не опубликованы. Ни отсутствие результата, ни пустая база не означают отсутствие организации.';
   if(!full&&rank.index_error)status.textContent+=' Причина последней попытки: '+rank.index_error;
+  if(!full&&rank.index_attempt)status.textContent+=' Последняя попытка восстановления индекса: '+rank.index_attempt+'.';
   button.disabled=!(full||rankReady);
   form.onsubmit=async e=>{
    e.preventDefault();const token=++serial,inn=input.value.trim();result.replaceChildren();exp.disabled=true;

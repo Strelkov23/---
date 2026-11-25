@@ -32,3 +32,17 @@ class TestImport(unittest.TestCase):
     def test_empty_quality(self):
         self.assertEqual(c.quality(c.empty())["corporate_income_records"],0)
         with self.assertRaises(ValueError):c.quality(dict(c.empty(),status="ok"))
+
+    def test_index_retry_independent(self):
+        release={"income_expense":"a","employment":"b"}
+        d={"checked":"2026-11-25T11:00:00Z"}
+        self.assertTrue(c.refresh_due(d,"2026-11-25",release,release,None))
+        self.assertFalse(c.refresh_due(d,"2026-11-25",release,release,True))
+        d.update(index_attempt="2026-11-25",index_retry_revision=c.INDEX_RETRY_REVISION)
+        self.assertFalse(c.refresh_due(d,"2026-11-26",release,release,None))
+        self.assertTrue(c.refresh_due(d,"2026-11-27",release,release,None))
+        new={**release,"employment":"c"}
+        self.assertTrue(c.refresh_due(d,"2026-11-25",new,release,True))
+        d.update(import_attempt="2026-11-25",import_attempt_release=new)
+        self.assertFalse(c.refresh_due(d,"2026-11-25",new,release,True))
+        self.assertTrue(c.refresh_due(d,"2026-11-26",new,release,True))

@@ -170,6 +170,19 @@ def quality(d):
             if previous is not None and previous>order:raise ValueError("Порядок рейтинга")
             previous=order
     return {"corporate_income_records":a,"corporate_employment_records":b,"corporate_paired_records":r["paired"]}
+INDEX_RETRY_REVISION=1
+def refresh_due(d,stamp,release,old_release,cached):
+    """Financial publication and index repair use independent cooldowns."""
+    from datetime import date,timedelta
+    today=date.fromisoformat(stamp[:10])
+    if release!=old_release:
+        attempted=d.get("import_attempt_release")==release
+        last=d.get("import_attempt") if attempted else None
+        return not last or today>=date.fromisoformat(last[:10])+timedelta(days=1)
+    if cached:return False
+    last=d.get("index_attempt") if d.get("index_retry_revision")==INDEX_RETRY_REVISION else None
+    return not last or today>=date.fromisoformat(last[:10])+timedelta(days=2)
+
 def publish(out,previous,stamp,refresh):
     from datetime import date,timedelta
     import company_index as index
@@ -183,18 +196,20 @@ def publish(out,previous,stamp,refresh):
     release={r["kind"]:r["archive"] for r in meta["rows"]}
     ready=all(r["schema_verified"] and r["archive"] for r in meta["rows"])
     old_release={r["kind"]:r["source"] for r in d["report"]["sources"]} if d["report"] else {}
-    due=not d["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(d["checked"][:10])+timedelta(days=2)
     cached=index.restore(previous,d["report"])
     if cached:
         try:index.install(out,previous,cached,d["report"])
         except (OSError,ValueError,TypeError,KeyError) as e:
             cached=None;d["index_error"]=str(e)[:220]
-    if refresh and ready and (release!=old_release or not cached) and due:
+    due=refresh_due(d,stamp,release,old_release,cached)
+    if refresh and ready and due:
+        d.update(import_attempt=stamp,import_attempt_release=release,index_attempt=stamp,index_retry_revision=INDEX_RETRY_REVISION)
+        print("COMPANY_INDEX_REPAIR_ATTEMPT",json.dumps({"release_changed":release!=old_release,"cached_index":bool(cached),"stamp":stamp}),flush=True)
         try:
             with tempfile.TemporaryDirectory() as folder:
                 folder=Path(folder)
                 report=run_import(meta,folder)
-                candidate=dict(schema=1,status="ok",checked=stamp,success=stamp,report=report)
+                candidate=dict(schema=1,status="ok",checked=stamp,success=stamp,report=report,import_attempt=stamp,import_attempt_release=release,index_attempt=stamp,index_retry_revision=INDEX_RETRY_REVISION)
                 counts=quality(candidate)
                 if d["report"] and report["year"]==d["report"]["year"]:
                     old=quality(d)
@@ -212,7 +227,12 @@ def publish(out,previous,stamp,refresh):
                     candidate["index_error"]=str(e)[:220]
                     print("COMPANY_INDEX_NOT_PUBLISHED",candidate["index_error"],flush=True)
                 d=candidate
-        except Exception as e:d.update(status="cached" if d["report"] else "unavailable",checked=stamp,error=str(e)[:220])
+        except Exception as e:
+            d.update(status="cached" if d["report"] else "unavailable",checked=stamp,error=str(e)[:220])
+            if not cached:d["index_error"]="Не удалось восстановить индекс: "+str(e)[:180]
+            print("COMPANY_INDEX_REPAIR_FAILED",str(e)[:220],flush=True)
+    elif not cached:
+        print("COMPANY_INDEX_REPAIR_DEFERRED",json.dumps({"refresh":refresh,"sources_ready":ready,"due":due,"last_attempt":d.get("index_attempt")}),flush=True)
     quality(d);(out/FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8");return d
 def main():
     parser=argparse.ArgumentParser()
