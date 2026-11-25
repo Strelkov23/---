@@ -20,6 +20,7 @@ jobs:
     outputs:
       version: ${{ steps.archive.outputs.version }}
       manifest_sha256: ${{ steps.archive.outputs.manifest_sha256 }}
+      analytics_sha256: ${{ steps.archive.outputs.analytics_sha256 }}
     permissions:
       contents: write
       actions: read
@@ -338,6 +339,14 @@ jobs:
           git rev-parse HEAD > monitor/public/version.txt
           echo "version=$(cat monitor/public/version.txt)" >> "$GITHUB_OUTPUT"
           echo "manifest_sha256=$(sha256sum monitor/public/data-manifest.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          analytics_sha256=$(python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js"]
+          print(json.dumps({n:hashlib.sha256((Path("monitor/public")/n).read_bytes()).hexdigest() for n in names},separators=(",",":")))
+          PY
+          )
+          echo "analytics_sha256=$analytics_sha256" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: monitor/public
@@ -359,6 +368,7 @@ jobs:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
           EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
+          EXPECTED_ANALYTICS_SHA256: ${{ needs.build.outputs.analytics_sha256 }}
         run: |
           set -eu
           base="${PAGE_URL%/}/"
@@ -411,6 +421,12 @@ jobs:
               json.loads(get(name,entry["sha256"],entry["bytes"]))
           entry=manifest["files"]["federal-budget.csv"]
           get("federal-budget.csv",entry["sha256"],entry["bytes"])
+          analytics=json.loads(os.environ["EXPECTED_ANALYTICS_SHA256"])
+          expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js"]
+          assert set(analytics)==set(expected_names),"Incomplete analytics hash manifest"
+          for name in expected_names:
+              get(name,analytics[name])
+          print("Exact public analytics files verified:",len(analytics))
           print("Exact public manifest and atlas files verified:",len(names)+7)
           PY
           echo "Public version verified: $EXPECTED_VERSION"
