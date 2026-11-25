@@ -111,12 +111,12 @@ def render(d):
     if d.get("error"):body+='<p role="status">'+e(d["error"])+'</p>'
     body+='<p>Записей: '+str(len(rows))+' · Отраслевых категорий: '+str(q["krasnodar_project_sectors"])+' · Муниципальных наименований: '+str(q["krasnodar_project_municipalities"])+'</p>'
     if d["source"]:body+='<p><a href="'+e(d["source"])+'">Оригинальный XLSX</a> · SHA-256: <code style="overflow-wrap:anywhere">'+e(d["sha256"])+'</code></p>'
-    body+='<p><a href="krasnodar-projects.csv">CSV</a> · <a href="krasnodar-projects.json">JSON</a></p></section><section><h2>Фильтры</h2><label>Поиск по проекту и инвестору<input id="amur-query" type="search"></label>'
+    body+='<p><a href="krasnodar-projects.csv">CSV</a> · <a href="krasnodar-projects.json">JSON</a></p></section><section><h2>Фильтры</h2><div class="project-controls"><label>Поиск по проекту и инвестору<input id="amur-query" type="search"></label>'
     for field,label in (("sector","Отрасль"),("municipality","Муниципалитет")):
         body+='<label>'+label+'<select id="amur-'+field+'" data-amur-filter="'+field+'"><option value="">Все</option>'
         for v in sorted({r[field] for r in rows}):body+='<option value="'+e(v)+'">'+e(v)+'</option>'
         body+='</select></label>'
-    body+='<p id="amur-count" role="status">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll"><table><thead><tr><th>№</th><th>Проект</th><th>Инвестор</th><th>Муниципалитет</th><th>Отрасль</th></tr></thead><tbody id="amur-rows">'
+    body+='</div><p id="amur-count" role="status">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll project-register-table" tabindex="0" role="region" aria-label="Таблица проектов"><table><thead><tr><th>№</th><th>Проект</th><th>Инвестор</th><th>Муниципалитет</th><th>Отрасль</th></tr></thead><tbody id="amur-rows">'
     for r in rows:
         body+='<tr data-amur-sector="'+e(r["sector"])+'" data-amur-municipality="'+e(r["municipality"])+'">'+''.join('<td>'+e(r[k])+'</td>' for k in ("record","name","investor","municipality","sector"))+'</tr>'
     return body+'</tbody></table></div></section><script defer src="amur-projects.js"></script>'

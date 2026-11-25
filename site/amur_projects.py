@@ -175,12 +175,12 @@ def render(d):
     if d.get("error"):body+='<p role="status">'+e(d["error"])+'</p>'
     body+='<p>Записей: '+str(len(rows))+' · Отраслевых категорий: '+str(counts["amur_project_sectors"])+' · Муниципальных наименований: '+str(counts["amur_project_municipalities"])+' · Числовая стоимость: '+str(counts["amur_project_cost_records"])+' · Числовые рабочие места: '+str(counts["amur_project_jobs_records"])+'</p>'
     if d["source"]:body+='<p><a href="'+e(d["source"])+'">Оригинальный XLSX</a> · SHA-256: <code style="overflow-wrap:anywhere">'+e(d["sha256"])+'</code></p>'
-    body+='<p><a href="amur-projects.csv">CSV</a> · <a href="amur-projects.json">JSON</a></p></section><section><h2>Фильтры проектов</h2><label>Поиск по названию и месту<input type="search" id="amur-query"></label>'
+    body+='<p><a href="amur-projects.csv">CSV</a> · <a href="amur-projects.json">JSON</a></p></section><section><h2>Фильтры проектов</h2><div class="project-controls"><label>Поиск по названию и месту<input type="search" id="amur-query"></label>'
     for field,label in (("sector","Отрасль"),("status","Статус"),("stage","Стадия"),("municipality","Муниципальное образование"),("investor_availability","Наличие инвестора")):
         body+='<label>'+label+'<select id="amur-'+field+'" data-amur-filter="'+field+'"><option value="">Все</option>'
         for v in sorted({r[field] for r in rows if r[field]}):body+='<option value="'+e(v)+'">'+e(v)+'</option>'
         body+='</select></label>'
-    body+='<p role="status" id="amur-count">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll"><table><thead><tr>'+''.join('<th>'+h+'</th>' for h in ("№ записи","№ в группе","Проект","Отрасль","Статус","Стадия","Муниципалитет","Место","Инвестор","Механизм","Период","Плановые инвестиции, млн руб.","Рабочие места, ед.","Орган власти"))+'</tr></thead><tbody id="amur-rows">'
+    body+='</div><p role="status" id="amur-count">Записей в выборке: '+str(len(rows))+'</p><div class="table-scroll project-register-table" tabindex="0" role="region" aria-label="Таблица проектов"><table><thead><tr>'+''.join('<th>'+h+'</th>' for h in ("№ записи","№ в группе","Проект","Отрасль","Статус","Стадия","Муниципалитет","Место","Инвестор","Механизм","Период","Плановые инвестиции, млн руб.","Рабочие места, ед.","Орган власти"))+'</tr></thead><tbody id="amur-rows">'
     for r in rows:
         body+='<tr '+ ' '.join('data-amur-'+f.replace("_","-")+'="'+e(r[f])+'"' for f in ("sector","status","stage","municipality","investor_availability"))+'>'
         body+=''.join('<td>'+e(r[f])+'</td>' for f in ("record","source_number","name","sector","status","stage","municipality","location","investor_availability","support","period"))
