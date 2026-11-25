@@ -375,11 +375,11 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     shape(p,'title',{},f.name+' · '+(options?options.format(v):fmtMetric(v,metric)));
     if(f.key&&counts.get(f.key)===1){const choose=()=>{if(options)options.choose(f);else{select.value=f.code;draw()}};p.addEventListener('click',choose);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}})}
    }
-   const scroll=node('div','');scroll.className='regional-figure-scroll';scroll.append(svg);host.append(scroll);
-   const legend=node('div','');legend.className='legend';
+   const scroll=node('div','');scroll.className='regional-figure-scroll geo-figure';scroll.append(svg);
+   const legend=node('div','');legend.className='technical-map-legend';legend.setAttribute('role','group');legend.setAttribute('aria-label','Цветовая шкала отраслевой карты');legend.append(node('strong',options?.label||metricLabels[metric]));const intervals=node('div','');intervals.className='technical-map-intervals';
    const bins=options?.bins||(metric==='localization'?['Менее 0,5','0,5–<1','1–<1,5','1,5–<2','2 и более']:thresholds.length===1?[number(thresholds[0])]:thresholds.slice(1).map((t,i)=>(i?' > ':'')+number(thresholds[i])+' — '+number(t)));
-   for(const [i,label] of [...bins,'Нет данных'].entries()){const span=node('span','');const sw=node('b','');sw.style.cssText='display:inline-block;width:1rem;height:1rem;border:1px solid #52696e;background:'+(i===bins.length?'#deded9':palette[i]);span.append(sw,document.createTextNode(' '+label));legend.append(span)}
-   host.append(legend);
+   for(const [i,label] of [...bins,'Нет данных'].entries()){const span=node('span','');const sw=node('i','');sw.style.backgroundColor=i===bins.length?'#deded9':palette[i];sw.setAttribute('aria-hidden','true');span.append(sw,node('span',label));intervals.append(span)}
+   legend.append(intervals);host.append(legend,scroll);
   }
   function draw(){
    const group=groups.find(g=>g.id===$('rm-group').value),year=Number($('rm-year').value),metric=$('rm-metric').value;

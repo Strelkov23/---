@@ -67,7 +67,7 @@ if(typeof module!=='undefined')module.exports=MapViewport;
    if(!wrap.hasAttribute('tabindex'))wrap.tabIndex=0;
    if(!wrap.hasAttribute('role'))wrap.setAttribute('role','region');
    if(!wrap.hasAttribute('aria-label'))wrap.setAttribute('aria-label','Таблица данных; при необходимости прокручивайте по горизонтали');
-   if(root.querySelector('.atlas-tools'))tableHint(wrap);
+   tableHint(wrap);
   }
  }
  function start(){

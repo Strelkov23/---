@@ -529,6 +529,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,growth?'Серый: нет данных; 100% = уровень предыдущего года.':'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
   txt(30,648,'Границы: Natural Earth (public domain), PiSpace Maps · источник статистики: '+series.code,12);
   txt(30,665,'Версия: '+(version||'не определена')+' · SHA-256 геометрии: '+String(meta.sha256||'—').slice(0,16)+'…',11);
+  const legend=node('div','');legend.className='technical-map-legend';legend.setAttribute('role','group');legend.setAttribute('aria-label','Полная цветовая шкала карты');
+  const legendTitle=node('strong',growth?'Фиксированные интервалы индекса':'Интервалы распределения');legend.append(legendTitle);
+  const intervals=node('div','');intervals.className='technical-map-intervals';
+  for(const [i,label] of [...labels,'Нет данных / не сопоставлено'].entries()){const item=node('span','');const swatch=node('i','');swatch.style.backgroundColor=i===labels.length?'#deded9':palette[i];swatch.setAttribute('aria-hidden','true');item.append(swatch,node('span',label));intervals.append(item)}
+  legend.append(intervals,node('p',growth?'100% — уровень предыдущего года.':'Интервалы определяются распределением значений выбранного года; не являются фиксированными нормативами.'));
+  host.append(legend);
   const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap);
   const toolbar=node('div','');toolbar.className='actions';const msg=node('span','');
   const blob=()=>new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
