@@ -46,7 +46,24 @@ const CompanyLookup=(()=>{
   const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')),text=await new Response(stream).text(),rows=JSON.parse(text);
   return row(validateBlock(rows,index,name),inn);
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup};
+ function parseSelection(value){
+  const ids=[...new Set(String(value).trim().split(/[\s,;]+/).filter(Boolean))];
+  if(ids.length<2||ids.length>5||ids.some(id=>!validInn(id)))throw Error('Укажите от 2 до 5 разных корректных десятизначных ИНН.');
+  return ids;
+ }
+ function divideRounded(n,d){if(d<=0n)throw Error('Неположительный знаменатель');const a=n<0n?-n:n;return (n<0n?-1n:1n)*((a+d/2n)/d);}
+ function calculate(r){
+  const inc=r.income_cents==null?null:BigInt(r.income_cents),exp=r.expense_cents==null?null:BigInt(r.expense_cents);
+  const workers=Number.isSafeInteger(r.workers)&&r.workers>0?BigInt(r.workers):null;
+  const diff=inc===null||exp===null?null:inc-exp;
+  return {difference:diff?.toString()??null,incomePerWorker:inc===null||inc<0n||workers===null?null:divideRounded(inc,workers).toString(),expenseShare:inc===null||inc<=0n||exp===null||exp<0n?null:divideRounded(exp*10000n,inc).toString()};
+ }
+ function barWidths(records,key){
+  const values=records.map(r=>r&&r[key]!=null?BigInt(r[key]):null);
+  const max=values.reduce((a,v)=>v!==null&&v>a?v:a,0n);
+  return values.map(v=>v===null||v<0n||max===0n?null:Number(v*10000n/max)/100);
+ }
+ return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -78,7 +95,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const ranks=Object.entries(ranking.matches);
     if(ranks.length){const list=node('ul');for(const [k,v] of ranks)list.append(node('li',labels[k]+': место '+v.rank.toLocaleString('ru')+' из '+v.eligible.toLocaleString('ru')+' организаций с наблюдением'));result.append(node('h4','Позиции в опубликованных рейтингах'),list,node('p','Рейтинг относится к отчётному году и охвату открытого набора, а не ко всем зарегистрированным организациям.'));}
     else result.append(node('p','В опубликованных первых 500 по трём показателям организация не найдена; точное место не рассчитано.'));
-    const link=new URL(location.href);link.searchParams.set('inn',inn);const share=node('a','Постоянная ссылка на поиск этого ИНН');share.href=link.href;result.append(share);
+    const link=new URL(location.href);link.searchParams.set('inn',inn);const share=node('a','Постоянная ссылка на поиск этого ИНН');share.href=link.href;result.append(share);const add=node('button','Добавить к сравнению');add.type='button';add.onclick=()=>{const target=$('company-compare-ids');const ids=target.value.trim().split(/[\s,;]+/).filter(Boolean);if(!ids.includes(inn))ids.push(inn);target.value=ids.join('\n');$('company-compare').scrollIntoView({block:'start'});target.focus();};result.append(node('p',''),add);
     if(r.income_name&&r.employment_name&&r.income_name!==r.employment_name)result.append(node('p','В источнике занятости: '+r.employment_name+'; различие названий сохранено.'));
     const sources=Object.fromEntries((full?index.sources:rank.report.sources).map(s=>[s.kind,s]));
     const member=(kind,v)=>full&&v!=null?index.members[kind][v]:v;
@@ -89,4 +106,57 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   };
   const requested=new URLSearchParams(location.search).get('inn');if(requested&&CompanyLookup.validInn(requested)){input.value=requested;if(full||rankReady)form.requestSubmit();}
  }catch(e){status.textContent='Индекс недоступен: '+String(e.message||e)}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),form=$('company-compare-form');if(!form)return;
+ const status=$('company-compare-status'),input=$('company-compare-ids'),submit=$('company-compare-submit'),out=$('company-compare-table'),chart=$('company-compare-chart'),exportButton=$('company-compare-export'),metric=$('company-compare-metric'),share=$('company-compare-link');
+ const fixed=(s,unit='')=>{if(s==null)return '—';const n=BigInt(s),a=n<0n?-n:n;return (n<0n?'−':'')+(a/100n).toLocaleString('ru')+','+(a%100n).toString().padStart(2,'0')+unit};
+ const descriptors={income_cents:'Доходы, руб.',expense_cents:'Расходы, руб.',workers:'Среднесписочная численность, чел.'};
+ let serial=0,last=[];
+ const label=r=>r.income_name||r.employment_name||r.name||r.inn;
+ function drawChart(){
+  chart.replaceChildren();if(!last.length)return;
+  const key=metric.value,widths=CompanyLookup.barWidths(last.map(x=>x.record),key);
+  chart.append(node('h3',descriptors[key]),node('p','Длина полосы относительно максимального положительного значения в выбранной группе. Отрицательные значения и пропуски не отображаются полосой.'));
+  const bars=node('div','');bars.className='rm-composition';
+  last.forEach((x,i)=>{if(!x.record)return;const v=x.record[key],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=(widths[i]??0)+'%';track.append(fill);line.append(node('span',label(x.record)),track,node('strong',key==='workers'?(v??'—'):fixed(v)));bars.append(line)});chart.append(bars);
+ }
+ try{
+  const manifest=await Provenance.validateManifest(await load('data-manifest.json'));
+  const [a,b]=await Promise.all(['company-index.json','company-rankings.json'].map(n=>Provenance.get(manifest,n,root)));
+  const index=a.data,rank=b.data,full=index.status==='ready',report=rank.report;
+  if(!full&&!report){status.textContent='Данные ФНС пока не опубликованы.';return}
+  const year=full?index.year:report.year,scope=full?'Полные два архива ФНС':'Опубликованные рейтинги ФНС';
+  const sources=Object.fromEntries((full?index.sources:report.sources).map(x=>[x.kind,x]));
+  status.textContent='Отчётный '+year+' год · '+scope;submit.disabled=false;
+  metric.onchange=drawChart;
+  form.onsubmit=async e=>{
+   e.preventDefault();const token=++serial;out.replaceChildren();chart.replaceChildren();last=[];exportButton.disabled=true;share.hidden=true;
+   let ids;try{ids=CompanyLookup.parseSelection(input.value)}catch(e){status.textContent=e.message;return}
+   submit.disabled=true;status.textContent='Проверка записей за '+year+' год…';
+   try{
+    const result=await Promise.all(ids.map(async inn=>{
+     try{const record=full?await CompanyLookup.lookup(index,inn,root):CompanyLookup.rankMatches(report,inn).record;return {inn,record,error:record?'':'Не найдено в области поиска'}}
+     catch(e){return {inn,record:null,error:'Ошибка проверки: '+String(e.message||e)}}
+    }));
+    if(token!==serial)return;
+    last=result;
+    const table=node('table',''),header=table.createTHead().insertRow(),body=table.createTBody();
+    for(const v of ['Организация / ИНН','Доходы, руб.','Расходы, руб.','Численность, чел.','Доходы минус расходы, руб.','Доходы на работника, руб.','Расходы / доходы, %','Статус']){const th=node('th',v);th.scope='col';header.append(th)}
+    for(const x of result){
+     const tr=body.insertRow(),r=x.record,calc=r?CompanyLookup.calculate(r):{};
+     const a=node('a',r?label(r)+' · '+x.inn:x.inn);const url=new URL(location.href);url.searchParams.set('inn',x.inn);url.hash='company-lookup';a.href=url.href;tr.insertCell().append(a);
+     for(const v of [fixed(r?.income_cents),fixed(r?.expense_cents),r?.workers??'—',fixed(calc.difference),fixed(calc.incomePerWorker),fixed(calc.expenseShare),x.error||'Наблюдение найдено'])tr.insertCell().textContent=v;
+    }
+    out.replaceChildren(table);const found=result.filter(x=>x.record).length;
+    status.textContent=year+' год · '+scope+' · найдено '+found+' из '+ids.length+'. Пропуск не равен нулю.';
+    drawChart();
+    const url=new URL(location.href);url.searchParams.set('compare-inn',ids.join(','));url.hash='company-compare';share.href=url.href;share.hidden=false;
+    exportButton.disabled=!found;
+    exportButton.onclick=()=>csv('company-comparison-'+year+'.csv',[['ИНН','Год','Область поиска','Название в финансовом наборе','Название в наборе занятости','Доходы, копейки','Расходы, копейки','Численность','Разность, копейки','Доходы на работника, копейки','Расходы / доходы, сотые доли процента','Статус','XML финансов','Документ финансов','XML занятости','Документ занятости','URL финансов','SHA-256 финансов','URL занятости','SHA-256 занятости','Отпечаток манифеста'],...result.map(x=>{const r=x.record||{},v=CompanyLookup.calculate(r),member=(kind,n)=>full&&n!=null?index.members[kind][n]:n;return [x.inn,year,scope,r.income_name,r.employment_name,r.income_cents,r.expense_cents,r.workers,v.difference,v.incomePerWorker,v.expenseShare,x.error,member('income',r.income_member),r.income_doc,member('employment',r.employment_member),r.employment_doc,sources.income_expense.source,sources.income_expense.sha256,sources.employment.source,sources.employment.sha256,manifest.data_fingerprint]})]);
+   }catch(e){if(token===serial)status.textContent='Сравнение недоступно: '+String(e.message||e)}finally{if(token===serial)submit.disabled=false}
+  };
+  const selected=new URLSearchParams(location.search).get('compare-inn');if(selected){input.value=selected;form.requestSubmit()}
+ }catch(e){status.textContent='Источники сравнения недоступны: '+String(e.message||e)}
 });

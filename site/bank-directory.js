@@ -64,6 +64,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const a=sources.income_expense,b=sources.employment,labels={income:'Доходы',expense:'Расходы',employment:'Среднесписочная численность'};
   for(const [label,v] of [['Финансовых записей',a.unique],['Записей занятости',b.unique],['Совпали по ИНН',r.paired]]){const c=node('div','');c.className='metric';c.append(node('b',textNum(v)),node('span',label));$('company-rank-metrics').append(c)}
   function show(v){detail.replaceChildren(node('h3',v.name),node('p','ИНН '+v.inn+' · год '+r.year),node('p','Доходы: '+money(v.income_cents)+' руб. · расходы: '+money(v.expense_cents)+' руб. · работники: '+textNum(v.workers)),node('p','Наименование в финансовом источнике: '+(v.income_name||'—')+'; в источнике занятости: '+(v.employment_name||'—')),node('p','Регистрация, ОКВЭД, продукция и текущий статус деятельности ещё не подтверждены.'));
+   const add=node('button','Добавить к сравнению');add.type='button';add.onclick=()=>{const input=$('company-compare-ids');if(!input)return;const ids=input.value.trim().split(/[\s,;]+/).filter(Boolean);if(!ids.includes(v.inn))ids.push(v.inn);input.value=ids.join('\n');$('company-compare').scrollIntoView({block:'start'});input.focus()};detail.append(add);
    for(const [label,s,member,doc] of [['Финансы',a,v.income_member,v.income_doc],['Занятость',b,v.employment_member,v.employment_doc]])if(member){const link=node('a',label+' · ZIP ФНС');link.href=s.source;detail.append(node('p',member+' · документ '+doc),link)}
   }
   function draw(){

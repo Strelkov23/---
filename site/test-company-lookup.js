@@ -20,3 +20,13 @@ const rep={rankings:{income:{eligible:10,rows:[rec]},employment:{eligible:20,row
 assert.deepEqual(C.rankMatches(rep,r[0]).matches,{income:{rank:1,eligible:10},employment:{rank:1,eligible:20}});
 assert.equal(C.rankMatches(rep,'7704211201').record,null);
 assert.throws(()=>C.rankMatches({rankings:{income:rep.rankings.income,employment:{eligible:20,rows:[{...rec,workers:2}]}}},r[0]));
+
+assert.deepEqual(C.parseSelection('7707083893, 7704211201;7707083893'),['7707083893','7704211201']);
+assert.throws(()=>C.parseSelection('7707083893'));
+assert.throws(()=>C.parseSelection('7707083893 7707083894'));
+assert.deepEqual(C.calculate({income_cents:'10001',expense_cents:'8000',workers:2}),{difference:'2001',incomePerWorker:'5001',expenseShare:'7999'});
+assert.deepEqual(C.calculate({income_cents:'0',expense_cents:'20',workers:0}),{difference:'-20',incomePerWorker:null,expenseShare:null});
+assert.deepEqual(C.calculate({income_cents:'9007199254740993',expense_cents:'0',workers:1}),{difference:'9007199254740993',incomePerWorker:'9007199254740993',expenseShare:'0'});
+assert.deepEqual(C.calculate({income_cents:null,expense_cents:'20',workers:2}),{difference:null,incomePerWorker:null,expenseShare:null});
+assert.deepEqual(C.barWidths([{income_cents:'10'},{income_cents:'5'},{income_cents:'-5'},null],'income_cents'),[100,50,null,null]);
+assert.deepEqual(C.barWidths([{workers:0},{workers:null}],'workers'),[null,null]);
