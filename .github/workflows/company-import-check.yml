@@ -2,7 +2,7 @@ name: FNS corporate archive complete import
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/company-import-check.yml','site/company_import.py']
+    paths: ['.github/workflows/company-import-check.yml','site/company_import.py','site/company_index.py','site/test_company_index.py']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
       - name: Verify source schemas and complete archive import
         run: |
           cd site
-          python -m unittest test_company_import.py
+          python -m unittest test_company_import.py test_company_index.py
           python - <<'PY'
           import company_sources as c
           from pathlib import Path
@@ -27,6 +27,7 @@ jobs:
           assert all(r["schema_verified"] for r in d["rows"])
           PY
           python company_import.py --sources ../company-sources.json --output ../corporate-pilot --full
+          python company_index.py --db ../corporate-pilot/company-pilot.sqlite --report ../corporate-pilot/company-pilot.json --output ../corporate-index
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -36,4 +37,5 @@ jobs:
             corporate-pilot/company-rankings.json
             corporate-pilot/company-pilot.sqlite
             company-sources.json
+            corporate-index/
           if-no-files-found: ignore

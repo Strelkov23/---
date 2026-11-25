@@ -24,7 +24,7 @@ jobs:
           cp site/* monitor/
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2
-          python3 -m unittest test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_company_sources.py test_company_import.py
+          python3 -m unittest test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_company_sources.py test_company_import.py test_company_index.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           node test-regional-disparities.js
@@ -38,6 +38,7 @@ jobs:
           node test-interface.js
           node test-facility-map.js
           node test-bank-directory.js
+          node test-company-lookup.js
           node test-sme-map.js
           node test-enterprise-diagnostics.js
           node test-district-map.js

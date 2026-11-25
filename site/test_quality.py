@@ -50,6 +50,8 @@ class QualityTests(unittest.TestCase):
         company_sources.publish(self.out,self.prev,"2026-11-24",False)
         import company_import
         company_import.publish(self.out,self.prev,"2026-11-24",False)
+        import company_index
+        company_index.publish(self.out)
         dg.publish(self.out,self.prev,"2026-11-24",False)
         self.put("rosstat-workbooks.json",{"schema":1,"catalogs":[],"files":[]})
         self.put("finance-workbooks.json",{"schema":1,"years":[]})

@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import link_audit
 
 REQUIRED=("archive.json","literature.json","compare.json","catalog.json","stats.json",
-          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json","amur-enterprises.json","bank-directory.json","company-sources.json","company-rankings.json")
+          "industry.json","cbr.json","sectors.json","status.json","links.json","national.json","historical.json","industrial.json","sector-passports.json","regional-boundaries.json","food-balance.json","electricity-balance.json","facility-energy.json","sme-regions.json","district-meta.json","freshness.json","stat-revisions.json","consistency.json","finance-workbooks.json","rosstat-workbooks.json","federal-budget.json","regional-manufacturing.json","regional-mining-energy.json","industrial-parks.json","park-certificates.json","frp-snapshot.json","investment-projects.json","amur-projects.json","krasnodar-projects.json","project-coverage.json","enterprise-sources.json","amur-enterprises.json","bank-directory.json","company-sources.json","company-rankings.json","company-index.json")
 def finite(x):
     return type(x) in (int,float) and math.isfinite(x)
 def http_url(x):
@@ -174,6 +174,10 @@ def check(out,previous,stamp):
         counts.update(company_import.quality(data["company-rankings.json"]))
         if not data["company-rankings.json"]["report"]:warnings.append("ФНС: полные корпоративные рейтинги ещё не импортированы")
     except (ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Корпоративные рейтинги: "+str(e))
+    try:
+        import company_index
+        counts.update(company_index.quality(data["company-index.json"],out))
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Индекс организаций: "+str(e))
     try:
         import sme_regions
         old_file=previous/"sme-regions.json"

@@ -288,6 +288,10 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/company-atlas.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#company-source-status').textContent.startsWith('Проверка')",timeout=30000)
         assert page.locator("#company-source-table tbody tr").count()==2
+        page.wait_for_function("!document.querySelector('#company-lookup-status').textContent.startsWith('Проверка')",timeout=30000)
+        page.locator("#company-lookup-inn").fill("7707083894")
+        page.locator("#company-lookup-submit").click()
+        assert "корректный" in page.locator("#company-lookup-result").inner_text()
         page.wait_for_function("!document.querySelector('#company-rank-status').textContent.startsWith('Проверка')",timeout=30000)
         if page.locator("#company-rank-export").is_enabled():
             assert page.locator("#company-rank-table tbody tr").count()>0
