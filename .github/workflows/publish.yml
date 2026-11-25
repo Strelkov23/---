@@ -129,6 +129,7 @@ jobs:
           node test-plan-comparison.js
           node test-plan-diagnostics.js
           node test-analyst-cockpit.js
+          node test-plan-report.js
           node test-horizon-feasibility.js
           node test-dynamic-plan.js
           node test-global-plan.js

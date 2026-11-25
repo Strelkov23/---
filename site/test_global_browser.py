@@ -165,6 +165,16 @@ with sync_playwright() as p:
             plan_rows=list(csv.reader(f,delimiter=";"))
         assert len(plan_rows)==3 and len({len(r) for r in plan_rows})==1
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2"), page.evaluate("Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+2&&!e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])")
+        page.goto("http://localhost:8765/plan-report.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#pre-plan option').length===2",timeout=45000)
+        page.locator("#pre-alt").select_option(index=1)
+        page.locator("#pre-run").click()
+        assert page.locator("#pre-json").is_enabled()
+        with page.expect_download() as report:
+            page.locator("#pre-json").click()
+        page.locator("#pre-replay").set_input_files(str(report.value.path()))
+        page.wait_for_function("document.querySelector('#pre-status').textContent.includes('повторный расчёт совпал')")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/analyst-cockpit.html",wait_until="load")
         page.wait_for_function("document.querySelector('#ac-versions').textContent==='2'",timeout=45000)
         page.locator("#ac-year").select_option(str(year+1))
