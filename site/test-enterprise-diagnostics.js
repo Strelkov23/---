@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),D=require('./enterprise-diagnostics.js'),S=require('./regional-disparities.js');
+const unit='На конец года, миллионов рублей',source='https://storage.yandexcloud.net/a/data_11_socio_economic_102_v20260313.zip';
+const note=' · Подраздел источника: A · Единица в оригинале: '+unit+' · Издание: 2025 · Версия: v20260313 · Уровень территории: Регион · ОКТМО: 1 · ОКАТО: 2 · Код показателя: Z';
+const row=(region,value,extra={})=>({region,value,year:2024,note,...extra});
+const a={source,unit,title:'Кредиторская задолженность организаций: Всего',values:[row('Москва',100),row('Томская область',0),row('Тульская область',100),row('Омская область',100)]};
+const b={source,unit,title:'Кредиторская задолженность организаций: Просроченная',values:[row('Москва',10),row('Томская область',0),row('Тульская область',110),row('Омская область',10,{note:note.replace('ОКАТО: 2','ОКАТО: 3')})]};
+let r=D.calculate(a,b,2024,S.sample);
+assert.equal(r.rows.find(x=>x.region==='Москва').value,10);
+assert.equal(r.rows.find(x=>x.region==='Томская область').reason,'bounds');
+assert.equal(r.rows.find(x=>x.region==='Тульская область').value,null);
+assert.equal(r.rows.find(x=>x.region==='Омская область').reason,'scope');
+assert.equal(D.candidates([a,b],'payable','Всего').length,1);
+assert.throws(()=>D.calculate(a,{...b,unit:'рубли'},2024,S.sample));
+assert.throws(()=>D.calculate(a,{...b,title:'Дебиторская задолженность организаций: Просроченная'},2024,S.sample));
+assert.equal(D.scope({note:''}),null);
+assert.equal(D.calculate(a,{...b,values:[row('Москва',0)]},2024,S.sample).rows.find(x=>x.region==='Москва').value,0);
+console.log('Enterprise diagnostics: exact scope, zero and missing tests passed');

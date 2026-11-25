@@ -49,6 +49,7 @@ jobs:
           node test-interface.js
           node test-facility-map.js
           node test-sme-map.js
+          node test-enterprise-diagnostics.js
           node test-district-map.js
           node test-freshness.js
           node test-stat-revisions.js
