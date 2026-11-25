@@ -283,3 +283,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #sme-finance-table table{min-width:660px}
 
 .company-passport-metrics .metric,.company-passport-metrics .metric b{min-width:0;overflow-wrap:anywhere;white-space:normal}#company-compare-chart strong{white-space:normal;overflow-wrap:anywhere}.company-chart-missing{height:1.25rem;border:1px dashed #9aaab3;border-radius:.2rem;background:repeating-linear-gradient(135deg,transparent,transparent 5px,#9aaab333 5px,#9aaab333 10px)}
+
+#group-cross-chart,#group-cross-table{min-width:0;max-width:100%;overflow-wrap:anywhere}#group-cross-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}#group-cross-chart strong{white-space:normal}#group-cross-table table{min-width:860px}#group-cross-year,#group-cross-sector,#group-cross-metric{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
