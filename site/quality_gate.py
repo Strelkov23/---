@@ -194,6 +194,12 @@ def check(out,previous,stamp):
             import group_passports
             counts.update(group_passports.quality(json.loads((out/"group-passports.json").read_text(encoding="utf-8"))))
         except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Группы компаний: "+str(e))
+    if (out/"corporate-watch.json").is_file():
+        try:
+            import corporate_watch
+            counts.update(corporate_watch.quality(json.loads((out/"corporate-watch.json").read_text(encoding="utf-8")),json.loads((out/"group-passports.json").read_text(encoding="utf-8"))))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as e:issues.append("Контроль корпоративных документов: "+str(e))
+
     try:
         import company_sources
         counts.update(company_sources.quality(data["company-sources.json"]))
