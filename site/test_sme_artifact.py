@@ -35,3 +35,21 @@ class ArtifactTest(unittest.TestCase):
             for changes in (dict(year=2024),dict(fingerprint="d"*64),dict(status="not_deployed")):
                 index.write_text(json.dumps({**ix,**changes}))
                 with self.subTest(changes=changes),self.assertRaises(ValueError):s.inspect(root,index)
+
+    def test_profile_feature_requires_validation(self):
+        from unittest.mock import patch
+        import sme_profile_index as p
+        a=dict(mode="full",xml_total=1,xml_processed=1,edition="2026-11-10",archive_sha256="a"*64,counts={},reconciliation=dict(period="2026-11-10",sha256="b"*64,national_difference=0))
+        b=dict(schema=1,status="diagnostic",sme_edition=a["edition"],sme_archive_sha256=a["archive_sha256"],reference_sha256="b"*64,financial_fingerprint="c"*64,financial_year=2025,national_difference=0,quarantined=0,declared=[{}],reported=[{}],paired_sums_version=1,profiles={"rows":[]})
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);index=root/"company-index.json"
+            for path,data in (("classification.json",a),("finance-join.json",b),("company-index.json",dict(status="ready",year=2025,fingerprint="c"*64)),(p.FILE,{"schema":1})):
+                (root/path).write_text(json.dumps(data))
+            with self.assertRaises(ValueError):s.inspect(root)
+            with patch.object(p,"quality",return_value={"profiles":1}) as checked:
+                self.assertEqual(s.inspect(root,index),("2026-11-10",6))
+                checked.assert_called_once()
+            with patch.object(p,"quality",side_effect=ValueError("bad block")):
+                with self.assertRaises(ValueError):s.inspect(root,index)
+            (root/p.FILE).unlink();(root/p.DIR).mkdir()
+            with self.assertRaises(ValueError):s.inspect(root,index)

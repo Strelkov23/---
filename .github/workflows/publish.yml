@@ -48,12 +48,17 @@ jobs:
             if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name sme-full-classification --dir "$folder" &&
                score=$(python3 site/sme_artifact.py "$folder" --financial-index history/published/company-index.json); then
               if [[ -z "$best" || "$score" > "$best" ]]; then
+                rm -rf /tmp/sme-source/sme-profile-index /tmp/sme-source/sme-profile-index.json
                 cp "$folder/classification.json" "$folder/finance-join.json" /tmp/sme-source/
+                if test "${score##* }" -ge 4; then
+                  cp "$folder/sme-profile-index.json" /tmp/sme-source/
+                  cp -a "$folder/sme-profile-index" /tmp/sme-source/
+                fi
                 best="$score"
                 echo "Selected diagnostic artifact from run $id ($score)"
               fi
               # A current-edition enriched candidate is sufficient.
-              if [[ "$score" == "$(date -u +%Y-%m)-10 2" ]]; then
+              if [[ "$score" == "$(date -u +%Y-%m)-10 6" ]]; then
                 rm -rf "$folder"
                 break
               fi
@@ -77,6 +82,7 @@ jobs:
           BANK_ARCHIVE_SOURCE: /tmp/bank-archive-source
           SME_FINANCE_REPORT: /tmp/sme-source/finance-join.json
           SME_MATRIX_REPORT: /tmp/sme-source/classification.json
+          SME_PROFILE_SOURCE: /tmp/sme-source
         run: |
           unzip -q EconomicsPages.zip -d monitor
           cp site/* monitor/

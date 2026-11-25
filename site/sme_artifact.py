@@ -23,6 +23,14 @@ def inspect(folder,financial_index=None):
         if index.get("status")!="ready":raise ValueError("Financial index is not ready")
         if b["financial_fingerprint"]!=index.get("fingerprint") or b.get("financial_year")!=index.get("year"):raise ValueError("Artifact belongs to another financial index")
     features=int(b.get("paired_sums_version")==1)+int(isinstance(b.get("profiles",{}).get("rows"),list))
+    if (folder/"sme-profile-index.json").exists():
+        import sme_profile_index as p
+        if financial_index is None:raise ValueError("Profile preflight requires exact financial index")
+        profile=read(folder/p.FILE,8*1024*1024)
+        p.quality(profile,folder,index,b)
+        features+=4
+    elif (folder/"sme-profile-index").exists():
+        raise ValueError("Profile shards without manifest")
     return (edition,features)
 
 if __name__=="__main__":
