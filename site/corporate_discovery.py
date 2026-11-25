@@ -9,7 +9,7 @@ import corporate_watch as watch
 
 FILE="corporate-discovery.json"
 NOTE="Кандидаты документов из HTML официальных страниц; не проверенные финансовые наблюдения. Дата обнаружения не дата публикации. Динамические ссылки могут отсутствовать."
-CATALOGS={"x5":"https://www.x5.ru/ru/investors/investors-calendar/","yandex":"https://ir.yandex.ru/financial-releases","ozon":"https://ir.ozon.com/"}
+CATALOGS={"x5":"https://www.x5.ru/ru/investors/investors-calendar/","yandex":"https://ir.yandex.ru/financial-releases","ozon":"https://ir.ozon.com/","nornickel":"https://nornickel.ru/investors/news/","phosagro":"https://www.phosagro.ru/investors/reports/msfo/"}
 MAX_HTML=4*1024*1024
 MAX_LINKS=100
 def allowed(group,url):
@@ -42,6 +42,10 @@ def candidate(group,url,title):
         q=parse_qs(u.query)
         return path.rstrip("/")=="/financial-releases" and bool(re.fullmatch(r"q[1-4]",q.get("report",[""])[0])) and bool(re.fullmatch(r"20\d{2}",q.get("year",[""])[0]))
     if group=="ozon":return path.startswith("/ru/sth/") and bool(re.search(r"финансов|отчетност|financial|finansov|results",text)) and not re.search(r"ozon-kapital|озон капитал|ozon capital",text)
+    if group=="nornickel":
+        return path.startswith("/news-and-media/press-releases-and-news/") and bool(re.search(r"finansovye-rezultaty|финансовые результаты",text)) and bool(re.search(r"msfo|мсфо|ifrs",text))
+    if group=="phosagro":
+        return path.endswith(".pdf") and bool(re.search(r"мсфо|ifrs|msfo|консолидированн|consolidated",text))
     return False
 def parse(group,html):
     p=Links();p.feed(html);rows={}
@@ -63,9 +67,10 @@ def fetch(group):
         return parse(group,raw.decode(r.headers.get_content_charset() or "utf-8",errors="strict"))
 def blank(group):
     return dict(url=CATALOGS[group],checked=None,success=None,status="waiting",error=None,candidates=[])
-def quality(d,data):
+def quality(d,data,expected=None):
     groups={g["id"] for g in data["groups"]}
-    if d.get("schema")!=1 or d.get("note")!=NOTE or set(d["rows"])!=set(CATALOGS) or not set(CATALOGS)<=groups:raise ValueError("Паспорт каталога")
+    expected=set(CATALOGS) if expected is None else set(expected)
+    if not expected or not expected<=set(CATALOGS) or d.get("schema")!=1 or d.get("note")!=NOTE or set(d["rows"])!=expected or not expected<=groups:raise ValueError("Паспорт каталога")
     for group,r in d["rows"].items():
         if r["url"]!=CATALOGS[group] or r["status"] not in ("waiting","ok","unavailable"):raise ValueError("Источник каталога")
         checked=watch.time(r["checked"]) if r["checked"] else None
@@ -78,7 +83,7 @@ def quality(d,data):
         if len(rows)>MAX_LINKS or len({x["url"] for x in rows})!=len(rows) or bool(rows)!=bool(success):raise ValueError("Охват кандидатов")
         for x in rows:
             if not candidate(group,x["url"],x["title"]) or not 0<len(x["title"])<=300 or watch.time(x["first_seen"])>watch.time(x["last_seen"]) or watch.time(x["last_seen"])>success:raise ValueError("Кандидат")
-    return dict(corporate_discovery_catalogs=len(CATALOGS),corporate_discovery_success=sum(bool(r["success"]) for r in d["rows"].values()),corporate_discovery_candidates=sum(len(r["candidates"]) for r in d["rows"].values()))
+    return dict(corporate_discovery_catalogs=len(expected),corporate_discovery_success=sum(bool(r["success"]) for r in d["rows"].values()),corporate_discovery_candidates=sum(len(r["candidates"]) for r in d["rows"].values()))
 def one(group,row,stamp,fetcher):
     r=dict(row,checked=stamp)
     try:
@@ -92,7 +97,15 @@ def publish(out,previous,stamp,refresh,fetcher=fetch):
     data=json.loads((out/"group-passports.json").read_text(encoding="utf-8"))
     d=dict(schema=1,note=NOTE,rows={k:blank(k) for k in CATALOGS})
     try:
-        old=json.loads((previous/FILE).read_text(encoding="utf-8"));quality(old,data);d=old
+        old=json.loads((previous/FILE).read_text(encoding="utf-8"))
+        # Restore each unchanged, valid catalogue independently on expansion.
+        if old.get("schema")==1 and old.get("note")==NOTE:
+            for k in CATALOGS:
+                if k not in old["rows"]:continue
+                try:
+                    quality(dict(schema=1,note=NOTE,rows={k:old["rows"][k]}),data,{k})
+                    d["rows"][k]=old["rows"][k]
+                except (ValueError,KeyError,TypeError,AttributeError):pass
     except (OSError,ValueError,KeyError,TypeError,AttributeError):pass
     now=watch.time(stamp)
     if refresh:

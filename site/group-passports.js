@@ -272,7 +272,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  try{
   const m=await Provenance.validateManifest(await load('data-manifest.json'));
   const e=await Provenance.get(m,'corporate-discovery.json',root),d=e.data;
-  const labels={x5:'X5',yandex:'Яндекс',ozon:'Ozon'},states={waiting:'Ожидает проверки',ok:'Ссылки распознаны',unavailable:'Недоступно / не распознано'};
+  const labels={x5:'X5',yandex:'Яндекс',ozon:'Ozon',nornickel:'Норникель',phosagro:'ФосАгро'},states={waiting:'Ожидает проверки',ok:'Ссылки распознаны',unavailable:'Недоступно / не распознано'};
   const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();let total=0;
   for(const label of ['Компания','Состояние каталога','Последняя проверка','Документ-кандидат','Впервые обнаружен','Последний раз обнаружен']){const th=node('th',label);th.scope='col';h.append(th)}
   for(const [k,r] of Object.entries(d.rows)){
