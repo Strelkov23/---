@@ -26,7 +26,15 @@ const ChainStress=(()=>{
   const shares=values.map(v=>v/total).sort((a,b)=>b-a);
   return {total,hhi:sum(shares.map(v=>v*v)),top3:sum(shares.slice(0,3)),top1:shares[0]};
  }
- return {validate,calculate,concentration};
+ function breakdown(result,index){
+  if(!Number.isInteger(index)||index<0||index>=result.rows.length)throw Error('Invalid group');
+  const row=result.rows[index],parts=result.contributions[index].map((value,j)=>({j,name:result.rows[j].name,value,direct:j===index?row.direct:0,indirect:value-(j===index?row.direct:0)})).sort((a,b)=>Math.abs(b.value)-Math.abs(a.value)||a.j-b.j);
+  return {direct:row.direct,indirect:row.dx-row.direct,total:row.dx,parts};
+ }
+ function constraints(result){
+  return result.rows.map((r,i)=>({i,name:r.name,required:r.pct,limit:r.cap,scaled:r.pct*result.alpha,gap:Math.max(0,r.pct-r.cap),lowerGap:Math.max(0,-100-r.pct),binding:r.binding})).sort((a,b)=>Number(b.binding)-Number(a.binding)||Math.max(b.gap,b.lowerGap)-Math.max(a.gap,a.lowerGap)||Math.abs(b.required)-Math.abs(a.required)||a.i-b.i);
+ }
+ return {validate,calculate,concentration,breakdown,constraints};
 })();
 if(typeof module!=='undefined')module.exports=ChainStress;
 
@@ -38,18 +46,58 @@ document.addEventListener('DOMContentLoaded',async()=>{
  const f=v=>Number.isFinite(v)?fmt(v):'—',sum=a=>a.reduce((s,x)=>s+x,0);
  const field=(v,min,max,label)=>{const x=node('input','');x.type='number';x.min=min;x.max=max;x.step='0.1';x.value=v;x.setAttribute('aria-label',label);return x};
  const table=(parent,headers,rows)=>{const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();for(const v of headers){const th=node('th',v);th.scope='col';h.append(th)}for(const r of rows){const tr=b.insertRow();for(const v of r){const c=tr.insertCell();if(v instanceof Node)c.append(v);else c.textContent=v??'—'}}parent.replaceChildren(t);return t};
+ const graph=$('stress-limit-chart'),decomp=$('stress-decomp-chart'),pick=$('stress-decomp-group'),decompStatus=$('stress-decomp-status'),decompCsv=$('stress-decomp-csv');
  const addMetric=(label,v)=>{const b=node('div','');b.className='metric';b.append(node('b',v),node('span',label));metrics.append(b)};
  try{
   const m=await load('sectors.json');ChainStress.validate(m);
   if(!version){try{const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}catch{}}
   const qs=new URLSearchParams(location.search),read=(key,def,min,max)=>{const parts=qs.get(key)?.split(',').map(Number)||[];return parts.length===m.names.length&&parts.every(v=>Number.isFinite(v)&&v>=min&&v<=max)?parts:m.names.map(()=>def)};
   const initialShock=read('stress-shocks',0,-20,20),initialCaps=read('stress-caps',10,0,100);
+  pick.replaceChildren(...m.names.map((n,i)=>new Option(n,String(i))));pick.value='8';
   const shocks=m.names.map((n,i)=>field(initialShock[i],-20,20,'Изменение спроса: '+n)),caps=m.names.map((n,i)=>field(initialCaps[i],0,100,'Предел прироста: '+n));
   table(host,['Группа','Выпуск базы, млрд ₽','Конечный спрос базы, млрд ₽','Шок спроса, %','Предел прироста, %'],m.names.map((n,i)=>[n,f(m.output[i]/1000),f(m.demand[i]/1000),shocks[i],caps[i]]));
+  let latest=null;
+  function renderBreakdown(){
+   decomp.replaceChildren();decompCsv.disabled=true;
+   if(!latest){decompStatus.textContent='Сначала задайте корректные параметры.';return}
+   const i=Number(pick.value),r=ChainStress.breakdown(latest,i),row=latest.rows[i],signed=v=>(v>0?'+':'')+f(v);
+   decompStatus.textContent=row.name+' · прямое изменение конечного спроса: '+signed(r.direct)+' · косвенный эффект: '+signed(r.indirect)+' · итог выпуска: '+signed(r.total)+' млрд ₽ (цены 2021 г.).';
+   const summary=node('div','');summary.className='stress-decomp-summary';
+   for(const [label,v] of [['Прямой спрос',r.direct],['Косвенный эффект',r.indirect],['Итог выпуска',r.total]]){const item=node('div','');item.append(node('span',label),node('strong',signed(v)+' млрд ₽'));summary.append(item)}
+   decomp.append(summary);
+   const max=Math.max(0,...r.parts.map(x=>Math.abs(x.value))),bars=node('div','');bars.className='stress-signed-bars';
+   for(const x of r.parts){
+    const line=node('div','');line.className='stress-signed-row';const track=node('div','');track.className='stress-signed-track';const bar=node('div','');bar.className='stress-signed-fill';bar.dataset.sign=x.value<0?'negative':'positive';bar.style.width=(max?50*Math.abs(x.value)/max:0)+'%';track.append(bar);
+    line.append(node('span',x.name),track,node('strong',signed(x.value)));bars.append(line);
+   }
+   decomp.append(node('p','Вклад каждой группы конечного спроса в выпуск выбранной группы, млрд ₽. Положительные и отрицательные вклады могут компенсировать друг друга.'),bars);
+   decompCsv.disabled=false;decompCsv.onclick=()=>csv('chain-group-contributions-'+(i+1)+'-2021.csv',[['Год','Группа выпуска','Группа спроса','Шок спроса, %','Полный вклад, млрд руб.','Прямой вклад, млрд руб.','Косвенный вклад, млрд руб.','Источник'],...r.parts.map(x=>[2021,row.name,x.name,latest.rows[x.j].shock,x.value,x.direct,x.indirect,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
+  }
+  pick.onchange=renderBreakdown;
+  function renderConstraints(r){
+   graph.replaceChildren();const rows=ChainStress.constraints(r),max=Math.max(1,...rows.flatMap(x=>[Math.abs(x.required),x.limit,Math.abs(x.scaled)]));
+   const caption=node('p','Требуемое изменение выпуска и изменение при едином допустимом масштабе. Вертикальная отметка — заданный верхний предел прироста; нижняя граница выпуска −100%. Шкала едина для всех групп.');
+   graph.append(caption);
+   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),w=1000,h=100+rows.length*30;svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('width',w);svg.setAttribute('role','img');svg.setAttribute('aria-label','Изменение выпуска, масштабированный сценарий и пределы по 19 группам');
+   const add=(tag,attrs,t,parent=svg)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(t!==undefined)el.textContent=t;parent.append(el);return el};
+   add('rect',{width:w,height:h,fill:'#fff'});
+   const zero=620,scale=245/max,X=v=>zero+v*scale;
+   add('text',{x:18,y:24,'font-size':16,fill:'#173e52','font-weight':'bold'},'Ограничения выпуска · % базового выпуска');
+   for(const v of [-max,-max/2,0,max/2,max]){add('line',{x1:X(v),x2:X(v),y1:45,y2:h-25,stroke:v===0?'#52696e':'#dce5e5'});add('text',{x:X(v),y:40,'text-anchor':'middle',fill:'#405960','font-size':11},f(v)+'%')}
+   for(const [j,x] of rows.entries()){
+    const y=54+j*30,name=(x.i+1)+'. '+x.name;
+    const label=add('text',{x:365,y:y+13,'text-anchor':'end','font-size':11,fill:'#173e52','font-weight':x.binding?'bold':'normal'},name);chartFitLabel(label,350);
+    for(const [v,dy,color] of [[x.required,0,x.gap>0||x.lowerGap>0?'#b26c43':'#7d9eaa'],[x.scaled,10,'#006c69']])add('rect',{x:Math.min(zero,X(v)),y:y+dy,width:Math.abs(v)*scale,height:8,fill:color});
+    add('line',{x1:X(x.limit),x2:X(x.limit),y1:y-3,y2:y+21,stroke:'#a24724','stroke-width':2});
+    add('text',{x:880,y:y+13,'font-size':11,fill:'#173e52'},f(x.required)+'%'+(x.binding?' · предел':''));
+   }
+   graph.append(svg);
+  }
   function draw(){
-   metrics.replaceChildren();out.replaceChildren();matrix.replaceChildren();btn.disabled=matrixBtn.disabled=true;
+   latest=null;metrics.replaceChildren();out.replaceChildren();matrix.replaceChildren();graph.replaceChildren();decomp.replaceChildren();btn.disabled=matrixBtn.disabled=decompCsv.disabled=true;decompStatus.textContent='';
    if([...shocks,...caps].some(x=>!x.value||!x.validity.valid)){status.textContent='Проверьте значения: спрос −20…20%, пределы 0…100%.';return}
    const p=shocks.map(x=>x.valueAsNumber),c=caps.map(x=>x.valueAsNumber),r=ChainStress.calculate(m,p,c);
+   latest=r;renderConstraints(r);renderBreakdown();
    const failed=r.rows.filter(x=>x.pct>x.cap+1e-9||x.belowZero).length;
    status.textContent='Превышения / отрицательный выпуск: '+failed+' из 19 групп · максимальная доля единого сценария: '+f(r.alpha*100)+'%. Это условная проверка, не прогноз мощности.';
    addMetric('Изменение валового выпуска',f(r.total)+' млрд ₽');addMetric('Прямое изменение спроса',f(r.direct)+' млрд ₽');addMetric('Косвенное изменение выпуска',f(r.total-r.direct)+' млрд ₽');addMetric('Чистое изменение импортных затрат',f(r.imports)+' млрд ₽');

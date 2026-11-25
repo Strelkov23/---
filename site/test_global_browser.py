@@ -26,6 +26,16 @@ with sync_playwright() as p:
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/scenario.html",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#stress-controls tbody tr').length===19",timeout=30000)
+        page.wait_for_function("document.querySelector('#stress-limit-chart svg')!==null",timeout=30000)
+        assert page.locator("#stress-decomp-chart .stress-signed-row").count()==19
+        page.locator("#stress-controls input[aria-label^='Изменение спроса:']").nth(8).fill("10")
+        assert page.locator("#stress-decomp-csv").is_enabled()
+        page.locator("#stress-decomp-group").select_option("0")
+        with page.expect_download() as decomp:
+            page.locator("#stress-decomp-csv").click()
+        assert decomp.value.suggested_filename=="chain-group-contributions-1-2021.csv"
+        page.locator("#stress-reset").click()
         page.locator("#global-run").wait_for()
         page.wait_for_function("!document.querySelector('#global-run').disabled")
         page.locator("#global-run").click()

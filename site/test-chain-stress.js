@@ -8,3 +8,13 @@ let c=cap.slice();c[8]=0;a=S.calculate(m,p,c);assert.equal(a.alpha,0);assert.ok(
 p[0]=-10;a=S.calculate(m,p,cap);assert.ok(a.grossImportIncrease>=0&&a.grossImportDecrease<=0);assert.ok(Math.abs(a.imports-a.grossImportIncrease-a.grossImportDecrease)<1e-8);
 const equal=S.concentration([1,1,1,1]);assert.equal(equal.hhi,.25);assert.equal(equal.top3,.75);assert.equal(S.concentration([1,-1]),null);
 console.log('Chain stress tests passed');
+const single=zero.slice();single[8]=10;
+let result=S.calculate(m,single,cap),d=S.breakdown(result,8);
+assert.ok(Math.abs(d.direct+d.indirect-d.total)<1e-9);
+assert.ok(Math.abs(d.parts.reduce((s,x)=>s+x.value,0)-d.total)<1e-9);
+assert.ok(Math.abs(d.parts.reduce((s,x)=>s+x.indirect,0)-d.indirect)<1e-9);
+assert.equal(d.parts.filter(x=>x.direct!==0).length,1);
+assert.equal(S.breakdown(result,0).direct,0);
+assert.throws(()=>S.breakdown(result,19));
+const blocked=cap.slice();blocked[8]=0;result=S.calculate(m,single,blocked);
+const limits=S.constraints(result);assert.ok(limits[0].binding);assert.ok(limits.every(x=>x.scaled<=x.limit+1e-9&&x.scaled>=-100-1e-9));assert.ok(limits.every(x=>x.gap>=0&&x.lowerGap>=0));
