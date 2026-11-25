@@ -16,6 +16,12 @@ const P=require('./provenance.js');
  assert.equal(P.validPath('federal-budget.csv'),true);
  assert.equal(P.validPath('other.csv'),false);
  assert.equal(P.validPath('../federal-budget.csv'),false);
+ for(const name of ['a.json\n','/a.json','regional-data/../a.json','a.txt','https://example.org/a.json'])assert.equal(P.validPath(name),false);
+ for(const v of [null,[],{sha256:hash,bytes:true},{sha256:hash,bytes:-1},{sha256:hash,bytes:2**53},{sha256:hash.toUpperCase(),bytes:7},{sha256:hash,bytes:7,extra:1}]){
+  await assert.rejects(P.validateManifest({...m,files:{'a.json':v}}));
+  await assert.rejects(P.verify({...m,files:{'a.json':v}},'a.json',data));
+ }
+ await assert.rejects(P.validateManifest({...m,files:[]}));
  const originalFetch=globalThis.fetch;
  try{
   globalThis.fetch=async()=>new Response(csv);
