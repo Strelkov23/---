@@ -297,3 +297,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #project-search-table,#project-search-summary,#project-search .project-controls{min-width:0;max-width:100%;overflow-wrap:anywhere}#project-search-table table{min-width:1050px}#project-search .project-controls>*{min-width:0;max-width:100%}
 
 #project-search-totals,#project-search-totals .metrics{min-width:0;max-width:100%;overflow-wrap:anywhere}#project-search-totals .metric b{white-space:normal;overflow-wrap:anywhere}
+
+#bank-ratio-table,#bank-balance-ratios .project-controls{min-width:0;max-width:100%;overflow-wrap:anywhere}#bank-ratio-table table{min-width:760px}#bank-ratio-metric{max-width:100%}
