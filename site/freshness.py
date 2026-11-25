@@ -158,7 +158,7 @@ def collect(out,stamp):
         path=out/("bank-"+name+".json")
         if not path.is_file():continue
         d=read(path.name);p=bank_progress(d,capital)
-        add("bank-form-"+name,"Банк России",title,"https://www.cbr.ru/banking_sector/credit/",p,d["period"],days=1,policy="До 20 запросов за сутки; повтор недоступной записи через 14 суток; период отчёта фиксирован",href="banks.html#bank-coverage",state_override=p["state"])
+        add("bank-form-"+name,"Банк России",title,"https://www.cbr.ru/banking_sector/credit/",p,d["period"],not_before=(dt(p["checked"]).replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)) if p["checked"] else now,policy="До 20 запросов за сутки; повтор недоступной записи через 14 суток; период отчёта фиксирован",href="banks.html#bank-coverage",state_override=p["state"])
     path=out/"bank-disclosure.json"
     if path.is_file():
         d=read(path.name)
@@ -174,7 +174,7 @@ def collect(out,stamp):
     path=out/"company-index.json"
     if path.is_file():
         d=read(path.name);ready=d["status"]=="ready"
-        add("company-full-index","Предприятия","ФНС · полный финансовый индекс",None,dict(status="Записей: "+str(d.get("count",0))+"; не ЕГРЮЛ"),str(d["year"]) if ready else None,policy="Перестраивается при смене выпуска финансовых архивов; при сбое сохраняется совместимый снимок",href="company-atlas.html#company-lookup",state_override="partial" if ready else "waiting")
+        add("company-full-index","Предприятия","ФНС · полный финансовый индекс",None,dict(status="Записей: "+str(d.get("count",0))+"; не ЕГРЮЛ"),str(d["year"]) if ready else None,policy="Перестраивается при смене выпуска финансовых архивов; при сбое сохраняется совместимый снимок. Дата успешной загрузки в паспорте индекса не указана.",href="company-atlas.html#company-lookup",state_override="ok" if ready else "waiting")
     path=out/"sme-finance.json"
     if path.is_file():
         d=read(path.name);ready=d.get("status")=="diagnostic"
