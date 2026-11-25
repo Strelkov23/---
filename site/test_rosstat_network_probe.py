@@ -29,4 +29,17 @@ class ProbeTests(unittest.TestCase):
             self.assertTrue(all(x["status"]=="accepted" and x["observations"]==1 for x in r["results"]))
             r=p.probe(fetcher=fetch,parser=lambda *a:[])
             self.assertTrue(all(x["status"]=="parse_rejected" for x in r["results"]))
+    def test_bounded_404_recovery(self):
+        urls=["https://rosstat.gov.ru/storage/mediabank/"+x+".xlsx" for x in "abcd"]
+        options=[dict(url=u,title="test") for u in urls]
+        calls=[]
+        def fetch(u,kind):
+            if kind=="workbook":
+                calls.append(u)
+                if u!=urls[2]:raise HTTPError(u,404,"missing",{},None)
+            return SimpleNamespace(raw=b"content",charset="utf-8",final_url=u,sha256="a"*64)
+        with patch.object(p.h,"discover",return_value=[]),patch.object(p,"shortlist",return_value=options):
+            r=p.probe(fetcher=fetch,parser=lambda *a:[{"metric":"test"}],alternatives=True)
+        self.assertTrue(all(x["status"]=="accepted" and len(x["attempts"])==3 for x in r["results"]))
+        self.assertNotIn(urls[3],calls)
 if __name__=="__main__":unittest.main()
