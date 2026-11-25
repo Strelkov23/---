@@ -9,3 +9,14 @@ const z=M.measures({code:'01',total:0,individual:0,workers:0},{total:100});
 assert.equal(z.ipShare,null);assert.equal(z.workersPerEntity,null);assert.equal(z.nationalShare,0);
 assert.equal(M.ratio(null,10),null);assert.deepEqual(M.rank([z,r],'ipShare').map(x=>x.code),['77','01']);
 assert.equal(M.measures({total:10,individual:0,workers:0},{total:0}).nationalShare,null);
+
+const sample={national:{total:100,legal:40},rows:[{code:'01',name:'А',total:20,legal:10,individual:10,workers:30},{code:'02',name:'Б',total:40,legal:10,individual:30,workers:0},{code:'03',name:'В',total:0,legal:0,individual:0,workers:0}]};
+const compare=M.regionalComparison(sample,['01','02'],'legal');
+assert.equal(compare.eligible,3);assert.deepEqual(compare.rows.map(r=>r.place),[1,1]);
+assert.deepEqual(compare.rows.map(r=>r.legalShare),[50,25]);assert.equal(compare.rows[0].legalNationalShare,25);
+assert.equal(M.regionalComparison(sample,['01','03'],'legalShare').rows[1].place,null);
+assert.equal(M.regionalComparison(sample,['01','03'],'legalShare').eligible,2);
+assert.equal(M.regionalComparison(sample,['01','03'],'workers').rows[1].width,0);
+assert.throws(()=>M.regionalComparison(sample,['01','01'],'legal'));
+assert.throws(()=>M.regionalComparison(sample,['01','99'],'legal'));
+assert.throws(()=>M.regionalComparison(sample,['01','02'],'invalid'));

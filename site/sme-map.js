@@ -13,7 +13,21 @@ const SMEMap=(()=>{
  function rank(rows,metric){
   return [...rows].sort((a,b)=>{const av=Number.isFinite(a[metric]),bv=Number.isFinite(b[metric]);return av!==bv?(av?-1:1):av?b[metric]-a[metric]||String(a.code).localeCompare(String(b.code)):String(a.code).localeCompare(String(b.code))});
  }
- return {key,join,ratio,measures,rank}
+ function regionalComparison(data,ids,metric){
+  const allowed=['total','legal','individual','workers','ipShare','nationalShare','workersPerEntity','legalShare','legalNationalShare'];
+  if(!allowed.includes(metric)||!Array.isArray(ids)||ids.length<2||ids.length>8||new Set(ids).size!==ids.length)throw Error('Выберите от 2 до 8 разных регионов и показатель');
+  const by=new Map(data.rows.map(r=>[r.code,r]));
+  const all=data.rows.map(r=>({...measures(r,data.national),legalShare:ratio(r.legal,r.total,100),legalNationalShare:ratio(r.legal,data.national.legal,100)}));
+  const ordered=rank(all,metric);
+  const rows=ids.map(code=>{
+   if(!by.has(code))throw Error('Регион отсутствует в срезе ФНС');
+   const r=all.find(x=>x.code===code),v=r[metric];
+   return {...r,value:v,place:Number.isFinite(v)?1+ordered.filter(x=>Number.isFinite(x[metric])&&x[metric]>v).length:null};
+  });
+  const max=Math.max(0,...rows.map(r=>Number.isFinite(r.value)?r.value:0));
+  return {rows:rows.map(r=>({...r,width:Number.isFinite(r.value)&&max>0?100*r.value/max:null})),eligible:all.filter(r=>Number.isFinite(r[metric])).length};
+ }
+ return {key,join,ratio,measures,rank,regionalComparison}
 })();
 if(typeof module!=='undefined')module.exports=SMEMap;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -60,4 +74,41 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   }
   metric.onchange=()=>{draw();renderTable()};form.onsubmit=e=>e.preventDefault();draw();renderTable()
  }catch(e){status.textContent='Срез МСП недоступен: '+e.message}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),form=$('sme-compare-form');if(!form)return;
+ const status=$('sme-compare-status'),select=$('sme-compare-regions'),add=$('sme-compare-add'),metric=$('sme-compare-metric'),chosen=$('sme-compare-selected'),out=$('sme-compare-table'),chart=$('sme-compare-chart'),exp=$('sme-compare-export'),link=$('sme-compare-link');
+ const labels={total:'Всего МСП',legal:'Юридические лица МСП',individual:'ИП',workers:'Учтённые работники',ipShare:'Доля ИП, %',nationalShare:'Доля в числе МСП РФ, %',workersPerEntity:'Учтённых работников на субъект МСП',legalShare:'Доля ЮЛ среди МСП, %',legalNationalShare:'Доля в числе ЮЛ МСП РФ, %'};
+ const fmt=n=>Number.isFinite(n)?n.toLocaleString('ru-RU',{maximumFractionDigits:2}):'—';
+ let ids=[];
+ try{
+  const m=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(m,'sme-regions.json',root),d=entry.data;
+  if(!d.rows.length){status.textContent='Срез ФНС недоступен. '+(d.error||'');return}
+  const by=new Map(d.rows.map(r=>[r.code,r]));
+  select.replaceChildren(...[...d.rows].sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(r=>new Option(r.name+' · '+r.code,r.code)));
+  const params=new URLSearchParams(location.search),requested=(params.get('sme-regions')||'').split(',').filter(x=>by.has(x));
+  ids=[...new Set(requested)].slice(0,8);
+  if(labels[params.get('sme-metric')])metric.value=params.get('sme-metric');
+  function draw(){
+   chosen.replaceChildren();out.replaceChildren();chart.replaceChildren();exp.disabled=true;link.hidden=true;
+   for(const code of ids){const b=node('button',by.get(code).name+' ×');b.type='button';b.className='sme-compare-chip';b.setAttribute('aria-label','Убрать '+by.get(code).name);b.onclick=()=>{ids=ids.filter(x=>x!==code);draw()};chosen.append(b)}
+   add.disabled=ids.length>=8||ids.includes(select.value);
+   const base='Срез '+d.period+' · '+d.rows.length+' территорий ФНС · '+(d.status==='cached'?'сохранённая редакция':'проверенный срез')+'. ';
+   if(ids.length<2){status.textContent=base+'Добавьте от 2 до 8 регионов.';return}
+   const k=metric.value,result=SMEMap.regionalComparison(d,ids,k);
+   status.textContent=base+'Выбрано '+ids.length+'. Места среди '+result.eligible+' территорий с числовым значением.';
+   const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
+   for(const name of ['Регион','Место: '+labels[k],'Всего МСП','ЮЛ','ИП','Учтённые работники','Доля ЮЛ, %','Доля в ЮЛ МСП РФ, %','Работников на субъект']){const th=node('th',name);th.scope='col';h.append(th)}
+   for(const r of result.rows){const tr=body.insertRow();for(const v of [r.name,r.place??'—',...['total','legal','individual','workers','legalShare','legalNationalShare','workersPerEntity'].map(x=>fmt(r[x]))])tr.insertCell().textContent=v}
+   out.append(table);
+   chart.append(node('h3',labels[k]),node('p','Полоса относительно максимума выбранных регионов. Ноль отличается от пропуска.'));
+   const bars=node('div','');bars.className='rm-composition';
+   for(const r of result.rows){const line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='rm-composition-track';const fill=node('div','');fill.className='rm-composition-fill';fill.style.width=(r.width??0)+'%';track.append(fill);line.append(node('span',r.name),track,node('strong',fmt(r.value)));bars.append(line)}chart.append(bars);
+   exp.disabled=false;exp.onclick=()=>csv('sme-regional-comparison-'+d.period+'.csv',[['Дата','Код ФНС','Регион','Всего МСП','ЮЛ','ИП','Работники','Доля ЮЛ, %','Доля в ЮЛ МСП РФ, %','Работников на субъект','Критерий','Значение критерия','Место','Охват ранга','Всего МСП РФ','ЮЛ МСП РФ','Источник','SHA-256 источника','SHA-256 JSON','Отпечаток манифеста'],...result.rows.map(r=>[d.period,r.code,r.name,r.total,r.legal,r.individual,r.workers,r.legalShare,r.legalNationalShare,r.workersPerEntity,k,r.value,r.place,result.eligible,d.national.total,d.national.legal,d.documentation,d.sha256,entry.sha256,m.data_fingerprint])]);
+   const url=new URL(location.href);url.searchParams.set('sme-regions',ids.join(','));url.searchParams.set('sme-metric',k);url.hash='sme-compare';link.href=url.href;link.hidden=false;
+  }
+  form.onsubmit=e=>{e.preventDefault();if(ids.length<8&&!ids.includes(select.value))ids.push(select.value);draw()};
+  select.onchange=()=>{add.disabled=ids.length>=8||ids.includes(select.value)};metric.onchange=draw;draw();
+ }catch(e){status.textContent='Сравнение недоступно: '+String(e.message||e)}
 });
