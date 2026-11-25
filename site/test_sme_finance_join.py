@@ -22,6 +22,10 @@ class Join(unittest.TestCase):
             self.assertIsNone(d["declared"][0]["expense_sum"])
             self.assertEqual(d["declared"][0]["workers_sum"],"0")
             self.assertEqual(d["reported"][0]["class"],"missing_or_other_version")
+            self.assertEqual(d["paired_sums_version"],1)
+            self.assertIsNone(d["declared"][0]["paired_income_sum"])
+            self.assertEqual(d["declared"][0]["worker_pair_income_sum"],"9007199254740993")
+            self.assertEqual(d["declared"][0]["worker_pair_workers_sum"],"0")
 
             self.assertEqual(d["profiles"]["rows"][0],{"inn":"7704211201","status":"not_matched"})
             self.assertEqual(d["profiles"]["rows"][1]["ogrn"],"1027700132195")
