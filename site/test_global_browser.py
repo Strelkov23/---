@@ -312,6 +312,29 @@ with sync_playwright() as p:
         else:
             assert page.locator("#sme-pair-export").is_disabled()
         groups=json.loads(Path("group-passports.json").read_text())
+        page.wait_for_function("document.querySelector('#group-observation-status').textContent.startsWith('Наблюдений:')",timeout=45000)
+        obs_total=sum(len(m["observations"]) for g in groups["groups"] for m in g["metrics"])
+        assert page.locator("#group-observation-table tbody tr").count()==min(40,obs_total)
+        if obs_total>40:
+            page.locator("#group-observation-more").click()
+            assert page.locator("#group-observation-table tbody tr").count()==min(80,obs_total)
+        page.locator("#group-observation-year").select_option("2025")
+        page.locator("#group-observation-group").select_option("x5")
+        expected_obs=sum(o["year"]==2025 for g in groups["groups"] if g["id"]=="x5" for m in g["metrics"] for o in m["observations"])
+        assert page.locator("#group-observation-table tbody tr").count()==min(40,expected_obs)
+        if expected_obs:
+            with page.expect_download() as obs_csv:
+                page.locator("#group-observation-export").click()
+            with open(obs_csv.value.path(),encoding="utf-8-sig",newline="") as f:
+                obs_rows=list(csv.reader(f,delimiter=";"))
+            assert len(obs_rows)==expected_obs+1 and len({len(r) for r in obs_rows})==1
+        page.locator("#group-observation-query").fill("zzzz_no_observation")
+        assert page.locator("#group-observation-export").is_disabled()
+        page.locator("#group-observation-query").fill("")
+        page.locator("#group-observation-group").select_option("")
+        page.locator("#group-observation-year").select_option("")
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+
         page.wait_for_function("!document.querySelector('#group-coverage-export').disabled",timeout=45000)
         assert page.locator("#group-coverage-table tbody tr").count()==len(groups["groups"])
         assert page.locator("#group-cross-table tbody tr").count()==len(groups["groups"])
