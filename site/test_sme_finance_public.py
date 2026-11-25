@@ -15,5 +15,13 @@ class Public(unittest.TestCase):
         with self.assertRaises(ValueError):p.quality(bad,idx,m)
         bad=copy.deepcopy(d);bad["profiles"]["rows"][0]["ogrn"]="0000000000001"
         with self.assertRaises(ValueError):p.quality(bad,idx,m)
+        d["paired_sums_version"]=1
+        for kind in ("declared","reported"):
+            d[kind][0].update(paired_income_sum=None,paired_expense_sum=None,worker_pair_income_sum="9007199254740993",worker_pair_workers_sum="0")
+        self.assertEqual(p.quality(d,idx,m)["sme_finance_matched"],1)
+        bad=copy.deepcopy(d);bad["declared"][0]["worker_pair_workers_sum"]="1"
+        with self.assertRaises(ValueError):p.quality(bad,idx,m)
+        bad=copy.deepcopy(d);bad["declared"][0]["paired_income_sum"]="0"
+        with self.assertRaises(ValueError):p.quality(bad,idx,m)
         d["reported"][0]["expense_sum"]="0"
         with self.assertRaises(ValueError):p.quality(d,idx,m)
