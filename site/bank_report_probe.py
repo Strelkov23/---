@@ -1,5 +1,5 @@
 """Inspect actual official report XML and archive metadata before mapping numbers."""
-import argparse,hashlib,json,re,zipfile,io
+import argparse,hashlib,json,re,zipfile,io,subprocess,tempfile
 from collections import Counter
 from datetime import date,datetime,timezone
 from html.parser import HTMLParser
@@ -82,6 +82,59 @@ def inspect_zip(raw):
                 out.append(dict(member=member.filename,**inspect_dbf(z.read(member))))
     if not out:raise ValueError("Нет DBF")
     return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),members=out)
+def archive_candidates(links):
+    """Use only exact dated official archive links observed in the catalogue."""
+    result=[]
+    for form in ("123","135"):
+        candidates=[]
+        for url in links:
+            if not allowed(url):continue
+            u=urlsplit(url)
+            if u.query:continue
+            m=re.fullmatch(r"/vfs/credit/forms/"+form+r"-(\d{8})\.(zip|rar)",u.path,re.I)
+            if not m:continue
+            try:day=datetime.strptime(m.group(1),"%Y%m%d").date()
+            except ValueError:continue
+            if day>date.today():continue
+            candidates.append((day,url))
+        if candidates:
+            day,url=max(candidates)
+            result.append(dict(form=form,date=day.isoformat(),url=url))
+    return result
+
+MAX_RAR_OUTPUT=100*1024*1024
+def bounded_tar(args,limit):
+    """Read libarchive stdout with a hard file-size limit; never extract paths to disk."""
+    import resource
+    def restrict():
+        resource.setrlimit(resource.RLIMIT_FSIZE,(limit,limit))
+    with tempfile.TemporaryFile() as output:
+        subprocess.run(["bsdtar",*args],stdout=output,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL,timeout=25,check=True,preexec_fn=restrict)
+        output.seek(0)
+        raw=output.read(limit+1)
+    if len(raw)>limit:raise ValueError("Размер распаковки RAR")
+    return raw
+
+def inspect_rar(raw,reader=bounded_tar):
+    if not raw.startswith((b"Rar!\x1a\x07\x00",b"Rar!\x1a\x07\x01\x00")):raise ValueError("Сигнатура RAR")
+    if not 0<len(raw)<=MAX_ARCHIVE:raise ValueError("Размер RAR")
+    with tempfile.TemporaryDirectory() as folder:
+        archive=Path(folder)/"report.rar";archive.write_bytes(raw)
+        names=reader(["-tf",str(archive)],256*1024).decode("utf-8",errors="strict").splitlines()
+        if not names or len(names)>100 or len(names)!=len(set(names)):raise ValueError("Список RAR")
+        out=[];total=0
+        for name in names:
+            if not re.fullmatch(r"[A-Za-z0-9_./-]{1,200}",name) or name.startswith(("/","-")) or any(p in ("",".","..") for p in name.rstrip("/").split("/")):raise ValueError("Недопустимое имя RAR")
+            if not name.lower().endswith(".dbf"):continue
+            remain=MAX_RAR_OUTPUT-total
+            if remain<=0:raise ValueError("Размер распаковки RAR")
+            data=reader(["-xOf",str(archive),"--",name],remain)
+            total+=len(data)
+            if total>MAX_RAR_OUTPUT:raise ValueError("Размер распаковки RAR")
+            out.append(dict(member=name,**inspect_dbf(data)))
+        if not out:raise ValueError("Нет DBF")
+    return dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),members=out)
+
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True);args=p.parse_args()
     out=args.output;out.mkdir(parents=True,exist_ok=True)
@@ -90,14 +143,14 @@ def main():
     try:
         raw=get(CATALOG,MAX_PAGE);report["catalog_sha256"]=hashlib.sha256(raw).hexdigest()
         links=archive_links(raw);report["archive_links"]=links
-        # Restrict the probe to explicit form-123 ZIP links, at most two; never guess archive URLs.
-        candidates=[x for x in links if re.search(r"(?:^|[^0-9])123(?:[^0-9]|$)",urlsplit(x).path,re.I) and urlsplit(x).path.lower().endswith(".zip")]
-        # Prefer current year if it occurs in the archive name; otherwise deterministic bounded probe.
-        candidates.sort(key=lambda x:(str(date.today().year) in x,x),reverse=True)
-        for url in candidates[:2]:
+        # One latest explicitly listed archive per form; no guessed addresses.
+        for entry in archive_candidates(links):
+            url=entry["url"]
             try:
-                data=get(url,MAX_ARCHIVE);report["archives"].append(dict(url=url,**inspect_zip(data)))
-            except Exception as e:report["archives"].append(dict(url=url,error=str(e)[:300]))
+                data=get(url,MAX_ARCHIVE)
+                info=inspect_rar(data) if urlsplit(url).path.lower().endswith(".rar") else inspect_zip(data)
+                report["archives"].append(dict(entry,**info))
+            except Exception as e:report["archives"].append(dict(entry,error=str(e)[:300]))
     except Exception as e:report["errors"].append("catalog: "+str(e)[:300])
     try:
         raw,enc=registry.fetch();system=registry.parse(raw,enc)

@@ -25,3 +25,23 @@ class BankReportProbeTests(unittest.TestCase):
             self.assertEqual(p.inspect_xml(raw,method)["bytes"],len(raw))
             with self.assertRaises(ValueError):p.inspect_xml(raw.replace(b"<rows><row/></rows>",b""),method)
         with self.assertRaises(ValueError):p.request(1,"2026-10-01","UnknownMethod")
+
+    def test_catalogue_latest_zip_and_rar(self):
+        urls=["https://www.cbr.ru/vfs/credit/forms/"+x for x in ("123-20240101.zip","123-20241001.rar","135-20240101.rar","135-20240230.rar","135-20990101.rar","101-20241001.rar")]
+        urls+=["https://example.org/vfs/credit/forms/123-20250101.rar","https://www.cbr.ru/vfs/credit/forms/123-20250101.rar?x=1"]
+        result=p.archive_candidates(urls)
+        self.assertEqual([(x["form"],x["date"],x["url"].split("/")[-1]) for x in result],[("123","2024-10-01","123-20241001.rar"),("135","2024-01-01","135-20240101.rar")])
+    def test_rar_structure_and_unsafe_name(self):
+        raw=bytearray(69);struct.pack_into("<IHH",raw,4,1,65,4);raw[32:36]=b"CODE";raw[43]=ord("C");raw[48]=3;raw[64]=13;raw[65:69]=b" 000"
+        calls=[]
+        def reader(args,limit):
+            calls.append(args)
+            return b"data/123.dbf\nreadme.txt\n" if args[0]=="-tf" else bytes(raw)
+        archive=b"Rar!\x1a\x07\x00dummy"
+        result=p.inspect_rar(archive,reader)
+        self.assertEqual(result["members"][0]["rows"],1)
+        self.assertEqual(calls[1][-2:],["--","data/123.dbf"])
+        for name in (b"../bad.dbf",b"/bad.dbf",b"a*.dbf",b"a.dbf\na.dbf"):
+            with self.subTest(name=name),self.assertRaises(ValueError):
+                p.inspect_rar(archive,lambda args,limit:name)
+        with self.assertRaises(ValueError):p.inspect_rar(b"not-rar",reader)
