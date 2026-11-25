@@ -31,7 +31,23 @@ const BankDirectory=(()=>{
    return {form,period:d?.period??null,status,error,checked:d?.attempts?.[reg]?.checked??null};
   });
  }
- return {rows,commonDates,profile,coverage};
+ function coverageSummary(feeds){
+  const definitions=[['capital','808','Регуляторный капитал'],['balance','806','Бухгалтерский баланс'],['profit','807','Финансовые результаты']];
+  const sets=[];
+  const forms=definitions.map(([key,form,label])=>{
+   const d=feeds[key],target=d?.target_cohort??d?.cohort;
+   if(!Array.isArray(target)||!target.length)return {form,label,period:d?.period??null,target:null,verified:null,documentary:null,failed:null,pending:null,outside:null};
+   const ids=new Set(target),verified=new Set(),documentary=new Set();
+   for(const r of d.rows||[]){if(!ids.has(r.registration_number))continue;if(key==='capital'&&r.verification!=='html'){if(r.verification==='documentary')documentary.add(r.registration_number)}else verified.add(r.registration_number)}
+   const failed=new Set(),errors=new Map((d.errors||[]).map(r=>[r.registration_number,r.error]));
+   for(const id of ids){if(verified.has(id)){documentary.delete(id);continue}if(!documentary.has(id)&&(d.attempts?.[id]?.error||errors.get(id)))failed.add(id);}
+   sets.push({ids,verified});
+   return {form,label,period:d.period,target:ids.size,verified:verified.size,documentary:documentary.size,failed:failed.size,pending:ids.size-verified.size-documentary.size-failed.size,outside:new Set((d.rows||[]).filter(r=>!ids.has(r.registration_number)).map(r=>r.registration_number)).size};
+  });
+  const shared=sets.length===3?[...sets[0].ids].filter(id=>sets.every(s=>s.ids.has(id))):null;
+  return {forms,commonTarget:shared?.length??null,allVerified:shared===null?null:shared.filter(id=>sets.every(s=>s.verified.has(id))).length};
+ }
+ return {rows,commonDates,profile,coverage,coverageSummary};
 })();
 if(typeof module!=='undefined')module.exports=BankDirectory;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -79,6 +95,16 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(reg&&/^\d{1,6}$/.test(reg)){const r=BankDirectory.rows(data,'full','','').find(v=>v.registration_number===reg);if(r){mode.value='full';query.value=reg;draw();detail(r)}}
   const settled=await Promise.allSettled([['capital','bank-capital.json'],['balance','bank-balance.json'],['profit','bank-profit.json']].map(async([key,file])=>[key,(await Provenance.get(manifest,file,root)).data]));
   feeds=Object.fromEntries(settled.filter(x=>x.status==='fulfilled').map(x=>x.value));if(selected)detail(selected);
+  const coverageHost=$('bank-coverage-table'),coverageStatus=$('bank-coverage-status'),coverageExport=$('bank-coverage-export');
+  if(coverageHost&&coverageStatus&&coverageExport){
+   const c=BankDirectory.coverageSummary(feeds),fmt=n=>n===null?'—':n.toLocaleString('ru'),pct=(n,d)=>n===null||!d?'—':(100*n/d).toLocaleString('ru',{maximumFractionDigits:2})+' %';
+   coverageStatus.textContent=c.commonTarget===null?'Общая выборка не подтверждена: не все целевые перечни доступны.':'Все три формы проверены для '+fmt(c.allVerified)+' из '+fmt(c.commonTarget)+' банков общей целевой выборки. Отчётные периоды различаются.';
+   const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
+   for(const label of ['Форма','Период','Целевая выборка','Проверено HTML','Документальная сверка','Не подтверждено','Ожидают проверки','Вне выборки','Охват HTML']){const th=node('th',label);th.scope='col';h.append(th)}
+   for(const r of c.forms){const tr=body.insertRow();for(const v of [r.form+' · '+r.label,r.period??'—',fmt(r.target),fmt(r.verified),fmt(r.documentary),fmt(r.failed),fmt(r.pending),fmt(r.outside),pct(r.verified,r.target)])tr.insertCell().textContent=v;}
+   coverageHost.replaceChildren(table);coverageExport.disabled=!c.forms.some(r=>r.target!==null);
+   coverageExport.onclick=()=>csv('bank-report-coverage.csv',[['Форма','Период','Целевая выборка','Проверено HTML','Документальная сверка','Не подтверждено','Ожидают проверки','Вне выборки','Общая целевая выборка','Все три формы проверены','Отпечаток манифеста'],...c.forms.map(r=>[r.form,r.period,r.target,r.verified,r.documentary,r.failed,r.pending,r.outside,c.commonTarget,c.allVerified,manifest.data_fingerprint])]);
+  }
   const failed=settled.filter(x=>x.status==='rejected').length;if(failed)status.textContent+=' · Недоступно финансовых наборов: '+failed+' из 3.';
  }catch(e){status.textContent='Каталог недоступен: '+String(e.message||e)}
 });
