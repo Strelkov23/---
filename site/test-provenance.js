@@ -16,6 +16,12 @@ const P=require('./provenance.js');
  assert.equal(P.validPath('federal-budget.csv'),true);
  assert.equal(P.validPath('other.csv'),false);
  assert.equal(P.validPath('../federal-budget.csv'),false);
+ for(const name of ['a.json\n','/a.json','regional-data/../a.json','a.txt','https://example.org/a.json'])assert.equal(P.validPath(name),false);
+ for(const v of [null,[],{sha256:hash,bytes:true},{sha256:hash,bytes:-1},{sha256:hash,bytes:2**53},{sha256:hash.toUpperCase(),bytes:7},{sha256:hash,bytes:7,extra:1}]){
+  await assert.rejects(P.validateManifest({...m,files:{'a.json':v}}));
+  await assert.rejects(P.verify({...m,files:{'a.json':v}},'a.json',data));
+ }
+ await assert.rejects(P.validateManifest({...m,files:[]}));
  const originalFetch=globalThis.fetch;
  try{
   globalThis.fetch=async()=>new Response(csv);
@@ -23,6 +29,26 @@ const P=require('./provenance.js');
   await assert.rejects(P.get(mixed,'federal-budget.csv'));
   globalThis.fetch=async()=>new Response('changed');
   await assert.rejects(P.getBytes(mixed,'federal-budget.csv'));
+
+  // Identical concurrent requests share one verification, not mutable buffers.
+  let calls=0,release;
+  let gate=new Promise(resolve=>{release=resolve});
+  globalThis.fetch=async()=>{calls++;await gate;return new Response(data)};
+  const a=P.getBytes(m,'a.json'),b=P.getBytes(m,'a.json');
+  release();const [ra,rb]=await Promise.all([a,b]);assert.equal(calls,1);
+  new Uint8Array(ra.bytes)[0]=0;assert.equal(new Uint8Array(rb.bytes)[0],data[0]);
+  // Different content identities must not share results even for the same URL.
+  const other=new TextEncoder().encode('{"x":2}'),otherHash=crypto.createHash('sha256').update(other).digest('hex');
+  const otherManifest={...m,files:{'a.json':{sha256:otherHash,bytes:other.length}}};
+  calls=0;globalThis.fetch=async()=>new Response(++calls===1?data:other);
+  const pair=await Promise.all([P.get(m,'a.json'),P.get(otherManifest,'a.json')]);
+  assert.equal(calls,2);assert.deepEqual(pair.map(r=>r.data.x),[1,2]);
+  // Rejected concurrent requests clear the pending entry and permit retry.
+  calls=0;globalThis.fetch=async()=>{calls++;return new Response('broken')};
+  const rejected=await Promise.allSettled([P.get(m,'a.json'),P.get(m,'a.json')]);
+  assert.equal(calls,1);assert.ok(rejected.every(x=>x.status==='rejected'));
+  globalThis.fetch=async()=>{calls++;return new Response(data)};
+  assert.equal((await P.get(m,'a.json')).data.x,1);assert.equal(calls,2);
  }finally{globalThis.fetch=originalFetch}
  console.log('Provenance exact-byte verification passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

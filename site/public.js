@@ -9,7 +9,19 @@ const pinned=dynamicPages.has(currentPage)&&/^[0-9a-f]{40}$/i.test(requestedSnap
 const root=/^[0-9a-f]{40}$/i.test(pinned)?'https://raw.githubusercontent.com/Strelkov23/---/'+pinned+'/history/published/':'';
 let versionRequest;
 async function ensureVersion(){if(version)return version;if(!versionRequest)versionRequest=fetch('version.txt',{cache:'no-cache'}).then(async r=>{if(r.ok){const v=(await r.text()).trim();if(/^[a-f0-9]{40}$/i.test(v))version=v}return version}).catch(()=>version);return versionRequest}
-async function load(file){const r=await fetch(root+file);if(!r.ok)throw Error();const data=await r.json();await ensureVersion();return data}
+// Coalesce simultaneous reads of the same URL without retaining mutable JSON objects.
+const pendingDataReads=new Map();
+async function load(file){
+ const url=root+file;
+ let request=pendingDataReads.get(url);
+ if(!request){
+  request=fetch(url).then(r=>{if(!r.ok)throw Error('Набор недоступен');return r.text()});
+  pendingDataReads.set(url,request);
+  const clear=()=>{if(pendingDataReads.get(url)===request)pendingDataReads.delete(url)};
+  request.then(clear,clear);
+ }
+ const data=JSON.parse(await request);await ensureVersion();return data;
+}
 function restore(ids){
  for(const id of ids){const value=params.get(id);if(value!==null){const field=el(id);if(!field)continue;if(field.tagName!=='SELECT'||Array.from(field.options).some(o=>o.value===value))field.value=value}}
 }

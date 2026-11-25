@@ -1,3 +1,13 @@
+// Page-scoped shared requests for immutable historical data in the selected revision.
+const HistoricalRequests=(()=>{
+ const cache=new Map(),limit=8;
+ function get(file){
+  if(cache.has(file)){const p=cache.get(file);cache.delete(file);cache.set(file,p);return p}
+  const p=load(file).catch(e=>{if(cache.get(file)===p)cache.delete(file);throw e});
+  cache.set(file,p);if(cache.size>limit)cache.delete(cache.keys().next().value);return p;
+ }
+ return {get};
+})();
 document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id);
  if(!$('hist-form'))return;
@@ -8,7 +18,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
  function metric(t,n){const x=node('div','');x.className='metric';x.append(node('b',fmt(n)),node('span',t));metrics.append(x)}
  try{
   if(!version){const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}
-  const data=await load('historical.json'),catalog=data.series;
+  const data=await HistoricalRequests.get('historical.json'),catalog=data.series;
   metric('исторических рядов',catalog.length);metric('наблюдений',catalog.reduce((n,s)=>n+s.count,0));metric('обнаруженных официальных файлов',data.sources.reduce((n,s)=>n+s.files.length,0));
   for(const s of data.sources){
    const e=node('article','');e.append(node('h3',s.title),a('Открыть первоисточник',s.url),node('p',s.status+' · '+(s.checked||'не проверено')));
@@ -27,7 +37,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    if(!meta){status.textContent='Нет загруженных рядов по выборке. Проверьте реестр официальных файлов ниже.';return}
    status.textContent='Загрузка ряда…';
    try{
-    const s=await load(meta.file);if(id!==generation)return;selected={...s,code:meta.code};
+    const s=await HistoricalRequests.get(meta.file);if(id!==generation)return;selected={...s,code:meta.code};
     for(const r of [...new Set(s.values.map(r=>r.region))].sort((a,b)=>a.localeCompare(b,'ru'))){region.add(new Option(r,r));peer.add(new Option(r,r))}
     for(const y of [...new Set(s.values.map(r=>r.year))].sort((a,b)=>b-a))rankYear.add(new Option(String(y),String(y)));
     for(const [j,e] of [region,peer,rankYear].entries()){const preferred=prior[j]||saved.get(e.id);if([...e.options].some(o=>o.value===preferred))e.value=preferred}
@@ -136,7 +146,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
    $('hist-rank').replaceChildren(node('p','Территорий в срезе: '+rows.length+' · '+year),t);
    $('hist-rank-export').disabled=!rows.length;$('hist-rank-export').onclick=()=>csv('regional-cross-section-'+s.code+'-'+year+'.csv',[['Территория','Год','Показатель','Значение','Единица','Источник','Лист','Строка','Столбец','Примечание'],...rows.map(r=>[r.region,r.year,s.title,r.value,s.unit,s.source,r.sheet,r.row,r.column,r.note])]);save(fields)
   }
-  $('hist-search').oninput=()=>{options();select()};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-visual-limit').onchange=ranking;$('hist-visual-years').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
+  $('hist-search').oninput=()=>{const previous=picker.value;options();if(previous!==picker.value||!selected)select();else save(fields)};picker.onchange=select;region.onchange=draw;peer.onchange=draw;mode.onchange=draw;rankYear.onchange=ranking;$('hist-rank-search').oninput=ranking;$('hist-rank-sort').onchange=ranking;$('hist-visual-limit').onchange=ranking;$('hist-visual-years').onchange=ranking;$('hist-from').oninput=draw;$('hist-to').oninput=draw;$('hist-form').onsubmit=e=>e.preventDefault();select()
  }catch(e){console.error(e);status.textContent='Исторический каталог не доступен в этой версии. Откройте текущую сборку.'}
 });
 
@@ -151,11 +161,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
  function clear(){host.replaceChildren();table.replaceChildren();download.disabled=true}
  function format(x){return Number.isFinite(x)?fmt(x):'—'}
  try{
-  const catalog=(await load('historical.json')).series;
+  const catalog=(await HistoricalRequests.get('historical.json')).series;
   for(const s of catalog)for(const p of [a,b])p.add(new Option(s.title+' · '+s.unit+' · '+s.kind,s.code));
   if(b.options.length>1)b.selectedIndex=1;
   restore(['rc-a','rc-b','rc-from','rc-to']);
-  async function get(s){if(!cache.has(s.code)){const req=load(s.file).catch(e=>{cache.delete(s.code);throw e});cache.set(s.code,req);if(cache.size>8)cache.delete(cache.keys().next().value)}return {...await cache.get(s.code),code:s.code}}
+  async function get(s){return {...await HistoricalRequests.get(s.file),code:s.code}}
   async function select(){
    const token=++seq,old=first?saved.get('rc-region'):region.value;pair=null;clear();sources.replaceChildren();region.replaceChildren();base.replaceChildren(new Option('Первый общий положительный год',''));status.textContent='Загрузка рядов…';
    const ma=catalog.find(s=>s.code===a.value),mb=catalog.find(s=>s.code===b.value);

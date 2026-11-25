@@ -22,11 +22,19 @@ def create(out,stamp):
     if not re.fullmatch(r"[0-9a-f]{40}",source):source=None
     return dict(schema=SCHEMA,built=stamp,source_revision=source,data_fingerprint=fingerprint(entries),files=entries,
       note="SHA-256 точных байтов опубликованных наборов; не цифровая подпись и не подтверждение достоверности первоисточника. Отчёты контроля и сам манифест исключены.")
+def valid_path(name):
+    return isinstance(name,str) and (name=="federal-budget.csv" or re.fullmatch(r"(?:regional-data/)?[A-Za-z0-9_.-]+\.(?:json|geojson)",name) is not None)
+
 def validate(out,data):
-    if data["schema"]!=SCHEMA or fingerprint(data["files"])!=data["data_fingerprint"]:raise ValueError("Invalid manifest fingerprint")
+    if not isinstance(data,dict) or data.get("schema")!=SCHEMA or not isinstance(data.get("files"),dict) or not data["files"]:
+        raise ValueError("Invalid manifest schema")
+    for name,entry in data["files"].items():
+        if not valid_path(name) or not isinstance(entry,dict) or set(entry)!={"sha256","bytes"} or not isinstance(entry["sha256"],str) or not re.fullmatch(r"[a-f0-9]{64}",entry["sha256"]) or type(entry["bytes"]) is not int or not 0<=entry["bytes"]<=9007199254740991:
+            raise ValueError("Invalid manifest entry")
+    if fingerprint(data["files"])!=data.get("data_fingerprint"):raise ValueError("Invalid manifest fingerprint")
     for name,entry in data["files"].items():
         p=Path(name)
-        if p.is_absolute() or ".." in p.parts or p.as_posix()!=name or file_info(out/p)!=entry:raise ValueError("Manifest mismatch: "+name)
+        if p.is_absolute() or ".." in p.parts or p.as_posix()!=name or not (out/p).resolve().is_relative_to(out.resolve()) or not (out/p).is_file() or file_info(out/p)!=entry:raise ValueError("Manifest mismatch: "+name)
 def publish(page,out,stamp):
     data=create(out,stamp)
     validate(out,data)
