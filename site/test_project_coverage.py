@@ -37,6 +37,8 @@ class CoverageTests(unittest.TestCase):
             d=p.publish(lambda *a:None,path,"2026-11-25")
             self.assertIn("Краснодарский край",p.render(d))
             self.assertIn("project-breakdown.csv",p.render(d))
+            self.assertIn("project-search.js",p.render(d))
+            self.assertIn("project-region=RU-BU",p.render(d))
             p.verify_breakdown_csv(path/"project-breakdown.csv",d)
             with (path/"project-breakdown.csv").open("a",encoding="utf-8") as f:f.write("bad\n")
             with self.assertRaises(ValueError):p.verify_breakdown_csv(path/"project-breakdown.csv",d)
