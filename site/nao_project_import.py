@@ -13,7 +13,7 @@ GROUPS={
  "implementation":("Реализуемые","2025-06-04",72,64,"Общий объем финансирования, (тыс. рублей)"),
  "planned":("Планируемые","2025-01-01",25,22,"Предполагаемый объем финансирования, (тыс. рублей)"),
 }
-NOTE="Три отдельные редакции реестров НАО; даты по именам файлов. Общий/предполагаемый объем финансирования не означает фактические вложения. Суммы в тыс. руб. из числовых ячеек, в млн руб. точным делением на 1000. Текстовые суммы и рабочие места не интерпретируются. Инициаторы, описания и контакты не публикуются."
+NOTE="Три отдельные редакции реестров НАО; даты по именам файлов. Общий/предполагаемый объем финансирования не означает фактические вложения. Суммы в тыс. руб. из числовых ячеек, в млн руб. точным делением на 1000. Текстовые суммы и рабочие места не интерпретируются. Номера внутри секций могут повторяться между секциями; идентификатор записи — группа и строка листа. Инициаторы, описания и контакты не публикуются."
 COMMON=["№ п/п","Инициатор","Отрасль реализации проекта","Наименование проекта","Краткое описание проекта","Период реализации проекта","Место реализации проекта"]
 def amount(v):
     if type(v) not in (int,float):return None
@@ -34,14 +34,16 @@ def parse(raw,group):
         s=wb["Лист1"];header=next(s.iter_rows(min_row=5,max_row=5,values_only=True))
         if list(header[1:8])!=COMMON or header[8]!=heading:raise ValueError("Заголовки")
         if group=="implementation" and header[10]!="Стадия реализации проекта":raise ValueError("Стадия")
-        rows=[];seen=set()
+        rows=[];seen=set();section=0;section_rows=[]
         for pos,r in enumerate(s.iter_rows(min_row=6,values_only=True),6):
             if all(v is None or isinstance(v,str) and not v.strip() for v in r):continue
-            if group=="implementation" and isinstance(r[1],str) and all(v is None for v in r[2:]):continue
-            if type(r[1]) is not int or r[1]<1 or r[1] in seen or r[0] is not None:raise ValueError("Номер/структура строки "+str(pos))
-            seen.add(r[1]);cost=amount(r[8])
+            if group=="implementation" and isinstance(r[1],str) and all(v is None for v in r[2:]):
+                section=pos;section_rows.append(pos);continue
+            if type(r[1]) is not int or r[1]<1 or (section,r[1]) in seen or r[0] is not None or group=="implementation" and not section:raise ValueError("Номер/структура строки "+str(pos))
+            seen.add((section,r[1]));cost=amount(r[8])
             period=str(r[6]) if type(r[6]) is int else label(r[6],True)
-            rows.append(dict(group=group,region=REGION,status=status,edition=edition,record=r[1],name=label(r[4],True),sector=label(r[3],True),location=label(r[7]),period=period,stage=label(r[10]) if group=="implementation" else None,cost_mln_rub=cost,cost_status="numeric" if cost is not None else "text_not_parsed",jobs=None,source=base.ROOT+base.FILES[group],sha256=audit.HASHES[group],sheet=s.title,row=pos))
+            rows.append(dict(group=group,region=REGION,status=status,edition=edition,record=f"{group}:{pos}",source_number=r[1],section_row=section,name=label(r[4],True),sector=label(r[3],True),location=label(r[7]),period=period,stage=label(r[10]) if group=="implementation" else None,cost_mln_rub=cost,cost_status="numeric" if cost is not None else "text_not_parsed",jobs=None,source=base.ROOT+base.FILES[group],sha256=audit.HASHES[group],sheet=s.title,row=pos))
+        if section_rows!=([6,16] if group=="implementation" else []):raise ValueError("Структура секций")
         if len(rows)!=expected or sum(r["cost_mln_rub"] is not None for r in rows)!=expected_numeric:raise ValueError("Охват "+group)
         return rows
     finally:wb.close()
@@ -50,9 +52,11 @@ def quality(d):
     count=numeric=0
     for group,(status,edition,expected,expected_numeric,_) in GROUPS.items():
         rows=d["groups"][group]
-        if len(rows)!=expected or len({r["record"] for r in rows})!=expected or len({r["row"] for r in rows})!=expected:raise ValueError("Охват")
+        if len(rows)!=expected or len({r["record"] for r in rows})!=expected or len({r["row"] for r in rows})!=expected or len({(r["section_row"],r["source_number"]) for r in rows})!=expected:raise ValueError("Охват")
         for r in rows:
-            if (r["group"],r["region"],r["status"],r["edition"],r["source"],r["sha256"],r["sheet"])!=(group,REGION,status,edition,base.ROOT+base.FILES[group],audit.HASHES[group],"Лист1") or r["jobs"] is not None or type(r["row"]) is not int or r["row"]<6 or type(r["record"]) is not int or r["record"]<1:raise ValueError("Происхождение")
+            if (r["group"],r["region"],r["status"],r["edition"],r["source"],r["sha256"],r["sheet"])!=(group,REGION,status,edition,base.ROOT+base.FILES[group],audit.HASHES[group],"Лист1") or r["jobs"] is not None or type(r["row"]) is not int or r["row"]<6 or r["record"]!=f'{group}:{r["row"]}' or type(r["source_number"]) is not int or r["source_number"]<1:raise ValueError("Происхождение")
+            expected_section=(6 if 6<r["row"]<16 else 16 if r["row"]>16 else -1) if group=="implementation" else 0
+            if r["section_row"]!=expected_section or expected_section<0:raise ValueError("Секция")
             for field in ("name","sector"):label(r[field],True)
             v=r["cost_mln_rub"]
             if v is not None and (not isinstance(v,str) or not re.fullmatch(r"\d+(?:\.\d+)?",v) or Decimal(v)<0) or r["cost_status"]!=("numeric" if v is not None else "text_not_parsed"):raise ValueError("Финансирование")

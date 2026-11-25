@@ -1,7 +1,7 @@
 name: NAO investment verified diagnostic import
 on:
   push:
-    branches: [stage-f-nao-project-import]
+    branches: [stage-f-nao-project-import, stage-f-nao-section-identifiers]
     paths: ['site/nao_project_import.py','site/test_nao_project_import.py','.github/workflows/nao-project-import.yml']
   workflow_dispatch:
 permissions:
