@@ -45,7 +45,12 @@ function chartAdjacent(a,b,monthly=false){
 function chartCoverage(years,series){
   return series.map(s=>({name:s.name,observed:years.filter((_,i)=>Number.isFinite(s.values[i])).length,expected:years.length}));
 }
+// Align export data to the displayed period; absent positions remain missing.
+function chartAlignedSeries(years,series){
+  return series.map(s=>({...s,values:years.map((_,i)=>Number.isFinite(s.values[i])?s.values[i]:null)}));
+}
 function chartTools(host,title,unit,years,series,options={}){
+  series=chartAlignedSeries(years,series);
   const toolbar=document.createElement('div'),status=document.createElement('span');
   toolbar.className='actions chart-export-toolbar';status.setAttribute('role','status');
   if(!years.length||!series.some(s=>s.values.some(Number.isFinite)))return;
@@ -76,7 +81,7 @@ function chartTools(host,title,unit,years,series,options={}){
     const wrap=(v,size,max=width-2*margin,weight='normal')=>chartWrap(v,max,t=>measure(t,size,weight));
     const header=wrap(title,26,width-2*margin,'bold'),sub=wrap((options.territory||'Россия')+' · '+years[0]+'–'+years.at(-1)+' · '+unit,19);
     const legends=series.map(s=>wrap(s.name,19,width-125));
-    const footer=[...wrap('Источник: '+source+' · '+series.map(s=>s.code).filter(Boolean).join(' / '),17),...(url?wrap(url,15):[]),...wrap('Версия: '+snapshot()+' · экспорт UTC '+new Date().toISOString().slice(0,10),14)];
+    const footer=[...chartCoverage(years,series).flatMap(s=>wrap('Покрытие: '+s.name+' — '+s.observed+' / '+s.expected,15)),...wrap('Источник: '+source+' · '+series.map(s=>s.code).filter(Boolean).join(' / '),17),...(url?wrap(url,15):[]),...wrap('Версия: '+snapshot()+' · экспорт UTC '+new Date().toISOString().slice(0,10),14)];
     const top=32+header.length*32+sub.length*25+26,bottom=top+330,legendTop=bottom+67;
     const footerTop=legendTop+legends.reduce((n,v)=>n+v.length*25+12,0)+15;
     const height=footerTop+footer.length*22+25;
@@ -131,7 +136,7 @@ function chartTools(host,title,unit,years,series,options={}){
   if(options.display){const figure=vector().svg;figure.style.display='block';figure.style.width='100%';figure.style.height='auto';host.append(figure)}
   toolbar.append(status);host.append(context,toolbar);
 }
-if(typeof module!=='undefined')module.exports={chartTickIndices,chartWrap,chartAdjacent,chartCoverage};
+if(typeof module!=='undefined')module.exports={chartTickIndices,chartWrap,chartAdjacent,chartCoverage,chartAlignedSeries};
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const payload=document.getElementById('figure-data');
  if(payload){if(!version){try{const r=await fetch('version.txt');if(r.ok)version=(await r.text()).trim()}catch{}}const d=JSON.parse(payload.textContent);chartTools(payload.parentElement,d.name,d.unit,d.years,[d])}
