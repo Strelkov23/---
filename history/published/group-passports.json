@@ -1129,6 +1129,440 @@
           ]
         }
       ]
+    },
+    {
+      "id": "alrosa",
+      "name": "АЛРОСА",
+      "sector": "Добыча алмазов",
+      "role": "Добыча, обогащение, сортировка и реализация алмазного сырья.",
+      "source": "https://www.alrosa.ru/upload/iblock/a99/4hp8remrsc6u7pvt32f2xo4fq2wtjf3w/%D0%90%D0%9B%D0%A0%D0%9E%D0%A1%D0%90_%D0%93%D0%9E2025%20%E2%80%94%20%D0%B4%D0%BB%D1%8F%20%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D0%BA%D0%B0%D1%86%D0%B8%D0%B8.pdf",
+      "section": "Годовой отчёт за 2025 год, приложение 1, с. 98–100",
+      "standard": "IFRS",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Выручка от продаж не включает доход от субсидий, который выделен отдельно. Прибыль группы не смешивается с прибылью акционеров головной компании.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка от продаж без субсидий",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "239067"
+            },
+            {
+              "year": 2025,
+              "value": "235089"
+            }
+          ],
+          "comparable": "annual_consolidated_revenue_rub"
+        },
+        {
+          "id": "subsidies",
+          "label": "Доход от субсидий",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "5005"
+            },
+            {
+              "year": 2025,
+              "value": "6040"
+            }
+          ]
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "85381"
+            },
+            {
+              "year": 2025,
+              "value": "64691"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit",
+          "label": "Прибыль от основной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "30535"
+            },
+            {
+              "year": 2025,
+              "value": "32826"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "19246"
+            },
+            {
+              "year": 2025,
+              "value": "36239"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров головной компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "21162"
+            },
+            {
+              "year": 2025,
+              "value": "36230"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "658735"
+            },
+            {
+              "year": 2025,
+              "value": "699482"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "368953"
+            },
+            {
+              "year": 2025,
+              "value": "406714"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "289782"
+            },
+            {
+              "year": 2025,
+              "value": "292768"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "302848"
+            },
+            {
+              "year": 2025,
+              "value": "310543"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистый денежный поток от операционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "41270"
+            },
+            {
+              "year": 2025,
+              "value": "35802"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nlmk",
+      "name": "НЛМК",
+      "sector": "Чёрная металлургия",
+      "role": "Производство стальной продукции, добыча и переработка сырья.",
+      "source": "https://reportcollection.inion.ru/reports/download/?reportId=4671",
+      "section": "Раскрываемая консолидированная финансовая отчётность за 2025 год, с. 3–4, 7–8, 11, 13; копия ИНИОН РАН",
+      "standard": "IFRS_based_disclosure",
+      "scope": "consolidated",
+      "source_kind": "issuer_statement",
+      "note": "Копия аудированного раскрываемого комплекта эмитента в коллекции ИНИОН РАН. Согласно аудиторскому заключению и примечанию 2, документ подготовлен на основе МСФО с исключением части раскрытий, но не является полным комплектом МСФО. Не включается в автоматическое сравнение МСФО. Операционная прибыль до отдельных корректировок не подменяет стандартный показатель.",
+      "metrics": [
+        {
+          "id": "revenue",
+          "label": "Выручка",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "979593"
+            },
+            {
+              "year": 2025,
+              "value": "831351"
+            }
+          ]
+        },
+        {
+          "id": "gross_profit",
+          "label": "Валовая прибыль",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "384344"
+            },
+            {
+              "year": 2025,
+              "value": "239892"
+            }
+          ]
+        },
+        {
+          "id": "operating_profit_before_adjustments",
+          "label": "Операционная прибыль до отдельно раскрытых корректировок",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "206222"
+            },
+            {
+              "year": 2025,
+              "value": "75389"
+            }
+          ]
+        },
+        {
+          "id": "profit_before_tax",
+          "label": "Прибыль до налогообложения",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "173989"
+            },
+            {
+              "year": 2025,
+              "value": "84918"
+            }
+          ]
+        },
+        {
+          "id": "profit",
+          "label": "Прибыль за год",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "121857"
+            },
+            {
+              "year": 2025,
+              "value": "63149"
+            }
+          ]
+        },
+        {
+          "id": "profit_parent",
+          "label": "Прибыль акционеров головной компании",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "121779"
+            },
+            {
+              "year": 2025,
+              "value": "63105"
+            }
+          ]
+        },
+        {
+          "id": "assets",
+          "label": "Активы на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "1130870"
+            },
+            {
+              "year": 2025,
+              "value": "1130081"
+            }
+          ]
+        },
+        {
+          "id": "equity",
+          "label": "Капитал на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "859913"
+            },
+            {
+              "year": 2025,
+              "value": "884433"
+            }
+          ]
+        },
+        {
+          "id": "liabilities",
+          "label": "Обязательства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "270957"
+            },
+            {
+              "year": 2025,
+              "value": "245648"
+            }
+          ]
+        },
+        {
+          "id": "ppe",
+          "label": "Основные средства на 31 декабря",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "556492"
+            },
+            {
+              "year": 2025,
+              "value": "577097"
+            }
+          ]
+        },
+        {
+          "id": "current_assets",
+          "label": "Оборотные активы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "506286"
+            },
+            {
+              "year": 2025,
+              "value": "474943"
+            }
+          ]
+        },
+        {
+          "id": "current_liabilities",
+          "label": "Текущие обязательства",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "139974"
+            },
+            {
+              "year": 2025,
+              "value": "171406"
+            }
+          ]
+        },
+        {
+          "id": "inventories",
+          "label": "Запасы",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "179241"
+            },
+            {
+              "year": 2025,
+              "value": "151137"
+            }
+          ]
+        },
+        {
+          "id": "cash",
+          "label": "Денежные средства и эквиваленты",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "87683"
+            },
+            {
+              "year": 2025,
+              "value": "115018"
+            }
+          ]
+        },
+        {
+          "id": "operating_cash_flow",
+          "label": "Чистые средства от операционной деятельности",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "185420"
+            },
+            {
+              "year": 2025,
+              "value": "127332"
+            }
+          ]
+        },
+        {
+          "id": "ppe_intangible_purchases",
+          "label": "Расходы на приобретение и строительство ОС и НМА (отток со знаком минус)",
+          "unit": "млн руб.",
+          "observations": [
+            {
+              "year": 2024,
+              "value": "-113391"
+            },
+            {
+              "year": 2025,
+              "value": "-102628"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
