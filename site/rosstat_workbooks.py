@@ -77,6 +77,49 @@ def complete_debt(values):
     return (abs(v["debt_total"]-v["debt_payable"]-v["debt_loans"])<=0.15000001 and
             abs(v["debt_overdue_total"]-v["debt_overdue_payable"]-v["debt_overdue_loans"])<=0.15000001 and
             all(v["debt_overdue_"+k]<=v["debt_"+k] for k in ("total","payable","loans","receivable")))
+
+# Observed official annual monetary layout: independent metrics, not percentages.
+AMOUNT_FIELDS=("cost_amount_total","cost_amount_materials","cost_amount_labor","cost_amount_insurance","cost_amount_depreciation","cost_amount_other")
+AMOUNT_LABELS=(r"материальные затраты",r"расходы на оплату труда",r"страховые взносы в (?:пенсионный фонд, фсс,фомс,тфомс|социальный фонд россии \(сфр\), ффомс)",r"амортизация основных средств",r"прочие затраты")
+for k in AMOUNT_FIELDS:RULES[k]=(k,r"млн\.?\s*руб","млн руб.","cost")
+def complete_amount(values):
+    return (set(values)==set(AMOUNT_FIELDS) and all(type(v) in (int,float) and math.isfinite(v) and v>=0 for v in values.values()) and
+            abs(values[AMOUNT_FIELDS[0]]-sum(values[k] for k in AMOUNT_FIELDS[1:]))<=3.00000001)
+def cost_amount_sheet(rows,sheet,url,now_year):
+    # Only the observed modern section layout, with the original exclusion notes.
+    if len(rows)<34 or len(rows[1])<1 or len(rows[2])<7 or len(rows[3])<3 or len(rows[4])<7:return []
+    title=h.norm(rows[1][0])
+    if not scope(title) or not re.search(r"затраты на производство и продажу продукции.*организаций \(юридических лиц\).*в разрезе видов экономической деятельности",title):return []
+    years=re.findall(r"\b(20[0-2]\d)\s+год",title)
+    if len(years)!=1 or not 2017<=int(years[0])<=now_year:return []
+    y=int(years[0])
+    if not re.fullmatch(r"млн\.?\s*рублей",h.norm(rows[2][6])):return []
+    if not re.fullmatch(r"затраты на производство и продажу продукции \(товаров, работ, услуг\)",h.norm(rows[3][1])):return []
+    if any(not re.fullmatch(p,h.norm(v)) for p,v in zip(AMOUNT_LABELS,rows[4][2:7])):return []
+    notes=[str(r[0]).strip() for r in rows[32:] if r and isinstance(r[0],str) and r[0].strip()]
+    coverage=" ".join(h.norm(v) for v in notes)
+    if not all(s in coverage for s in ("без субъектов малого предпринимательства","бюджетных организаций","банков","страховых и прочих финансово-кредитных организаций")):return []
+    if y>=2022 and not all(s in coverage for s in ("без учета статистической информации","донецкой","луганской","запорожской","херсонской")):return []
+    if not h.norm(rows[12][0]).startswith("всего по организациям (юридическим лицам)"):return []
+    if not h.norm(rows[13][0]).startswith("из них с основным видом деятельности"):return []
+    definition=str(rows[1][0])+" | "+str(rows[2][6])+" | "+str(rows[4][4])+" | "+" ".join(notes)+" | Только полные строки; суммы в текущих денежных единицах, не проценты."
+    result=[];seen=set()
+    for index in [12,*range(14,32)]:
+        line=rows[index]
+        if len(line)<7:continue
+        label=str(line[0] or "").strip()
+        if not label or not re.search(r"[а-яё]",label,re.I):continue
+        values=dict(zip(AMOUNT_FIELDS,(h.numeric(v) for v in line[1:7])))
+        if any(v is None for v in values.values()):continue
+        if not complete_amount(values):raise ValueError("Не сходятся денежные затраты: "+label)
+        key=h.norm(label)
+        if key in seen:raise ValueError("Повтор вида деятельности")
+        seen.add(key)
+        for j,k in enumerate(AMOUNT_FIELDS,2):
+            result.append(dict(metric=k,title=label,year=y,value=values[k],unit="млн руб.",source=url,sheet=sheet,row=index+1,column=j,definition=definition))
+    if len(seen)<10:return []
+    return result
+
 def cost_sheet(rows,sheet,url,now_year):
     found=[]
     for hi,row in enumerate(rows[:35]):
@@ -145,7 +188,7 @@ def debt_sheet(rows,sheet,url,now_year):
     if len(found)>1:raise ValueError("Несколько таблиц задолженности")
     return found[0] if found else []
 def parse_sheet(rows,group,sheet,url,now_year):
-    if group=='cost':return cost_sheet(rows,sheet,url,now_year)
+    if group=='cost':return cost_amount_sheet(rows,sheet,url,now_year) or cost_sheet(rows,sheet,url,now_year)
     if group=='debt':return debt_sheet(rows,sheet,url,now_year)
     # Annual horizontal layouts only. Reject mixed/ambiguous metric or geographical dimensions.
     if not rows:return []
@@ -263,9 +306,9 @@ def quality(d):
             keys.add(k);count+=1
         groups={}
         for r in f["rows"]:
-            if f["group"] in ("cost","debt"):groups.setdefault((r["title"],r.get("period",str(r["year"]))),{})[r["metric"]]=r["value"]
+            if f["group"] in ("cost","debt"):groups.setdefault((r["title"],r.get("period",str(r["year"])),r["metric"] in AMOUNT_FIELDS),{})[r["metric"]]=r["value"]
         for v in groups.values():
-            if not (complete_cost(v) if f["group"]=="cost" else complete_debt(v)):raise ValueError("Balance not reproducible")
+            if not (complete_amount(v) if set(v)&set(AMOUNT_FIELDS) else complete_cost(v) if f["group"]=="cost" else complete_debt(v)):raise ValueError("Balance not reproducible")
     return dict(rosstat_workbook_files=sum(bool(f["rows"]) for f in d["files"]),rosstat_workbook_observations=count)
 def publish(page,out,d):
     quality(d)
@@ -273,7 +316,7 @@ def publish(page,out,d):
     with (out/"rosstat-workbooks.csv").open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=["metric","title","year","period","value","unit","source","sheet","row","column","definition"]);w.writeheader()
         for batch in d["files"]:w.writerows(batch["rows"])
-    body="<h1>Оригинальные отраслевые таблицы Росстата</h1><p>Автоматический импорт однозначных годовых таблиц фондов, мощностей, структуры затрат и месячных запасов задолженности. Неоднозначные форматы отклоняются; ручные наборы не замещаются.</p><p><a href='rosstat-workbooks.csv'>CSV</a> · <a href='rosstat-workbooks.json'>JSON</a> · <a href='capital.html'>Основные фонды</a> · <a href='cost-structure.html'>Затраты</a> · <a href='financial-state.html'>Финансовое состояние</a></p>"
+    body="<h1>Оригинальные отраслевые таблицы Росстата</h1><p>Автоматический импорт однозначных годовых таблиц фондов, мощностей, структуры и денежных сумм затрат и месячных запасов задолженности. Денежные затраты (млн руб.) за 2017 год и далее отделены от процентных долей; исключения и исходные примечания указаны в CSV/JSON. До 2017 года классификация не объединяется. Неоднозначные форматы отклоняются; ручные наборы не замещаются.</p><p><a href='rosstat-workbooks.csv'>CSV</a> · <a href='rosstat-workbooks.json'>JSON</a> · <a href='capital.html'>Основные фонды</a> · <a href='cost-structure.html'>Затраты</a> · <a href='financial-state.html'>Финансовое состояние</a></p>"
     for group,url in CATALOGS.items():
         c=next((x for x in d["catalogs"] if x["group"]==group),None)
         body+="<section><h2>"+escape({"capital":"Основные фонды","capacity":"Мощности","cost":"Затраты","debt":"Задолженность"}[group])+"</h2><p><a href='"+escape(url,quote=True)+"'>Каталог Росстата</a> · "+escape(c["status"] if c else "Ожидается проверка")+"</p>"
