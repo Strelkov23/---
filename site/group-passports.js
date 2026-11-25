@@ -48,7 +48,17 @@ const GroupPassports=(()=>{
    return {...spec,numerator:n,denominator,denCurrent:a,denPrevious:b,value:Number.isFinite(value)?value:null};
   });
  }
- return {change,revenueComparison,signedBars,filterGroups,ratios};
+ function ratioComparison(d,year,id,sector=''){
+  const spec=ratioSpecs.find(x=>x.id===id);if(!spec||!Number.isInteger(year))throw Error('Параметры сравнения');
+  const rows=filterGroups(d,sector).map(g=>{
+   const r=ratios(g,year).find(x=>x.id===id);
+   const special=spec.den==='revenue'&&g.id==='rushydro';
+   const reason=g.scope!=='consolidated'||g.standard!=='IFRS'?'Несопоставимый стандарт или периметр':special?'Выручка без субсидий: исключена из сравнения маржи':!r.numerator?'Нет сопоставимого числителя':!r.denCurrent?'Нет знаменателя за выбранный год':spec.average&&!r.denPrevious?'Нет знаменателя за предыдущий год':r.denominator===null?'Неположительный знаменатель':r.value===null?'Расчёт недоступен':null;
+   return {...r,value:reason?null:r.value,id:g.id,name:g.name,sector:g.sector,source:g.source,section:g.section,sourceKind:g.source_kind||'documentary',note:g.note||'',reason};
+  }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
+  return {spec,rows,eligible:rows.filter(r=>r.value!==null).length};
+ }
+ return {change,revenueComparison,signedBars,filterGroups,ratios,ratioComparison,ratioSpecs};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -115,6 +125,27 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     comparison.replaceChildren(t);ce.disabled=!r.eligible;ce.onclick=()=>csv('group-revenue-'+y+'.csv',[['Год','Группа','Отрасль','Место в выборке','Охват','Выручка, млн руб.','Исходное значение','Единица','Источник','Отпечаток манифеста'],...r.rows.map(x=>[y,x.name,x.sector,x.rank,r.eligible,x.value,x.original,x.unit,x.source,m.data_fingerprint])]);
    }
    year.onchange=sectorCompare.onchange=compare;compare();
+  }
+  const cy=$('group-cross-year'),cm=$('group-cross-metric'),cs2=$('group-cross-sector'),ct=$('group-cross-table'),cc=$('group-cross-chart'),ce2=$('group-cross-export'),cstatus=$('group-cross-status');
+  if(cy&&cm&&cs2&&ct&&cc&&ce2&&cstatus){
+   const years=[...new Set(d.groups.flatMap(g=>g.metrics.flatMap(p=>p.observations.map(r=>r.year))))].sort((a,b)=>b-a);
+   cy.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
+   cm.replaceChildren(...GroupPassports.ratioSpecs.map(r=>new Option(r.label,r.id)));
+   cs2.replaceChildren(new Option('Все отрасли',''),...sectors.map(s=>new Option(s,s)));
+   function cross(){
+    const y=Number(cy.value),r=GroupPassports.ratioComparison(d,y,cm.value,cs2.value),valid=r.rows.filter(x=>x.value!==null),model=GroupPassports.signedBars(valid.map(x=>x.value));
+    cstatus.textContent='Сопоставимых расчётов: '+r.eligible+' из '+r.rows.length+' групп · '+y+' год. Не рейтинг эффективности или надёжности.';
+    cc.replaceChildren();
+    if(valid.length){
+     const bars=node('div','');bars.className='rm-composition';
+     valid.forEach((x,i)=>{const b=model.bars[i],line=node('div','');line.className='rm-composition-row';const track=node('div','');track.className='group-signed-track';track.setAttribute('aria-hidden','true');const fill=node('div','');fill.className='group-signed-fill'+(b.negative?' negative':'');fill.style.left=b.left+'%';fill.style.width=b.width+'%';const zero=node('span','');zero.className='group-signed-zero';zero.style.left=model.zero+'%';track.append(fill,zero);line.append(node('span',x.name),track,node('strong',fmt(x.value)+' '+r.spec.unit));bars.append(line)});cc.append(bars);
+    }else cc.append(node('p','Нет сопоставимых значений.'));
+    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
+    for(const label of ['Группа','Отрасль','Коэффициент','Числитель, млн руб.','Знаменатель, млн руб.','Статус / оговорки','Источник']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const x of r.rows){const tr=b.insertRow();for(const v of [x.name,x.sector,x.value===null?'—':fmt(x.value)+' '+r.spec.unit,fmt(x.numerator?.value),fmt(x.denominator),[x.reason||'Рассчитано',x.note].filter(Boolean).join(' · ')])tr.insertCell().textContent=v;const a=node('a',x.sourceKind==='republished_issuer_release'?'Перепубликация':'Документ');a.href=x.source;tr.insertCell().append(a)}
+    ct.replaceChildren(t);ce2.disabled=!r.rows.length;ce2.onclick=()=>csv('group-ratio-comparison-'+r.spec.id+'-'+y+'.csv',[['Год','Код коэффициента','Группа','Отрасль','Единица','Значение','Числитель, млн руб.','Знаменатель, млн руб.','Знаменатель на конец года','Знаменатель на начало года','Причина отсутствия','Оговорки','Тип источника','Источник','Раздел','Отпечаток манифеста'],...r.rows.map(x=>[y,r.spec.id,x.name,x.sector,r.spec.unit,x.value,x.numerator?.value,x.denominator,x.denCurrent?.value,x.denPrevious?.value,x.reason,x.note,x.sourceKind,x.source,x.section,m.data_fingerprint])]);
+   }
+   cy.onchange=cm.onchange=cs2.onchange=cross;cross();
   }
  }catch(e){status.textContent='Паспорта недоступны: '+String(e.message||e)}
 });
