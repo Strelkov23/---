@@ -65,3 +65,13 @@ assert.equal(bars.bars[2],null);
 assert.equal(C.comparisonBars([{workers:0},{workers:null}],'workers').bars[0].width,0);
 assert.equal(C.comparisonBars([{workers:0},{workers:null}],'workers').bars[1],null);
 assert.equal(C.comparisonBars([{income_cents:'9007199254740993'}],'income_cents').bars[0].value,'9007199254740993');
+
+const si={status:'ready',year:2025,fingerprint:'a'};
+const sd={status:'diagnostic',financial_year:2025,financial_fingerprint:'a',sme_edition:'2026-11-10',sme_archive_sha256:'b',profiles:{rows:[{inn:'7707083893',status:'matched',region:'77',declared:'64.19'},{inn:'7704211201',status:'not_matched'}]}};
+assert.equal(C.smeProfile(sd,si,'7707083893').declared,'64.19');
+assert.equal(C.smeProfile(sd,si,'7707083893').edition,'2026-11-10');
+assert.equal(C.smeProfile(sd,si,'7704211201').status,'not_matched');
+assert.equal(C.smeProfile({...sd,profiles:{rows:[]}},si,'7707083893').status,'outside_pilot');
+assert.equal(C.smeProfile(sd,{...si,fingerprint:'z'},'7707083893').status,'unavailable');
+assert.equal(C.smeProfile({...sd,profiles:undefined},si,'7707083893').status,'unavailable');
+assert.throws(()=>C.smeProfile({...sd,profiles:{rows:[sd.profiles.rows[0],sd.profiles.rows[0]]}},si,'7707083893'));
