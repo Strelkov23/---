@@ -1,0 +1,68 @@
+name: Production copy and real SME preflight
+on:
+  push:
+    branches: [stage-f-publish-real-preflight]
+    paths: ['.github/workflows/production-copy-acceptance.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reproduce real production artifact preflight and source copy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test "$(gh run view 45719204483 --json conclusion --jq '.conclusion')" = success
+          test "$(gh run view 45719204483 --json headSha --jq '.headSha')" = 46c0dde8ba942e0cf38ae85695a6632b21f7d1c6
+          gh run download 45719204483 --name sme-full-classification --dir /tmp/sme-source
+          score=$(python3 site/sme_artifact.py /tmp/sme-source --financial-index history/published/company-index.json)
+          test "$score" = '2026-11-10 6'
+          test -d site/__pycache__
+          unzip -q EconomicsPages.zip -d monitor
+          find site -maxdepth 1 -type f -exec cp -t monitor/ -- {} +
+          test -f monitor/build.py
+          test ! -e monitor/__pycache__
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          files=[p for p in Path("site").iterdir() if p.is_file()]
+          assert files and all(hashlib.sha256(p.read_bytes()).digest()==hashlib.sha256((Path("monitor")/p.name).read_bytes()).digest() for p in files)
+          print("PRODUCTION_COPY_OK",len(files))
+          PY
+      - name: Build from exact archived database with selected SME index
+        env:
+          SME_PROFILE_SOURCE: /tmp/sme-source
+          SME_FINANCE_REPORT: /tmp/sme-source/finance-join.json
+          SME_MATRIX_REPORT: /tmp/sme-source/classification.json
+        run: |
+          mkdir -p monitor/data
+          if test -f history/monitor.db.gz; then gzip -dc history/monitor.db.gz > monitor/data/monitor.db; else cp history/monitor.db monitor/data/monitor.db; fi
+          cd monitor
+          python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2
+          ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import sme_profile_public as p
+          out=Path("public")
+          d=json.loads((out/"quality.json").read_text())
+          assert not d["errors"],d["errors"]
+          q=p.quality(out,deep=True)
+          assert q["sme_profile_records"]==1823060,q
+          assert q["sme_profile_regions"]==88,q
+          print("PRODUCTION_PROFILE_OK",json.dumps(q,ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-copy-diagnostic
+          path: monitor/public/quality.json
+          if-no-files-found: ignore
