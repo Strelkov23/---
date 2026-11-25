@@ -8,6 +8,7 @@ class Names(unittest.TestCase):
         self.assertEqual(n.normalize('ПАО «СБЕРБАНК»'),'сбербанк')
         self.assertEqual(n.normalize('ООО Ёлка-2026'),'ёлка 2026')
         self.assertEqual(n.bucket('сбербанк'),n.bucket('сбе'))
+        self.assertEqual(n.normalize('Общество с ограниченной ответственностью «Ромашка»'),'ромашка')
     def test_build(self):
         with tempfile.TemporaryDirectory() as t,sqlite3.connect(":memory:") as db:
             root=Path(t);src=root/'src';src.mkdir();out=root/'out';out.mkdir()

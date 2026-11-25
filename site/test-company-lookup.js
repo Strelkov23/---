@@ -42,3 +42,8 @@ assert.equal(C.normalizeName('ООО Ёлка-2026'),'ёлка 2026');
 assert.equal(C.namePath('сбербанк'),C.namePath('сбе'));
 assert.throws(()=>C.namePath('сб'));
 assert.deepEqual(C.nameMatches([['7707083893','ПАО Сбербанк'],['7707083893','Сбербанк'],['7704211201','Другой']],'сбе'),[['7707083893','ПАО Сбербанк']]);
+
+assert.equal(C.normalizeName('Общество с ограниченной ответственностью «Ромашка»'),'ромашка');
+const np=C.namePath('сбер'),np2=np.slice(0,-8)+'-001.json.gz';
+const nd={files:{[np]:{min:'сбера',max:'сбербанк',count:10,bytes:100},[np2]:{min:'сбербанк',max:'сберю',count:10,bytes:100}}};
+assert.equal(C.nameParts(nd,'сбербанк').length,2);assert.equal(C.nameParts(nd,'сберю').length,1);assert.equal(C.nameParts(nd,'сберхх').length,1);assert.throws(()=>C.nameParts({files:{[np]:{min:'сбе',max:'сберю',count:190000,bytes:100}}},'сбер'));

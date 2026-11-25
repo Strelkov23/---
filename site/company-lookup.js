@@ -74,7 +74,9 @@ const CompanyLookup=(()=>{
   const forms=new Set(['ооо','пао','ао','зао','оао','нко','фгуп','гуп','муп','ип','llc','jsc']);
   const tokens=(String(value).replace(/[A-ZА-ЯЁ]/g,c=>c.toLowerCase()).match(/[а-яёa-z0-9]+/g)||[]);
   while(tokens.length>1&&forms.has(tokens[0]))tokens.shift();
-  return tokens.join(' ');
+  const key=tokens.join(' '),long=['общество с ограниченной ответственностью','публичное акционерное общество','непубличное акционерное общество','открытое акционерное общество','закрытое акционерное общество','акционерное общество'];
+  for(const form of long)if(key.startsWith(form+' '))return key.slice(form.length+1);
+  return key;
  }
  function namePath(key){if(key.length<3)throw Error('Введите не менее трёх символов названия');let h=0;for(const c of key.slice(0,3))h=(h*31+c.charCodeAt(0))%256;return 'company-names/name-'+String(h).padStart(3,'0')+'.json.gz'}
  function nameMatches(rows,key){
@@ -82,17 +84,28 @@ const CompanyLookup=(()=>{
   for(const [inn,name] of rows){if(!validInn(inn)||typeof name!=='string')throw Error('Некорректная запись имён');if(normalizeName(name).startsWith(key)&&!result.has(inn))result.set(inn,name)}
   return [...result].sort((a,b)=>a[1].localeCompare(b[1],'ru')||a[0].localeCompare(b[0]));
  }
+ function nameParts(d,key){
+  const base=namePath(key),prefix=base.slice(0,-8),end=key+'\uffff';
+  const candidates=Object.entries(d.files).filter(([p,e])=>(p===base||p.startsWith(prefix+'-')&&/^\d{3}\.json\.gz$/.test(p.slice(prefix.length+1)))&&e.count>0&&typeof e.min==='string'&&typeof e.max==='string'&&e.min<=end&&e.max>=key);
+  const size=candidates.reduce((s,[p,e])=>s+e.bytes,0),count=candidates.reduce((s,[p,e])=>s+e.count,0);
+  if(size>12*1024*1024||count>180000||candidates.length>16)throw Error('Слишком широкий запрос. Уточните начало названия.');
+  return candidates;
+ }
  async function searchNames(d,index,key,base='',fetcher=fetch){
-  const name=namePath(key),e=d.files[name];
-  if(d.status!=='ready'||index.status!=='ready'||d.year!==index.year||d.index_fingerprint!==index.fingerprint||!e||!Number.isSafeInteger(e.bytes)||e.bytes<1||e.bytes>8*1024*1024||!Number.isSafeInteger(e.count)||e.count<0||!/^[a-f0-9]{64}$/.test(e.sha256))throw Error('Индекс названий недоступен');
-  const response=await fetcher(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Блок названий недоступен');
-  const bytes=await response.arrayBuffer();
-  if(bytes.byteLength!==e.bytes||await Provenance.digest(bytes)!==e.sha256)throw Error('Контрольная сумма названий');
-  const rows=JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
-  if(!Array.isArray(rows)||rows.length!==e.count||rows.some(r=>!Array.isArray(r)||r.length!==2||namePath(normalizeName(r[1]))!==name))throw Error('Некорректный блок имён');
+  if(d.schema!==2||d.status!=='ready'||index.status!=='ready'||d.year!==index.year||d.index_fingerprint!==index.fingerprint)throw Error('Индекс названий недоступен');
+  const parts=nameParts(d,key),rows=[];
+  for(const [name,e] of parts){
+   if(!Number.isSafeInteger(e.bytes)||e.bytes<1||e.bytes>8*1024*1024||!Number.isSafeInteger(e.count)||e.count<1||e.count>60000||!/^[a-f0-9]{64}$/.test(e.sha256))throw Error('Некорректный паспорт названий');
+   const response=await fetcher(base+name,{cache:'no-cache'});if(!response.ok)throw Error('Блок названий недоступен');
+   const bytes=await response.arrayBuffer();
+   if(bytes.byteLength!==e.bytes||await Provenance.digest(bytes)!==e.sha256)throw Error('Контрольная сумма названий');
+   const block=JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+   if(!Array.isArray(block)||block.length!==e.count||block.some(r=>!Array.isArray(r)||r.length!==2||typeof r[1]!=='string'||!validInn(r[0])||namePath(normalizeName(r[1]))!==namePath(key)||normalizeName(r[1])<e.min||normalizeName(r[1])>e.max))throw Error('Некорректный блок имён');
+   rows.push(...block);
+  }
   return nameMatches(rows,key);
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage,normalizeName,namePath,nameMatches,searchNames};
+ return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage,normalizeName,namePath,nameMatches,nameParts,searchNames};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
