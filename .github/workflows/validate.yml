@@ -57,6 +57,7 @@ jobs:
           node test-global-plan.js
           node test-labor-calibration.js
           node test-labor-diagnostics.js
+          node test-investment-diagnostics.js
           node test-data-registry.js
           node test-research-projects.js
           node test-provenance.js

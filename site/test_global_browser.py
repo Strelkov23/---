@@ -74,6 +74,26 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/diagnostics.html#diag-overview",wait_until="load")
         page.wait_for_function("document.querySelectorAll('#diag-overview-cards article').length===6",timeout=45000)
         assert page.locator("#diag-overview-export").is_enabled()
+        page.wait_for_function("!document.querySelector('#asset-diag-status').textContent.includes('Проверка архива')",timeout=45000)
+        assert page.locator("#asset-diag-table tbody tr").count()==19
+        with page.expect_download() as inv_assets:
+            page.locator("#asset-diag-export").click()
+        with open(inv_assets.value.path(),encoding="utf-8-sig",newline="") as f:
+            asset_rows=list(csv.reader(f,delimiter=";"))
+        assert len(asset_rows)==20 and len({len(r) for r in asset_rows})==1
+        page.wait_for_function("!document.querySelector('#inv-diag-status').textContent.includes('Проверка архива')",timeout=45000)
+        if page.locator("#inv-diag-export").is_enabled():
+            assert page.locator("#inv-diag-table tbody tr").count()>0
+            with page.expect_download() as inv_data:
+                page.locator("#inv-diag-export").click()
+            with open(inv_data.value.path(),encoding="utf-8-sig",newline="") as f:
+                investment_rows=list(csv.reader(f,delimiter=";"))
+            assert len(investment_rows)>1 and len({len(r) for r in investment_rows})==1
+            page.locator("#inv-diag-query").fill("zzzz_no_region")
+            assert page.locator("#inv-diag-export").is_disabled()
+            page.locator("#inv-diag-query").fill("")
+        else:
+            assert "недоступны" in page.locator("#inv-diag-status").inner_text()
         with page.expect_download() as overview:
             page.locator("#diag-overview-export").click()
         assert overview.value.suggested_filename.startswith("economic-diagnostic-overview-")
