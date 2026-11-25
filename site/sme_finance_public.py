@@ -2,7 +2,8 @@
 import json,os,re
 from collections import Counter
 from pathlib import Path
-from sme_finance_join import NOTE
+from sme_finance_join import NOTE,PROFILE_LIMIT
+from company_import import inn_valid
 FILE="sme-finance.json"
 def empty():return dict(schema=1,status="not_loaded",note=NOTE)
 def quality(d,index=None,matrix=None):
@@ -37,6 +38,25 @@ def quality(d,index=None,matrix=None):
                 if type(z) is not int or not max(0,l+r-v)<=z<=min(l,r):raise ValueError("Пересечение")
         if seen!=set(expected) or matched!=i:raise ValueError("Баланс ячеек")
         total+=len(seen)
+    if "profiles" in d:
+        p=d["profiles"]
+        if p["limit_per_metric"]!=PROFILE_LIMIT or not isinstance(p["rows"],list) or len(p["rows"])>3*PROFILE_LIMIT or len(p["rows"])>a:raise ValueError("Охват пилотных паспортов")
+        eligible={r["region"] for r in matrix["declared"]}
+        previous=""
+        for r in p["rows"]:
+            inn=r["inn"]
+            if not isinstance(inn,str) or not inn_valid(inn) or inn<=previous:raise ValueError("ИНН/порядок пилотных паспортов")
+            previous=inn
+            if r["status"] in ("not_matched","region_excluded"):
+                if set(r)!={"inn","status"}:raise ValueError("Неподтверждённый паспорт")
+                continue
+            if r["status"]!="matched" or set(r)!={"inn","status","ogrn","region","declared","dver","reported","rver","member","sha256","document"}:raise ValueError("Паспорт МСП")
+            ogrn=r["ogrn"]
+            if not isinstance(ogrn,str) or not re.fullmatch(r"\d{13}",ogrn) or int(ogrn[:12])%11%10!=int(ogrn[-1]) or r["region"] not in eligible:raise ValueError("ОГРН/регион")
+            for key,version in (("declared","dver"),("reported","rver")):
+                v=r[key];ver=r[version]
+                if (v is None)!=(ver is None) or v is not None and (not isinstance(v,str) or not re.fullmatch(r"\d{2}(?:\.\d{1,2}){0,2}",v) or ver not in ("2001","2014")):raise ValueError("ОКВЭД")
+            if not isinstance(r["member"],str) or not r["member"].lower().endswith(".xml") or not re.fullmatch(r"[0-9a-f]{64}",r["sha256"]) or type(r["document"]) is not int or r["document"]<1:raise ValueError("Источник паспорта")
     return {"sme_finance_matched":i,"sme_finance_cells":total}
 def publish(out,previous):
     index=json.loads((out/"company-index.json").read_text());matrix=json.loads((out/"sme-matrix.json").read_text());d=empty()
