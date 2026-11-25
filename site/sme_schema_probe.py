@@ -29,6 +29,8 @@ def main():
     a=argparse.ArgumentParser();a.add_argument("--output",type=Path,required=True);p=a.parse_args()
     raw,enc=fetch(SOURCE,4_000_000);d=parse(raw,enc)
     raw,_=fetch(d["schema"],2_000_000);d.update(inspect_schema(raw));d["checked"]=datetime.now(timezone.utc).isoformat()
+    required={"ИННЮЛ","ОГРН","КодРегион","КодОКВЭД","ВерсОКВЭД","ДатаСост"}
+    if not required<=set(d["attributes"]):raise ValueError("В XSD отсутствуют необходимые поля")
     p.output.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(d,ensure_ascii=False))
 if __name__=="__main__":main()
