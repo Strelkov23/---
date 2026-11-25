@@ -28,3 +28,14 @@ class Coverage(unittest.TestCase):
         self.assertIn("Тематические разрезы",html)
         self.assertIn("100,0 %",html)
         self.assertIn("catalogue-view=coverage",html)
+
+    def test_empty_registered_journal_visible(self):
+        lit=dict(registry={"Есть":{"issn":"1234-5678"},"Нет":{"issn":"9876-5432"}},articles=[dict(doi="10.1234/a",journal="Есть",published="2025")])
+        d=p.collect(lit,"2026-11-26")
+        self.assertEqual({j["journal"]:j["records"] for j in d["registry_journals"]},{"Есть":1,"Нет":0})
+        self.assertIn("Нет · 9876-5432 — 0 записей в локальном каталоге",p.render(d))
+        self.assertEqual(len(d["rows"]),1)
+        empty=p.collect(dict(registry=lit["registry"],articles=[]),"2026-11-26")
+        self.assertEqual(empty["records"],0)
+        self.assertEqual(len(empty["registry_journals"]),2)
+        self.assertIn("Нет · 9876-5432",p.render(empty))

@@ -31,7 +31,7 @@ def collect(lit,stamp):
     rows=[dict(journal=name,issn=registry[name]["issn"],year=y,**{k:c[k] for k in FIELDS[3:]}) for (name,y),c in sorted(journal.items())]
     groups=[dict(topic=tag,year=y,records=n,denominator=years[y]) for (tag,y),n in sorted(topic.items())]
     if sum(r["records"] for r in rows)!=len(seen) or any(r["records"]>r["denominator"] for r in groups):raise ValueError("Баланс")
-    return dict(schema=1,as_of=asof.isoformat(),note=NOTE,records=len(seen),years=dict(sorted(years.items())),rows=rows,topics=groups)
+    return dict(schema=1,as_of=asof.isoformat(),note=NOTE,records=len(seen),registry_journals=[dict(journal=name,issn=registry[name]["issn"],records=sum(r["records"] for r in rows if r["journal"]==name)) for name in sorted(registry)],years=dict(sorted(years.items())),rows=rows,topics=groups)
 def csv_value(v):
     s=str(v)
     return "'"+s if s[:1] in ("=","+","-","@","\t","\r") else s
@@ -55,8 +55,12 @@ def render(d):
     def link(label,url):return '<a href="'+e(url)+'">'+e(label)+'</a>' if url else e(label)
     for y,n in d["years"].items():body+='<tr><td>'+e(("Год не определён" if y=="unknown" else y+" · будущий" if int(y)>int(d["as_of"][:4]) else y))+'</td><td>'+link(n,search_link(y))+'</td></tr>'
     body+='</tbody></table></div>'
-    for name in sorted({r["journal"] for r in d["rows"]}):
+    for j in d["registry_journals"]:
+        name=j["journal"]
         rs=[r for r in d["rows"] if r["journal"]==name]
+        if not rs:
+            body+='<p>'+e(name)+' · '+e(j["issn"])+' — 0 записей в локальном каталоге; полнота выпуска не установлена.</p>'
+            continue
         body+='<details><summary>'+e(name)+' · '+e(sum(r["records"] for r in rs))+' записей</summary><div class="table-scroll" tabindex="0" role="region" aria-label="'+e(name)+'"><table><thead><tr><th>Год</th><th>Статей</th><th>Полная библиография</th><th>Метаданные доступа</th></tr></thead><tbody>'
         for r in rs:
             y=r["year"];body+='<tr><td>'+e(y)+'</td><td>'+link(r["records"],search_link(y,journal=name))+'</td><td>'+link(r["complete_bibliography"],search_link(y,journal=name,metadata="complete"))+'</td><td>'+e(r["with_access_metadata"])+'</td></tr>'
