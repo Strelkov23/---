@@ -67,3 +67,20 @@ def publish(out,previous):
             if d.get("edition","")<=candidate["edition"]:d=candidate
         except (OSError,ValueError,KeyError,TypeError) as e:print("SME_MATRIX_NOT_IMPORTED",str(e)[:180],flush=True)
     quality(d);(out/FILE).write_text(json.dumps(d,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+
+def render_reconciliation(d):
+    """Use the actual published edition, not a fixed count from an earlier run."""
+    import html
+    quality(d)
+    if d["status"]=="not_loaded":return "Диагностический срез пока не опубликован."
+    def fmt(n):return format(n,",").replace(",", " ")
+    def diff(n):return ("+" if n>0 else "")+fmt(n)
+    matched=[r for r in d["regions"] if r["official"] is not None and r["difference"]==0]
+    excluded=[r for r in d["regions"] if r["official"] is None or r["difference"]!=0]
+    details=[]
+    for r in excluded:
+        label="код "+html.escape(r["region"])
+        if r["official"] is None:label+=": нет отдельного официального итога; импортировано "+fmt(r["imported"])
+        else:label+=": расхождение "+diff(r["difference"])
+        details.append(label)
+    return ("Срез "+d["edition"]+": "+fmt(d["xml_processed"])+" из "+fmt(d["xml_total"])+" XML; "+fmt(d["national_imported"])+" уникальных ЮЛ; официальный итог "+fmt(d["national_official"])+"; расхождение "+diff(d["national_difference"])+". Совпали итоги "+str(len(matched))+" территорий; карантин "+fmt(d["quarantined"])+". "+("Исключены: "+"; ".join(details)+". " if details else "")+"Только диагностическая классификация.")

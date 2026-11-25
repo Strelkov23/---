@@ -40,3 +40,16 @@ class Public(unittest.TestCase):
         self.assertIs(p.prefer(both,p.empty()),both)
         new=dict(both,edition="new")
         self.assertIs(p.prefer(both,new),new)
+
+    def test_dynamic_sme_reconciliation_summary(self):
+        import sme_matrix as m
+        from unittest.mock import patch
+        self.assertIn("не опубликован",m.render_reconciliation(m.empty()))
+        d=dict(status="diagnostic",edition="2026-11-10",xml_total=7661,xml_processed=7661,national_imported=2032933,national_official=2032928,national_difference=5,quarantined=1,regions=[dict(region="77",official=5,imported=5,difference=0),dict(region="00",official=None,imported=6,difference=None),dict(region="71",official=14930,imported=14929,difference=-1)])
+        with patch.object(m,"quality",return_value={}):
+            result=m.render_reconciliation(d)
+        self.assertIn("2026-11-10",result)
+        self.assertIn("расхождение +5",result)
+        self.assertIn("код 00: нет отдельного официального итога",result)
+        self.assertIn("код 71: расхождение -1",result)
+        self.assertIn("Только диагностическая классификация",result)
