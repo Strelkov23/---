@@ -6,20 +6,41 @@ const SMEMap=(()=>{
  // Composite oblast polygons are not coloured unless their territorial definition is established.
  function key(code){const k=cross.get(String(code));return ['RU-ARK','RU-TYU'].includes(k)?null:k||null}
  function join(rows,features){const counts=new Map();for(const f of features){const c=f.properties?.iso_3166_2;if(c)counts.set(c,(counts.get(c)||0)+1)}const matched=new Map();for(const r of rows){const k=key(r.code);if(k&&counts.get(k)===1)matched.set(k,r)}return matched}
- return {key,join}
+ function ratio(a,b,scale=1){return Number.isFinite(a)&&a>=0&&Number.isFinite(b)&&b>0?a/b*scale:null}
+ function measures(r,national){
+  return {...r,ipShare:ratio(r.individual,r.total,100),nationalShare:ratio(r.total,national.total,100),workersPerEntity:ratio(r.workers,r.total)};
+ }
+ function rank(rows,metric){
+  return [...rows].sort((a,b)=>{const av=Number.isFinite(a[metric]),bv=Number.isFinite(b[metric]);return av!==bv?(av?-1:1):av?b[metric]-a[metric]||String(a.code).localeCompare(String(b.code)):String(a.code).localeCompare(String(b.code))});
+ }
+ return {key,join,ratio,measures,rank}
 })();
 if(typeof module!=='undefined')module.exports=SMEMap;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
  const $=id=>document.getElementById(id),form=$('sme-form');if(!form)return;
  const status=$('sme-status'),host=$('sme-map'),metric=$('sme-metric'),detail=$('sme-detail'),exp=$('sme-export'),tableHost=$('sme-table');
- const label={total:'Субъекты МСП',legal:'Юридические лица',individual:'Индивидуальные предприниматели',workers:'Работники по данным реестра'};
+ const label={total:'Субъекты МСП',legal:'Юридические лица',individual:'Индивидуальные предприниматели',workers:'Работники по данным реестра',ipShare:'Доля ИП, %',nationalShare:'Доля в количестве МСП РФ, %',workersPerEntity:'Учтённые работники на один субъект МСП'};
  try{
   const manifest=await Provenance.validateManifest(await load('data-manifest.json')),get=async n=>(await Provenance.get(manifest,n,root)).data,data=await get('sme-regions.json');
   if(!data.rows.length){status.textContent='ФНС: срез пока недоступен. '+(data.error||'');return}
-  const geo=await get('regional-boundaries.geojson'),matched=SMEMap.join(data.rows,geo.features),fmt=n=>n.toLocaleString('ru-RU');
+  const geo=await get('regional-boundaries.geojson'),rows=data.rows.map(r=>SMEMap.measures(r,data.national)),matched=SMEMap.join(rows,geo.features),fmt=n=>Number.isFinite(n)?n.toLocaleString('ru-RU',{maximumFractionDigits:2}):'—';
   status.textContent='Срез: '+data.period+' · регионов: '+data.rows.length+' · сопоставлено с контурами: '+matched.size+(data.error?' · сохранён прежний срез':'');
-  const table=node('table',''),head=table.createTHead().insertRow(),body=table.createTBody();for(const t of ['Регион','Всего МСП','ЮЛ','ИП','Работники'])head.append(node('th',t));for(const r of data.rows){const tr=body.insertRow();for(const v of [r.name,fmt(r.total),fmt(r.legal),fmt(r.individual),fmt(r.workers)])tr.insertCell().textContent=v}tableHost.append(table,node('p','Итог РФ: '+fmt(data.national.total)+' · сумма региональных строк: '+fmt(data.regional_sum.total)+'.'));
-  exp.disabled=false;exp.onclick=()=>csv('sme-regions-'+data.period+'.csv',[['Дата','Код ФНС','Регион','Всего','ЮЛ','ИП','Работники','Контур ISO','Источник','SHA-256'],...data.rows.map(r=>[data.period,r.code,r.name,r.total,r.legal,r.individual,r.workers,SMEMap.key(r.code)||'',data.documentation,data.sha256])]);
+  const summary=$('sme-summary'),national=SMEMap.measures(data.national,data.national);
+  for(const [title,value] of [['МСП России',national.total],['Доля ИП, %',national.ipShare],['Учтённые работники на субъект',national.workersPerEntity],['Региональных строк',rows.length]]){
+   const card=node('div','');card.className='metric';card.append(node('b',fmt(value)),node('span',title));summary.append(card);
+  }
+  const query=$('sme-query'),scope=$('sme-scope'),selectionExport=$('sme-selection-export');
+  function renderTable(){
+   const field=metric.value,q=query.value.trim().toLocaleLowerCase('ru'),visible=SMEMap.rank(rows.filter(r=>(!q||r.name.toLocaleLowerCase('ru').includes(q)||r.code===q)&&(!scope.checked||matched.has(SMEMap.key(r.code)))),field);
+   const table=node('table',''),head=table.createTHead().insertRow(),body=table.createTBody();
+   for(const t of ['Регион','Всего МСП','ЮЛ','ИП','Работники','Доля ИП, %','Доля в МСП России, %','Работников на субъект']){const th=node('th',t);th.scope='col';head.append(th)}
+   for(const r of visible){const tr=body.insertRow();for(const v of [r.name,...[r.total,r.legal,r.individual,r.workers,r.ipShare,r.nationalShare,r.workersPerEntity].map(fmt)])tr.insertCell().textContent=v}
+   tableHost.replaceChildren(node('p','Показано '+visible.length+' из '+rows.length+' строк; сортировка: '+label[field]+'. Итог РФ: '+fmt(data.national.total)+' · сумма региональных строк: '+fmt(data.regional_sum.total)+'.'),table);
+   selectionExport.disabled=!visible.length;selectionExport.onclick=()=>exportRows(visible,'sme-selection-'+data.period+'.csv');
+  }
+  function exportRows(items,name){csv(name,[['Дата','Код ФНС','Регион','Всего','ЮЛ','ИП','Работники','Доля ИП, %','Доля в МСП РФ, %','Работников на субъект','Итог МСП РФ (знаменатель)','Контур ISO (однозначное соответствие)','Источник','SHA-256'],...items.map(r=>[data.period,r.code,r.name,r.total,r.legal,r.individual,r.workers,r.ipShare,r.nationalShare,r.workersPerEntity,data.national.total,matched.has(SMEMap.key(r.code))?SMEMap.key(r.code):'',data.documentation,data.sha256])])}
+  exp.disabled=false;exp.onclick=()=>exportRows(rows,'sme-regions-'+data.period+'.csv');
+  query.oninput=scope.onchange=renderTable;
   function draw(){
    host.replaceChildren();detail.textContent='Выберите регион на карте.';
    const features=geo.features.map(f=>({code:f.properties?.iso_3166_2,name:f.properties?.name,rings:RegionalMap.rings(f.geometry).map(r=>r.map(p=>RegionalMap.project(p[0],p[1])).filter(Boolean)).filter(r=>r.length>=4)}));
@@ -31,12 +52,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const txt=(xx,yy,t,size=14)=>shape('text',{x:xx,y:yy,'font-size':size,fill:'#173e52'},t);
    const key=metric.value,thresholds=RegionalMap.classes([...matched.values()].map(r=>r[key])),colors=['#e3f1ea','#b6dacb','#75b7a7','#388c83','#075953'];
    shape('rect',{width:w,height:h,fill:'#fff'});txt(25,32,label[key]+' · '+data.period,22);txt(25,55,'ФНС: агрегаты реестра, не число производственных площадок.',14);
-   for(const f of features){const r=matched.get(f.code),d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' '),p=shape('path',{d,fill:r?colors[RegionalMap.bin(r[key],thresholds)]:'#e1e4e1',stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd'});shape('title',{},r?r.name+' · '+fmt(r[key]):RegionalMap.displayName(f.code,f.name)+' · нет соответствия',p);if(r){p.setAttribute('role','button');p.setAttribute('tabindex','0');p.setAttribute('aria-label',r.name+' · '+fmt(r[key]));const show=()=>detail.textContent=r.name+' · '+label[key]+': '+fmt(r[key])+' · '+data.period;p.onclick=show;p.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show()}}}}
+   for(const f of features){const r=matched.get(f.code),d=f.rings.map(r=>r.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(2)+' '+y(p[1]).toFixed(2)).join(' ')+' Z').join(' '),p=shape('path',{d,fill:r&&Number.isFinite(r[key])?colors[Math.max(0,Math.min(colors.length-1,RegionalMap.bin(r[key],thresholds)))]: '#e1e4e1',stroke:'#52696e','stroke-width':.85,'fill-rule':'evenodd'});shape('title',{},r?r.name+' · '+fmt(r[key]):RegionalMap.displayName(f.code,f.name)+' · нет соответствия',p);if(r){p.setAttribute('role','button');p.setAttribute('tabindex','0');p.setAttribute('aria-label',r.name+' · '+fmt(r[key]));const show=()=>detail.textContent=r.name+' · '+label[key]+': '+fmt(r[key])+' · МСП: '+fmt(r.total)+' · доля ИП: '+fmt(r.ipShare)+'% · доля в МСП РФ: '+fmt(r.nationalShare)+'% · учтённых работников на субъект: '+fmt(r.workersPerEntity)+' · '+data.period;p.onclick=show;p.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show()}}}}
    if(thresholds.length===1){shape('rect',{x:25,y:565,width:20,height:15,fill:colors[0]});txt(52,578,fmt(thresholds[0]))}
-   else thresholds.slice(1).forEach((v,i)=>{shape('rect',{x:25+i*220,y:565,width:20,height:15,fill:colors[i]});txt(52+i*220,578,fmt(Math.round(thresholds[i]))+'–'+fmt(Math.round(v)),12)});
+   else thresholds.slice(1).forEach((v,i)=>{shape('rect',{x:25+i*220,y:565,width:20,height:15,fill:colors[i]});txt(52+i*220,578,fmt(thresholds[i])+'–'+fmt(v),12)});
    txt(25,610,'Серый — нет однозначного соответствия. Интервалы — квантили доступных регионов.',13);txt(25,630,'Источник: ФНС · границы Natural Earth / PiSpace Maps',13);
    const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap)
   }
-  metric.onchange=draw;form.onsubmit=e=>e.preventDefault();draw()
+  metric.onchange=()=>{draw();renderTable()};form.onsubmit=e=>e.preventDefault();draw();renderTable()
  }catch(e){status.textContent='Срез МСП недоступен: '+e.message}
 });

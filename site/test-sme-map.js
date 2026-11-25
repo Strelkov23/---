@@ -3,3 +3,9 @@ assert.equal(M.key('77'),'RU-MOW');assert.equal(M.key('72'),null);assert.equal(M
 const feature=c=>({properties:{iso_3166_2:c}}),rows=[{code:'77'},{code:'78'},{code:'72'}];
 assert.equal(M.join(rows,[feature('RU-MOW'),feature('RU-SPE'),feature('RU-SPE'),feature('RU-TYU')]).size,1);
 console.log('SME map tests passed');
+const r=M.measures({code:'77',total:20,individual:15,workers:60},{total:100});
+assert.equal(r.ipShare,75);assert.equal(r.nationalShare,20);assert.equal(r.workersPerEntity,3);
+const z=M.measures({code:'01',total:0,individual:0,workers:0},{total:100});
+assert.equal(z.ipShare,null);assert.equal(z.workersPerEntity,null);assert.equal(z.nationalShare,0);
+assert.equal(M.ratio(null,10),null);assert.deepEqual(M.rank([z,r],'ipShare').map(x=>x.code),['77','01']);
+assert.equal(M.measures({total:10,individual:0,workers:0},{total:0}).nationalShare,null);

@@ -213,6 +213,17 @@ with sync_playwright() as p:
             assert page.locator("#sme-map svg").count()==1
             page.locator("#sme-metric").select_option("workers")
             assert "Работники" in page.locator("#sme-map svg").text_content()
+            page.locator("#sme-metric").select_option("ipShare")
+            assert "Доля ИП" in page.locator("#sme-map svg").text_content()
+            page.locator("#sme-map-section details summary").click()
+            page.locator("#sme-query").fill("77")
+            assert page.locator("#sme-table tbody tr").count()==1
+            with page.expect_download() as sme_export:
+                page.locator("#sme-selection-export").click()
+            assert sme_export.value.suggested_filename.startswith("sme-selection-")
+            page.locator("#sme-query").fill("no_such_region")
+            assert page.locator("#sme-selection-export").is_disabled()
+            assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/glossary.html",wait_until="load")
         assert page.locator("#glossary-list article").count()>=20
         page.locator("#glossary-query").fill("ВРП")
