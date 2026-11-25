@@ -7,6 +7,7 @@ class Join(unittest.TestCase):
     def test_counts_and_nulls(self):
         with tempfile.TemporaryDirectory() as t,sqlite3.connect(":memory:") as db:
             root=Path(t);s.setup(db)
+            db.execute("INSERT INTO members VALUES(?,?,?,?)",(1,"part.xml","d"*64,1))
             db.execute("INSERT INTO org VALUES(?,?,?,?,?,?,?,?,?,?)",("7707083893","1027700132195","77","64.19","2014",None,None,"1",1,1))
             rows=[["7707083893","A",None,"9007199254740993",None,0,0,1,None,None],["7704211201","B",None,"1","1",None,0,1,None,None]]
             raw=gzip.compress(json.dumps(rows).encode());(root/"block.gz").write_bytes(raw)
@@ -21,3 +22,11 @@ class Join(unittest.TestCase):
             self.assertIsNone(d["declared"][0]["expense_sum"])
             self.assertEqual(d["declared"][0]["workers_sum"],"0")
             self.assertEqual(d["reported"][0]["class"],"missing_or_other_version")
+
+            self.assertEqual(d["profiles"]["rows"][0],{"inn":"7704211201","status":"not_matched"})
+            self.assertEqual(d["profiles"]["rows"][1]["ogrn"],"1027700132195")
+            self.assertEqual(d["profiles"]["rows"][1]["accepted_ordinal"],1)
+    def test_bounded_ranking(self):
+        heap=[]
+        for inn,value in [("7707083893","5"),("7704211201","5"),("7700000000",None)]:j.retain(heap,value,inn,1)
+        self.assertEqual(heap[0][2],"7704211201")
