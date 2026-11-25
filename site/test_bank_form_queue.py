@@ -25,5 +25,6 @@ class BankQueue(unittest.TestCase):
             with patch.object(bank_capital,"target_cohort",return_value=[str(i) for i in range(1,31)]),patch.object(bank_capital,"quality"),patch.object(bank_balance,"quality"),patch.object(bank_profit,"quality"):
                 d=q.audit(p,"2026-11-26")
             self.assertEqual(d["distribution"],{"0":29,"1":0,"2":1,"3":0})
+            self.assertEqual(d["form_coverage"],{"0409808":1,"0409806":1,"0409807":0})
             self.assertEqual(d["scope"],"conditional_queue_simulation_not_import")
             self.assertTrue(all(n<=20 for n in d["coordinated"]["requests"]))

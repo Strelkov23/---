@@ -61,4 +61,6 @@ def audit(previous,stamp):
             selected.append(set() if last==stamp[:10] else set(todo))
         possible=sum(all(reg in verified[i] or reg in selected[i] for i in range(3)) for reg in cohort)
         return dict(requests=[len(s) for s in selected],possible_complete=possible,additional=possible-distribution["3"],requests_to_partial=sum(counts[r]>0 for ids in selected for r in ids))
-    return dict(schema=1,scope="conditional_queue_simulation_not_import",date=stamp[:10],target=len(cohort),distribution=distribution,independent=scenario(False),coordinated=scenario(True))
+    form_coverage=[len(ids & cohort) for ids in verified]
+    if sum(distribution.values())!=len(cohort) or sum(int(k)*v for k,v in distribution.items())!=sum(form_coverage):raise ValueError("Bank cohort coverage mismatch")
+    return dict(schema=1,scope="conditional_queue_simulation_not_import",date=stamp[:10],target=len(cohort),distribution=distribution,form_coverage=dict(zip(("0409808","0409806","0409807"),form_coverage)),independent=scenario(False),coordinated=scenario(True))

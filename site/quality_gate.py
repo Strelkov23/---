@@ -450,7 +450,11 @@ def check(out,previous,stamp):
     try:
         import literature_quality as lq
         if (out/lq.FILE).is_file():
-            counts.update(lq.quality(json.loads((out/lq.FILE).read_text(encoding="utf-8")),data["literature.json"]))
+            lqd=json.loads((out/lq.FILE).read_text(encoding="utf-8"));counts.update(lq.quality(lqd,data["literature.json"]))
+            import literature_coverage as lc
+            lc.verify_csv(out/"literature-journals.csv",lc.REGISTRY_FIELDS,lqd["coverage"]["registry_journals"])
+            lc.verify_csv(out/"literature-years.csv",lc.FIELDS,lqd["coverage"]["rows"])
+            lc.verify_csv(out/"literature-topics.csv",lc.TOPIC_FIELDS,lqd["coverage"]["topics"])
     except (ValueError,KeyError,TypeError,OSError) as e:issues.append("Качество литературы: "+str(e))
     internal,_=link_audit.scan(out)
     if internal:issues.extend(f"{p}: {u} ({e})" for p,u,e in internal)

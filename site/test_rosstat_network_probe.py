@@ -29,4 +29,39 @@ class ProbeTests(unittest.TestCase):
             self.assertTrue(all(x["status"]=="accepted" and x["observations"]==1 for x in r["results"]))
             r=p.probe(fetcher=fetch,parser=lambda *a:[])
             self.assertTrue(all(x["status"]=="parse_rejected" for x in r["results"]))
+    def test_bounded_404_recovery(self):
+        urls=["https://rosstat.gov.ru/storage/mediabank/"+x+".xlsx" for x in "abcd"]
+        options=[dict(url=u,title="test") for u in urls]
+        calls=[]
+        def fetch(u,kind):
+            if kind=="workbook":
+                calls.append(u)
+                if u!=urls[2]:raise HTTPError(u,404,"missing",{},None)
+            return SimpleNamespace(raw=b"content",charset="utf-8",final_url=u,sha256="a"*64)
+        with patch.object(p.h,"discover",return_value=[]),patch.object(p,"shortlist",return_value=options):
+            r=p.probe(fetcher=fetch,parser=lambda *a:[{"metric":"test"}],alternatives=True)
+        self.assertTrue(all(x["status"]=="accepted" and len(x["attempts"])==3 for x in r["results"]))
+        self.assertNotIn(urls[3],calls)
+    def test_alternatives_stop_on_restriction_and_preserve_evidence(self):
+        url="https://rosstat.gov.ru/storage/mediabank/a.xlsx"
+        options=[dict(url=url,title="test"),dict(url=url.replace("a.xlsx","b.xlsx"),title="other")]
+        calls=[]
+        def fetch(u,kind):
+            if kind=="workbook":
+                calls.append(u)
+                raise HTTPError(u,403,"denied",{},None)
+            return SimpleNamespace(raw=b"content",charset="utf-8",final_url=u,sha256="a"*64)
+        with patch.object(p.h,"discover",return_value=[]),patch.object(p,"shortlist",return_value=options):
+            r=p.probe(fetcher=fetch,alternatives=True)
+        self.assertEqual(calls,[url])
+        self.assertEqual(r["results"][0]["eligible_candidates"],2)
+        self.assertEqual(r["results"][0]["attempts"],[dict(url=url,status=403)])
+        self.assertTrue(all(x["status"]=="skipped_access_restriction" for x in r["results"][1:]))
+    def test_alternatives_record_parse_rejection(self):
+        url="https://rosstat.gov.ru/storage/mediabank/a.xlsx"
+        def fetch(u,kind):
+            return SimpleNamespace(raw=b"content",charset="utf-8",final_url=u,sha256="a"*64)
+        with patch.object(p.h,"discover",return_value=[]),patch.object(p,"shortlist",return_value=[dict(url=url,title="test")]):
+            r=p.probe(fetcher=fetch,parser=lambda *a:[],alternatives=True)
+        self.assertTrue(all(x["attempts"][0]["status"]=="parse_rejected" and x["eligible_candidates"]==1 for x in r["results"]))
 if __name__=="__main__":unittest.main()

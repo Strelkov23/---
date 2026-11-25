@@ -735,6 +735,33 @@ with sync_playwright() as p:
             with open(bank_cov.value.path(),encoding="utf-8-sig",newline="") as f:
                 coverage=list(csv.reader(f,delimiter=";"))
             assert len(coverage)==4 and len({len(r) for r in coverage})==1
+        common=page.locator("#bank-common-distribution")
+        assert common.count()==1
+        cards=common.locator(".metric")
+        assert cards.count() in (0,4)
+        if page.locator("#bank-common-export").is_enabled():
+            assert cards.count()==4
+            with page.expect_download() as bank_common:
+                page.locator("#bank-common-export").click()
+            with open(bank_common.value.path(),encoding="utf-8-sig",newline="") as f:
+                joint=list(csv.reader(f,delimiter=";"))
+            assert len(joint)>1 and all(len(r)==11 for r in joint)
+            assert joint[0][-2:]==["Версия данных","Выгружено UTC"]
+            assert all(r[9] and r[10] for r in joint[1:])
+            assert len({r[0] for r in joint[1:]})==len(joint)-1
+            counts=[0,0,0,0]
+            for r in joint[1:]:
+                assert all(v in ("0","1") for v in r[1:4])
+                n=sum(map(int,r[1:4]))
+                assert int(r[4])==n
+                counts[n]+=1
+                assert len(r[8])==64
+            assert counts==[int(cards.nth(i).locator("b").inner_text().replace("\u00a0","").replace("\u202f","").replace(" ","")) for i in range(4)]
+        elif cards.count()==4:
+            assert all(cards.nth(i).locator("b").inner_text()=="0" for i in range(4))
+        else:
+            assert "Распределение недоступно" in common.inner_text()
+
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.wait_for_function("document.querySelector('#bank-ratio-status').textContent.startsWith('Сопоставимых значений:')",timeout=45000)
         bank_balance=json.loads(Path("bank-balance.json").read_text())
@@ -1268,6 +1295,21 @@ with sync_playwright() as p:
             assert group.locator("[data-project-breakdown]:visible").count()>0
             assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/literature-quality.html",wait_until="load")
+        literature_quality=json.loads(Path("literature-quality.json").read_text())
+        coverage_links=page.locator('#literature-period-coverage a[href*="catalogue-view=coverage"]')
+        if literature_quality["coverage"]["rows"]:
+            assert coverage_links.count()>0
+            from urllib.parse import urlencode
+            first=next((r for r in literature_quality["coverage"]["rows"] if r["year"]!="unknown"),None)
+            if first:
+                query=urlencode({"catalogue-view":"coverage","journal":first["journal"],"from":first["year"],"to":first["year"]})
+                page.goto("http://localhost:8765/papers.html?"+query,wait_until="load")
+                page.wait_for_function("document.querySelector('#found').textContent.startsWith('Найдено статей:')",timeout=30000)
+                assert page.locator("#journal").input_value()==first["journal"]
+                assert page.locator("#from").input_value()==first["year"]
+                assert page.locator("#to").input_value()==first["year"]
+                assert int(''.join(c for c in page.locator("#found").inner_text() if c.isdigit()))==first["records"]
         page.goto("http://localhost:8765/industrial-parks.html?park-iso=RU-MOS",wait_until="load")
         parks=json.loads(Path("industrial-parks.json").read_text())
         if parks["rows"]:

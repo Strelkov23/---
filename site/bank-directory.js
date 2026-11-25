@@ -45,7 +45,13 @@ const BankDirectory=(()=>{
    return {form,label,period:d.period,target:ids.size,verified:verified.size,documentary:documentary.size,failed:failed.size,pending:ids.size-verified.size-documentary.size-failed.size,outside:new Set((d.rows||[]).filter(r=>!ids.has(r.registration_number)).map(r=>r.registration_number)).size};
   });
   const shared=sets.length===3?[...sets[0].ids].filter(id=>sets.every(s=>s.ids.has(id))):null;
-  return {forms,commonTarget:shared?.length??null,allVerified:shared===null?null:shared.filter(id=>sets.every(s=>s.verified.has(id))).length};
+  const distribution=shared===null?null:[0,0,0,0];
+  const commonRows=shared===null?null:shared.sort((a,b)=>Number(a)-Number(b)).map(id=>{
+   const flags=sets.map(s=>s.verified.has(id));
+   const count=flags.filter(Boolean).length;distribution[count]++;
+   return {registration_number:id,capital:flags[0],balance:flags[1],profit:flags[2],count};
+  });
+  return {forms,commonTarget:shared?.length??null,allVerified:distribution===null?null:distribution[3],distribution,commonRows};
  }
  return {rows,commonDates,profile,coverage,coverageSummary};
 })();
@@ -102,7 +108,24 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const table=node('table',''),h=table.createTHead().insertRow(),body=table.createTBody();
    for(const label of ['Форма','Период','Целевая выборка','Проверено HTML','Документальная сверка','Не подтверждено','Ожидают проверки','Вне выборки','Охват HTML']){const th=node('th',label);th.scope='col';h.append(th)}
    for(const r of c.forms){const tr=body.insertRow();for(const v of [r.form+' · '+r.label,r.period??'—',fmt(r.target),fmt(r.verified),fmt(r.documentary),fmt(r.failed),fmt(r.pending),fmt(r.outside),pct(r.verified,r.target)])tr.insertCell().textContent=v;}
-   coverageHost.replaceChildren(table);coverageExport.disabled=!c.forms.some(r=>r.target!==null);
+   coverageHost.replaceChildren(table);
+   const distributionHost=$('bank-common-distribution');
+   if(distributionHost){
+    distributionHost.replaceChildren();
+    if(c.distribution===null)distributionHost.append(node('p','Распределение недоступно: общий состав не установлен.'));
+    else{
+     const title=node('h3','Число проверенных форм у банков общей выборки');
+     const grid=node('div','');grid.className='metrics';
+     for(let i=0;i<4;i++){const card=node('div','');card.className='metric';card.append(node('b',fmt(c.distribution[i])),node('span',i+' из 3 форм · '+pct(c.distribution[i],c.commonTarget)));grid.append(card)}
+     distributionHost.append(title,grid,node('p','Учитываются только подтверждённые HTML-формы; документальная сверка отдельно. Не оценка финансовой устойчивости.'));
+    }
+   }
+   const commonExport=$('bank-common-export');
+   if(commonExport){
+    commonExport.disabled=c.commonRows===null||!c.commonRows.length;
+    commonExport.onclick=()=>{if(c.commonRows?.length)csv('bank-common-coverage.csv',[['Регистрационный номер','808 HTML','806 HTML','807 HTML','Число подтверждённых форм','Период 808','Период 806','Период 807','Отпечаток манифеста'],...c.commonRows.map(r=>[r.registration_number,Number(r.capital),Number(r.balance),Number(r.profit),r.count,...c.forms.map(f=>f.period),manifest.data_fingerprint])])};
+   }
+   coverageExport.disabled=!c.forms.some(r=>r.target!==null);
    coverageExport.onclick=()=>csv('bank-report-coverage.csv',[['Форма','Период','Целевая выборка','Проверено HTML','Документальная сверка','Не подтверждено','Ожидают проверки','Вне выборки','Общая целевая выборка','Все три формы проверены','Отпечаток манифеста'],...c.forms.map(r=>[r.form,r.period,r.target,r.verified,r.documentary,r.failed,r.pending,r.outside,c.commonTarget,c.allVerified,manifest.data_fingerprint])]);
   }
   const failed=settled.filter(x=>x.status==='rejected').length;if(failed)status.textContent+=' · Недоступно финансовых наборов: '+failed+' из 3.';

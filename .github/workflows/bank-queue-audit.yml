@@ -1,7 +1,7 @@
 name: Bank queue counterfactual audit
 on:
   push:
-    branches: [stage-f-bank-queue-audit]
+    branches: [stage-f-bank-queue-audit, stage-f-bank-current-coverage]
     paths: ['site/bank_form_queue.py','site/test_bank_form_queue.py','.github/workflows/bank-queue-audit.yml']
   workflow_dispatch:
 permissions:
@@ -22,8 +22,16 @@ jobs:
           python - <<'PY'
           import json
           import bank_form_queue as q
-          d=q.audit("../history/published","2026-11-26")
+          from datetime import datetime,timezone
+          import os
+          current=os.environ.get("GITHUB_REF_NAME")=="stage-f-bank-current-coverage"
+          d=q.audit("../history/published",datetime.now(timezone.utc).date().isoformat() if current else "2026-11-26")
           print("BANK_QUEUE_AUDIT",json.dumps(d,ensure_ascii=False))
+          if current:
+              assert sum(d["distribution"].values())==d["target"]
+              assert all(0<=n<=20 for key in ("independent","coordinated") for n in d[key]["requests"])
+              assert all(d["distribution"]["3"]<=d[key]["possible_complete"]<=d["target"] for key in ("independent","coordinated"))
+              raise SystemExit(0)
           assert d["target"]==299
           assert d["distribution"]["3"]==14
           assert d["independent"]["possible_complete"]==34

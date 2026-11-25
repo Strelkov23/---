@@ -147,8 +147,17 @@ REGISTRY.update({
  "2949-320X":{"tags":["РИНЦ"],"site":"https://1economic.ru/journals/pre","sources":["https://1economic.ru/journals/pre","https://1economic.ru/journals/pre/publication"],"note":"Другие категории не подтверждены."}
 })
 
+# Verified individual sources; do not infer article indexing or VAK K1–K3.
+JOURNALS.update({"0424-7388":"Экономика и математические методы","2073-6487":"Вестник Института экономики Российской академии наук","1609-1442":"Экономическая наука современной России","2076-3182":"Научные труды: Институт народнохозяйственного прогнозирования РАН"})
+REGISTRY.update({
+ "0424-7388":{"tags":["ВАК","Web of Science","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/5904/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/5904/","https://journalrank.rcsi.science/ru/record-sources/levels/5904/"],"white_history":{"2023":3,"2025":1},"verified":"2026-11-26","note":"Категория ВАК К1–К3 и другие базы не подтверждены в этой редакции справочника."},
+ "2073-6487":{"tags":["ВАК","Белый список 1"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/31145/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/31145/","https://journalrank.rcsi.science/ru/record-sources/levels/31145/"],"white_history":{"2025":1},"verified":"2026-11-26","note":"Категория ВАК К1–К3 не установлена."},
+ "1609-1442":{"tags":["ВАК","Белый список 2"],"site":"https://journalrank.rcsi.science/ru/record-sources/details/30864/","sources":["https://journalrank.rcsi.science/ru/record-sources/indexes/30864/","https://journalrank.rcsi.science/ru/record-sources/levels/30864/"],"white_history":{"2025":2},"verified":"2026-11-26","note":"Запрос по печатному ISSN; электронный ISSN 2618-8996 указан в РЦНИ, полнота охвата обоих не подтверждена."},
+ "2076-3182":{"tags":["ВАК"],"site":"https://ecfor.ru/nauchnye-izdaniya/nauchnye-trudy/ob-izdanii/","sources":["https://ecfor.ru/nauchnye-izdaniya/nauchnye-trudy/ob-izdanii/"],"verified":"2026-11-26","note":"Статус ВАК по издателю; категория и полнота регистрации DOI не подтверждены."}
+})
+
 def registry():
-    return {JOURNALS[issn]:dict(meta,issn=issn,verified='2026-11-24') for issn,meta in REGISTRY.items()}
+    return {JOURNALS[issn]:dict(meta,issn=issn,verified=meta.get('verified','2026-11-24')) for issn,meta in REGISTRY.items()}
 
 TOPICS={
  "Макроэкономика и рост":"макроэконом|macroeconom|экономическ.{1,4} рост|economic growth|gross domestic|inflation|инфляц",
@@ -272,17 +281,18 @@ def windows(start,end,days):
         yield start,finish
         start=finish+timedelta(days=1)
 
-def period_items(issn,filters,date_key,start,end):
+def period_items(issn,filters,date_key,start,end,fetcher=None):
+    fetcher=fetcher or fetch_batch
     # Split dense intervals before using offsets; no silent truncation at 1000 records.
     interval=filters+["from-"+date_key+":"+str(start),"until-"+date_key+":"+str(end)]
-    batch=fetch_batch(issn,interval)
+    batch=fetcher(issn,interval)
     total=batch.get("total-results")
     if type(total) is not int or total<0:raise ValueError("Crossref total-results missing")
     items=batch["items"]
     if total>1000 and start<end:
         mid=start+(end-start)//2
-        yield from period_items(issn,filters,date_key,start,mid)
-        yield from period_items(issn,filters,date_key,mid+timedelta(days=1),end)
+        yield from period_items(issn,filters,date_key,start,mid,fetcher)
+        yield from period_items(issn,filters,date_key,mid+timedelta(days=1),end,fetcher)
         return
     if total>10000:raise ValueError("Crossref: more than 10000 works in a single day")
     seen=set();offset=0
@@ -296,7 +306,7 @@ def period_items(issn,filters,date_key,start,end):
         offset+=len(items)
         if offset>=total:break
         if not items:raise ValueError("Crossref: incomplete page")
-        batch=fetch_batch(issn,interval,offset)
+        batch=fetcher(issn,interval,offset)
         items=batch["items"]
     if len(seen)!=total:raise ValueError("Crossref: incomplete result set")
 
@@ -318,6 +328,8 @@ def sync(db, stamp, refresh):
     db.execute("create table if not exists journal_checks(issn text primary key,success text,checked text,status text)")
     db.execute("create table if not exists literature_meta(doi text primary key,payload text,checked text)")
     db.execute("create table if not exists literature_meta_checks(issn text primary key,success text)")
+    import literature_resume as resume
+    resume.setup(db)
     service=service_status(db,stamp)
     if not refresh:return
     if service["cooldown"]:
@@ -329,20 +341,20 @@ def sync(db, stamp, refresh):
     ordered=sorted(JOURNALS,key=lambda issn:checked.get(issn,""))
     # Backfill one previously imported journal per refresh; existing DOI records are not erased.
     backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
+    budget=resume.Budget(fetch_batch)
     for position,issn in enumerate(ordered):
         journal=JOURNALS[issn]
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
+        if not budget.available():break
         full=not(last and last[0]) or issn==backfill
-        today=date.fromisoformat(stamp[:10])
-        # Include forthcoming records within the current calendar year in a full backfill.
+        full,start,finish,watermark=resume.plan(db,issn,full,last[0] if last else None,stamp)
         filters=['type:journal-article']
         key="pub-date" if full else "index-date"
-        start=date(1991,1,1) if full else date.fromisoformat(last[0][:10])-timedelta(days=2)
-        finish=date(today.year,12,31) if full else today
         if not full:filters.append("from-pub-date:1991-01-01")
         try:
-            for lo,hi in windows(start,finish,366*5 if full else 7):
-              for items in period_items(issn,filters,key,lo,hi):
+            # One confirmed interval per journal per run; progress survives 429.
+            for lo,hi in windows(start,finish,resume.window_days(db,issn,full)):
+              for items in period_items(issn,filters,key,lo,hi,budget):
                 entries=[]
                 details=[]
                 for item in items:
@@ -364,9 +376,21 @@ def sync(db, stamp, refresh):
                 with db:
                     db.executemany("insert or replace into literature values(?,?,?,?,?,?)",entries)
                     db.executemany("insert or replace into literature_meta values(?,?,?)",details)
+              with db:
+                done=resume.advance(db,issn,hi,finish,watermark)
+                resume.clear_window(db,issn)
+                if done:
+                    db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
+                    if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
+                else:
+                    db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Частично проверено: по "+str(hi)))
+              break
+        except resume.BudgetExhausted:
+            # Do not mark a partially paginated interval as complete.
             with db:
-                db.execute("insert or replace into journal_checks values(?,?,?,?)",(issn,stamp,stamp,'Проверено'))
-                if full:db.execute("insert or replace into literature_meta_checks values(?,?)",(issn,stamp))
+                resume.shrink_window(db,issn,full)
+                db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
+            break
         except CrossrefRateLimited as err:
             observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
             deadline=retry_deadline(observed,err.retry_after)

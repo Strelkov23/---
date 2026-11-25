@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }
   for(const tag of tags)$('index').add(new Option(tag+' ('+records.filter(r=>(meta(r).tags||[]).includes(tag)).length+')',tag));
   $('index').add(new Option('Статус не подтверждён','unknown'));restore(ids);
+  const params=new URLSearchParams(location.search);
+  if(params.get('catalogue-view')==='coverage'){
+   for(const id of ids)$(id).value=id==='order'?'new':'';
+   for(const id of ['journal','theme','paper-meta']){const v=params.get(id);if(v&&[...$(id).options].some(o=>o.value===v))$(id).value=v}
+   for(const id of ['from','to']){const v=params.get(id);if(v&&/^\d{4}$/.test(v)&&Number(v)>=1991&&Number(v)<=2100)$(id).value=v}
+  }
   const overview=$('index-overview');
   const groups=[['Российские перечни и базы',['РИНЦ','RSCI','ВАК','ВАК К1','ВАК К2','ВАК К3','Белый список 1','Белый список 2','Белый список 3','Белый список 4']],['Международные базы',['Scopus','Web of Science','DOAJ','EconLit','RePEc']]];
   for(const [heading,items] of groups){
@@ -59,7 +65,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const storageKey='economics-research-collection-v1';
   let basket=new Map(),persistent=true;
   try{for(const item of JSON.parse(localStorage.getItem(storageKey)||'[]'))if(item&&valid(item.url))basket.set(item.url,item)}catch{persistent=false}
-  const complete=r=>Boolean(r.volume&&r.issue&&(r.pages||r.article_number));
+  const complete=r=>Boolean(r.authors&&r.volume&&r.issue&&(r.pages||r.article_number));
   function item(r){return {title:r.title,url:doiURL(r.doi),date:r.published||'',type:'Научная статья',source:r.journal,topics:r.topics||'',authors:r.authors||'',doi:r.doi||'',issn:meta(r).issn||'',volume:r.volume||'',issue:r.issue||'',pages:r.pages||'',article_number:r.article_number||'',metadata_checked:r.metadata_checked||'',archive_revision:version||''}}
   const projects=$('paper-project'),projectStatus=$('paper-project-status'),P=ResearchProjects;
   function projectList(){
@@ -150,9 +156,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
   $('gost').onclick=()=>exportText('references.txt','Рабочий список литературы (проверьте недостающие том, номер и страницы перед оформлением по ГОСТ).\n\n'+selected.map((r,i)=>(i+1)+'. '+[clean(r.authors),clean(r.title)].filter(Boolean).join('. ')+' // '+clean(r.journal)+'. — '+clean(r.published).slice(0,4)+'.'+(citation(r)?' — '+citation(r)+'.':'')+' — DOI: '+clean(r.doi)+'. — URL: '+doiURL(r.doi)).join('\n'));
   const service=data.service||{},serviceHost=$('crossref-service');if(serviceHost)serviceHost.textContent=service.cooldown?'Crossref ограничил запросы. На дату сборки повтор отложен до '+service.retry_at+' (UTC). Сохранённый архив доступен; отсутствие новых статей не означает их отсутствие в журналах.':service.limited_at?'Последнее ограничение Crossref: '+service.limited_at+' (UTC). Состояние отдельных журналов указано ниже.':'Ограничение Crossref в сохранённом состоянии не зафиксировано.';
   const byJournal=new Map((data.checks||[]).map(r=>[r.journal,r]));
+  const queue=new Map((data.queue?.rows||[]).map(r=>[r.journal,r]));
   for(const journal of [...new Set([...Object.keys(reg),...records.map(r=>r.journal),...byJournal.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'))){
    const m=reg[journal]||{},j=byJournal.get(journal)||{},card=node('article','');
    card.append(node('h3',journal),node('p',[m.issn?'ISSN '+m.issn:'',...(m.tags||['Статус не подтверждён'])].filter(Boolean).join(' · ')),node('small','Статей: '+records.filter(r=>r.journal===journal).length+' · Загрузка: '+(j.status||'Нет проверки')+' · '+(j.checked||'')+' · Классификация: '+(m.verified||'нет даты')));
+   const q=queue.get(journal);if(q?.mode)card.append(node('p',(q.mode==='history'?'Исторический проход':'Индексное обновление')+' · следующий период с '+q.next_start+' по '+q.finish+' · окно до '+q.window_days+' суток. Это границы очереди, не гарантия полноты журнала.'));if(q?.watermark)card.append(node('small','Граница последнего завершённого прохода: '+q.watermark));
    if(m.note)card.append(node('p',m.note));
    if(m.white_history)card.append(node('p','Подтверждённые уровни Белого списка по редакциям: '+Object.entries(m.white_history).map(([y,v])=>y+' — уровень '+v).join('; ')+'. Не означает статус каждой статьи в год публикации.'));
    const sources=node('p','');links(sources,[['Сайт журнала',m.site],...(m.sources||[]).map((url,i)=>['Источник '+(i+1),url])]);card.append(sources);$('journals-status').append(card)
