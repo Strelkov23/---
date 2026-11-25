@@ -215,7 +215,7 @@ def choose_emiss_codes(db,stamp,limit=2):
             options.append((1,checked,code))
     return [code for _,__,code in sorted(options)[:limit]]
 
-MIRROR_REVISIONS={"industry":"mirror_industry_activity_v2","enterprises":"mirror_enterprises_expanded_v2"}
+MIRROR_REVISIONS={"industry":"mirror_industry_activity_v2","enterprises":"mirror_enterprises_expanded_v2","agriculture":"mirror_agriculture_verified_v2","ict":"mirror_ict_verified_v2","foreign_trade":"mirror_foreign_trade_verified_v2"}
 
 def choose_sections(db,stamp,limit=3):
     """Untried first, then longest overdue; a failing section cannot monopolise the queue."""
@@ -394,6 +394,44 @@ def enterprise_concept(title,unit):
 
 STRICT_MIRROR_SECTIONS={"enterprises","agriculture","construction","trade","transport","innovation","farming","manufacturing","living","capital","ict","prices","foreign_trade"}
 
+
+# Exact observed v20260313 title/unit pairs. No merge across legacy definitions.
+REGIONAL_VERIFIED={
+ "agriculture":{
+ "Продукция сельского хозяйства":"В хозяйствах всех категорий, в фактически действовавших ценах, миллионов рублей",
+ "Индексы производства продукции сельского хозяйства: Всего":"В хозяйствах всех категорий, в сопоставимых ценах, в процентах к предыдущему году",
+ "Индексы производства продукции сельского хозяйства: Продукция животноводства":"В хозяйствах всех категорий, в сопоставимых ценах, в процентах к предыдущему году",
+ "Индексы производства продукции сельского хозяйства: Продукция растениеводства":"В хозяйствах всех категорий, в сопоставимых ценах, в процентах к предыдущему году",
+ "Валовой сбор зерна (в весе после доработки)":"В хозяйствах всех категорий, тысяч тонн; для значений в целом по России: млн т",
+ "Производство молока":"В хозяйствах всех категорий, тысяч тонн",
+ "Поголовье крупного рогатого скота":"В хозяйствах всех категорий, на конец года, тысяч голов",
+ "Посевные площади сельскохозяйственных культур":"В хозяйствах всех категорий, тысяча гектаров",
+ },
+ "ict":{
+ **{title:"По данным выборочного обследования населения по вопросам использования ИКТ, в процентах от общего числа домашних хозяйств соответствующего субъекта Российской Федерации" for title in (
+ "Использование компьютеров и сети интернет в домашних хозяйствах: Удельный вес домашних хозяйств, имевших доступ к сети интернет",
+ "Использование персональных компьютеров и сети интернет в домашних хозяйствах: Удельный вес домашних хозяйств, имевших доступ к сети интернет",
+ "Использование компьютеров и сети интернет в домашних хозяйствах: Удельный вес домашних хозяйств, имевших широкополосный доступ к сети интернет",
+ "Использование персональных компьютеров и сети интернет в домашних хозяйствах: Удельный вес домашних хозяйств, имевших широкополосный доступ к сети интернет")},
+ **{title:"На конец года, единиц" for title in (
+ "Численность активных абонентов фиксированного и мобильного широкополосного доступа к сети интернет на 100 человек населения: Численность активных абонентов мобильного широкополосного доступа к сети интернет",
+ "Численность активных абонентов фиксированного и мобильного широкополосного доступа к сети интернет на 100 человек населения: Численность активных абонентов фиксированного широкополосного доступа к сети интернет")},
+ "Использование широкополосного доступа к сети интернет в организациях":"В процентах от общего числа обследованных организаций",
+ },
+ "foreign_trade":{f"Внешняя торговля со странами {group}: {flow}":"В фактически действовавших ценах, миллионов долларов США" for group in ("СНГ","дальнего зарубежья") for flow in ("Импорт","Экспорт")}
+}
+def verified_regional_concept(section,title,unit):
+    return REGIONAL_VERIFIED.get(section,{}).get(title)==unit
+def regional_unit(unit,region,level):
+    if "для значений в целом по россии" not in norm(unit):return unit
+    national=norm(region) in ("российская федерация","россия") or norm(level) in ("страна","россия","рф")
+    regional=norm(level) in ("регион","федеральный округ","фо","субъект российской федерации")
+    if re.fullmatch(r"миллионов рублей; для значений в целом по россии: млрд руб\.?",norm(unit)):
+        return "млрд руб." if national else "млн руб." if regional else None
+    if unit==REGIONAL_VERIFIED["agriculture"]["Валовой сбор зерна (в весе после доработки)"]:
+        return "В хозяйствах всех категорий, млн тонн" if national else "В хозяйствах всех категорий, тысяч тонн" if regional else None
+    return None
+
 def select_mirror(rows,section,limit=4):
     by=defaultdict(list)
     for r in rows:by[r["indicator"]].append(r)
@@ -406,6 +444,10 @@ def select_mirror(rows,section,limit=4):
     if not picked and section not in STRICT_MIRROR_SECTIONS:
         picked=[k for k,v in sorted(by.items(),key=lambda item:(-len(item[1]),item[0]))[:limit]]
     selected=[r for k in picked[:limit] for r in by[k]]
+    if section in REGIONAL_VERIFIED:
+        # The verified list is complete for the selected concepts; retain separate units/definitions.
+        exact=[r for r in rows if r.get("verified_regional")]
+        if exact:selected=exact
     if section in ('industry','manufacturing'):
         used=set(picked[:limit])
         for pat in INDUSTRY_ACTIVITY:
@@ -460,20 +502,17 @@ def mirror_rows(raw,section,selected=False):
                     if v in MIRROR_MISSING_MARKERS:continue
                     # The publisher explicitly uses mixed units for nationwide budget totals.
                     original_unit=unit
-                    if "для значений в целом по россии" in norm(unit):
-                        if not re.fullmatch(r"миллионов рублей; для значений в целом по россии: млрд руб\.?",norm(unit)):continue
-                        level=norm(r.get("object_level"))
-                        if norm(region) in ("российская федерация","россия") or level in ("страна","россия","рф"):
-                            unit="млрд руб."
-                        elif level in ("регион","федеральный округ","фо"):
-                            unit="млн руб."
-                        else:continue
+                    unit=regional_unit(unit,region,r.get("object_level"))
+                    if unit is None:continue
+                    if selected and section in REGIONAL_VERIFIED and verified_regional_concept(section,title,original_unit):
+                        verified=True
+                    else:verified=False
                     # For new large sections retain only indicators selected by the declared concepts.
-                    if selected and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]) and not (section=="enterprises" and enterprise_concept(title,unit)):continue
+                    if selected and not verified and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]) and not (section=="enterprises" and enterprise_concept(title,unit)):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Подраздел источника: "+str(r.get("subsection",""))+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
-                    result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note})
+                    result.append({"indicator":"R_"+code,"title":title,"region":region,"year":y,"value":v,"unit":unit,"sheet":member.filename,"row":reader.line_num,"column":None,"note":note,**({"verified_regional":True} if verified else {})})
                     if len(result)>250000:raise ValueError("Слишком большой раздел; требуется выборочная загрузка")
     if not result:raise ValueError("Структура CSV распознана, но нет наблюдений выбранных показателей" if recognized else "Не распознана документированная структура CSV: "+"; ".join(headers)[:350])
     result=select_mirror(result,section) if selected else result

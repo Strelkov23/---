@@ -1,0 +1,35 @@
+name: Regional verified series live acceptance
+on:
+  push:
+    branches: [stage-f-regional-verified-series]
+    paths: ['site/historical.py','.github/workflows/regional-verified-live.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify real archives without production writes
+        run: |
+          python -m pip install openpyxl==3.1.5
+          cd site
+          python -m unittest test_historical.HistoricalTests.test_verified_regional_units_and_exact_titles
+          python - <<'PY'
+          import json,collections
+          import historical as h
+          import regional_schema_probe as p
+          for section in p.SECTIONS:
+              payload=p.fetch(section)
+              rows=h.mirror_rows(payload.raw,section,selected=True)
+              assert rows and all(r.get("verified_regional") for r in rows)
+              keys=collections.defaultdict(set)
+              for r in rows:keys[(r["indicator"],r["region"],r["year"],r["unit"])].add(r["value"])
+              assert all(len(v)==1 for v in keys.values()),"Conflicting duplicates"
+              print("REGIONAL_ACCEPTANCE",json.dumps(dict(section=section,sha256=payload.sha256,observations=len(keys),series=len(set(r["indicator"] for r in rows)),years=sorted(set(r["year"] for r in rows)),territories=len(set(r["region"] for r in rows))),ensure_ascii=False))
+          PY
