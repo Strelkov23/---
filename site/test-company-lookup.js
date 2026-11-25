@@ -47,3 +47,21 @@ assert.equal(C.normalizeName('Общество с ограниченной от�
 const np=C.namePath('сбер'),np2=np.slice(0,-8)+'-001.json.gz';
 const nd={files:{[np]:{min:'сбера',max:'сбербанк',count:10,bytes:100},[np2]:{min:'сбербанк',max:'сберю',count:10,bytes:100}}};
 assert.equal(C.nameParts(nd,'сбербанк').length,2);assert.equal(C.nameParts(nd,'сберю').length,1);assert.equal(C.nameParts(nd,'сберхх').length,1);assert.throws(()=>C.nameParts({files:{[np]:{min:'сбе',max:'сберю',count:190000,bytes:100}}},'сбер'));
+
+const anal=[{income_cents:'100',expense_cents:'200',workers:2},{income_cents:'100',expense_cents:'50',workers:2},null];
+assert.equal(C.metrics(anal[0]).length,6);
+assert.equal(C.metrics(anal[0])[3].value,'-100');
+assert.equal(C.metrics(anal[0])[4].value,'50');
+assert.equal(C.metrics(anal[0])[5].value,'20000');
+assert.equal(C.metrics({workers:0})[2].value,0);
+assert.equal(C.metrics({workers:0})[4].value,null);
+const bars=C.comparisonBars(anal,'difference');
+assert.equal(bars.signed,true);
+assert.equal(bars.zero,50);
+assert.equal(bars.bars[0].left,0);
+assert.equal(bars.bars[0].width,50);
+assert.equal(bars.bars[1].width,25);
+assert.equal(bars.bars[2],null);
+assert.equal(C.comparisonBars([{workers:0},{workers:null}],'workers').bars[0].width,0);
+assert.equal(C.comparisonBars([{workers:0},{workers:null}],'workers').bars[1],null);
+assert.equal(C.comparisonBars([{income_cents:'9007199254740993'}],'income_cents').bars[0].value,'9007199254740993');
