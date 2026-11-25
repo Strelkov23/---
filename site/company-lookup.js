@@ -63,7 +63,14 @@ const CompanyLookup=(()=>{
   const max=values.reduce((a,v)=>v!==null&&v>a?v:a,0n);
   return values.map(v=>v===null||v<0n||max===0n?null:Number(v*10000n/max)/100);
  }
- return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths};
+ function coverage(report){
+  if(!report||report.mode!=='full')return null;
+  const a=report.sources.find(s=>s.kind==='income_expense'),b=report.sources.find(s=>s.kind==='employment'),p=report.paired;
+  if(!a||!b||!a.complete||!b.complete||a.year!==report.year||b.year!==report.year||[a.unique,b.unique,p].some(x=>!Number.isSafeInteger(x)||x<0)||p>Math.min(a.unique,b.unique))throw Error('Некорректный охват');
+  const total=a.unique+b.unique-p;
+  return {total,paired:p,incomeOnly:a.unique-p,employmentOnly:b.unique-p,income:a.unique,employment:b.unique};
+ }
+ return {validInn,path,row,rankMatches,validateBlock,lookup,parseSelection,calculate,barWidths,coverage};
 })();
 if(typeof module!=='undefined')module.exports=CompanyLookup;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -159,4 +166,25 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   };
   const selected=new URLSearchParams(location.search).get('compare-inn');if(selected){input.value=selected;form.requestSubmit()}
  }catch(e){status.textContent='Источники сравнения недоступны: '+String(e.message||e)}
+});
+
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
+ const $=id=>document.getElementById(id),status=$('company-coverage-status');if(!status)return;
+ try{
+  const m=await Provenance.validateManifest(await load('data-manifest.json')),entry=await Provenance.get(m,'company-rankings.json',root),data=entry.data,r=data.report,v=CompanyLookup.coverage(r);
+  if(!v){status.textContent='Полная обработка двух архивов пока не подтверждена.';return}
+  const num=x=>x.toLocaleString('ru'),pct=x=>v.total?(100*x/v.total).toLocaleString('ru',{maximumFractionDigits:2})+'%':'—';
+  status.textContent='Отчётный '+r.year+' год · импорт '+data.success+' · '+(data.status==='cached'?'сохранённая редакция':'проверенная редакция')+'. Это объединение открытых наборов, не ЕГРЮЛ.';
+  for(const [label,n] of [['Уникальных ИНН',v.total],['В обоих наборах',v.paired],['Только доходы / расходы',v.incomeOnly],['Только занятость',v.employmentOnly]]){const card=node('div','');card.className='metric';card.append(node('b',num(n)),node('span',label));$('company-coverage-metrics').append(card)}
+  const items=[['Оба набора',v.paired,'#16736b'],['Только финансовый',v.incomeOnly,'#ad6b32'],['Только занятость',v.employmentOnly,'#426d9b']];
+  const bar=node('div','');bar.className='company-coverage-bar';bar.setAttribute('aria-hidden','true');
+  for(const [label,n,color] of items){const part=node('span','');part.style.width=(v.total?100*n/v.total:0)+'%';part.style.backgroundColor=color;bar.append(part)}
+  $('company-coverage-chart').append(bar);
+  for(const [label,n,color] of items){const line=node('p',''),swatch=node('span','');swatch.className='company-coverage-swatch';swatch.style.backgroundColor=color;line.append(swatch,document.createTextNode(label+': '+num(n)+' · '+pct(n)));$('company-coverage-chart').append(line)}
+  const table=node('table',''),header=table.createTHead().insertRow(),body=table.createTBody();
+  for(const title of ['Набор','Документов','Уникальных ИНН','Точных дублей','Конфликтующих ИНН','Обработано XML','Архив']){const th=node('th',title);th.scope='col';header.append(th)}
+  for(const x of r.sources){const tr=body.insertRow();for(const value of [x.kind==='employment'?'Занятость':'Доходы и расходы',num(x.documents),num(x.unique),num(x.exact_duplicates),num(x.conflicts),num(x.processed_members)+' / '+num(x.xml_members)])tr.insertCell().textContent=value;const a=node('a','ZIP ФНС');a.href=x.source;tr.insertCell().append(a)}
+  $('company-coverage-table').replaceChildren(table);
+  const btn=$('company-coverage-export');btn.disabled=false;btn.onclick=()=>csv('company-coverage-'+r.year+'.csv',[['Год','Объединение ИНН','Оба набора','Только финансы','Только занятость','Набор','Уникальных ИНН','Документов','Точных дублей','Конфликтующих ИНН','Обработано XML','Всего XML','URL ZIP','SHA-256 ZIP','Отпечаток манифеста'],...r.sources.map(x=>[r.year,v.total,v.paired,v.incomeOnly,v.employmentOnly,x.kind,x.unique,x.documents,x.exact_duplicates,x.conflicts,x.processed_members,x.xml_members,x.source,x.sha256,m.data_fingerprint])]);
+ }catch(e){status.textContent='Охват не подтверждён: '+String(e.message||e)}
 });

@@ -1,0 +1,22 @@
+name: FNS SME source schema
+on:
+  push:
+    branches: [main]
+    paths: ['site/sme_schema_probe.py','.github/workflows/sme-schema-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python site/sme_schema_probe.py --output sme-schema.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sme-schema
+          path: sme-schema.json

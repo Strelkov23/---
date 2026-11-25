@@ -30,3 +30,9 @@ assert.deepEqual(C.calculate({income_cents:'9007199254740993',expense_cents:'0',
 assert.deepEqual(C.calculate({income_cents:null,expense_cents:'20',workers:2}),{difference:null,incomePerWorker:null,expenseShare:null});
 assert.deepEqual(C.barWidths([{income_cents:'10'},{income_cents:'5'},{income_cents:'-5'},null],'income_cents'),[100,50,null,null]);
 assert.deepEqual(C.barWidths([{workers:0},{workers:null}],'workers'),[null,null]);
+
+const cov={mode:'full',year:2025,paired:8,sources:[{kind:'income_expense',complete:true,year:2025,unique:10},{kind:'employment',complete:true,year:2025,unique:12}]};
+assert.deepEqual(C.coverage(cov),{total:14,paired:8,incomeOnly:2,employmentOnly:4,income:10,employment:12});
+assert.equal(C.coverage({...cov,mode:'pilot'}),null);
+assert.throws(()=>C.coverage({...cov,paired:11}));
+assert.throws(()=>C.coverage({...cov,year:2024}));
