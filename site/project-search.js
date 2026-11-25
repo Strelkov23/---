@@ -64,7 +64,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const settled=await Promise.allSettled(active.map(async s=>({spec:s,rows:s.group?ProjectSearch.naoRecords(s,(await nao).data,refs.find(r=>key(r)===key(s))):ProjectSearch.records(s,(await Provenance.get(m,s.slug+'.json',root)).data,refs.find(r=>key(r)===key(s)))})));
   const ok=settled.filter(x=>x.status==='fulfilled').map(x=>x.value),all=ok.flatMap(x=>x.rows),failed=settled.length-ok.length;
   iso.replaceChildren(new Option('Все подключённые регионы',''),...refs.map(r=>new Option(r.region+(r.group?' · '+r.register_type:''),key(r))));
-  const requested=new URLSearchParams(location.search).get('project-region');if(requested==='RU-NEN'&&nao)iso.add(new Option('НАО · все три реестра','RU-NEN'));if(requested&&/^RU-[A-Z0-9-]{2,8}$/.test(requested)&&![...iso.options].some(o=>o.value===requested))iso.add(new Option(requested+' · источник не подключён',requested));if([...iso.options].some(o=>o.value===requested))iso.value=requested;
+  const requested=new URLSearchParams(location.search).get('project-region');if(nao)iso.add(new Option('НАО · все три реестра','RU-NEN'));if(requested&&/^RU-[A-Z0-9-]{2,8}$/.test(requested)&&![...iso.options].some(o=>o.value===requested))iso.add(new Option(requested+' · источник не подключён',requested));if([...iso.options].some(o=>o.value===requested))iso.value=requested;
   function options(){
    const rows=all.filter(r=>!iso.value||key(r)===iso.value||r.iso===iso.value);
    for(const [el,key] of [[sector,'sector'],[state,'status']]){
@@ -98,7 +98,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
       const item=node('div','');item.className='metric';item.append(node('b',v),node('span',label));cards.append(item)
      }
      totals.append(cards,node('p','Стоимость отображается с округлением до 0,01 млн руб.; CSV сохраняет исходную десятичную сумму. Суммы только по заполненным полям выбранных записей одного источника. Возможны пересечения проектов и разные сроки; это не фактические вложения, не созданные места и не общий итог региона.'));
-     totalsExport.onclick=()=>csv('project-numeric-'+iso.value+'.csv',[['Регион ISO','Редакция','Записей','Записей со стоимостью','Сумма стоимости, млн руб.','Записей с местами','Сумма мест','Оба поля','Отрасль','Статус','Поиск','Числовой фильтр','Источник','SHA-256','Отпечаток манифеста'],[n.iso,ref.edition,n.records,ref.cost_numeric===null?null:n.costCount,n.cost,ref.jobs_numeric===null?null:n.jobsCount,n.jobs,ref.cost_numeric===null||ref.jobs_numeric===null?null:n.both,sector.value,state.value,query.value,numeric.value,ref.source,ref.sha256,m.data_fingerprint]]);
+     totalsExport.onclick=()=>csv('project-numeric-'+iso.value+'.csv',[['Регион ISO','Ключ реестра','Редакция','Записей','Записей со стоимостью','Сумма стоимости, млн руб.','Записей с местами','Сумма мест','Оба поля','Отрасль','Статус','Поиск','Числовой фильтр','Источник','SHA-256','Отпечаток манифеста'],[n.iso,key(ref),ref.edition,n.records,ref.cost_numeric===null?null:n.costCount,n.cost,ref.jobs_numeric===null?null:n.jobsCount,n.jobs,ref.cost_numeric===null||ref.jobs_numeric===null?null:n.both,sector.value,state.value,query.value,numeric.value,ref.source,ref.sha256,m.data_fingerprint]]);
     }
    }
    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();

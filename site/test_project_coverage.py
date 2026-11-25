@@ -83,6 +83,11 @@ class CoverageTests(unittest.TestCase):
             self.assertEqual(p.quality(d,root)["project_registers_configured"],6)
             self.assertTrue(all(r["records"] is None for r in d["nao_registers"]))
             self.assertIn("Ненецкий автономный округ",p.render(d))
+            d=p.publish(lambda *a:None,root,"2026-11-26")
+            p.verify_csv(root/"project-coverage.csv",d)
+            self.assertEqual(len(p.sources(d)),6)
+            self.assertIn("RU-NEN:planned",(root/"project-coverage.csv").read_text(encoding="utf-8-sig"))
+            self.assertIn("nao-planned",np.render(np.blank()))
     def test_offline_discovery_accepts_date_without_network(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

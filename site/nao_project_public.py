@@ -53,7 +53,7 @@ def render(d):
     body='<section class="mast"><p class="kicker">Инвестиции · региональные реестры</p><h1>Инвестиционные проекты Ненецкого автономного округа</h1><p>'+e(NOTE)+'</p><p><a href="project-coverage.html">Охват региональных реестров</a> · <a href="'+e(SOURCE)+'">Официальный источник</a> · <a href="'+CSV+'">CSV</a> · <a href="'+FILE+'">JSON</a> · <a href="freshness.html">Актуальность</a></p></section>'
     body+='<section><h2>Состояние загрузки</h2><p>Последняя проверка: '+e(d["checked"])+' · последняя успешная: '+e(d["success"])+'</p>'
     if d["error"]:body+='<p>Ошибка обновления: '+e(d["error"])+'</p>'
-    if not d["report"]:return body+'<p>Подтверждённая редакция пока отсутствует. Это не означает отсутствие проектов.</p></section>'
+    if not d["report"]:return body+'<p>Подтверждённая редакция пока отсутствует. Это не означает отсутствие проектов.</p></section>'+''.join('<section id="nao-'+g+'"><h2>'+e(v[0])+'</h2><p>Нет подтверждённой редакции.</p></section>' for g,v in imp.GROUPS.items())
     body+='</section>'
     for g,(status,edition,_,_,heading) in imp.GROUPS.items():
         rs=d["report"]["groups"][g];n=sum(r["cost_mln_rub"] is not None for r in rs)
