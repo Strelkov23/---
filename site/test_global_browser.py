@@ -533,6 +533,14 @@ with sync_playwright() as p:
                 page.locator("#metal-export").click()
             assert metal.value.suggested_filename.startswith("metal-output-")
         page.goto("http://localhost:8765/atlas.html#balance-matrix",wait_until="load")
+        page.wait_for_function("document.querySelectorAll('#bm-network path[data-bm-edge]').length>0",timeout=30000)
+        assert page.locator("#bm-network path[data-bm-edge]").count()==20
+        page.locator("#bm-network-limit").select_option("10")
+        assert page.locator("#bm-network path[data-bm-edge]").count()==10
+        with page.expect_download() as network:
+            page.locator("#bm-network-export").click()
+        assert network.value.suggested_filename=="domestic-intermediate-network-2021.csv"
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.wait_for_function("document.querySelector('#bm-status').textContent.startsWith('19 × 19')",timeout=30000)
         assert page.locator("#bm-table td button").count()==361
         page.locator("#bm-metric").select_option("inputs")

@@ -6,3 +6,13 @@ assert.equal(B.prepare({names:['A','B'],flows:[[1,-1],[2,3]]}).cells[0][0].outpu
 assert.equal(B.band(null,10),'missing');assert.equal(B.band(0,10),'zero');assert.equal(B.band(-1,10),'negative');assert.equal(B.band(10,10),'4');
 const real=require('./sectors.json');d=B.prepare(real);assert.equal(d.cells.flat().length,361);
 for(let i=0;i<19;i++){if(d.supply[i].valid&&d.supply[i].total>0)assert.ok(Math.abs(d.cells[i].reduce((s,c)=>s+c.outputs,0)-100)<1e-8);if(d.purchase[i].valid&&d.purchase[i].total>0)assert.ok(Math.abs(d.cells.reduce((s,r)=>s+r[i].inputs,0)-100)<1e-8);}
+
+const net=B.network(B.prepare(m),'value',null,2);
+assert.deepEqual(net.edges.map(x=>x.value),[40,30]);
+assert.equal(net.total,100);assert.equal(net.shown,70);assert.equal(net.coverage,70);
+assert.equal(B.network(B.prepare(m,false),'value',null,10).eligible,2);
+assert.equal(B.network(B.prepare(m),'value',0,10).eligible,3);
+assert.equal(B.network(B.prepare({names:['A'],flows:[[0]]}),'value',null,10).coverage,null);
+assert.equal(B.network(B.prepare({names:['A','B'],flows:[[1,-1],[2,3]]}),'outputs',null,10).comparable,2);
+const network=B.network(B.prepare(real),'value',null,20);
+assert.equal(network.edges.length,20);assert.ok(network.coverage>0&&network.coverage<=100);
