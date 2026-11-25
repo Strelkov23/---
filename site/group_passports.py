@@ -34,6 +34,21 @@ def quality(d):
             balance={m["id"]:{r["year"]:Decimal(r["value"]) for r in m["observations"]} for m in g["metrics"] if m["id"] in ("assets","equity","liabilities")}
             for year in balance["assets"].keys() & balance["equity"].keys() & balance["liabilities"].keys():
                 if balance["assets"][year]!=balance["equity"][year]+balance["liabilities"][year]:raise ValueError("Баланс активов и обязательств")
+        if g["id"]=="mmk":
+            # Explicitly defined statement identities for this issuer and this unit.
+            fields={m["id"]:m for m in g["metrics"]}
+            identities=[
+                ("assets",("current_assets","noncurrent_assets")),
+                ("liabilities",("current_liabilities","noncurrent_liabilities")),
+                ("gross_profit",("revenue","cost_of_sales")),
+                ("cash",("cash_opening","operating_cash_flow","investment_cash_flow","financing_cash_flow","cash_fx"))]
+            for target,terms in identities:
+                selected=[fields[k] for k in (target,*terms)]
+                if any(m["unit"]!="млн руб." for m in selected):raise ValueError("Единицы ММК")
+                values=[{r["year"]:Decimal(r["value"]) for r in m["observations"]} for m in selected]
+                if any(v.keys()!=values[0].keys() for v in values[1:]):raise ValueError("Периоды ММК")
+                for y in values[0]:
+                    if values[0][y]!=sum(v[y] for v in values[1:]):raise ValueError("Контрольное равенство ММК: "+target)
         if not mids:raise ValueError("Нет показателей")
     if not ids:raise ValueError("Пустой каталог")
     return {"group_passports":len(ids),"group_observations":count}
