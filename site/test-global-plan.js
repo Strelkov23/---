@@ -56,3 +56,16 @@ near(joint.rows[4].delta,0);
 assert.ok(joint.rows[8].score>=joint.rows[0].score-1e-6);
 assert.throws(()=>G.jointCases(p,'investment',25,'investment',25));
 assert.equal(G.jointCases(laborP,'laborCap',10,'investment',2,'absolute')[8].params.labor.cap,110);
+
+const baseCalendar=schedulePlan.rows.map(r=>r.groups.map(g=>g.investment));
+const fixedBase=G.fixedSchedule(m,p,'cumulative',baseCalendar);
+assert.equal(fixedBase.feasible,true);near(fixedBase.score,schedulePlan.score);
+const fixedCut=G.fixedSchedule(m,{...p,investment:0},'cumulative',baseCalendar);
+assert.equal(fixedCut.feasible,false);assert.equal(fixedCut.score,null);assert.ok(fixedCut.budgetGap>0);
+const fixedMore=G.fixedSchedule(m,{...p,investment:20},'cumulative',baseCalendar);
+near(fixedMore.score,schedulePlan.score);
+assert.equal(joint.robustness.unique,9);
+assert.ok(joint.robustness.fixedInvalid>0);
+assert.ok(joint.rows.every(x=>x.regret===null||x.regret>=0));
+near(joint.rows[4].regret,0);
+assert.equal(G.robustness([{a:1,b:2,score:10,allBinding:['A']},{a:1,b:2,score:10,allBinding:['A']}]).counts[0].count,1);

@@ -110,24 +110,55 @@ const GlobalPlan=(()=>{
   const set=(base,key,value)=>key==='laborCap'?{...base,labor:{...base.labor,cap:value}}:{...base,[key]:value};
   return a.flatMap(x=>b.map(y=>({a:x.value,b:y.value,dirA:x.dir,dirB:y.dir,clampedA:x.clamped,clampedB:y.clamped,params:set(set(p,keyA,x.value),keyB,y.value)})));
  }
+ // Evaluate the baseline investment calendar without reallocating investments.
+ function fixedSchedule(m,p,objective,plan){
+  const z=problem(m,p,objective),{n,T,periods,spare,k,retention,B}=z;
+  if(plan.length!==T||plan.some(row=>row.length!==n||row.some(v=>!finite(v)||v<0)))throw Error('Некорректный базовый календарь');
+  const budgetGap=Math.max(0,...plan.map(row=>sum(row)-B));
+  if(budgetGap>1e-7*Math.max(1,B))return {feasible:false,budgetGap,score:null,alpha:null,binding:[],reason:'Календарь превышает инвестиционный лимит'};
+  let extra=Array(n).fill(0);const rows=[];
+  for(let t=0;t<T;t++){
+   const q=periods[t],available=extra.map((v,i)=>v+spare[i]),caps=q.required.map((v,i)=>v>0?available[i]/v:Infinity),imp=q.imports>0?p.importLimit/q.imports:Infinity;
+   const alpha=Math.max(0,Math.min(1,imp,q.laborUpper,...caps)),binding=[];
+   if(alpha<1-1e-8){if(q.imports>0&&Math.abs(imp-alpha)<1e-7)binding.push('Импорт');if(q.laborNeed>0&&Math.abs(q.laborUpper-alpha)<1e-7)binding.push('Трудовые ресурсы');for(let i=0;i<n;i++)if(q.required[i]>0&&Math.abs(caps[i]-alpha)<1e-7)binding.push(m.names[i])}
+   rows.push({year:t+1,alpha,demand:q.totalDemand*alpha,binding});
+   extra=extra.map((v,i)=>retention*v+plan[t][i]/k);
+  }
+  return {feasible:true,budgetGap,score:objective==='terminal'?rows.at(-1).demand:sum(rows.map(r=>r.demand)),alpha:rows.at(-1).alpha,binding:[...new Set(rows.flatMap(r=>r.binding))],rows,reason:'Календарь допустим'};
+ }
+ function robustness(rows){
+  const unique=[...new Map(rows.map(r=>[JSON.stringify([r.a,r.b]),r])).values()],known=unique.filter(r=>finite(r.score)),fixed=unique.filter(r=>r.fixed?.feasible&&finite(r.fixed.score));
+  const min=arr=>arr.length?Math.min(...arr):null,max=arr=>arr.length?Math.max(...arr):null,counts=new Map();
+  for(const r of known)for(const name of new Set(r.allBinding||r.binding||[]))counts.set(name,(counts.get(name)||0)+1);
+  return {unique:unique.length,verified:known.length,fixedFeasible:fixed.length,fixedInvalid:unique.filter(r=>r.fixed?.feasible===false).length,adaptiveMin:min(known.map(r=>r.score)),adaptiveMax:max(known.map(r=>r.score)),fixedMin:min(fixed.map(r=>r.fixed.score)),maxRegret:max(fixed.filter(r=>finite(r.score)).map(r=>Math.max(0,r.score-r.fixed.score))),counts:[...counts].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'ru'))};
+ }
  function jointSensitivity(m,p,objective,keyA,stepA,keyB,stepB,mode,progress=()=>{}){
   const cases=jointCases(p,keyA,stepA,keyB,stepB,mode),cache=new Map(),rows=[];
+  const baseline=solve(m,p,objective),plan=baseline.rows.map(r=>r.groups.map(g=>g.investment)),center=cases[4],baseKey=JSON.stringify([center.a,center.b]);
   for(const c of cases){
-   const k=JSON.stringify([c.a,c.b]);
-   if(!cache.has(k))try{const r=solve(m,c.params,objective),last=r.rows.at(-1);cache.set(k,{score:r.score,alpha:last.alpha,terminal:last.actualDemand,investment:sum(r.rows.map(x=>x.investment)),binding:last.binding,upper:r.upper,gap:r.dualityGap,tolerance:r.tolerance})}catch(e){cache.set(k,{error:String(e.message||e)})}
-   const {params,...meta}=c;rows.push({...meta,...cache.get(k)});progress(rows.length,cases.length);
+   const key=JSON.stringify([c.a,c.b]);
+   if(!cache.has(key)){
+    let result={};
+    try{const r=key===baseKey?baseline:solve(m,c.params,objective),last=r.rows.at(-1);result={score:r.score,alpha:last.alpha,terminal:last.actualDemand,investment:sum(r.rows.map(x=>x.investment)),binding:last.binding,allBinding:[...new Set(r.rows.flatMap(x=>x.binding))],upper:r.upper,gap:r.dualityGap,tolerance:r.tolerance}}
+    catch(e){result.error=String(e.message||e)}
+    try{result.fixed=fixedSchedule(m,c.params,objective,plan);if(result.fixed.feasible&&finite(result.score)&&result.fixed.score>result.score+result.tolerance)throw Error('Фиксированный календарь выше проверенной границы');}
+    catch(e){result.fixed={reason:String(e.message||e)}}
+    cache.set(key,result);
+   }
+   const {params,...meta}=c;rows.push({...meta,...cache.get(key)});progress(rows.length,cases.length);
   }
   const base=rows.find(r=>r.dirA===0&&r.dirB===0);
-  return {keyA,keyB,stepA,stepB,mode,objective,rows:rows.map(r=>({...r,delta:finite(r.score)&&finite(base.score)?r.score-base.score:null,deltaPP:finite(r.alpha)&&finite(base.alpha)?100*(r.alpha-base.alpha):null}))};
+  return {keyA,keyB,stepA,stepB,mode,objective,robustness:robustness(rows),rows:rows.map(r=>({...r,delta:finite(r.score)&&finite(base.score)?r.score-base.score:null,deltaPP:finite(r.alpha)&&finite(base.alpha)?100*(r.alpha-base.alpha):null,regret:r.fixed?.feasible&&finite(r.score)?Math.max(0,r.score-r.fixed.score):null}))};
  }
  function mount(m){
   const $=id=>document.getElementById(id),button=$('global-run'),status=$('global-status'),results=$('global-results'),details=$('global-detail'),comparison=$('global-comparison'),chart=$('global-chart'),metrics=$('global-metrics'),select=$('global-period'),download=$('global-csv'),objective=$('global-objective');
   const timeline=$('global-timeline'),investmentHost=$('global-investment-heat'),investmentStatus=$('global-investment-status'),investmentCsv=$('global-investment-csv'),investmentFocus=$('global-investment-focus');
   const sensKey=$('global-sens-key'),sensMode=$('global-sens-mode'),sensStep=$('global-sens-step'),sensRun=$('global-sens-run'),sensStatus=$('global-sens-status'),sensTable=$('global-sens-table'),sensChart=$('global-sens-chart'),sensCsv=$('global-sens-csv');
   const jointA=$('global-joint-a'),jointB=$('global-joint-b'),jointStepA=$('global-joint-step-a'),jointStepB=$('global-joint-step-b'),jointMode=$('global-joint-mode'),jointRun=$('global-joint-run'),jointStatus=$('global-joint-status'),jointGrid=$('global-joint-grid'),jointTable=$('global-joint-table'),jointCsv=$('global-joint-csv');
+  const robustHost=$('global-robustness'),robustTable=$('global-robustness-table');
   let params=null,worker=null,answer=null,serial=0,sensWorker=null,sensSerial=0,jointWorker=null,jointSerial=0;
   function clearJoint(){
-   jointSerial++;if(jointWorker){jointWorker.terminate();jointWorker=null}jointGrid.replaceChildren();jointTable.replaceChildren();jointCsv.disabled=true;jointRun.disabled=!answer;
+   jointSerial++;if(jointWorker){jointWorker.terminate();jointWorker=null}jointGrid.replaceChildren();jointTable.replaceChildren();robustHost.replaceChildren();robustTable.replaceChildren();jointCsv.disabled=true;jointRun.disabled=!answer;
    jointStatus.textContent=answer?'Выберите два разных параметра.':'Сначала рассчитайте основной план.';
   }
   function showJoint(r,p){
@@ -141,7 +172,14 @@ const GlobalPlan=(()=>{
    }
    jointGrid.replaceChildren(t);
    table(jointTable,['Параметр A','Параметр B','Цель, млрд ₽','Δ цели, млрд ₽','Доля спроса последнего периода, %','Δ доли, п. п.','Инвестиции, млрд ₽','Ограничения','Статус'],r.rows.map(x=>[fmt(x.a),fmt(x.b),fmt(x.score),signed(x.delta),fmt(finite(x.alpha)?100*x.alpha:null),signed(x.deltaPP),fmt(x.investment),x.binding?.join('; ')||'—',x.error||(x.clampedA||x.clampedB?'Ограничено диапазоном; оптимум проверен':'Оптимум проверен')]));
-   jointCsv.disabled=false;jointCsv.onclick=()=>csv('global-joint-sensitivity.csv',[['Цель',r.objective],['Параметр A',r.keyA],['Шаг A',r.stepA],['Параметр B',r.keyB],['Шаг B',r.stepB],['Режим',r.mode],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['A','Единица A','B','Единица B','Направление A','Направление B','Ограничено A','Ограничено B','Цель, млрд руб.','Δ цели','Доля спроса','Δ доли, п.п.','Инвестиции','Верхняя граница','Разрыв двойственности','Допуск','Ограничения','Ошибка','Источник'],...r.rows.map(x=>[x.a,a.unit,x.b,b.unit,x.dirA,x.dirB,x.clampedA,x.clampedB,x.score,x.delta,x.alpha,x.deltaPP,x.investment,x.upper,x.gap,x.tolerance,x.binding?.join('; '),x.error,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
+   const u=r.robustness;
+   const make=(tag,text)=>{const el=document.createElement(tag);el.textContent=text;return el};
+   const grid=document.createElement('div');grid.className='stress-decomp-summary';
+   for(const [label,value] of [['Худший подтверждённый результат с переоптимизацией',fmt(u.adaptiveMin)+' млрд ₽'],['Худший результат допустимого фиксированного календаря',fmt(u.fixedMin)+' млрд ₽'],['Максимальный выигрыш от переоптимизации',fmt(u.maxRegret)+' млрд ₽']]){const item=document.createElement('div');item.append(make('span',label),make('strong',value));grid.append(item)}
+   robustHost.append(grid,make('p','Уникальных сочетаний: '+u.unique+' · оптимум подтверждён: '+u.verified+' · исходный календарь допустим: '+u.fixedFeasible+' · превышает инвестиционный лимит: '+u.fixedInvalid+'. При недопустимости календаря его результат не рассчитывается; он не заменяется нулём.'));
+   if(u.counts.length){const bars=document.createElement('div');bars.className='rm-composition';for(const c of u.counts){const line=document.createElement('div');line.className='rm-composition-row';const track=document.createElement('div');track.className='rm-composition-track';const fill=document.createElement('div');fill.className='rm-composition-fill';fill.style.width=(100*c.count/u.verified)+'%';track.append(fill);line.append(make('span',c.name),track,make('strong',c.count+' / '+u.verified));bars.append(line)}robustHost.append(make('h4','Связывающие ограничения по всему горизонту'),make('p','Число уникальных подтверждённых сочетаний, где ограничение активно хотя бы в одном периоде. Не вероятность и не оценка реального риска.'),bars)}
+   table(robustTable,['Параметр A','Параметр B','Оптимум, млрд ₽','Фиксированный календарь, млрд ₽','Выигрыш переоптимизации, млрд ₽','Превышение инвестиционного лимита, млрд ₽','Статус календаря'],r.rows.map(x=>[fmt(x.a),fmt(x.b),fmt(x.score),fmt(x.fixed?.score),fmt(x.regret),fmt(x.fixed?.budgetGap),x.fixed?.reason||'Нет расчёта']));
+   jointCsv.disabled=false;jointCsv.onclick=()=>csv('global-joint-sensitivity.csv',[['Цель',r.objective],['Параметр A',r.keyA],['Шаг A',r.stepA],['Параметр B',r.keyB],['Шаг B',r.stepB],['Режим',r.mode],...dynamic.paramRows(p),['Группа','Рост спроса, %','Доп. человеко-лет на млрд ₽'],...m.names.map((n,i)=>[n,p.growth[i],p.labor?.intensity[i]??'']),['A','Единица A','B','Единица B','Направление A','Направление B','Ограничено A','Ограничено B','Цель, млрд руб.','Δ цели','Доля спроса','Δ доли, п.п.','Инвестиции','Верхняя граница','Разрыв двойственности','Допуск','Ограничения','Ограничения всего горизонта','Фиксированный календарь: цель','Фиксированный календарь: допустимость','Превышение лимита','Выигрыш переоптимизации','Статус календаря','Ошибка','Источник'],...r.rows.map(x=>[x.a,a.unit,x.b,b.unit,x.dirA,x.dirB,x.clampedA,x.clampedB,x.score,x.delta,x.alpha,x.deltaPP,x.investment,x.upper,x.gap,x.tolerance,x.binding?.join('; '),x.allBinding?.join('; '),x.fixed?.score,x.fixed?.feasible,x.fixed?.budgetGap,x.regret,x.fixed?.reason,x.error,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
   }
   jointRun.onclick=()=>{
    if(!params||!answer)return;clearJoint();const keyA=jointA.value,keyB=jointB.value,stepA=jointStepA.valueAsNumber,stepB=jointStepB.valueAsNumber,mode=jointMode.value,goal=objective.value,p={...params,growth:[...params.growth]};
@@ -235,6 +273,6 @@ const GlobalPlan=(()=>{
   });
   objective.addEventListener('change',clear);select.addEventListener('change',detail);investmentFocus.addEventListener('change',renderSchedule);clear();return {setParams};
  }
- return {problem,solve,mount,investmentSchedule,sensitivityCases,sensitivity,jointCases,jointSensitivity};
+ return {problem,solve,mount,investmentSchedule,sensitivityCases,sensitivity,jointCases,jointSensitivity,fixedSchedule,robustness};
 })();
 if(typeof module!=='undefined')module.exports=GlobalPlan;

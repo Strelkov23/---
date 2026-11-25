@@ -60,6 +60,8 @@ with sync_playwright() as p:
         page.locator("#global-joint-run").click()
         page.wait_for_function("document.querySelectorAll('#global-joint-table tbody tr').length===9",timeout=120000)
         assert page.locator("#global-joint-grid tbody td").count()==9
+        assert page.locator("#global-robustness-table tbody tr").count()==9
+        assert page.locator("#global-robustness .stress-decomp-summary > div").count()==3
         with page.expect_download() as joint:
             page.locator("#global-joint-csv").click()
         assert joint.value.suggested_filename=="global-joint-sensitivity.csv"
@@ -73,6 +75,7 @@ with sync_playwright() as p:
         assert page.locator("#global-sens-csv").is_disabled()
         assert page.locator("#global-joint-csv").is_disabled()
         assert page.locator("#global-joint-table tbody tr").count()==0
+        assert page.locator("#global-robustness-table tbody tr").count()==0
         assert page.locator("#global-sens-table tbody tr").count()==0
         assert page.locator("#global-investment-heat tbody tr").count()==0
         page.locator("#global-run").click()
