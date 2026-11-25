@@ -20,7 +20,16 @@ const SectorPassports=(()=>{
   const total=rows.reduce((s,r)=>s+r.value,0),valid=total>0&&rows.every(r=>r.value>=0);
   return {total,valid,rows:rows.map(r=>({...r,share:valid?r.value/total:null})).sort((a,b)=>b.value-a.value||a.i-b.i)};
  }
- return {financeDelta,relatedBalance,relatedRegional,capitalRows,chain}
+ function flowSummary(result,limit=5){
+  if(!result.valid||!Number.isInteger(limit)||limit<1)return null;
+  const positive=result.rows.filter(r=>r.value>0),top=positive.slice(0,limit),rest=positive.slice(limit);
+  const remaining=rest.reduce((s,r)=>s+r.value,0);
+  return {total:result.total,top:top.map(r=>({...r})),remaining,remainingShare:remaining/result.total,remainingCount:rest.length,topShare:top.reduce((s,r)=>s+r.share,0)};
+ }
+ function network(m,i,includeSelf=true,limit=5){
+  return {inputs:flowSummary(chain(m,i,'inputs',includeSelf),limit),outputs:flowSummary(chain(m,i,'outputs',includeSelf),limit)};
+ }
+ return {financeDelta,relatedBalance,relatedRegional,capitalRows,chain,flowSummary,network}
 })();
 if(typeof module!=='undefined')module.exports=SectorPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -183,9 +192,36 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
      const description=node('p','');description.id='sp-chain-status';description.setAttribute('role','status');
      const host=node('div','');host.id='sp-chain-table';host.className='table-scroll';host.tabIndex=0;host.setAttribute('role','region');host.setAttribute('aria-label','Промежуточные межгрупповые потоки');
      const exp=node('button','Скачать потоки CSV');exp.id='sp-chain-export';exp.type='button';
-     b.append(node('h3','Структура прямых производственных связей'),box,description,host,exp);
+     const diagram=node('div','');diagram.id='sp-chain-diagram';diagram.className='sp-flow-diagram';
+     const diagramInfo=node('p','');diagramInfo.id='sp-chain-diagram-info';
+     const limit=node('select','');limit.id='sp-chain-limit';
+     for(const n of [3,5,8])limit.add(new Option(String(n),String(n)));limit.value='5';
+     const limitLabel=node('label','Связей на каждой стороне схемы');limitLabel.append(limit);box.append(limitLabel);
+     b.append(node('h3','Структура прямых производственных связей'),box,diagramInfo,diagram,description,host,exp);
+     function drawNetwork(i,inc){
+      diagram.replaceChildren();
+      const net=SectorPassports.network(balance,i,inc,Number(limit.value));
+      diagramInfo.textContent='Входящие и исходящие потоки, 2021 г. Доли рассчитаны отдельно для каждой стороны, ширина полосы — доля в её сумме. '+(inc?'Внутригрупповой оборот включён.':'Внутригрупповой оборот исключён.')+' Остальные ненулевые связи объединены только на схеме.';
+      function side(result,input){
+       const el=node('section','');el.className='sp-flow-side';el.append(node('h4',input?'Поставщики →':'→ Покупатели'));
+       if(!result){el.append(node('p','Нет положительного неотрицательного итога для расчёта долей.'));return el}
+       el.append(node('p',fmt(result.total/1000)+' млрд ₽ · сумма '+(input?'закупок':'поставок')));
+       function item(name,value,share,idx){
+        const row=node('div','');row.className='sp-flow-item';
+        const label=idx===null?node('span',name):link(name,'sector-'+(idx+1)+'.html');
+        const amount=node('strong',fmt(value/1000)+' млрд ₽ · '+fmt(100*share)+'%');
+        const track=node('div','');track.className='sp-flow-track';const fill=node('div','');fill.className='sp-flow-fill';fill.style.width=(100*share)+'%';track.append(fill);
+        row.append(label,amount,track);el.append(row);
+       }
+       for(const x of result.top)item(x.name,x.value,x.share,x.i);
+       if(result.remainingCount)item('Остальные связи ('+result.remainingCount+')',result.remaining,result.remainingShare,null);
+       return el
+      }
+      const center=node('div','');center.className='sp-flow-center';center.append(node('small','Выбранная группа ОКПД2'),node('strong',balance.names[i]),node('span','Промежуточные потоки · 2021'),link('Открыть паспорт группы','sector-'+(i+1)+'.html'));
+      diagram.append(side(net.inputs,true),center,side(net.outputs,false));
+     }
      function chainDraw(){
-      const i=Number(group.value),dir=direction.value,inc=self.value==='yes',r=SectorPassports.chain(balance,i,dir,inc);
+      const i=Number(group.value),dir=direction.value,inc=self.value==='yes',r=SectorPassports.chain(balance,i,dir,inc);drawNetwork(i,inc);
       description.textContent='Группа: '+balance.names[i]+' · '+(dir==='inputs'?'отечественные промежуточные закупки':'отечественные промежуточные поставки')+' · сумма выбранных потоков: '+fmt(r.total/1000)+' млрд ₽, 2021. '+(r.valid?'Доля — поток / сумма выбранных потоков.':'Доли не рассчитываются при отрицательных потоках или неположительном итоге.');
       const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
       for(const title of ['Группа контрагента','Поток, млрд ₽','Доля, %']){const th=node('th',title);th.scope='col';h.append(th)}
@@ -193,7 +229,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
       host.replaceChildren(t);
       exp.onclick=()=>csv('sector-chain-'+(i+1)+'-'+dir+'-2021.csv',[['Группа','Направление','Внутригрупповые потоки','Группа контрагента','Поток, млн руб.','Знаменатель, млн руб.','Доля, 0–1','Год','Источник'],...r.rows.map(x=>[balance.names[i],dir,inc?'да':'нет',x.name,x.value,r.total,x.share,2021,'https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx'])]);
      }
-     group.onchange=direction.onchange=self.onchange=chainDraw;chainDraw();
+     group.onchange=direction.onchange=self.onchange=limit.onchange=chainDraw;chainDraw();
     }
     if(!related.length)b.append(node('p','Нет однозначно подобранной тематической группы баланса.'));
    }else b.append(node('p','Статические паспорта баланса относятся к текущей сборке, а не закреплённой версии.'));

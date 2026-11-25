@@ -538,6 +538,12 @@ with sync_playwright() as p:
         assert page.locator("#sp-sector option").count()==20
         assert "Химическая промышленность" in page.locator("#sp-scope").inner_text()
         assert page.locator("#sp-chain-table tbody tr").count()==19
+        assert page.locator("#sp-chain-diagram .sp-flow-side").count()==2
+        assert page.locator("#sp-chain-diagram .sp-flow-center").count()==1
+        assert page.locator("#sp-chain-diagram .sp-flow-item").count()>0
+        page.locator("#sp-chain-limit").select_option("3")
+        assert page.locator("#sp-chain-diagram .sp-flow-item").count()<=8
+        assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.locator("#sp-chain-direction").select_option("outputs")
         page.locator("#sp-chain-self").select_option("no")
         assert page.locator("#sp-chain-table tbody tr").count()==18
