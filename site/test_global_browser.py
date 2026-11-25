@@ -265,6 +265,20 @@ with sync_playwright() as p:
         page.locator("#capacity-trend").select_option("machine-tools")
         assert "40,5" in page.locator("#capacity-trend-chart tbody tr").last.inner_text()
         assert page.locator("#capacity-table tbody tr").count()==72
+        assert page.locator("#cap-signal-table tbody tr").count()==72
+        assert "71 из 72" in page.locator("#cap-signal-status").inner_text()
+        page.locator("#cap-signal-filter").select_option("incomplete")
+        assert page.locator("#cap-signal-table tbody tr").count()==1
+        assert "Сгущённые" in page.locator("#cap-signal-table").inner_text()
+        with page.expect_download() as cap_signal:
+            page.locator("#cap-signal-export").click()
+        with open(cap_signal.value.path(),encoding="utf-8-sig",newline="") as f:
+            cap_signal_rows=list(csv.reader(f,delimiter=";"))
+        assert len(cap_signal_rows)==4 and len({len(r) for r in cap_signal_rows})==1
+        page.locator("#cap-signal-span").select_option("2")
+        assert page.locator("#cap-signal-export").is_disabled()
+        page.locator("#cap-signal-filter").select_option("")
+        assert page.locator("#cap-signal-table tbody tr").count()==72
         assert page.locator("#capacity-distribution progress").count()==5
         page.locator("#capacity-sort").select_option("low")
         vals=page.locator("#capacity-table tbody tr td:nth-child(3)").all_text_contents()

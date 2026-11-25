@@ -10,7 +10,25 @@ const CapacityAnalysis=(()=>{
   const key=mode==='change'||mode==='fall'?'change_pp':'utilization_pct',sign=mode==='low'||mode==='fall'?1:-1;
   return [...rows].sort((a,b)=>{const av=Number.isFinite(a[key]),bv=Number.isFinite(b[key]);return av!==bv?(av?-1:1):av?sign*(a[key]-b[key])||byName(a,b):byName(a,b)});
  }
- return {distribution,sorted};
+ // Consecutive calendar years only; a changed definition breaks the chain.
+ const valid=v=>Number.isFinite(v)&&v>=0&&v<=100;
+ function capacitySignals(records,end,span,low,high,target){
+  if(!Number.isInteger(end)||!Number.isInteger(span)||span<2||span>10||!valid(low)||!valid(high)||low>=high||!valid(target)||target<=0)throw Error('Invalid capacity diagnostic parameters');
+  const years=Array.from({length:span},(_,i)=>end-span+1+i),groups=new Map();
+  for(const r of records){if(!r.code||!years.includes(r.year))continue;const a=groups.get(r.code)||[];a.push(r);groups.set(r.code,a)}
+  const out=[];
+  for(const [code,all] of groups){
+   const slots=years.map(y=>{const a=all.filter(r=>r.year===y);return a.length===1?a[0]:null}),current=slots.at(-1),reference=current||all[0];
+   const vals=slots.map(r=>r&&valid(r.utilization_pct)?r.utilization_pct:null),u=vals.at(-1);
+   const comparable=slots.every((r,i)=>r&&vals[i]!==null&&r.coverage===reference.coverage&&r.source===reference.source&&r.group===reference.group&&(i===0||r.comparison_status==='same_published_label'));
+   const state=u===null?'missing':!comparable?'incomplete':vals.every(v=>v>=high)?'persistent-high':vals.every(v=>v<low)?'persistent-low':u>=high?'current-high':u<low?'current-low':'middle';
+   // Arithmetic relative to current output, without claiming available capacity.
+   const headroom=u!==null&&u>0?100*(target/u-1):null;
+   out.push({code,title:reference.title,group:reference.group,years,slots,vals,u,comparable,state,headroom,aboveTarget:u!==null&&u>target});
+  }
+  return out.sort((a,b)=>a.title.localeCompare(b.title,'ru')||a.code.localeCompare(b.code));
+ }
+ return {distribution,sorted,capacitySignals};
 })();
 if(typeof module!=='undefined')module.exports=CapacityAnalysis;
 if(typeof document!=='undefined')
@@ -67,6 +85,25 @@ document.addEventListener('DOMContentLoaded',async()=>{
    const exportButton=$('capacity-export');exportButton.disabled=!rows.length;exportButton.onclick=()=>csv('capacity-selection.csv',[['Код','Продукт','Группа','Год','Загрузка, %','Незагруженная доля, %','Условный прирост, %','Изменение, п.п.','Сопоставимость','Охват','Таблица','Страница','Источник','Примечание'],...rows.map(x=>[x.code,x.title,x.group,x.year,x.utilization_pct,x.unused_share_pct,x.theoretical_extra_vs_output_pct,x.change_pp,x.comparison_status,x.coverage,x.table,x.page,x.source,x.note])]);
    bars($('capacity-chart'),CapacityAnalysis.sorted(rows,'high'),'utilization_pct','Наиболее загруженные продукты в выбранном срезе');
   }
+  const labels={'persistent-high':'Устойчиво высокая загрузка','persistent-low':'Устойчиво низкая загрузка','current-high':'Высокая в последнем году','current-low':'Низкая в последнем году',middle:'Между порогами в последнем году',incomplete:'Нет полной сопоставимой истории',missing:'Нет значения последнего года'};
+  const signalYear=$('cap-signal-year'),signalGroup=$('cap-signal-group');
+  for(const y of [...new Set(c.map(r=>r.year))].sort((a,b)=>b-a))signalYear.add(new Option(String(y),String(y)));
+  signalGroup.add(new Option('Все группы',''));for(const g of [...new Set(c.map(r=>r.group))])signalGroup.add(new Option(g,g));
+  function signals(){
+   const year=Number(signalYear.value),span=Number($('cap-signal-span').value),low=Number($('cap-signal-low').value),high=Number($('cap-signal-high').value),target=Number($('cap-signal-target').value),state=$('cap-signal-filter').value;
+   const host=$('cap-signal-table'),summary=$('cap-signal-summary'),button=$('cap-signal-export');
+   host.replaceChildren();summary.replaceChildren();button.disabled=true;
+   if(low>=high){$('cap-signal-status').textContent='Нижний порог должен быть меньше верхнего.';return}
+   const all=CapacityAnalysis.capacitySignals(c,year,span,low,high,target).filter(r=>!signalGroup.value||r.group===signalGroup.value),rows=all.filter(r=>!state||r.state===state);
+   $('cap-signal-status').textContent='Срез '+year+' · полная сопоставимая история: '+all.filter(r=>r.comparable).length+' из '+all.length+' продуктов · показано: '+rows.length+'. Документальный снимок, без малого предпринимательства.';
+   for(const [key,label] of Object.entries(labels)){const d=node('div','');d.className='metric';d.append(node('b',String(all.filter(r=>r.state===key).length)),node('span',label));summary.append(d)}
+   const years=Array.from({length:span},(_,i)=>year-span+1+i);
+   table(host,['Продукт','Группа',...years.map(y=>y+' (%)'),'Сигнал','До целевой загрузки: изменение выпуска, %','Выше цели'],rows.map(r=>[r.title,r.group,...r.vals.map(fmt),labels[r.state],fmt(r.headroom),r.u===null?'—':r.aboveTarget?'Да':'Нет']));
+   button.disabled=!rows.length;
+   button.onclick=()=>csv('capacity-diagnostic-'+year+'.csv',[
+    ['Код','Продукт','Группа','Год окончания','Окно, лет','Нижний порог, %','Верхний порог, %','Целевая загрузка, %','Состояние','Сопоставимая история','Изменение выпуска до цели, %','Выше цели','Год наблюдения','Загрузка, %','Сопоставимость','Охват','Таблица','Страница','Источник','Примечание','Редакция ежегодника','Дата транскрипции','Статус проверки'],...rows.flatMap(r=>r.years.map((y,i)=>{const o=r.slots[i];return [r.code,r.title,r.group,year,span,low,high,target,labels[r.state],r.comparable?'да':'нет',r.headroom,r.u===null?'':r.aboveTarget?'да':'нет',y,r.vals[i],o?.comparison_status,o?.coverage,o?.table,o?.page,o?.source,o?.note,d.edition,d.transcribed,d.verification]}))]);
+  }
+  for(const id of ['cap-signal-year','cap-signal-group','cap-signal-span','cap-signal-low','cap-signal-high','cap-signal-target','cap-signal-filter'])$(id).addEventListener('change',signals);signals();
   $('capital-year').addEventListener('change',assets);$('capital-sort').addEventListener('change',assets);
   $('capacity-year').addEventListener('change',capacity);$('capacity-group').addEventListener('change',capacity);$('capacity-query').addEventListener('input',capacity);$('capacity-sort').addEventListener('change',capacity);assets();capacity();assetTrend();capacityTrend();
  }catch(e){console.error(e);$('capital-status').textContent='Не удалось загрузить данные.'}
