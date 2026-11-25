@@ -82,3 +82,22 @@ assert.equal(G.observationRows(obs,{standard:'IFRS_based_disclosure'}).length,1)
 assert.equal(G.observationRows(obs,{sector:'Добыча',unit:'млн руб.'}).length,0);
 assert.equal(G.observationRows(obs,{query:'нет такого показателя'}).length,0);
 assert.equal(G.observationRows(obs).at(-1).year,2024);
+
+const oc=G.observationChange;
+assert.equal(oc('9007199254740993','9007199254740992','млн руб.').delta,'1');
+assert.equal(oc('1.005','1.002','тыс. т').delta,'0.003');
+assert.equal(oc('5.125','6.125','%').delta,'-1');
+assert.equal(oc('5.125','6.125','%').deltaUnit,'п.п.');
+assert.equal(oc('5.125','6.125','%').rate,null);
+assert.equal(oc('0','2','млн руб.').rate,'-100');
+assert.equal(oc('-2','2','млн руб.').rate,'-200');
+assert.equal(oc('2','0','млн руб.').rate,null);
+assert.equal(oc('2','-1','млн руб.').rate,null);
+assert.equal(oc('1','3','млн руб.').rate,'-66.67');
+assert.equal(oc('0.0001','0.0001','тыс. т').delta,'0');
+assert.equal(oc('5',null,'млн руб.').delta,null);
+assert.throws(()=>oc('1e9','2','млн руб.'));
+assert.equal(G.observationRows(obs,{paired:true}).length,1);
+assert.equal(G.observationRows(obs,{paired:true,year:2024}).length,0);
+assert.equal(G.observationRows(obs,{paired:true,year:2025})[0].previous,'0');
+assert.equal(G.observationRows({groups:[{...obs.groups[0],metrics:[{...obs.groups[0].metrics[0],observations:[{year:2023,value:'3'},{year:2025,value:'5'}]}]}]},{paired:true}).length,0);
