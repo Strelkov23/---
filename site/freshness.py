@@ -179,6 +179,14 @@ def collect(out,stamp):
             states={"waiting":"waiting","baseline":"ok","unchanged":"ok","changed":"partial","no_metadata":"partial","unavailable":"cached" if r["success"] else "unavailable"}
             info=dict(checked=r["checked"],success=r["success"],status=labels[r["status"]]+(" · Сигнал изменения сохранён" if r["changed"] else ""),error=r["error"])
             add("corp-watch-"+k,"Корпоративные документы",r["name"]+" · "+urlsplit(r["url"]).hostname,r["url"],info,None,days=7,failure_days=2,policy="До 6 ссылок в сутки; 7 суток после успеха, 2 после сбоя. Только метаданные известных документов, не дата финансовых данных.",href="company-atlas.html#group-passports",state_override=states[r["status"]])
+    path=out/"corporate-discovery.json"
+    if path.is_file():
+        d=read(path.name)
+        for k,r in d["rows"].items():
+            labels={"waiting":"Ожидает проверки","ok":"Найдено ссылок: "+str(len(r["candidates"])),"unavailable":"Каталог недоступен или ссылки не распознаны"}
+            current={"waiting":"waiting","ok":"ok","unavailable":"cached" if r["success"] else "unavailable"}[r["status"]]
+            info=dict(checked=r["checked"],success=r["success"],status=labels[r["status"]],error=r["error"])
+            add("corp-discovery-"+k,"Корпоративные документы",k+" · поиск новых публикаций",r["url"],info,None,days=7,failure_days=2,policy="HTML официальной страницы; найденные ссылки требуют проверки, дата обнаружения не дата отчётности.",href="company-atlas.html#group-discovery",state_override=current)
     path=out/"company-index.json"
     if path.is_file():
         d=read(path.name);ready=d["status"]=="ready"
