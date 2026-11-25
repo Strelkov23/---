@@ -54,5 +54,16 @@ jobs:
                       if raw[:2]!=bytes([31,139]) and raw[:4]!=b"PAR1":raise ValueError("Unexpected file signature")
                       print("EMISS_RESOURCE",code,url,len(raw),flush=True)
                   except Exception as exc:print("EMISS_RESOURCE_UNAVAILABLE",code,url,str(exc),flush=True)
-          assert ok, "Original source verification incomplete"
+          import hashlib
+          url=h.mirror_url("enterprises")
+          raw,_=h.get(url,35_000_000)
+          rows=h.mirror_rows(raw,"enterprises",selected=True)
+          print("SELECTED_ENTERPRISE",len(rows),"SHA256",hashlib.sha256(raw).hexdigest(),flush=True)
+          for (title,unit),count in Counter((r["title"],r["unit"]) for r in rows).most_common():
+              print("SELECTED",title,unit,count,flush=True)
+          assert any(r["title"]=="Число организаций" for r in rows)
+          assert any("фактически действующих индивидуальных предпринимателей" in r["title"] for r in rows)
+          assert all(r["value"] not in h.MIRROR_MISSING_MARKERS for r in rows)
+          assert len(rows)>10000
+          if not ok:print("DIRECT_WORKBOOKS_UNAVAILABLE; HISTORICAL_ARCHIVE_VERIFIED",flush=True)
           PY

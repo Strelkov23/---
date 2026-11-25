@@ -343,6 +343,34 @@ class HistoricalTests(unittest.TestCase):
         self.assertTrue(url.endswith(".parquet"))
         self.assertEqual(rows[0]["value"],100)
         self.assertEqual(rows[0]["sheet"],"61483.parquet")
+    def test_enterprise_archive_exact_concepts(self):
+        import zipfile
+        buffer=io.BytesIO()
+        header="region;year;value;indicator;unit;indicator_id;subsection\n"
+        rows=[
+            "Москва;2024;10;Число организаций;На конец года;Y1;A",
+            "Москва;2024;11;Число организаций;На конец года;Y1;B",
+            "Москва;2024;999;Число организаций;Тысяч;Y1;C",
+            "Москва;2024;2;Итоги выборочных обследований: Численность фактически действующих индивидуальных предпринимателей;По данным выборочных обследований индивидуальных предпринимателей, тысяч;Y2;A",
+            "Москва;2024;-77777777;Число организаций;На конец года;Y1;D",
+            "Москва;2024;5;Оборот организаций;Миллиардов рублей;Y3;A",
+            "Москва;2024;9;Итоги сплошных наблюдений: Число малых предприятий на 10000 человек населения;ND;Y4;A",
+            "Москва;2024;-12;Сальдированный финансовый результат (прибыль минус убыток) деятельности организаций;Миллионов рублей;Y5;A"]
+        with zipfile.ZipFile(buffer,"w") as z:z.writestr("data.csv",header+"\n".join(rows))
+        result=historical.mirror_rows(buffer.getvalue(),"enterprises",selected=True)
+        self.assertEqual(len(result),5)
+        self.assertEqual(len({r["indicator"] for r in result}),5)
+        self.assertEqual({r["value"] for r in result},{10,11,2,5,-12})
+    def test_enterprise_revision_due(self):
+        import sqlite3
+        with sqlite3.connect(":memory:") as db:
+            db.execute("create table hist_sources(code text primary key,checked text,success text,status text,files text)")
+            for section in historical.REGIONAL_ZIPS:
+                db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_"+section,"2026-11-25","2026-11-25","ok","[]"))
+            db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_industry_activity_v2","2026-11-25","2026-11-25","ok","[]"))
+            self.assertEqual(historical.choose_sections(db,"2026-11-25"),["enterprises"])
+            db.execute("insert into hist_sources values(?,?,?,?,?)",("mirror_enterprises_expanded_v2","2026-11-25","2026-11-25","ok","[]"))
+            self.assertEqual(historical.choose_sections(db,"2026-11-25"),[])
     def test_seed(self):
         import regional_seed
         rows=list(regional_seed.rows())

@@ -215,13 +215,16 @@ def choose_emiss_codes(db,stamp,limit=2):
             options.append((1,checked,code))
     return [code for _,__,code in sorted(options)[:limit]]
 
+MIRROR_REVISIONS={"industry":"mirror_industry_activity_v2","enterprises":"mirror_enterprises_expanded_v2"}
+
 def choose_sections(db,stamp,limit=3):
     """Untried first, then longest overdue; a failing section cannot monopolise the queue."""
     options=[]
     for section in REGIONAL_ZIPS:
         code="mirror_"+section
-        if section=="industry" and not db.execute("select success from hist_sources where code='mirror_industry_activity_v2' and success is not null").fetchone():
-            code="mirror_industry_activity_v2"
+        revision=MIRROR_REVISIONS.get(section)
+        if revision and not db.execute("select success from hist_sources where code=? and success is not null",(revision,)).fetchone():
+            code=revision
         row=db.execute("select checked,success from hist_sources where code=?",(code,)).fetchone()
         if not row:options.append((0,"",section));continue
         if due_date(*row,stamp,30,2)<=stamp[:10]:
@@ -365,6 +368,30 @@ MIRROR_PRIORITY.update({
  "prices":[r"^индекс[ы]? потребительских цен",r"^стоимость фиксированного набора потребительских товаров и услуг",r"^стоимость условного.*минимального набора продуктов питания",r"^индекс цен производителей промышленных товаров"],
  "foreign_trade":[r"^экспорт товаров(?:$|:| \()",r"^импорт товаров(?:$|:| \()",r"^внешнеторговый оборот(?:$|:| \()",r"^сальдо торгового баланса"]
 })
+# Exact title and original unit fields, verified in the v20260313 archive.
+ENTERPRISE_CONCEPTS={
+ "Число организаций":"На конец года",
+ "Удельный вес убыточных организаций":"В процентах от общего числа организаций",
+ "Сальдированный финансовый результат (прибыль минус убыток) деятельности организаций":"Миллионов рублей",
+ "Сальдированный финансовый результат (прибыль (убыток) до налогообложения) деятельности организаций":"Миллионов рублей",
+ "Дебиторская задолженность организаций: Всего":"На конец года, миллионов рублей",
+ "Дебиторская задолженность организаций: Просроченная":"На конец года, миллионов рублей",
+ "Кредиторская задолженность организаций: Всего":"На конец года, миллионов рублей",
+ "Кредиторская задолженность организаций: Просроченная":"На конец года, миллионов рублей",
+ "Оборот организаций":"Миллиардов рублей",
+ "Итоги выборочных обследований: Оборот малых предприятий":"Миллиардов рублей",
+ "Итоги выборочных обследований: Средняя численность работников малых предприятий":"Тысяч человек",
+ "Итоги выборочных обследований: Численность фактически действующих индивидуальных предпринимателей":"По данным выборочных обследований индивидуальных предпринимателей, тысяч",
+ "Итоги выборочных обследований: Численность занятых в бизнесе индивидуального предпринимателя":"По данным выборочных обследований индивидуальных предпринимателей, тысяч человек",
+ "Итоги выборочных обследований: Объем выручки от продажи товаров, продукции, работ, услуг":"По данным выборочных обследований индивидуальных предпринимателей, миллиардов рублей",
+ "Итоги сплошных наблюдений: Число индивидуальных предпринимателей":"Тысяч",
+ "Итоги сплошных наблюдений: Число малых предприятий":"Тысяч",
+ "Итоги сплошных наблюдений: Выручка от реализации товаров (работ, услуг) малых предприятий":"Миллиардов рублей",
+ "Итоги сплошных наблюдений: Среднесписочная численность работников (без внешних совместителей)":"Тысяч человек"
+}
+def enterprise_concept(title,unit):
+    return any(norm(title)==norm(t) and norm(unit)==norm(u) for t,u in ENTERPRISE_CONCEPTS.items())
+
 STRICT_MIRROR_SECTIONS={"enterprises","agriculture","construction","trade","transport","innovation","farming","manufacturing","living","capital","ict","prices","foreign_trade"}
 
 def select_mirror(rows,section,limit=4):
@@ -385,6 +412,8 @@ def select_mirror(rows,section,limit=4):
             candidates=[(k,v) for k,v in by.items() if k not in used and re.search(pat,norm(v[0]['title'])) and re.search(r'^индекс|^объем отгруженных',norm(v[0]['title']))]
             for k,v in sorted(candidates,key=lambda item:(-len(item[1]),item[0]))[:2]:
                 selected.extend(v);used.add(k)
+    if section=="enterprises":
+        selected.extend(r for k,v in by.items() if k not in picked[:limit] and enterprise_concept(v[0]["title"],v[0]["unit"]) for r in v)
     # Include a separate nationwide budget unit only when its exact indicator title is selected.
     if section=="finance":
         titles={r["title"] for r in selected}
@@ -440,7 +469,7 @@ def mirror_rows(raw,section,selected=False):
                             unit="млн руб."
                         else:continue
                     # For new large sections retain only indicators selected by the declared concepts.
-                    if selected and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]):continue
+                    if selected and section in STRICT_MIRROR_SECTIONS-{'manufacturing'} and not any(re.search(pat,norm(title)) for pat in MIRROR_PRIORITY[section]) and not (section=="enterprises" and enterprise_concept(title,unit)):continue
                     # Keep definitions separate by exact title, unit and provider code.
                     code=hashlib.sha256((val("code")+"|"+title+"|"+unit+"|"+str(r.get("subsection",""))).encode()).hexdigest()[:16]
                     note=val("note")+" · Подраздел источника: "+str(r.get("subsection",""))+" · Единица в оригинале: "+original_unit+" · Издание: "+str(r.get("source",""))+" · Версия: "+str(r.get("version_date",""))+" · Уровень территории: "+str(r.get("object_level",""))+" · ОКТМО: "+str(r.get("object_oktmo",""))+" · ОКАТО: "+str(r.get("object_okato",""))+" · Код показателя: "+val("code")
@@ -750,13 +779,13 @@ def publish(db,stamp,out,refresh):
                 if not n:raise ValueError("Нет однозначных наблюдений")
                 status="Ключей выбранных основных показателей: "+str(n)
                 db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(code,stamp,stamp,status,"[]"))
-                if section=="industry":db.execute("insert or replace into hist_sources values(?,?,?,?,?)",("mirror_industry_activity_v2",stamp,stamp,status,"[]"))
+                if section in MIRROR_REVISIONS:db.execute("insert or replace into hist_sources values(?,?,?,?,?)",(MIRROR_REVISIONS[section],stamp,stamp,status,"[]"))
                 sources.append(dict(code=code,title=mirror_title(section),url=url,checked=stamp,success=stamp,status=status,files=[]))
             except Exception as e:
                 status="Ошибка: "+str(e)[:160]
                 db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(code,stamp,status,"[]"))
-                if section=="industry":
-                    db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",("mirror_industry_activity_v2",stamp,status,"[]"))
+                if section in MIRROR_REVISIONS:
+                    db.execute("insert into hist_sources values(?,?,null,?,?) on conflict(code) do update set checked=excluded.checked,status=excluded.status",(MIRROR_REVISIONS[section],stamp,status,"[]"))
                 old=db.execute("select success from hist_sources where code=?",(code,)).fetchone()
                 sources.append(dict(code=code,title=mirror_title(section),url=url,checked=stamp,success=old[0] if old else None,status=status,files=[]))
     # Include historical check metadata even if this build used cached data.
