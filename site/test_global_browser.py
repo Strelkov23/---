@@ -346,6 +346,15 @@ with sync_playwright() as p:
             source_col=x5rows[0].index("Источник")
             code_col=x5rows[0].index("Код")
             assert all(row[source_col]==metric["source"] for row in x5rows[1:] if row[code_col]==metric["id"])
+        if any(g["id"]=="mmk" for g in groups["groups"]):
+            page.locator("#group-pick").select_option("mmk")
+            page.locator("#group-metric").select_option("profit")
+            assert "14" in page.locator("#group-chart").inner_text()
+            assert page.locator("#group-ratio-export").is_enabled()
+            page.locator("#group-level-sector").select_option(label="Чёрная металлургия")
+            page.locator("#group-level-metric").select_option("revenue")
+            assert page.locator("#group-level-table tbody tr").count()==sum(g["sector"]=="Чёрная металлургия" for g in groups["groups"])
+            page.locator("#group-level-sector").select_option("")
         if any(g["id"]=="nlmk" for g in groups["groups"]):
             page.locator("#group-pick").select_option("nlmk")
             assert "не полный комплект" in page.locator("#group-detail").inner_text()
