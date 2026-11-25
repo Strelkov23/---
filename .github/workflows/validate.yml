@@ -72,8 +72,6 @@ jobs:
           node test-sme-matrix.js
           node test-sme-finance.js
           node test-project-search.js
-          node test-price-model.js
-          node test-technology.js
       - name: Build from the saved archive without refreshing sources
         run: |
           mkdir -p monitor/data
@@ -82,6 +80,8 @@ jobs:
           else echo "Saved database missing"; exit 1; fi
           cd monitor
           ECONOMIC_SOURCE_REVISION=$(git rev-parse HEAD) python3 build.py
+          node test-price-model.js
+          node test-technology.js
           git rev-parse HEAD > public/source-version.txt
           cp public/source-version.txt public/version.txt
           python3 -c "import json; from pathlib import Path; d=json.loads(Path('public/quality.json').read_text()); print(d); assert not d['errors'],d['errors']"
