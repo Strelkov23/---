@@ -1,0 +1,33 @@
+name: Bank of Russia directory source check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/bank-source-check.yml','site/bank_registry.py','site/test_bank_registry.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test parser and verify official dated list
+        run: |
+          cd site
+          python -m unittest test_bank_registry.py
+          python - <<'PY'
+          import bank_registry as b,json
+          from pathlib import Path
+          raw,enc=b.fetch()
+          d=b.parse(raw,enc)
+          print("BANK_DIRECTORY",d["edition"],len(d["rows"]),d["sha256"])
+          Path("../system-banks-verified.json").write_text(json.dumps(d,ensure_ascii=False),encoding="utf-8")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-system-banks
+          path: system-banks-verified.json
