@@ -161,7 +161,6 @@ amur_enterprises.publish(out,Path("../history/published"),m.now(),"--refresh" in
 bank_registry.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_sources.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 company_import.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
-company_index.publish(out)
 industrial_parks.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 park_certificates.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)
 sme_regions.publish(out,Path("../history/published"),m.now(),"--refresh" in sys.argv)

@@ -19,6 +19,19 @@ class TestCompanyIndex(unittest.TestCase):
             self.assertEqual(d["count"],2);self.assertEqual(d["paired"],1)
             self.assertEqual(x.lookup(d,out,"7707083893")["income_cents"],"9007199254740993")
             self.assertEqual(x.lookup(d,out,"7704211201")["workers"],8)
+            self.assertTrue(x.matches_report(d,report))
+            self.assertIsNotNone(x.restore(out,report))
+            self.assertIsNone(x.restore(out,{**report,"year":2024}))
+            target=out/"published";target.mkdir()
+            x.install(target,out,d,report)
+            self.assertEqual(x.lookup(d,target,"7707083893")["income_cents"],"9007199254740993")
+            from unittest.mock import patch
+            with patch.object(x,"MAX_PUBLISH_BYTES",1):
+                with self.assertRaises(ValueError):x.publishable(d,out,report)
+                self.assertIsNone(x.restore(out,report))
+            x.publish(target)
+            self.assertFalse((target/"company-index").exists())
+            self.assertEqual(x.quality(x.empty())["company_index_records"],0)
             path=out/x.filename(x.bucket("7707083893"));path.write_bytes(b"bad")
             with self.assertRaises(ValueError):x.quality(d,out)
     def test_empty(self):

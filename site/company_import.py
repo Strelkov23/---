@@ -172,6 +172,8 @@ def quality(d):
     return {"corporate_income_records":a,"corporate_employment_records":b,"corporate_paired_records":r["paired"]}
 def publish(out,previous,stamp,refresh):
     from datetime import date,timedelta
+    import company_index as index
+    index.publish(out)
     d=empty()
     try:
         old=json.loads((previous/FILE).read_text(encoding="utf-8"));quality(old);d=old
@@ -182,17 +184,34 @@ def publish(out,previous,stamp,refresh):
     ready=all(r["schema_verified"] and r["archive"] for r in meta["rows"])
     old_release={r["kind"]:r["source"] for r in d["report"]["sources"]} if d["report"] else {}
     due=not d["checked"] or date.fromisoformat(stamp[:10])>=date.fromisoformat(d["checked"][:10])+timedelta(days=2)
-    if refresh and ready and release!=old_release and due:
+    cached=index.restore(previous,d["report"])
+    if cached:
+        try:index.install(out,previous,cached,d["report"])
+        except (OSError,ValueError,TypeError,KeyError) as e:
+            cached=None;d["index_error"]=str(e)[:220]
+    if refresh and ready and (release!=old_release or not cached) and due:
         try:
             with tempfile.TemporaryDirectory() as folder:
-                report=run_import(meta,Path(folder))
-            candidate=dict(schema=1,status="ok",checked=stamp,success=stamp,report=report)
-            counts=quality(candidate)
-            if d["report"] and report["year"]==d["report"]["year"]:
-                old=quality(d)
-                if any(counts[k]<old[k]*.9 for k in ("corporate_income_records","corporate_employment_records")):raise ValueError("Существенная потеря охвата")
-            if d["report"] and report["year"]<d["report"]["year"]:raise ValueError("Старая редакция")
-            d=candidate
+                folder=Path(folder)
+                report=run_import(meta,folder)
+                candidate=dict(schema=1,status="ok",checked=stamp,success=stamp,report=report)
+                counts=quality(candidate)
+                if d["report"] and report["year"]==d["report"]["year"]:
+                    old=quality(d)
+                    if any(counts[k]<old[k]*.9 for k in ("corporate_income_records","corporate_employment_records")):raise ValueError("Существенная потеря охвата")
+                if d["report"] and report["year"]<d["report"]["year"]:raise ValueError("Старая редакция")
+                try:
+                    if not index.matches_report(cached or index.empty(),report):
+                        stage=folder/"index";stage.mkdir()
+                        with sqlite3.connect(folder/"company-pilot.sqlite") as db:
+                            built=index.create(db,report,stage)
+                        index.install(out,stage,built,report)
+                    print("COMPANY_INDEX_PUBLISHED",json.dumps(index.quality(json.loads((out/index.FILE).read_text()),out)),flush=True)
+                except Exception as e:
+                    index.publish(out)
+                    candidate["index_error"]=str(e)[:220]
+                    print("COMPANY_INDEX_NOT_PUBLISHED",candidate["index_error"],flush=True)
+                d=candidate
         except Exception as e:d.update(status="cached" if d["report"] else "unavailable",checked=stamp,error=str(e)[:220])
     quality(d);(out/FILE).write_text(json.dumps(d,ensure_ascii=False,allow_nan=False),encoding="utf-8");return d
 def main():

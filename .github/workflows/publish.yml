@@ -144,6 +144,11 @@ jobs:
           if [ -f monitor/public/regional-boundaries.geojson ]; then cp monitor/public/regional-boundaries.geojson history/published/; fi
           mkdir -p history/published/regional-data
           cp -a monitor/public/regional-data/. history/published/regional-data/
+          # Archive the exact sharded index (or remove stale shards when not published).
+          rm -rf history/published/company-index
+          if [ -d monitor/public/company-index ]; then
+            cp -a monitor/public/company-index history/published/company-index
+          fi
           # SQLite is restored losslessly at the next build. Do not commit a raw database over GitHub's 100 MiB limit.
           gzip -n -c history/monitor.db > history/monitor.db.gz.tmp
           gzip -t history/monitor.db.gz.tmp
@@ -178,6 +183,12 @@ jobs:
           for name,entry in manifest['files'].items():
               data=subprocess.check_output(['git','show','HEAD:history/published/'+name])
               assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'],name
+          index=json.loads(Path('monitor/public/company-index.json').read_text())
+          if index['status']=='ready':
+              for name,entry in index['files'].items():
+                  data=subprocess.check_output(['git','show','HEAD:history/published/'+name])
+                  assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'],name
+              print('Exact archived company shards verified:',len(index['files']))
           print('Exact archived files verified:',len(manifest['files']))
           PY
           git rev-parse HEAD > monitor/public/version.txt

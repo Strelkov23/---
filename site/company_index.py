@@ -1,7 +1,7 @@
 """Compact, independently verifiable exact-INN lookup index for the full FNS releases.
 Generation is deliberately separated from GitHub Pages deployment until its size is measured.
 """
-import argparse,gzip,hashlib,json,sqlite3,re
+import argparse,gzip,hashlib,json,sqlite3,re,shutil
 from pathlib import Path
 import company_import as ci
 BUCKETS=512
@@ -9,6 +9,8 @@ FILE="company-index.json"
 COLUMNS=["inn","income_name","employment_name","income_cents","expense_cents","workers","income_member","income_doc","employment_member","employment_doc"]
 NOTE="Объединение двух полных открытых наборов ФНС по ИНН и году. Не ЕГРЮЛ; регистрация и деятельность не подтверждены. Денежные поля — копейки строкой; null — пропуск."
 MAX_BUCKET_BYTES=8*1024*1024
+# Conservative project-specific cap, not a GitHub Pages service limit.
+MAX_PUBLISH_BYTES=128*1024*1024
 def bucket(inn):
     if not ci.inn_valid(inn):raise ValueError("Некорректный ИНН")
     return int(inn)%BUCKETS
@@ -103,8 +105,34 @@ def lookup(d,root,inn):
     i=bucket(inn);e=d["files"][filename(i)];raw=(root/filename(i)).read_bytes()
     if hashlib.sha256(raw).hexdigest()!=e["sha256"] or len(raw)!=e["bytes"]:raise ValueError("Контрольная сумма")
     return next((dict(zip(COLUMNS,r)) for r in json.loads(gzip.decompress(raw)) if r[0]==inn),None)
+def matches_report(d,report):
+    return bool(report and d["status"]=="ready" and d["year"]==report["year"] and d["paired"]==report["paired"] and d["sources"]==report["sources"])
+def publishable(d,root,report):
+    q=quality(d,root)
+    if not matches_report(d,report):raise ValueError("Индекс и рейтинги относятся к разным выпускам")
+    if q["company_index_bytes"]+(root/FILE).stat().st_size>MAX_PUBLISH_BYTES:raise ValueError("Индекс превышает бюджет публикации 128 МиБ")
+    return q
+def restore(previous,report):
+    try:
+        d=json.loads((previous/FILE).read_text(encoding="utf-8"))
+        publishable(d,previous,report)
+        return d
+    except (OSError,ValueError,TypeError,KeyError,AttributeError):
+        return None
+def install(out,source,d,report):
+    publishable(d,source,report)
+    target=out/"company-index"
+    if target.exists():shutil.rmtree(target)
+    try:
+        shutil.copytree(source/"company-index",target)
+        quality(d,out)
+        (out/FILE).write_bytes(encode(d))
+    except Exception:
+        shutil.rmtree(target,ignore_errors=True)
+        publish(out)
+        raise
 def publish(out):
-    # Main site has a safe explicit empty state until storage/deployment is decided.
+    shutil.rmtree(out/"company-index",ignore_errors=True)
     (out/FILE).write_bytes(encode(empty()))
 def main():
     p=argparse.ArgumentParser();p.add_argument("--db",type=Path,required=True);p.add_argument("--report",type=Path,required=True);p.add_argument("--output",type=Path,required=True)
