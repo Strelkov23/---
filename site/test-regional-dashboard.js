@@ -25,3 +25,15 @@ const paired=D.matrixRows(opts,[...calc,{result:D.summarize(b,2024,opts.map(o=>o
 assert.equal(D.pair(paired,0,1,S.pearson).rows.length,2);
 assert.equal(D.pair(paired,0,1,S.pearson).correlation,null);
 assert.equal(D.pair(paired,0,0,S.pearson).rows.length,0);
+
+const M=require('./macro-diagnostics.js');
+const note='source · Подраздел источника: labor · Издание: 2025 · Версия: 1 · Уровень территории: Регион · ОКТМО: 1 · ОКАТО: 2';
+const hist=[0,1,3,6,10,15,21,121].map((value,i)=>({...r('Москва',value,2010+i),note}));
+const ss=D.regionalSignals({values:hist},opts.slice(0,1),2017,10,3.5,'points',S.sample,M.assessChange)[0];
+assert.equal(ss.status,'signal');assert.equal(ss.delta,100);assert.equal(ss.history.length,6);
+const broken=hist.map(x=>x.year===2016?{...x,note:note.replace('ОКАТО: 2','ОКАТО: 3')}:x);
+assert.equal(D.regionalSignals({values:broken},opts.slice(0,1),2017,10,3.5,'points',S.sample,M.assessChange)[0].delta,null);
+assert.equal(D.scope({note:'missing'}),null);
+const rel=D.regionalSignals({values:hist},opts.slice(0,1),2017,10,3.5,'relative',S.sample,M.assessChange)[0];
+assert.ok(Math.abs(rel.delta-100*(121/21-1))<1e-9);
+assert.equal(rel.history.length,5);

@@ -353,6 +353,15 @@ with sync_playwright() as p:
             page.locator("#geo-dashboard summary").click()
             page.wait_for_function("document.querySelector('#gd-status').textContent.startsWith('Год:')",timeout=45000)
             assert page.locator("#gd-table tbody tr").count()>70
+            page.locator("#gd-signals summary").click()
+            page.wait_for_function("document.querySelectorAll('#gd-sig-table tbody tr').length>70",timeout=30000)
+            page.locator("#gd-sig-query").fill("RU-MOW")
+            assert page.locator("#gd-sig-table tbody tr").count()==1
+            with page.expect_download() as regional_signal:
+                page.locator("#gd-sig-csv").click()
+            assert regional_signal.value.suggested_filename.startswith("regional-change-signals-")
+            page.locator("#gd-sig-query").fill("")
+            page.locator("#gd-signals summary").click()
             page.locator("#gd-query").fill("RU-MOW")
             assert page.locator("#gd-table tbody tr").count()==1
             page.locator("#gd-query").fill("")

@@ -42,6 +42,11 @@ const MacroDiagnostics=(()=>{
   if(!values.length)return null;
   const a=[...values].sort((x,y)=>x-y),mid=Math.floor(a.length/2);return a.length%2?a[mid]:(a[mid-1]+a[mid])/2;
  }
+ function assessChange(delta,history,threshold=3.5,minHistory=5){
+  const med=median(history.map(x=>x.delta)),mad=med===null?null:median(history.map(x=>Math.abs(x.delta-med))),scale=mad===null?null:1.4826*mad,enough=history.length>=minHistory;
+  const score=Number.isFinite(delta)&&enough&&scale>0?(delta-med)/scale:null,validScore=Number.isFinite(score)?score:null;
+  return {median:med,mad,score:validScore,status:!Number.isFinite(delta)?'missing':!enough?'short':scale===0?'constant':validScore===null?'unavailable':Math.abs(validScore)>=threshold?'signal':'ordinary'};
+ }
  function changeSignals(rows,from,to,window=10,threshold=3.5,minHistory=5){
   if(!Number.isInteger(from)||!Number.isInteger(to)||from>to||!Number.isInteger(window)||window<minHistory||!Number.isInteger(minHistory)||minHistory<3||!Number.isFinite(threshold)||threshold<=0)throw Error('Некорректное окно сигнала');
   const by=new Map(),duplicates=new Set();
@@ -52,16 +57,11 @@ const MacroDiagnostics=(()=>{
   for(let y=from;y<=to;y++){
    const current=by.get(y)??null,previous=by.get(y-1)??null,delta=changes.get(y)??null,history=[];
    for(let k=y-window;k<y;k++)if(changes.has(k))history.push({year:k,delta:changes.get(k)});
-   const med=median(history.map(x=>x.delta)),mad=med===null?null:median(history.map(x=>Math.abs(x.delta-med)));
-   const scale=mad===null?null:1.4826*mad;
-   const enough=history.length>=minHistory;
-   const score=delta!==null&&enough&&scale>0?(delta-med)/scale:null,validScore=Number.isFinite(score)?score:null;
-   const status=delta===null?'missing':!enough?'short':scale===0?'constant':validScore===null?'unavailable':Math.abs(validScore)>=threshold?'signal':'ordinary';
-   out.push({year:y,current,previous,delta,history,median:med,mad,score:validScore,status});
+   out.push({year:y,current,previous,delta,history,...assessChange(delta,history,threshold,minHistory)});
   }
   return out;
  }
- return {rules,compute,value,formula,snapshot,capacitySummary,regionalSummary,changeSignals};
+ return {rules,compute,value,formula,snapshot,capacitySummary,regionalSummary,changeSignals,assessChange};
 })();
 if(typeof module!=='undefined')module.exports=MacroDiagnostics;
 

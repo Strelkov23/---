@@ -48,7 +48,32 @@ const RegionalDashboard=(()=>{
   const data=rows.map(r=>({key:r.key,name:r.name,iso:r.iso,a:r.cells[i],b:r.cells[j]})).filter(r=>Number.isFinite(r.a?.row?.value)&&Number.isFinite(r.b?.row?.value)).map(r=>({...r,x:r.a.row.value,y:r.b.row.value}));
   return {rows:data,correlation:pearson(data)};
  }
- return {specs,matches,summarize,common,matrixRows,percentile,pair};
+ function scope(row){
+  const fields=['Подраздел источника','Версия','Уровень территории','ОКТМО','ОКАТО'],note=String(row?.note||'');
+  const values=fields.map(k=>{const marker=' · '+k+': ',i=note.lastIndexOf(marker);return i<0?null:note.slice(i+marker.length).split(' · ')[0].trim()});
+  if(values.some(v=>v===null)||!values[0]||!values[1]||values[2]!=='Регион'||(!values[3]&&!values[4]))return null;
+  return JSON.stringify(values);
+ }
+ function regionalSignals(data,options,year,window,threshold,mode,sample,assess){
+  if(!Number.isInteger(year)||!Number.isInteger(window)||window<5||!Number.isFinite(threshold)||threshold<=0||!['relative','points'].includes(mode))throw Error('Некорректные параметры');
+  const years=new Map();
+  for(let y=year-window-1;y<=year;y++)years.set(y,sample(data.values.filter(r=>r.year===y)).out);
+  return options.map(o=>{
+   const current=years.get(year).get(o.key)||null,previous=years.get(year-1).get(o.key)||null,target=scope(current);
+   const change=y=>{const a=years.get(y).get(o.key),b=years.get(y-1).get(o.key);
+    if(!a||!b||!target||scope(a)!==target||scope(b)!==target)return null;
+    if(mode==='relative'&&(b.value<=0||a.value<0))return null;
+    const delta=mode==='relative'?100*(a.value/b.value-1):a.value-b.value;
+    return Number.isFinite(delta)?{year:y,delta,current:a,previous:b}:null;
+   };
+   const observation=change(year),history=[];
+   for(let y=year-window;y<year;y++){const r=change(y);if(r)history.push(r)}
+   const delta=observation?.delta??null,assessment=assess(delta,history,threshold,5);
+   const reason=!current||!previous?'Нет соседней пары':!target||scope(previous)!==target?'Несопоставимые территориальные метаданные':delta===null?'Недопустимая база изменения':null;
+   return {...o,current,previous,delta,history,...assessment,reason};
+  });
+ }
+ return {specs,matches,summarize,common,matrixRows,percentile,pair,scope,regionalSignals};
 })();
 if(typeof module!=='undefined')module.exports=RegionalDashboard;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -70,7 +95,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    }));
    const active=all.filter(x=>x.data),years=[...new Set(active.flatMap(x=>x.data.values.map(r=>r.year)))].sort((a,b)=>b-a);
    year.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
-   if(years.includes(2024))year.value='2024';
+   const commonYear=years.find(y=>active.length===all.length&&active.every(x=>x.data.values.some(r=>r.year===y&&Number.isFinite(r.value))));if(commonYear)year.value=String(commonYear);
    const options=Object.entries(RegionalMap.regionNames()).map(([iso,key])=>({iso,key,name:RegionalMap.displayName(iso,key)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
    // Include the two explicitly disjoint oblast observations without attributing them to full-oblast map polygons.
    options.push({iso:null,key:'архангельская область без автономного округа',name:'Архангельская область (без АО)'},{iso:null,key:'тюменская область без автономных округов',name:'Тюменская область (без АО)'});
@@ -81,6 +106,38 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const e of [pairA,pairB])e.replaceChildren(...short.map((name,i)=>new Option(name,String(i))));
    pairA.value='1';pairB.value='5';
    for(let i=0;i<picks.length;i++){picks[i].replaceChildren(new Option('Не выбран',''),...options.map(o=>new Option(o.name,optionId(o))));picks[i].value=['RU-MOW','RU-SVE',''][i]}
+   const signalPanel=$('gd-signals'),sigPick=$('gd-sig-indicator'),sigYear=$('gd-sig-year'),sigWindow=$('gd-sig-window'),sigThreshold=$('gd-sig-threshold'),sigOnly=$('gd-sig-only'),sigQuery=$('gd-sig-query'),sigStatus=$('gd-sig-status'),sigTable=$('gd-sig-table'),sigDetail=$('gd-sig-detail'),sigCsv=$('gd-sig-csv');
+   sigPick.replaceChildren(...all.map((x,i)=>new Option(short[i]+(x.data?'':' (нет ряда)'),String(i))));sigPick.value='5';
+   const signalLabels={missing:'Нет сопоставимого изменения',short:'Недостаточно истории',constant:'Нулевой MAD',unavailable:'Оценка отсутствует',signal:'Необычное изменение',ordinary:'В пределах порога'};
+   function syncSignalYears(){
+    const x=all[Number(sigPick.value)],available=[...new Set((x?.data?.values||[]).map(r=>r.year))].sort((a,b)=>b-a),old=Number(sigYear.value);
+    sigYear.replaceChildren(...available.map(y=>new Option(String(y),String(y))));if(available.includes(old))sigYear.value=String(old);drawSignals();
+   }
+   function drawSignals(){
+    if(!signalPanel.open)return;
+    sigTable.replaceChildren();sigDetail.replaceChildren();sigCsv.disabled=true;
+    const i=Number(sigPick.value),x=all[i],y=Number(sigYear.value),w=Number(sigWindow.value),threshold=Number(sigThreshold.value),mode=[5,7].includes(i)?'points':'relative',unit=mode==='points'?'п. п.':'%',q=sigQuery.value.trim().toLocaleLowerCase('ru');
+    if(!x?.data||!y){sigStatus.textContent='Нет проверенного ряда.';return}
+    const rows=RegionalDashboard.regionalSignals(x.data,options,y,w,threshold,mode,RegionalStats.sample,MacroDiagnostics.assessChange);
+    const scored=rows.filter(r=>Number.isFinite(r.score)),flags=scored.filter(r=>r.status==='signal'),shown=rows.filter(r=>(!sigOnly.checked||r.status==='signal')&&(!q||[r.name,r.iso,r.key].some(v=>String(v||'').toLocaleLowerCase('ru').includes(q)))).sort((a,b)=>(Number.isFinite(b.score)?Math.abs(b.score):-1)-(Number.isFinite(a.score)?Math.abs(a.score):-1)||a.name.localeCompare(b.name,'ru'));
+    sigStatus.textContent=x.spec[2]+' · '+y+' · необычных изменений '+flags.length+' из '+scored.length+' оценённых · без оценки '+(rows.length-scored.length)+' · показано '+shown.length+'. '+(mode==='relative'?'Относительное изменение; денежные показатели в текущих ценах, не реальный рост.':'Изменение в процентных пунктах.')+' Порог не является нормативом.';
+    const t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody(),signed=v=>Number.isFinite(v)?(v>0?'+':'')+textNum(v):'—';
+    for(const name of ['Территория','Предыдущий год','Выбранный год','Изменение, '+unit,'Медиана','MAD','История (n)','z','Статус']){const th=node('th',name);th.scope='col';h.append(th)}
+    function detail(r){
+     sigDetail.replaceChildren(node('h4',r.name+' · '+x.spec[2]),node('p','Исходная единица: '+x.spec[3]+'. История изменений, '+unit+'. '+(r.reason||signalLabels[r.status])));
+     const tab=node('table',''),hh=tab.createTHead().insertRow(),bb=tab.createTBody();for(const name of ['Год','Предыдущее значение','Текущее значение','Изменение','Строки источника']){const th=node('th',name);th.scope='col';hh.append(th)}
+     for(const k of [...r.history,{year:y,previous:r.previous,current:r.current,delta:r.delta}]){const tr=bb.insertRow();for(const v of [k.year,textNum(k.previous?.value),textNum(k.current?.value),signed(k.delta),[k.previous?.row,k.current?.row].filter(v=>v!=null).join(' / ')||'—'])tr.insertCell().textContent=v}
+     const wrapper=node('div','');wrapper.className='table-scroll';wrapper.append(tab);sigDetail.append(wrapper);
+     const a=node('a','Открыть источник архива');a.href=x.meta.source;sigDetail.append(a);
+    }
+    for(const r of shown){const tr=body.insertRow(),button=node('button',r.name);button.type='button';button.className='rm-region-link';button.onclick=()=>detail(r);tr.insertCell().append(button);
+     for(const v of [textNum(r.previous?.value),textNum(r.current?.value),signed(r.delta),textNum(r.median),textNum(r.mad),r.history.length,signed(r.score),r.reason||signalLabels[r.status]])tr.insertCell().textContent=v;
+     tr.dataset.signalStatus=r.status;
+    }
+    sigTable.append(t);if(shown.length)detail(shown[0]);sigCsv.disabled=!shown.length;
+    sigCsv.onclick=()=>csv('regional-change-signals-'+x.spec[1]+'-'+y+'.csv',[['Регион','ISO','Код','Год оценки','Единица ряда','Единица изменения','Окно','Порог','Оценка z','Медиана','MAD','Число изменений','Статус','Год пары','Предыдущее значение','Текущее значение','Изменение','Лист предыдущий','Строка предыдущая','Столбец предыдущий','Примечание предыдущее','Лист текущий','Строка текущая','Столбец текущий','Примечание текущее','Источник','SHA-256 JSON','Отпечаток манифеста'],...shown.flatMap(r=>[...r.history,{year:y,previous:r.previous,current:r.current,delta:r.delta}].map(k=>[r.name,r.iso,x.spec[1],y,x.spec[3],unit,w,threshold,r.score,r.median,r.mad,r.history.length,r.reason||signalLabels[r.status],k.year,k.previous?.value,k.current?.value,k.delta,k.previous?.sheet,k.previous?.row,k.previous?.column,k.previous?.note,k.current?.sheet,k.current?.row,k.current?.column,k.current?.note,x.meta.source,manifest.files[x.meta.file]?.sha256,manifest.data_fingerprint]))]);
+   }
+   sigPick.onchange=syncSignalYears;for(const el of [sigYear,sigWindow,sigThreshold,sigOnly])el.onchange=drawSignals;sigQuery.oninput=drawSignals;signalPanel.addEventListener('toggle',()=>{if(signalPanel.open)syncSignalYears()});if(signalPanel.open)syncSignalYears();
    function draw(){
     host.replaceChildren();exp.disabled=true;wide.disabled=true;
     const matrix=mode.value==='all',y=Number(year.value),selected=matrix?options:[...new Set(picks.map(p=>p.value).filter(Boolean))].map(id=>options.find(o=>optionId(o)===id)).filter(Boolean),keys=selected.map(o=>o.key);
