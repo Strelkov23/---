@@ -88,3 +88,17 @@ assert.equal(gc.coverage,80);assert.equal(gc.known,2);assert.equal(gc.missing,1)
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',101)]},'light',2024,S.sample).hhi,null);
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',50,{edition:'old'})]},'light',2024,S.sample).hhi,null);
 assert.equal(M.geographicConcentration({rows:[r(country,'light',100),r(a,'light',30),r(a,'light',30)]},'light',2024,S.sample).ambiguous,1);
+
+// Shift-share reconciles two endpoint observations and retains true zero bases.
+const ss0={...base,editionOK:true,value:100,total:200,national:1000,nationalTotal:5000,nationalShare:20,share:50};
+const ss1={...ss0,year:2024,value:160,total:300,national:1300,nationalTotal:5500,nationalShare:1300/55,share:160/3};
+const ss=M.shiftShare(ss0,ss1);
+for(const [key,expected] of Object.entries({sectionEffect:10,industryEffect:20,regionalEffect:30,actual:60,residual:0}))assert.ok(Math.abs(ss[key]-expected)<1e-10,key);
+assert.equal(M.shiftShare(ss0,{...ss1,editionOK:false}),null);
+assert.equal(M.shiftShare(ss0,{...ss1,okato:'different'}),null);
+assert.equal(M.shiftShare({...ss0,national:0},ss1),null);
+assert.equal(M.shiftShare({...ss0,value:0,share:0},ss1).regionalEffect,160);
+assert.equal(M.shiftShare(ss0,{...ss1,value:null}),null);
+assert.equal(M.shiftShare(ss0,{...ss1,value:0,share:0,national:0,nationalShare:0}).actual,-100);
+assert.equal(M.shiftShare(ss0,{...ss1,value:1400}),null);
+console.log('Shift-share: reconciliation, territorial matching, zero and missing data OK');

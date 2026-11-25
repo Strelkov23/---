@@ -26,7 +26,7 @@ const ManufacturingAtlas=(()=>{
    const editionOK=common&&r.edition===nat.edition&&r.version===nat.version;
    const localization=editionOK&&nationalShare!==null?quotient(regionalShare,nationalShare):null;
    const countryShare=editionOK?share(r.value,nat.value):null;
-   result.set(key,{...r,total:total?.value??null,totalRow:total?.row??null,share:regionalShare,localization,countryShare,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,nationalRow:nat?.row??null,nationalTotalRow:natTotal?.row??null})
+   result.set(key,{...r,editionOK:!!editionOK,total:total?.value??null,totalRow:total?.row??null,share:regionalShare,localization,countryShare,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,nationalRow:nat?.row??null,nationalTotalRow:natTotal?.row??null})
   }
   return {rows:result,national:nat?.value??null,nationalTotal:natTotal?.value??null,nationalShare,excluded:checked.excluded,ambiguous:checked.ambiguous}
  }
@@ -36,12 +36,21 @@ const ManufacturingAtlas=(()=>{
   if(!a||!b||a.year>=b.year||a.group!==b.group||a.region!==b.region||a.level!==b.level||a.okato!==b.okato||a.oktmo!==b.oktmo||a.version!==b.version)return null;
   return {from:a.year,to:b.year,valueDelta:finite(a.value)&&finite(b.value)?b.value-a.value:null,nominalChange:finite(a.value)&&a.value>0&&finite(b.value)?100*(b.value/a.value-1):null,shareDelta:finite(a.share)&&finite(b.share)?b.share-a.share:null,localizationDelta:finite(a.localization)&&finite(b.localization)?b.localization-a.localization:null}
  }
+ // Static two-endpoint shift-share in nominal shipment values, within one OKVED section.
+ function shiftShare(a,b){
+  if(!changeBetween(a,b)||!a.editionOK||!b.editionOK||![a.value,b.value,a.total,b.total,a.national,b.national,a.nationalTotal,b.nationalTotal].every(finite)||a.national<=0||a.nationalTotal<=0||b.nationalTotal<=0||!finite(a.share)||!finite(b.share)||!finite(a.nationalShare)||!finite(b.nationalShare)||a.value>a.national||b.value>b.national)return null;
+  const sectionRate=b.nationalTotal/a.nationalTotal-1,industryRate=b.national/a.national-1;
+  const sectionEffect=a.value*sectionRate,industryEffect=a.value*(industryRate-sectionRate),regionalEffect=b.value-a.value*(1+industryRate),actual=b.value-a.value;
+  const residual=actual-sectionEffect-industryEffect-regionalEffect;
+  if(![sectionRate,industryRate,sectionEffect,industryEffect,regionalEffect,actual,residual].every(Number.isFinite)||Math.abs(residual)>1e-9*Math.max(1,Math.abs(actual),Math.abs(sectionEffect),Math.abs(industryEffect),Math.abs(regionalEffect)))return null;
+  return {sectionRate,industryRate,sectionEffect,industryEffect,regionalEffect,actual,residual};
+ }
  function regionalChanges(data,group,start,end,territories,sample){
   if(!Number.isInteger(start)||!Number.isInteger(end)||start>=end)return [];
   const a=calculate(data,group,start,sample),b=calculate(data,group,end,sample);
   return territories.map(t=>{
    const first=a.rows.get(t.key)||null,last=b.rows.get(t.key)||null,delta=changeBetween(first,last);
-   return {...t,first,last,delta,status:!first||!last?'Нет пары наблюдений':!delta?'Несопоставимые территориальные коды или версии':'Пара проверена'};
+   return {...t,first,last,delta,shiftShare:shiftShare(first,last),status:!first||!last?'Нет пары наблюдений':!delta?'Несопоставимые территориальные коды или версии':'Пара проверена'};
   });
  }
  function orderChanges(rows,metric,direction='desc',query='',knownOnly=false){
@@ -115,7 +124,7 @@ const ManufacturingAtlas=(()=>{
  function profileFilter(rows,section='',mode='all'){
   return rows.filter(r=>(!section||r.section===section)&&(mode==='specialized'? !r.isTotal&&Number.isFinite(r.observation?.localization)&&r.observation.localization>1:mode==='missing'?!Number.isFinite(r.observation?.localization):true));
  }
- return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows,geographicConcentration}
+ return {calculate,identity,share,quotient,localizationBin,sections,sectionOf,changeBetween,regionalProfile,profileFilter,regionalChanges,orderChanges,concentration,concentrationRows,structuralShift,structuralRows,geographicConcentration,shiftShare}
 })();
 if(typeof module!=='undefined')module.exports=ManufacturingAtlas;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -195,6 +204,17 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     for(const v of [number(a?.value),number(b?.value),number(a?.share),number(b?.share),signed(d?.shareDelta),number(a?.localization),number(b?.localization),signed(d?.localizationDelta),signed(d?.nominalChange),signed(d?.valueDelta),r.status])tr.insertCell().textContent=v;
    }
    deltaHost.append(t);
+   const shift=node('details','');shift.id='rm-shift-share';shift.append(node('summary','Разложение изменения отгрузки (shift-share)'));
+   const usable=rows.filter(r=>r.shiftShare);
+   shift.append(node('p','Доступно: '+usable.length+' из '+rows.length+' показанных территорий. Все компоненты — млн руб. в текущих ценах; остаток региона не является оценкой конкурентоспособности или причинного эффекта.'));
+   const st=node('table',''),sh=st.createTHead().insertRow(),sb=st.createTBody();
+   for(const label of ['Территория','Темп раздела РФ, %','Темп группы РФ, %','Компонент раздела РФ','Отраслевой компонент','Региональный остаток','Изменение отгрузки','Невязка']){const th=node('th',label);th.scope='col';sh.append(th)}
+   for(const r of rows){const q=r.shiftShare,tr=sb.insertRow();tr.insertCell().textContent=r.name;for(const v of [q?q.sectionRate*100:null,q?q.industryRate*100:null,q?.sectionEffect,q?.industryEffect,q?.regionalEffect,q?.actual,q?.residual])tr.insertCell().textContent=number(v)}
+   const sw=node('div','');sw.className='table-scroll';sw.append(st);shift.append(sw);
+   const sx=node('button','Скачать разложение и исходные значения CSV');sx.type='button';sx.id='rm-shift-share-export';sx.disabled=!rows.length;
+   sx.onclick=()=>csv('regional-shift-share-'+group.id+'-'+start+'-'+end+'.csv',[
+    ['Регион','ISO','Группа','Раздел','Начало','Конец','Отгрузка региона начало','Отгрузка региона конец','Отгрузка группы РФ начало','Отгрузка группы РФ конец','Отгрузка раздела РФ начало','Отгрузка раздела РФ конец','Темп раздела (доля)','Темп группы (доля)','Компонент раздела','Отраслевой компонент','Региональный остаток','Изменение','Невязка','Статус','Издание начало','Издание конец','Строка региона начало','Строка региона конец','Строка группы РФ начало','Строка группы РФ конец','Строка раздела РФ начало','Строка раздела РФ конец','Источник','SHA-256 JSON','Отпечаток манифеста'],...rows.map(r=>{const a=r.first,b=r.last,q=r.shiftShare,src=bySection[group.section];return [r.name,r.code,group.id,group.section,start,end,a?.value,b?.value,a?.national,b?.national,a?.nationalTotal,b?.nationalTotal,q?.sectionRate,q?.industryRate,q?.sectionEffect,q?.industryEffect,q?.regionalEffect,q?.actual,q?.residual,q?'Расчёт принят':'Нет сопоставимых данных или допустимой базы',a?.edition,b?.edition,a?.row,b?.row,a?.nationalRow,b?.nationalRow,a?.nationalTotalRow,b?.nationalTotalRow,src?.data.source,src?.sha256,manifest.data_fingerprint]})]);
+   shift.append(sx,link('Методика shift-share','methodology.html#regional-shift-share-method'));deltaHost.append(shift);
    const numeric=rows.filter(r=>Number.isFinite(r.delta?.[metric]));
    const descending=[...numeric].sort((a,b)=>b.delta[metric]-a.delta[metric]);
    const extremes=[...new Set([...descending.filter(r=>r.delta[metric]>0).slice(0,6),...descending.filter(r=>r.delta[metric]<0).slice(-6)])];
