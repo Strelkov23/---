@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 FILE="group-passports.json"
-HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru"}
+HOSTS={"ar2025.phosagro.ru","limited.rosneft.ru","www.x5.ru","www.company.rt.ru","storage.ir.mts.ru"}
 def quality(d):
     if d.get("schema")!=1 or d.get("mode")!="documentary_snapshot":raise ValueError("Тип снимка")
     from datetime import date
@@ -18,6 +18,7 @@ def quality(d):
         mids=set()
         for m in g["metrics"]:
             if m["id"] in mids or m["unit"] not in ("млн руб.","млрд руб.","%","тыс. т") or not m["label"]:raise ValueError("Показатель")
+            if m.get("comparable") is not None and (m["comparable"]!="annual_consolidated_revenue_rub" or m["id"]!="revenue" or m["unit"] not in ("млн руб.","млрд руб.")):raise ValueError("Несопоставимый показатель")
             mids.add(m["id"]);years=[]
             for r in m["observations"]:
                 if type(r["year"]) is not int or not 1990<=r["year"]<checked.year or not re.fullmatch(r"-?\d+(?:\.\d+)?",r["value"]):raise ValueError("Наблюдение")

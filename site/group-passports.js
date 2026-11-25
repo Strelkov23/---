@@ -1,6 +1,17 @@
 const GroupPassports=(()=>{
  function change(a,b,unit){if(!Number.isFinite(a)||!Number.isFinite(b))return null;return unit==='%'?b-a:a>0?(b-a)/a*100:null}
- return {change};
+ function revenueComparison(d,year){
+  const rows=d.groups.map(g=>{
+   const m=g.metrics.find(x=>x.id==='revenue'&&x.comparable==='annual_consolidated_revenue_rub'&&['млн руб.','млрд руб.'].includes(x.unit)),r=m?.observations.find(x=>x.year===year);
+   if(!r||g.scope!=='consolidated'||g.standard!=='IFRS')return {id:g.id,name:g.name,source:g.source,value:null,original:null,unit:null};
+   const value=Number(r.value)*(m.unit==='млрд руб.'?1000:1);
+   if(!Number.isFinite(value)||value<0)throw Error('Некорректная выручка');
+   return {id:g.id,name:g.name,source:g.source,value,original:r.value,unit:m.unit};
+  }).sort((a,b)=>a.value===null?b.value===null?a.id.localeCompare(b.id):1:b.value===null?-1:b.value-a.value||a.id.localeCompare(b.id));
+  const eligible=rows.filter(r=>r.value!==null).length;
+  return {eligible,rows:rows.map(r=>({...r,rank:r.value===null?null:1+rows.filter(x=>x.value!==null&&x.value>r.value).length}))};
+ }
+ return {change,revenueComparison};
 })();
 if(typeof module!=='undefined')module.exports=GroupPassports;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -29,5 +40,19 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    exp.disabled=false;exp.onclick=()=>csv('group-'+g.id+'.csv',[['Группа','Отрасль','Периметр','Стандарт','Код','Показатель','Единица','Год','Значение','Источник','Раздел','Проверено','SHA-256 JSON','Отпечаток манифеста'],...g.metrics.flatMap(p=>p.observations.map(r=>[g.name,g.sector,g.scope,g.standard,p.id,p.label,p.unit,r.year,r.value,g.source,g.section,d.checked,entry.sha256,m.data_fingerprint]))]);
   }
   pick.onchange=draw;draw();
+  const year=$('group-compare-year'),comparison=$('group-compare-table'),cs=$('group-compare-status'),ce=$('group-compare-export');
+  if(year&&comparison){
+   const years=[...new Set(d.groups.flatMap(g=>g.metrics.filter(x=>x.comparable==='annual_consolidated_revenue_rub').flatMap(x=>x.observations.map(r=>r.year))))].sort((a,b)=>b-a);
+   year.replaceChildren(...years.map(y=>new Option(String(y),String(y))));
+   function compare(){
+    const y=Number(year.value),r=GroupPassports.revenueComparison(d,y);
+    cs.textContent='Сопоставимая выручка: '+r.eligible+' из '+d.groups.length+' групп каталога. Не рейтинг всех компаний России; география выручки и состав групп различаются.';
+    const t=node('table',''),h=t.createTHead().insertRow(),b=t.createTBody();
+    for(const label of ['Место в выборке','Группа','Выручка, млн руб.','Исходное значение','Источник']){const th=node('th',label);th.scope='col';h.append(th)}
+    for(const x of r.rows){const tr=b.insertRow();for(const v of [x.rank??'—',x.name,x.value===null?'Нет сопоставимого значения':fmt(x.value),x.original===null?'—':x.original+' '+x.unit])tr.insertCell().textContent=v;const a=node('a','Отчёт');a.href=x.source;tr.insertCell().append(a)}
+    comparison.replaceChildren(t);ce.disabled=!r.eligible;ce.onclick=()=>csv('group-revenue-'+y+'.csv',[['Год','Группа','Место в выборке','Охват','Выручка, млн руб.','Исходное значение','Единица','Источник','Отпечаток манифеста'],...r.rows.map(x=>[y,x.name,x.rank,r.eligible,x.value,x.original,x.unit,x.source,m.data_fingerprint])]);
+   }
+   year.onchange=compare;compare();
+  }
  }catch(e){status.textContent='Паспорта недоступны: '+String(e.message||e)}
 });
