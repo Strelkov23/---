@@ -291,3 +291,5 @@ figure{margin:1rem 0;max-width:100%}img,canvas{max-width:100%;height:auto}
 #bank-coverage-table{min-width:0;max-width:100%;overflow-wrap:anywhere}#bank-coverage-table table{min-width:890px}#bank-coverage-status{overflow-wrap:anywhere}
 
 #group-level-chart,#group-level-table,#group-level-year,#group-level-metric,#group-level-sector{min-width:0;max-width:100%;overflow-wrap:anywhere}#group-level-chart .rm-composition-row>*{min-width:0;overflow-wrap:anywhere}#group-level-chart strong{white-space:normal}#group-level-table table{min-width:850px}
+
+#sme-pair-table,#sme-pair-overview,#sme-pair-kind,#sme-pair-class,#sme-pair-metric{min-width:0;max-width:100%;overflow-wrap:anywhere}#sme-pair-table table{min-width:760px}
