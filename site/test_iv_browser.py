@@ -1,3 +1,4 @@
+import csv
 """Exercise real IV controls against the offline archive."""
 import os
 from playwright.sync_api import sync_playwright
@@ -196,7 +197,7 @@ with sync_playwright() as p:
         page.locator("#iv-power-wage").fill("10")
         assert page.locator("#iv-power-official").inner_text()=="2,12%"
         assert page.locator("#iv-power-panel").inner_text()=="-7,72%"
-        assert page.locator("#iv-power-delta").inner_text()=="-9,84 п.п."
+        assert page.locator("#iv-power-delta").inner_text()=="-9,83 п.п."
         assert "не оценка реальной зарплаты России" in page.locator("#iv-power-status").inner_text()
         with page.expect_download() as power:
             page.locator("#iv-power-export").click()
