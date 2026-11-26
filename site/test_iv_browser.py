@@ -72,6 +72,10 @@ with sync_playwright() as p:
         page.locator("#trajectory-run").click()
         page.wait_for_function("document.querySelectorAll('#trajectory-rows tr').length===2",timeout=60000)
         assert "лимит дополнительных человеко-лет: 0" in page.locator("#trajectory-status").inner_text()
+        table_details=page.locator("#trajectory-lab details").filter(has=page.locator("#trajectory-rows"))
+        if table_details.get_attribute("open") is None:
+            table_details.locator("summary").click()
+        assert page.locator("#trajectory-rows").is_visible()
         for row in page.locator("#trajectory-rows tr").all():
             for attr,col in (("data-labor-a",8),("data-labor-b",9)):
                 raw=row.get_attribute(attr)
