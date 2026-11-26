@@ -963,8 +963,19 @@ with sync_playwright() as p:
         page.wait_for_function("!document.querySelector('#district-status').textContent.startsWith('Загрузка')",timeout=45000)
         if page.locator("#district-status").inner_text().startswith("2017 год"):
             assert page.locator("#district-map svg path").count()==2327
+        # An offline build is not an archived deployment. Exercise its explicit
+        # failure state, then supply a test-only publication revision over HTTP.
+        page.route("**/version.txt",lambda route:route.fulfill(status=404,body=""))
         page.goto("http://localhost:8765/news-map.html",wait_until="load")
-        page.wait_for_function("document.querySelector('#news-geo-status').textContent.startsWith('Период до')",timeout=30000)
+        page.wait_for_function("document.querySelector('#news-geo-status').textContent.includes('Версия сайта недоступна')",timeout=30000)
+        assert page.locator("#news-geo-map svg").count()==0
+        assert page.locator("#news-geo-export").is_disabled()
+        page.unroute("**/version.txt")
+        fixture_revision="a"*40
+        page.route("**/version.txt",lambda route:route.fulfill(status=200,content_type="text/plain",body=fixture_revision))
+        page.reload(wait_until="load")
+        page.wait_for_function("!document.querySelector('#news-geo-status').textContent.startsWith('Загрузка')",timeout=30000)
+        assert page.locator("#news-geo-status").inner_text().startswith("Период до"), page.locator("#news-geo-status").inner_text()
         assert page.locator("#news-geo-map svg").count()==1
         assert "Сборка архива:" in page.locator("#news-geo-freshness").inner_text()
         page.locator("#news-geo-update").click()
@@ -995,6 +1006,7 @@ with sync_playwright() as p:
         if page.locator("#news-geo-region option").count()>1:
             page.locator("#news-geo-region").select_option(index=1)
             assert page.locator("#news-geo-list article a[href^='http']").count()>0
+        page.unroute("**/version.txt")
         page.goto("http://localhost:8765/method-passports.html",wait_until="load")
         methods=json.loads(Path("method-passports.json").read_text())
         assert len(methods)>=33
