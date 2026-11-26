@@ -34,6 +34,12 @@ with sync_playwright() as p:
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         page.goto("http://localhost:8765/desk.html#v-workspace",wait_until="load")
+        assert page.locator("#v-section-index a").count()==5
+        page.locator("#v-section-index a[href='#brief']").click()
+        assert page.url.endswith("#brief")
+        assert page.locator("#brief .v-index-back").count()==1
+        page.locator("#brief .v-index-back").click()
+        assert page.url.endswith("#v-section-index")
         assert not page.locator("#v-track-history").is_checked()
         page.locator("#v-track-history").check()
         page.goto("http://localhost:8765/iv-lab.html?view=simple",wait_until="load")
