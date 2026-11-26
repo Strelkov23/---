@@ -124,6 +124,7 @@ jobs:
           for i in $(seq 1 30); do if curl --silent --fail http://localhost:8765/index.html > /dev/null; then break; fi; sleep 1; done
           CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
           CHROME_BIN=$(command -v google-chrome) python3 ../test_visual_system.py
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_iv_browser.py
       - name: Save offline quality report
         if: always()
         uses: actions/upload-artifact@v4

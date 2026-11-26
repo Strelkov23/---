@@ -9,7 +9,7 @@ const IVPulse=(()=>{
  };
  function observation(series,year){const v=series?.values?.[String(year)];return typeof v==='number'&&Number.isFinite(v)?v:null}
  function analyse(series,year,spec){const value=observation(series,year),prior=observation(series,year-1);return {value,prior,delta:value!==null&&prior!==null?value-prior:null,text:value===null?'Наблюдение за выбранный год отсутствует. Пропуск не равен нулю.':spec.level?'Это доля, а не темп роста. Изменение доли измеряется в процентных пунктах.':value>0?spec.positive:value<0?spec.negative:'Зафиксировано нулевое изменение.'}}
- function timeline(data){const years=Object.keys(specs).flatMap(k=>Object.keys(data[k]?.values||{})).filter(y=>/^\d{4}$/.test(y)&&Number(y)>=1991&&Number(y)<=2100).map(Number);return years.length?[Math.min(...years),Math.max(...years)]:null}
+ function timeline(data){const years=Object.keys(specs).flatMap(k=>Object.keys(data[k]?.values||{}).filter(y=>observation(data[k],y)!==null)).filter(y=>/^\d{4}$/.test(y)&&Number(y)>=1991&&Number(y)<=2100).map(Number);return years.length?[Math.min(...years),Math.max(...years)]:null}
  function segments(series,start,end){let result=[],part=[];for(let y=start;y<=end;y++){const v=observation(series,y);if(v===null){if(part.length)result.push(part);part=[]}else part.push([y,v])}if(part.length)result.push(part);return result}
  return {specs,observation,analyse,timeline,segments};
 })();
