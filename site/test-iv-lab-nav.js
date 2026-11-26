@@ -1,0 +1,1 @@
+const A=require('node:assert/strict'),N=require('./iv-lab-nav.js');A.equal(N.resolve('#allocation-lab'),'allocation-lab');A.equal(N.resolve('#iv-lab-nav'),'all');A.equal(N.resolve(''),'all');A.equal(N.resolve('#unknown'),'all');A.equal(new Set(N.ids).size,5);console.log('IV lab navigation checks passed');

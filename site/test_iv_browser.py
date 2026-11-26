@@ -52,6 +52,7 @@ with sync_playwright() as p:
         assert page.locator("#policy-rows tr").count()==5
         page.locator("#policy-horizon").fill("10")
         assert page.locator("#policy-rows tr").count()==10
+        assert "общий горизонт (5 лет)" in page.locator("#policy-compare").inner_text()
         page.wait_for_function("!document.getElementById('allocation-budget').disabled")
         page.locator("#allocation-budget").fill("0")
         assert "0 млрд" in page.locator("#allocation-result strong").first.inner_text()
@@ -71,6 +72,16 @@ with sync_playwright() as p:
         assert "Баланс пересчитан" in page.locator("#iv-tech-status").inner_text()
         assert not page.locator("#iv-tech-csv").is_disabled()
         page.locator("#iv-tech-reset").click()
+        page.locator("[data-lab=policy-lab]").click()
+        assert page.locator("#policy-lab").is_visible()
+        assert not page.locator("#allocation-lab").is_visible()
+        assert page.locator("#policy-horizon").input_value()=="10"
+        page.locator("[data-lab=allocation-lab]").click()
+        assert page.locator("#allocation-lab").is_visible()
+        assert page.locator("#allocation-budget").input_value()=="1000"
+        page.locator("[data-lab=all]").click()
+        assert page.locator("#policy-lab").is_visible()
+        assert page.locator("#iv-technology-lab").is_visible()
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme,page.evaluate("() => [...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>innerWidth+2 && !e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])"))
