@@ -45,6 +45,7 @@ jobs:
           node test-site-search.js
           node test-interface.js
           node test-iv-lab.js
+          node test-iv-policy.js
           node test-iv-pulse.js
           node test-iv-trade.js
           node test-iv-labour.js

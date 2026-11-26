@@ -30,6 +30,12 @@ with sync_playwright() as p:
         assert "Отличие" in page.locator("#iv-compare").inner_text()
         page.locator("#iv-mode").select_option("budget")
         assert "дефицит" in page.locator("#iv-explain").inner_text()
+        page.locator("#policy-save").click()
+        page.locator("#policy-investment").fill("20")
+        assert "Разница" in page.locator("#policy-compare").inner_text()
+        assert page.locator("#policy-rows tr").count()==5
+        page.locator("#policy-horizon").fill("10")
+        assert page.locator("#policy-rows tr").count()==10
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme)
