@@ -19,7 +19,7 @@ const IVOrigin=(()=>{
   for(const c of physical?.schema==='iv-physical-v1'&&Array.isArray(physical.companies)?physical.companies:[]){
    const category=c.origin==='corporate_disclosure_state_owned'?'state':c.origin==='corporate_disclosure_republished'?'republished':'corporate';
    const obs=(c.rows||[]).flatMap(r=>(c.metrics||[]).filter(m=>finite(r[m.id])).map(m=>({year:r.year,metric:m.id})));
-   add(c.id,c.title,category,obs.map(r=>String(r.year)),obs.length,c.source,c.verification==='source_rechecked'?'Сверка документа '+c.verification_date+' · '+c.verification_method:'Ручной перенос; '+(category==='republished'?'первичный документ не сверён':'полная повторная сверка не завершена'),'iv-physical',c.scope||'');
+   add(c.id,c.title,category,obs.map(r=>String(r.year)),obs.length,c.source,c.verification==='source_rechecked'||c.verification==='partial'?'Сверка '+c.verification_date+' · '+c.verification_method:'Ручной перенос; '+(category==='republished'?'первичный документ не сверён':'полная повторная сверка не завершена'),'iv-physical',c.scope||'');
   }
   a=list(ember,'iv-ember-v1');
   const obs=a.flatMap(r=>Object.values(r.values||{}).filter(finite));

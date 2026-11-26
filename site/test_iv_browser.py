@@ -1,3 +1,4 @@
+import csv
 """Exercise real IV controls against the offline archive."""
 import os
 from playwright.sync_api import sync_playwright
@@ -151,6 +152,17 @@ with sync_playwright() as p:
         assert "84,57" in page.locator("#physical-value").inner_text()
         assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
         assert page.locator("#physical-index-export").is_disabled()
+        page.locator("#physical-index-verified").click()
+        assert page.locator("#physical-index-weight-4").input_value()=="0"
+        assert page.locator("#physical-index-export").is_enabled()
+        page.locator("#physical-index-sensitivity-rows").locator("xpath=ancestor::details").locator("summary").click()
+        assert page.locator("#physical-index-sensitivity-rows tr").count()==4
+        page.locator("#physical-index-reset").click()
+        page.locator("#physical-index-year").select_option("2024")
+        assert page.locator("#physical-index-export").is_enabled()
+        assert page.locator("#physical-index-sensitivity-rows tr").count()==5
+        page.locator("#physical-index-year").select_option("2025")
+        assert page.locator("#physical-index-export").is_disabled()
         page.locator("#physical-index-draft").check()
         page.locator("#physical-index-base").select_option("2023")
         page.locator("#physical-index-year").select_option("2023")
@@ -168,6 +180,11 @@ with sync_playwright() as p:
         assert page.locator("#iv-method-result").inner_text()=="1%"
         page.locator("#iv-method-weight").fill("100")
         assert page.locator("#iv-method-result").inner_text()=="10%"
+        page.locator("#iv-method-mode").select_option("reweight")
+        assert page.locator("#iv-method-result").inner_text()=="3 п.п."
+        assert "Структура 1: 1%; структура 2: 4%" in page.locator("#iv-method-detail").inner_text()
+        page.locator("#iv-method-weightNew").fill("40")
+        assert page.locator("#iv-method-result").inner_text()=="0 п.п."
         page.locator("#iv-method-mode").select_option("poverty")
         assert page.locator("#iv-method-result").inner_text()=="30%"
         page.goto("http://localhost:8765/iv-comparison.html")
@@ -176,6 +193,21 @@ with sync_playwright() as p:
         page.locator("#iv-audit-basis").select_option("yoy")
         page.locator("#iv-audit-threshold").fill("20")
         assert "Отмечено 0" in page.locator("#iv-audit-gap-status").inner_text()
+        page.locator("#iv-power-period").select_option("2024-03")
+        page.locator("#iv-power-wage").fill("10")
+        assert page.locator("#iv-power-official").inner_text()=="2,12%"
+        assert page.locator("#iv-power-panel").inner_text()=="-7,72%"
+        assert page.locator("#iv-power-delta").inner_text()=="-9,83 п.п."
+        assert "не оценка реальной зарплаты России" in page.locator("#iv-power-status").inner_text()
+        with page.expect_download() as power:
+            page.locator("#iv-power-export").click()
+        with open(power.value.path(),encoding="utf-8-sig",newline="") as f:
+            power_rows=list(csv.reader(f,delimiter=";"))
+        assert len(power_rows)==2 and len(power_rows[0])==len(power_rows[1])
+        assert power_rows[1][:3]==["2024-03","yoy","10"]
+        page.locator("#iv-audit-basis").select_option("mom")
+        assert page.locator("#iv-power-period").input_value()=="2024-03"
+        assert page.locator("#iv-power-official").inner_text()=="9,57%"
         page.goto("http://localhost:8765/economic-map.html")
         page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
         page.locator("#geo-scale").select_option("history")

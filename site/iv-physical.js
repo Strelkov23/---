@@ -1,5 +1,6 @@
 /* Corporate physical output: never add unlike products or infer national coverage. */
 const IVPhysical=(()=>{
+ function verification(c,y){const r=c.rows.find(r=>r.year===y);if(!r)return 'Нет наблюдения';return c.verification==='source_rechecked'||r.verification==='source_rechecked'?'Сверено с корпоративным документом '+c.verification_date:r.verification==='secondary_rechecked'?'Совпадает в двух вторичных таблицах; первичный документ недоступен':'Предварительный ручной перенос; требует сверки'}
  function compare(company,metric,year,base){
   if(!company.metrics.some(m=>m.id===metric)||!Number.isInteger(year)||!Number.isInteger(base))throw Error('Некорректный выбор');
   const get=y=>{const v=company.rows.find(r=>r.year===y)?.[metric];return Number.isFinite(v)&&v>=0?v:null};
@@ -11,7 +12,7 @@ const IVPhysical=(()=>{
   if(new Set(d.companies.map(c=>c.id)).size!==d.companies.length)throw Error('Дубликат компании');
   for(const c of d.companies){if(!c.source.startsWith('https://')||!c.metrics.length||!c.rows.length||new Set(c.rows.map(r=>r.year)).size!==c.rows.length||new Set(c.metrics.map(m=>m.id)).size!==c.metrics.length||c.rows.some(r=>!Number.isInteger(r.year)||(r.source!==undefined&&(typeof r.source!=='string'||!r.source.startsWith('https://')))||c.metrics.some(m=>r[m.id]!==null&&(!Number.isFinite(r[m.id])||r[m.id]<0))))throw Error('Некорректные наблюдения')}
   return d;
- }return {compare,validate};
+ }return {compare,validate,verification};
 })();
 if(typeof module!=='undefined')module.exports=IVPhysical;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -23,12 +24,12 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  function setup(){const c=selected(),ys=c.rows.map(r=>r.year).sort((a,b)=>a-b);metric.replaceChildren(...c.metrics.map(m=>new Option(m.title,m.id)));base.replaceChildren(...ys.map(y=>new Option(String(y),String(y))));year.min=0;year.max=ys.length-1;year.value=ys.length-1;year.disabled=ys.length<2;draw()}
  function draw(){const c=selected(),ys=c.rows.map(r=>r.year).sort((a,b)=>a-b),y=ys[Number(year.value)],m=c.metrics.find(m=>m.id===metric.value),a=IVPhysical.compare(c,m.id,y,Number(base.value));
  $('physical-year-label').textContent=y;$('physical-value').textContent=f(a.value)+(a.value===null?'':' '+m.unit);$('physical-index').textContent=f(a.index);$('physical-yoy').textContent=f(a.yoy)+(a.yoy===null?'':'%');
- $('physical-explain').textContent=c.scope+'. '+(a.yoy===null?'Нет сопоставимого предыдущего года.':'Выпуск '+(a.yoy>0?'увеличился':a.yoy<0?'сократился':'не изменился')+' относительно предыдущего года.')+' Статус: '+(c.verification==='source_rechecked'?'Сверено с документом '+c.verification_date+'. '+c.verification_method:'Предварительный ручной ряд; повторная сверка не завершена.')+' Не общероссийское производство.';
+ $('physical-explain').textContent=c.scope+'. '+(a.yoy===null?'Нет сопоставимого предыдущего года.':'Выпуск '+(a.yoy>0?'увеличился':a.yoy<0?'сократился':'не изменился')+' относительно предыдущего года.')+' Статус: '+IVPhysical.verification(c,y)+'. Базовый год: '+IVPhysical.verification(c,Number(base.value))+' Не общероссийское производство.';
  chart.replaceChildren();const vals=ys.map(yr=>[yr,IVPhysical.compare(c,m.id,yr,Number(base.value)).index]);const max=Math.max(100,...vals.filter(x=>x[1]!==null).map(x=>x[1]));
  for(const [yr,v] of vals){const line=node('div','');line.className='hh-bar-row';const meter=document.createElement('meter');meter.min=0;meter.max=max;meter.value=v??0;meter.hidden=v===null;meter.setAttribute('aria-label',yr+': '+f(v));line.append(node('span',String(yr)),meter,node('span',f(v)));chart.append(line)}
  const observation=c.rows.find(r=>r.year===y);$('physical-source').href=observation?.source||c.source;$('physical-source').textContent=observation?.reference||('Годовой отчёт, стр. '+c.page);
- $('physical-export').onclick=()=>csv('corporate-physical-output.csv',[['Компания','Год','Продукт','Значение','Единица','Базовый год','Индекс','Источник','Страница','Статус проверки'],...ys.flatMap(yr=>c.metrics.map(m=>{const a=IVPhysical.compare(c,m.id,yr,Number(base.value));const observation=c.rows.find(r=>r.year===yr);return[c.title,yr,m.title,a.value,m.unit,base.value,a.index,observation?.source||c.source,observation?.reference||c.page,c.verification==='source_rechecked'?'Сверено с документом '+c.verification_date:'Предварительный ручной перенос; требует сверки']}))]);
+ $('physical-export').onclick=()=>csv('corporate-physical-output.csv',[['Компания','Год','Продукт','Значение','Единица','Базовый год','Индекс','Источник','Страница','Статус проверки','Статус базового года','Источник базового года'],...ys.flatMap(yr=>c.metrics.map(m=>{const a=IVPhysical.compare(c,m.id,yr,Number(base.value));const observation=c.rows.find(r=>r.year===yr);return[c.title,yr,m.title,a.value,m.unit,base.value,a.index,observation?.source||c.source,observation?.reference||c.page,IVPhysical.verification(c,yr),IVPhysical.verification(c,Number(base.value)),c.rows.find(r=>r.year===Number(base.value))?.source||c.source]}))]);
  }
- company.disabled=metric.disabled=base.disabled=$('physical-export').disabled=false;company.onchange=setup;metric.onchange=base.onchange=year.oninput=draw;status.textContent='Предварительная корпоративная выборка: '+d.companies.length+' групп, '+d.companies.reduce((s,c)=>s+c.rows.length*c.metrics.length,0)+' годовых наблюдений. Три группы сверены с документами; две предварительные. Автоматического обновления нет.';setup()
+ company.disabled=metric.disabled=base.disabled=$('physical-export').disabled=false;company.onchange=setup;metric.onchange=base.onchange=year.oninput=draw;status.textContent='Предварительная корпоративная выборка: '+d.companies.length+' групп, '+d.companies.reduce((s,c)=>s+c.rows.length*c.metrics.length,0)+' годовых наблюдений. '+d.verification.note+' Автоматического обновления нет.';setup()
  }catch(e){status.textContent='Набор недоступен: '+e.message}
 });

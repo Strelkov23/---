@@ -50,7 +50,14 @@
           2725,
           667
         ]
-      ]
+      ],
+      "year_sources": {
+        "2021": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2022": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2023": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2024": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2025": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf"
+      }
     },
     "novatek": {
       "sources": [
@@ -84,11 +91,16 @@
           84.57,
           14.11
         ]
-      ]
+      ],
+      "year_sources": {
+        "2022": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "2023": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "2024": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511",
+        "2025": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511"
+      }
     },
     "rosenergoatom": {
       "method": "PDF screenshot and HTML",
-      "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
       "reference": "2024, printed p.10 (PDF index 6); 2025 official reporting page",
       "rows": [
         [
@@ -111,7 +123,98 @@
           2025,
           218.349
         ]
-      ]
+      ],
+      "keys": [
+        "nuclear_generation"
+      ],
+      "sources": [
+        "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "https://report.rosatom.ru/1684.html"
+      ],
+      "year_sources": {
+        "2021": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2022": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2023": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2024": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2025": "https://report.rosatom.ru/1684.html"
+      }
+    },
+    "rzd": {
+      "sources": [
+        "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "https://rspp.ru/upload/uf/e20/j1m9r4nmszlidbi2l4ylbzzwt7tscn1g/%D0%9E%D1%82%D1%87%D0%B5%D1%82%20%D0%BE%D0%B1%20%D1%83%D1%81%D1%82%D0%BE%D0%B9%D1%87%D0%B8%D0%B2%D0%BE%D0%BC%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B8%20%D0%9E%D0%90%D0%9E%20%D0%A0%D0%96%D0%94%20%D0%B7%D0%B0%202025%20%D0%B3%D0%BE%D0%B4.pdf"
+      ],
+      "reference": "Годовой отчёт 2024, таблица «Основные показатели грузовых перевозок по инфраструктуре ОАО РЖД»; отчёт об устойчивом развитии 2025, стр. 12–13 и бизнес-модель",
+      "method": "extracted_table; screenshot unavailable due to size",
+      "keys": [
+        "loading",
+        "turnover"
+      ],
+      "rows": [
+        [
+          2020,
+          1243.6,
+          3221
+        ],
+        [
+          2021,
+          1282.8,
+          3320.3
+        ],
+        [
+          2022,
+          1234.3,
+          3300.9
+        ],
+        [
+          2023,
+          1232.2,
+          3274.8
+        ],
+        [
+          2024,
+          1181.4,
+          3113.2
+        ],
+        [
+          2025,
+          1115.8,
+          3075.3
+        ]
+      ],
+      "year_sources": {
+        "2020": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2021": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2022": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2023": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2024": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2025": "https://rspp.ru/upload/uf/e20/j1m9r4nmszlidbi2l4ylbzzwt7tscn1g/%D0%9E%D1%82%D1%87%D0%B5%D1%82%20%D0%BE%D0%B1%20%D1%83%D1%81%D1%82%D0%BE%D0%B9%D1%87%D0%B8%D0%B2%D0%BE%D0%BC%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B8%20%D0%9E%D0%90%D0%9E%20%D0%A0%D0%96%D0%94%20%D0%B7%D0%B0%202025%20%D0%B3%D0%BE%D0%B4.pdf"
+      }
+    },
+    "severstal": {
+      "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+      "reference": "Корпоративный пресс-релиз от 03.02.2025, стр. 1, изображение",
+      "method": "PDF screenshot",
+      "keys": [
+        "steel",
+        "pigiron"
+      ],
+      "rows": [
+        [
+          2023,
+          11273,
+          11301
+        ],
+        [
+          2024,
+          10384,
+          10032
+        ]
+      ],
+      "year_sources": {
+        "2023": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+        "2024": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf"
+      }
     }
   },
   "trade": {
@@ -261,17 +364,47 @@
   },
   "unresolved": [
     {
+      "id": "nornickel",
+      "note": "Извлечённый текст таблиц совпадает, screenshot PDF не получен."
+    },
+    {
       "id": "rzd",
       "year": 2025,
       "metric": "turnover",
       "archived": 3075.3,
       "other_publication": 3075.1,
-      "source": "https://www.rzd-partner.ru/zhd-transport/news/pogruzka-na-rzhd-v-2025-godu-snizalas-na-5-6-do-1-12-mlrd-tonn/",
-      "note": "Вторичная публикация приводит 3075,1; указанный в исходном наборе документ РСПП не открылся из-за размера. Возможная редакционная разница, значение не изменено."
+      "source": "https://publications.hse.ru/pubs/share/direct/1141865334.pdf",
+      "note": "3075,3 подтверждено итоговым корпоративным отчётом; другая публикация приводит 3075,1. Редакции не смешиваются; причина различия не установлена. Изображение PDF недоступно."
     },
     {
-      "id": "nornickel",
-      "note": "Извлечённый текст таблиц совпадает, screenshot PDF не получен."
+      "id": "severstal",
+      "year": 2025,
+      "note": "Два точных числа совпадают у BigCapital и Fin-Vista; первичная таблица недоступна. Не считать первичной сверкой.",
+      "source": "https://severstal.com/upload/iblock/611/dg0os1stfqh1ji82yun28xjuu9c6wfwb/Press_release_po_finansovym_rezultatam_za_12_mes_2025_goda.pdf"
     }
-  ]
+  ],
+  "secondary_corporate": {
+    "severstal": {
+      "sources": [
+        "https://bigcapital.org/ru/moex/chmf/2025/",
+        "https://fin-vista.ru/stocks/CHMF/study"
+      ],
+      "original_unavailable": "https://severstal.com/upload/iblock/611/dg0os1stfqh1ji82yun28xjuu9c6wfwb/Press_release_po_finansovym_rezultatam_za_12_mes_2025_goda.pdf",
+      "reference": "Две вторичные таблицы, точные тыс. т; исходный пресс-релиз 502, архив раскрытия недоступен",
+      "keys": [
+        "steel",
+        "pigiron"
+      ],
+      "rows": [
+        [
+          2025,
+          10825,
+          11206
+        ]
+      ],
+      "year_sources": {
+        "2025": "https://bigcapital.org/ru/moex/chmf/2025/"
+      }
+    }
+  }
 }

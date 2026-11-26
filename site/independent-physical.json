@@ -181,11 +181,13 @@
           "year": 2025,
           "loading": 1115.8,
           "turnover": 3075.3,
-          "source": "https://rspp.ru/download/509d241530f496716c4a4b02b45a2348da51aaeccda89a5a/",
-          "reference": "Отчёт об устойчивом развитии 2025, ключевые показатели"
+          "source": "https://rspp.ru/upload/uf/e20/j1m9r4nmszlidbi2l4ylbzzwt7tscn1g/%D0%9E%D1%82%D1%87%D0%B5%D1%82%20%D0%BE%D0%B1%20%D1%83%D1%81%D1%82%D0%BE%D0%B9%D1%87%D0%B8%D0%B2%D0%BE%D0%BC%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B8%20%D0%9E%D0%90%D0%9E%20%D0%A0%D0%96%D0%94%20%D0%B7%D0%B0%202025%20%D0%B3%D0%BE%D0%B4.pdf",
+          "reference": "Отчёт об устойчивом развитии 2025, стр. 12–13"
         }
       ],
-      "verification": "pending"
+      "verification": "source_rechecked",
+      "verification_date": "2026-11-26",
+      "verification_method": "Сверка извлечённых таблиц годового отчёта 2024 и отчёта об устойчивом развитии 2025; изображения PDF недоступны из-за размера файлов."
     },
     {
       "id": "novatek",
@@ -244,9 +246,9 @@
       "id": "severstal",
       "title": "Северсталь",
       "origin": "corporate_disclosure_republished",
-      "scope": "Годовые производственные показатели компании; републикации корпоративных таблиц Финамом и BigCapital, первичные документы ещё не сверены. Не вся чёрная металлургия.",
-      "source": "https://bigcapital.org/ru/moex/chmf/2025/",
-      "page": "Производственные показатели",
+      "scope": "Консолидированные годовые производственные показатели компании. За 2023–2024 визуально сверены с корпоративным PDF; за 2025 точные числа сопоставлены с двумя вторичными публикациями. Не вся чёрная металлургия.",
+      "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+      "page": "Стр. 1 корпоративного пресс-релиза 2024",
       "metrics": [
         {
           "id": "steel",
@@ -264,30 +266,35 @@
           "year": 2023,
           "steel": 11273,
           "pigiron": 11301,
-          "source": "https://www.finam.ru/publications/item/severstal-strategiya-budushchego-rosta-20250207-1300/",
-          "reference": "Финам, таблица операционных результатов 2024"
+          "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+          "reference": "Корпоративный пресс-релиз 03.02.2025, стр. 1",
+          "verification": "source_rechecked"
         },
         {
           "year": 2024,
           "steel": 10384,
           "pigiron": 10032,
-          "source": "https://www.finam.ru/publications/item/severstal-strategiya-budushchego-rosta-20250207-1300/",
-          "reference": "Финам, таблица операционных результатов 2024"
+          "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+          "reference": "Корпоративный пресс-релиз 03.02.2025, стр. 1",
+          "verification": "source_rechecked"
         },
         {
           "year": 2025,
           "steel": 10825,
           "pigiron": 11206,
           "source": "https://bigcapital.org/ru/moex/chmf/2025/",
-          "reference": "BigCapital, производственные показатели 2025"
+          "reference": "BigCapital, производственная таблица; дополнительная сверка Fin-Vista",
+          "verification": "secondary_rechecked"
         }
       ],
-      "verification": "pending"
+      "verification": "partial",
+      "verification_date": "2026-11-26",
+      "verification_method": "2023–2024: визуальная сверка корпоративного PDF, стр. 1; 2025: точные числа в двух вторичных таблицах, оригинал недоступен."
     }
   ],
   "verification": {
     "status": "partial",
     "date": "2026-11-26",
-    "note": "33 значения трёх групп сверены с опубликованными документами; 18 значений РЖД и Северстали остаются предварительными. Сверка переноса не подтверждает репрезентативность или независимость корпоративной отчётности."
+    "note": "49 из 51 значения сверены с корпоративными документами; два значения Северстали за 2025 подтверждены вторичными таблицами, оригинал недоступен. Сверка переноса не аудит измерения."
   }
 }

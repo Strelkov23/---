@@ -123,7 +123,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const commonExport=$('bank-common-export');
    if(commonExport){
     commonExport.disabled=c.commonRows===null||!c.commonRows.length;
-    commonExport.onclick=()=>{if(c.commonRows?.length)csv('bank-common-coverage.csv',[['Регистрационный номер','808 HTML','806 HTML','807 HTML','Число подтверждённых форм','Период 808','Период 806','Период 807','Отпечаток манифеста'],...c.commonRows.map(r=>[r.registration_number,Number(r.capital),Number(r.balance),Number(r.profit),r.count,...c.forms.map(f=>f.period),manifest.data_fingerprint])])};
+    commonExport.onclick=()=>{if(c.commonRows?.length)csv('bank-common-coverage.csv',[['Регистрационный номер','808 HTML','806 HTML','807 HTML','Число подтверждённых форм','Период 808','Период 806','Период 807','Отпечаток манифеста'],...c.commonRows.map(r=>[r.registration_number,Number(r.capital),Number(r.balance),Number(r.profit),r.count,...c.forms.map(f=>f.period),manifest.data_fingerprint])],manifest.data_fingerprint)};
    }
    coverageExport.disabled=!c.forms.some(r=>r.target!==null);
    coverageExport.onclick=()=>csv('bank-report-coverage.csv',[['Форма','Период','Целевая выборка','Проверено HTML','Документальная сверка','Не подтверждено','Ожидают проверки','Вне выборки','Общая целевая выборка','Все три формы проверены','Отпечаток манифеста'],...c.forms.map(r=>[r.form,r.period,r.target,r.verified,r.documentary,r.failed,r.pending,r.outside,c.commonTarget,c.allVerified,manifest.data_fingerprint])]);
