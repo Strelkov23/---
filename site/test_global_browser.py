@@ -835,8 +835,26 @@ with sync_playwright() as p:
         assert page.locator("#view-mode").input_value()=="professional"
         assert page.locator(".section-more").evaluate("(e)=>e.open")
         assert page.locator(".page-guide a[href='methodology.html#global-plan-method']").count()==1
-        page.locator("#view-mode").select_option("simple")
+        page.locator("#view-mode").select_option("analytical")
+        assert page.locator("html").get_attribute("data-view")=="analytical"
         assert not page.locator(".section-more").evaluate("(e)=>e.open")
+        page.goto("http://localhost:8765/index.html",wait_until="load")
+        assert page.locator("#view-mode").input_value()=="analytical"
+        assert page.locator("#iv-workspace-grid .section-more[open]").count()==5
+        page.locator("#iv-workspace-query").fill("воспроизводимость")
+        assert page.locator("#iv-workspace-grid article:visible").count()==1
+        page.locator("#view-mode").select_option("simple")
+        assert page.locator("#iv-workspace-grid article:visible .section-more[open]").count()==1
+        page.locator("#iv-workspace-query").fill("")
+        assert page.locator("#iv-workspace-grid .section-more[open]").count()==0
+        page.goto("http://localhost:8765/iv-lab.html",wait_until="load")
+        assert page.locator(".v-task-guide details").evaluate("e=>e.open")
+        page.locator("#view-mode").select_option("professional")
+        assert not page.locator(".v-task-guide details").evaluate("e=>e.open")
+        page.locator(".v-task-guide summary").click()
+        assert page.locator(".v-task-guide details").evaluate("e=>e.open")
+        assert page.locator(".v-task-guide dt").count()==4
+        page.locator("#view-mode").select_option("simple")
         page.goto("http://localhost:8765/search.html?q=инвестиции",wait_until="load")
         page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
         assert page.locator("#site-search-results section").count()==4
