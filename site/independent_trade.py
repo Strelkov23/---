@@ -87,10 +87,15 @@ def publish(db,out,stamp,refresh,fetch=download):
             if not {r["period"] for r in rows}<={r["period"] for r in new}:raise ValueError("Source lost previously published periods")
             if any(r["period"]>stamp[:7] for r in new):raise ValueError("Future observation")
             changes=revisions(rows,new);added=len(new)-len(rows)
-            with db:
+            db.execute('SAVEPOINT iv_trade_update')
+            try:
                 db.executemany("insert into iv_trade_revisions(observed,period,metric,before,after,old_sha,new_sha) values(?,?,?,?,?,?,?)",[(stamp,r["period"],r["metric"],r["before"],r["after"],sha,response.sha256) for r in changes])
                 db.execute("insert or replace into iv_trade_cache values(1,?,?,?)",(json.dumps(new,allow_nan=False),stamp,response.sha256))
                 db.execute("insert or replace into iv_trade_attempt values(1,?,?,?,?)",(stamp,None,added,len(changes)))
+            except Exception:
+                db.execute('ROLLBACK TO iv_trade_update');db.execute('RELEASE iv_trade_update');raise
+            else:
+                db.execute('RELEASE iv_trade_update')
             rows=new;fetched=stamp;sha=response.sha256;status="downloaded"
         except Exception as e:
             error=type(e).__name__+": "+str(e)[:240];status="cached_after_error" if cache else "seed_after_error"
@@ -99,6 +104,6 @@ def publish(db,out,stamp,refresh,fetch=download):
     attempt=db.execute("select stamp,error,added,revised from iv_trade_attempt where id=1").fetchone()
     history=[dict(zip(("observed","period","metric","before","after","old_sha","new_sha"),r)) for r in db.execute("select observed,period,metric,before,after,old_sha,new_sha from iv_trade_revisions order by seq desc limit 1000")]
     total=db.execute("select count(*) from iv_trade_revisions").fetchone()[0]
-    payload={"schema":"iv-trade-v1","publisher":"U.S. Census Bureau","source":URL,"scope":"Торговля товарами США с Россией; направление по классификации США","unit":"млн долл. США, текущие цены, без сезонной корректировки","origin":"partner_customs","status":status,"last_success":fetched,"source_sha256":sha,"error":error,"seed_verified":"2026-11-26","last_attempt":dict(zip(("stamp","error","added","revised"),attempt)) if attempt else None,"revision_count":total,"revisions":history,"rows":rows,"limitations":"Не вся внешняя торговля России; услуги не включены. Страна происхождения/назначения, правила оценки, посредники и сроки регистрации могут отличаться от российских данных. Изменение стоимости не равно изменению физического объёма."}
+    payload={"schema":"iv-trade-v1","publisher":"U.S. Census Bureau","source":URL,"scope":"Торговля товарами США с Россией; направление по классификации США","unit":"млн долл. США, текущие цены, без сезонной корректировки","origin":"partner_customs","status":status,"last_success":fetched,"source_sha256":sha,"error":error,"seed_verification":"pending","last_attempt":dict(zip(("stamp","error","added","revised"),attempt)) if attempt else None,"revision_count":total,"revisions":history,"rows":rows,"limitations":"Не вся внешняя торговля России; услуги не включены. Страна происхождения/назначения, правила оценки, посредники и сроки регистрации могут отличаться от российских данных. Изменение стоимости не равно изменению физического объёма."}
     (out/"independent-trade.json").write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
     return payload
