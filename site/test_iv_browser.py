@@ -41,6 +41,13 @@ with sync_playwright() as p:
         assert "округлённого" in page.locator("#iv-price-explain").inner_text()
         page.locator("#iv-price-basis").select_option("yoy")
         assert page.locator("#iv-price-custom").inner_text()=="8,55%"
+        page.wait_for_function("!document.getElementById('evidence-a').disabled")
+        assert "Только содержательное" in page.locator("#evidence-verdict").inner_text()
+        page.locator("#evidence-b").select_option("romir-mom")
+        assert page.locator("#evidence-verdict").inner_text()=="Один показатель"
+        page.locator("#evidence-b").select_option("hh-index")
+        assert page.locator("#evidence-verdict").inner_text()=="Разные темы"
+        page.wait_for_function("document.querySelectorAll('#evidence-coverage article strong').length===3")
         assert not errors,errors
         page.close()
     browser.close()
