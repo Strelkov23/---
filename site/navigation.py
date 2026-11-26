@@ -156,12 +156,36 @@ def publish(page):
         body='<section class="mast"><p class="kicker">Экономический обзор · раздел</p><h1>'+escape(label)+'</h1><p>'+escape(desc)+'</p></section><section class="hub-filter"><label for="hub-query">Найти инструмент в разделе</label><input id="hub-query" type="search" placeholder="Название, показатель или задача" autocomplete="off"><p id="hub-status" role="status">Инструментов: '+str(len(items))+'</p></section><section class="portal-grid hub-grid" id="hub-tools">'+''.join('<article><h2>'+a(href,title)+'</h2><p>'+escape(note)+'</p></article>' for href,title,note in items)+'</section>'
         page(key+".html",body)
 
+# V.4: curated questions and synonyms on existing catalogue destinations.
+TASK_QUERIES={
+ "indicators.html":("как менялась экономика россии","динамика ввп инфляции","экономика за последние годы"),
+ "industrial.html":("как изменилось производство","что происходит с промышленностью","выпуск продукции заводов"),
+ "economic-map.html":("как развивается мой регион","посмотреть экономику на карте","карта субъектов россии"),
+ "economic-map.html#geo-dashboard":("как сравнить регионы","сравнить два региона по врп","сравнить области по инвестициям"),
+ "company-atlas.html":("найти предприятие по инн","найти завод или компанию","отчетность предприятия"),
+ "banks.html":("найти банк","сравнить банки по капиталу","проверить лицензию банка"),
+ "sector-passports.html":("как изучить отрасль","состояние отрасли","экономика отрасли"),
+ "iv-comparison.html":("почему статистика различается","как проверить данные росстата","сравнить инфляцию росстат ромир"),
+ "independent-statistics.html":("независимая статистика","альтернативные данные экономики","зеркальная торговая статистика"),
+ "iv-lab.html":("что будет если увеличить выпуск","как изменится занятость при росте производительности","смоделировать экономический сценарий"),
+ "labor.html":("сколько людей работает","производительность работников","занятость и труд"),
+ "plan-feasibility.html":("как проверить выполнимость плана","хватит ли ресурсов для выпуска","проверить достижимость целей"),
+ "scenario.html":("как изменение спроса повлияет на выпуск","межотраслевой баланс леонтьева","расчет производственных связей"),
+ "data-registry.html":("где найти исходные данные","скачать статистику","найти статистический ряд"),
+ "method-passports.html":("как рассчитывается показатель","методология росстата","как считают статистику"),
+ "papers.html":("найти научную статью","где найти научную литературу","поиск публикаций"),
+ "report-builder.html":("как подготовить доклад","собрать экономический отчет","подготовить аналитическую справку"),
+}
+
 def search_entries():
     entries={}
     for key,label,desc,items in GROUPS:
         entries[key+".html"]={"href":key+".html","title":label,"description":desc,"section":label}
         for href,title,note in items:
             if href not in entries:entries[href]={"href":href,"title":title,"description":note,"section":label}
+    for href,questions in TASK_QUERIES.items():
+        if href not in entries:raise ValueError("Неизвестный маршрут поиска: "+href)
+        entries[href]["questions"]=list(questions)
     return list(entries.values())
 
 GUIDES={
