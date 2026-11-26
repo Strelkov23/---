@@ -52,6 +52,12 @@ with sync_playwright() as p:
         assert page.locator("#policy-rows tr").count()==5
         page.locator("#policy-horizon").fill("10")
         assert page.locator("#policy-rows tr").count()==10
+        page.wait_for_function("!document.getElementById('allocation-budget').disabled")
+        page.locator("#allocation-budget").fill("0")
+        assert "0 млрд" in page.locator("#allocation-result strong").first.inner_text()
+        assert page.locator("#allocation-rows tr").count()==19
+        page.locator("#allocation-budget").fill("1000")
+        assert "opt-budget=1000" in page.locator("#allocation-deep").get_attribute("href")
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme)
