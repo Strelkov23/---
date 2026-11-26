@@ -21,6 +21,10 @@ with sync_playwright() as p:
         page.locator("#pulse-play").click()
         page.locator("#pulse-play").click()
         assert page.locator("#pulse-play").get_attribute("aria-pressed")=="false"
+        page.wait_for_function("document.querySelectorAll('#iv-evidence-cards article').length===3")
+        page.locator("#iv-evidence-month").fill("2024-05")
+        page.locator("#iv-evidence-exact").check()
+        assert "Точно за выбранный месяц:" in page.locator("#iv-evidence-status").inner_text()
         page.goto("http://localhost:8765/iv-lab.html")
         page.locator("#iv-output").fill("10")
         page.locator("#iv-productivity").fill("10")
