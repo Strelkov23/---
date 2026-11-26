@@ -427,6 +427,9 @@ main:has(#allocation-lab) section,main:has(#allocation-lab) .iv-workbench>div,ma
 
 /* Keep dynamically populated long option labels inside narrow viewports. */
 .pulse-controls label{flex:1 1 180px;min-width:0;max-width:100%;grid-template-columns:minmax(0,1fr)}
-.pulse-controls select,main:has(#iv-audit-pair) select{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.pulse-controls select,main:has(#iv-audit-pair) select{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+/* pulse-indicator is a direct child of the separate detail label, not pulse-controls. */
+.pulse-panel>label[for="pulse-indicator"]{min-width:0;max-width:100%;width:100%;grid-template-columns:minmax(0,1fr)}
+#pulse-indicator,#iv-audit-pair{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 main:has(#iv-audit-pair) section,main:has(#iv-audit-pair) label,main:has(#iv-audit-pair) .iv-workbench>div{min-width:0;max-width:100%;overflow-wrap:anywhere}
 main:has(#iv-audit-pair) label:not(.iv-slider){grid-template-columns:minmax(0,1fr)}
