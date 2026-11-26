@@ -75,6 +75,12 @@ with sync_playwright() as p:
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme,page.evaluate("() => [...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>innerWidth+2 && !e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])"))
         page.goto("http://localhost:8765/independent-statistics.html")
+        page.wait_for_function("!document.getElementById('iv-origin-category').disabled")
+        assert page.locator("#iv-origin-rows tr").count()==10
+        page.locator("#iv-origin-category").select_option("official")
+        assert page.locator("#iv-origin-rows tr").count()==1
+        assert "27" in page.locator("#iv-origin-rows").inner_text()
+        page.locator("#iv-origin-category").select_option("")
         page.wait_for_function("!document.getElementById('iv-price-period').disabled")
         page.locator("#iv-price-period").select_option("2024-05")
         page.locator("#iv-price-share").fill("100")
