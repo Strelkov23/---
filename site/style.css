@@ -480,3 +480,15 @@ html[data-view=professional] .v-task-guide summary{font-size:.88rem}
 .v-workspace-grid label{min-width:0;grid-template-columns:minmax(0,1fr);margin:.6rem 0}
 .v-workspace-grid .v-history-toggle{display:flex;align-items:center;gap:.5rem}
 @media(max-width:700px){.v-workspace-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* V.6: a short operational route, without hiding calculations or inputs. */
+.v-lab-guide{background:#fff;border:1px solid #b8d0d0;border-left:3px solid #398b89;border-radius:.4rem;padding:.8rem;margin:.8rem 0 1.15rem;min-width:0;overflow-wrap:anywhere}
+.v-lab-base{margin:.1rem 0 .6rem;font-size:.9rem}
+.v-lab-guide ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin:0;padding-left:1.4rem}
+.v-lab-guide li{min-width:0;padding:.25rem .4rem}
+.v-lab-guide li strong,.v-lab-guide li span{display:block}
+.v-lab-guide li span{font-size:.88rem;line-height:1.45;margin:.25rem 0 .5rem}
+.v-lab-guide button{font-size:.83rem;white-space:normal;overflow-wrap:anywhere;max-width:100%}
+html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
+@media(max-width:700px){.v-lab-guide ol{grid-template-columns:minmax(0,1fr);gap:.4rem}.v-lab-guide li{padding:.25rem 0}}
+@media print{.v-lab-guide button{display:none}}
