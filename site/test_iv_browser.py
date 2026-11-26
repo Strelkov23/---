@@ -41,6 +41,15 @@ with sync_playwright() as p:
         assert "округлённого" in page.locator("#iv-price-explain").inner_text()
         page.locator("#iv-price-basis").select_option("yoy")
         assert page.locator("#iv-price-custom").inner_text()=="8,55%"
+        page.goto("http://localhost:8765/economic-map.html")
+        page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
+        page.locator("#geo-scale").select_option("history")
+        page.locator("#geo-time").fill("0")
+        assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
+        legend=page.locator("#geo-map .technical-map-intervals").inner_text()
+        page.locator("#geo-time-next").click()
+        assert page.locator("#geo-map .technical-map-intervals").inner_text()==legend
+        assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
         assert not errors,errors
         page.close()
     browser.close()

@@ -139,3 +139,5 @@ assert.deepEqual(P.capitalRows('light',cap,2024).products.map(r=>r.code),['cotto
 assert.deepEqual(P.capitalRows('pharma',cap,2024),{assets:[],products:[]});
 assert.deepEqual(P.capitalRows('energy',cap,2024).assets.map(r=>r.code),['D']);
 assert.deepEqual(P.capitalRows('chemical',cap,2023).products.map(r=>r.year),[2023]);
+
+{const M=require('./regional-map.js');const ys=M.availableYears([{year:2022,value:0},{year:2020,value:1},{year:2021,value:null},{year:2022,value:2},{year:2023,value:NaN}]);require('node:assert/strict').deepEqual(ys,[2020,2022]);require('node:assert/strict').equal(M.temporalPosition(ys,2020),0);require('node:assert/strict').equal(M.temporalPosition(ys,2021),1);}

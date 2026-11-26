@@ -22,6 +22,8 @@ const RegionalMap=(()=>{
   const q=p=>{const i=(sorted.length-1)*p,j=Math.floor(i);return sorted[j]+(sorted[Math.min(j+1,sorted.length-1)]-sorted[j])*(i-j)};
   return [...new Set([0,.2,.4,.6,.8,1].map(q))];
  }
+ function availableYears(rows){return [...new Set(rows.filter(r=>Number.isInteger(r.year)&&Number.isFinite(r.value)).map(r=>r.year))].sort((a,b)=>a-b)}
+ function temporalPosition(years,year){const i=years.indexOf(Number(year));return i<0?Math.max(0,years.length-1):i}
  function bin(v,thresholds){if(!Number.isFinite(v)||!thresholds.length)return -1;if(thresholds.length===1)return 0;const i=thresholds.slice(1).findIndex(t=>v<=t);return i<0?thresholds.length-2:i}
  const industryThemes=[
  ['light','Лёгкая промышленность','ЛП',/производств[ао]\s+(?:текстильн[а-я]*|одежд[а-я]*|кожи|кожаных изделий)|текстильное и швейное производство/iu],
@@ -147,7 +149,7 @@ const RegionalMap=(()=>{
    return {...spec,inputs:[a,b],year:ok?x.year:null,region:ok?x.region:null,value:ok?(spec.op==='ratio'?spec.factor*x.value/y.value:x.value-y.value):null};
   })
  }
- return {key,project,rings,classes,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,availableYears,temporalPosition,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -159,6 +161,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  let catalog=[],geo=null,meta=null,series=null,seq=0,first=true;
  const palettePick=$('geo-palette');
  const themePick=$('geo-theme'),growthPick=$('geo-scale'),markerPick=$('geo-markers'),regionPick=$('geo-region');
+ const time=$('geo-time'),timeLabel=$('geo-time-label'),timePlay=$('geo-time-play'),timeBack=$('geo-time-back'),timeNext=$('geo-time-next'),timeSpeed=$('geo-time-speed');
+ let timeYears=[],timeTimer=null,historyThresholds=null;
+ function stopTime(){if(timeTimer!==null)clearInterval(timeTimer);timeTimer=null;if(timePlay){timePlay.textContent='Воспроизвести годы';timePlay.setAttribute('aria-pressed','false')}}
+ function syncTime(){if(!time)return;const i=RegionalMap.temporalPosition(timeYears,year.value),has=timeYears.length>0;time.min=0;time.max=Math.max(0,timeYears.length-1);time.value=i;time.disabled=timeYears.length<2;timeLabel.textContent=has?String(timeYears[i]):'—';timePlay.disabled=timeYears.length<2;timeBack.disabled=!has||i===0;timeNext.disabled=!has||i>=timeYears.length-1}
+ function moveTime(i){if(i<0||i>=timeYears.length)return;year.value=String(timeYears[i]);draw()}
+ function resetTime(){stopTime();timeYears=[];historyThresholds=null;syncTime()}
+ if(time){
+  time.oninput=()=>{stopTime();moveTime(Number(time.value))};timeBack.onclick=()=>{stopTime();moveTime(Number(time.value)-1)};timeNext.onclick=()=>{stopTime();moveTime(Number(time.value)+1)};
+  timeSpeed.onchange=stopTime;
+  timePlay.onclick=()=>{if(timeTimer!==null){stopTime();return}if(timeYears.length<2)return;if(growthPick&&growthPick.value==='quantile')growthPick.value='history';moveTime(Number(time.value)>=timeYears.length-1?0:Number(time.value));timePlay.textContent='Остановить';timePlay.setAttribute('aria-pressed','true');timeTimer=setInterval(()=>{if(Number(time.value)>=timeYears.length-1){stopTime();return}moveTime(Number(time.value)+1)},Number(timeSpeed.value))};
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopTime()});window.addEventListener('pagehide',stopTime);
+ }
  let chosenRegion=saved.get('geo-region')||'';
  const compareIds=['geo-compare-a','geo-compare-b','geo-compare-c'].filter(id=>$(id));
  const profileEnabled=Boolean($('geo-region')),profileCache=new Map();
@@ -444,7 +458,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  function clearCompare(message){const panel=$('geo-compare-result');if(panel)panel.replaceChildren(node('p',message));const b=$('geo-compare-export');if(b)b.disabled=true;for(const id of compareIds)$(id).disabled=true}
  function draw(){
   if(!geo||!series)return;
-  host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
+  syncTime();host.replaceChildren();details.replaceChildren();csvButton.disabled=true;
   const Y=Number(year.value),sample=RegionalStats.sample(series.values.filter(r=>r.year===Y)),counts=new Map();
   const regionName=p=>RegionalMap.displayName(p?.iso_3166_2,p?.name);
   const regionKey=p=>typeof p?.name==='string'&&p.name.trim()?RegionalMap.key(p.iso_3166_2):null;
@@ -473,7 +487,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    }
    for(const id of compareIds)$(id).onchange=renderCompare;renderCompare()
   }
-  const thresholds=RegionalMap.classes(matched.map(x=>x.r.value));
+  const fixedHistory=growthPick?.value==='history';
+  if(fixedHistory&&!historyThresholds){const all=[];for(const y of timeYears){const sampleY=RegionalStats.sample(series.values.filter(r=>r.year===y));for(const [k,r] of sampleY.out)if(counts.get(k)===1&&Number.isFinite(r.value))all.push(r.value)}historyThresholds=RegionalMap.classes(all)}
+  const thresholds=fixedHistory?historyThresholds:RegionalMap.classes(matched.map(x=>x.r.value));
   const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code,series.title,series.unit)),theme=RegionalMap.theme(series.code,series.source,series.title),palette=RegionalMap.palette(theme,palettePick?.value||'auto',growth);if(palettePick)palettePick.disabled=growth;
   if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code,series.title,series.unit);if(!RegionalMap.isGrowth(series.code,series.title,series.unit))growthPick.value='quantile'}
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
@@ -526,14 +542,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   const bins=thresholds.length===1?[[thresholds[0],thresholds[0]]]:thresholds.slice(1).map((v,i)=>[thresholds[i],v]);
   const labels=growth?['< 95%','95–<100%','100%','>100–105%','>105%']:bins.map(([lo,hi])=>fmtValue(lo)+' – '+fmtValue(hi));
   labels.forEach((label,i)=>{const xx=30+i*220;shape('rect',{x:xx,y:590,width:24,height:16,fill:palette[i]});chartFitLabel(txt(xx+30,603,label,12),185)});
-  shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,growth?'Серый: нет данных; 100% = уровень предыдущего года.':'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
+  shape('rect',{x:30,y:613,width:24,height:15,fill:'#deded9'});txt(60,625,growth?'Серый: нет данных; 100% = уровень предыдущего года.':fixedHistory?'Нет данных / не сопоставлено; единая шкала по всем годам ряда.':'Нет данных / не сопоставлено; квантильные интервалы по окрашенным территориям.',12);
   txt(30,648,'Границы: Natural Earth (public domain), PiSpace Maps · источник статистики: '+series.code,12);
   txt(30,665,'Версия: '+(version||'не определена')+' · SHA-256 геометрии: '+String(meta.sha256||'—').slice(0,16)+'…',11);
   const legend=node('div','');legend.className='technical-map-legend';legend.setAttribute('role','group');legend.setAttribute('aria-label','Полная цветовая шкала карты');
-  const legendTitle=node('strong',growth?'Фиксированные интервалы индекса':'Интервалы распределения');legend.append(legendTitle);
+  const legendTitle=node('strong',growth?'Фиксированные интервалы индекса':fixedHistory?'Единая историческая шкала':'Интервалы распределения');legend.append(legendTitle);
   const intervals=node('div','');intervals.className='technical-map-intervals';
   for(const [i,label] of [...labels,'Нет данных / не сопоставлено'].entries()){const item=node('span','');const swatch=node('i','');swatch.style.backgroundColor=i===labels.length?'#deded9':palette[i];swatch.setAttribute('aria-hidden','true');item.append(swatch,node('span',label));intervals.append(item)}
-  legend.append(intervals,node('p',growth?'100% — уровень предыдущего года.':'Интервалы определяются распределением значений выбранного года; не являются фиксированными нормативами.'));
+  legend.append(intervals,node('p',growth?'100% — уровень предыдущего года.':fixedHistory?'Интервалы рассчитаны по совокупности однозначно сопоставленных наблюдений всех доступных лет; фиксированы для этого ряда, без поправки на инфляцию.':'Интервалы определяются распределением значений выбранного года; не являются фиксированными нормативами.'));
   host.append(legend);
   const wrap=node('div','');wrap.className='regional-figure-scroll geo-figure';wrap.append(svg);host.append(wrap);
   const toolbar=node('div','');toolbar.className='actions';const msg=node('span','');
@@ -556,10 +572,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   csvButton.disabled=!matched.length;csvButton.onclick=()=>csv('regional-map-'+series.code+'-'+Y+'.csv',[['Год','Код геометрии','Название региона','Название в географическом файле','Территория статистики','Код показателя','Значение','Единица','Источник','Лист','Строка','Столбец','SHA-256 границ','Источник границ'],...features.map(f=>[Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.f.properties.name,f.r?.region,series.code,f.r?.value??'',series.unit,series.source,f.r?.sheet,f.r?.row,f.r?.column,meta.sha256,meta.source])]);save(activeFields)
  }
  async function choose(){
-  const token=++seq,old=first?saved.get('geo-year'):year.value;series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;clearCompare('Загрузка выбранного ряда…');
+  const token=++seq,old=first?saved.get('geo-year'):year.value;resetTime();series=null;host.replaceChildren();details.replaceChildren();csvButton.disabled=true;clearCompare('Загрузка выбранного ряда…');
   const m=catalog.find(s=>s.code===pick.value);if(!m)return;
   status.textContent='Загрузка ряда…';
-  try{const data=await mapLoad(m.file);if(token!==seq)return;series={...data,code:m.code};const ys=[...new Set(data.values.map(r=>r.year))].sort((a,b)=>b-a);year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.';clearCompare('Ряд недоступен для сравнения.')}}
+  try{const data=await mapLoad(m.file);if(token!==seq)return;series={...data,code:m.code};timeYears=RegionalMap.availableYears(data.values);const ys=[...timeYears].reverse();year.replaceChildren();for(const y of ys)year.add(new Option(String(y),String(y)));if(ys.includes(Number(old)))year.value=old;first=false;draw()}catch(e){if(token===seq){console.error(e);status.textContent='Ряд недоступен для этой версии.';clearCompare('Ряд недоступен для сравнения.')}}
  }
  try{
   meta=await mapLoad('regional-boundaries.json');
@@ -584,10 +600,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    pick.replaceChildren(...subset.map(s=>new Option(s.title+' · '+s.unit+' · '+s.first+'–'+s.last,s.code)));
    if(subset.some(s=>s.code===preferred))pick.value=preferred;
    else {const def=subset.find(s=>s.code.startsWith('GRP_PC_'));if(def)pick.value=def.code}
-   if(!subset.length){++seq;series=null;clearCompare('В этом слое нет данных для сравнения.');status.textContent='В этом слое нет загруженных рядов. Выберите другой слой или откройте региональную справку.';host.replaceChildren();source.replaceChildren();details.replaceChildren();year.replaceChildren();csvButton.disabled=true;$('geo-coverage-current')?.replaceChildren();if(regionPick){const code=chosenRegion;const eligible=geo.features.filter(f=>RegionalMap.key(f.properties?.iso_3166_2));const unique=eligible.filter(f=>eligible.filter(z=>z.properties.iso_3166_2===f.properties.iso_3166_2).length===1);regionPick.replaceChildren(new Option('Выберите регион',''),...unique.sort((a,b)=>RegionalMap.displayName(a.properties.iso_3166_2,a.properties.name).localeCompare(RegionalMap.displayName(b.properties.iso_3166_2,b.properties.name),'ru')).map(f=>new Option(RegionalMap.displayName(f.properties.iso_3166_2,f.properties.name),f.properties.iso_3166_2)));regionPick.onchange=()=>{chosenRegion=regionPick.value;details.replaceChildren();const f=unique.find(x=>x.properties.iso_3166_2===chosenRegion);if(f){details.append(node('h3',RegionalMap.displayName(chosenRegion,f.properties.name)));addBrief({f,key:RegionalMap.key(chosenRegion)});}save(activeFields)};regionPick.value=code;regionPick.onchange()}save(activeFields);return false}
+   if(!subset.length){++seq;resetTime();series=null;clearCompare('В этом слое нет данных для сравнения.');status.textContent='В этом слое нет загруженных рядов. Выберите другой слой или откройте региональную справку.';host.replaceChildren();source.replaceChildren();details.replaceChildren();year.replaceChildren();csvButton.disabled=true;$('geo-coverage-current')?.replaceChildren();if(regionPick){const code=chosenRegion;const eligible=geo.features.filter(f=>RegionalMap.key(f.properties?.iso_3166_2));const unique=eligible.filter(f=>eligible.filter(z=>z.properties.iso_3166_2===f.properties.iso_3166_2).length===1);regionPick.replaceChildren(new Option('Выберите регион',''),...unique.sort((a,b)=>RegionalMap.displayName(a.properties.iso_3166_2,a.properties.name).localeCompare(RegionalMap.displayName(b.properties.iso_3166_2,b.properties.name),'ru')).map(f=>new Option(RegionalMap.displayName(f.properties.iso_3166_2,f.properties.name),f.properties.iso_3166_2)));regionPick.onchange=()=>{chosenRegion=regionPick.value;details.replaceChildren();const f=unique.find(x=>x.properties.iso_3166_2===chosenRegion);if(f){details.append(node('h3',RegionalMap.displayName(chosenRegion,f.properties.name)));addBrief({f,key:RegionalMap.key(chosenRegion)});}save(activeFields)};regionPick.value=code;regionPick.onchange()}save(activeFields);return false}
    return true
   }
   if(themePick){const requested=catalog.find(s=>s.code===saved.get('geo-series'));if(requested&&!saved.has('geo-theme'))themePick.value=RegionalMap.theme(requested.code,requested.source,requested.title);restore(['geo-theme','geo-scale','geo-markers','geo-palette']);themePick.onchange=()=>{if(populate(pick.value))choose()}}
-  const ready=populate(saved.get('geo-series'));if(ready&&saved.has('geo-series')&&[...pick.options].some(o=>o.value===saved.get('geo-series')))pick.value=saved.get('geo-series');pick.onchange=choose;year.onchange=draw;if(growthPick)growthPick.onchange=draw;if(markerPick)markerPick.onchange=draw;if(palettePick)palettePick.onchange=draw;form.onsubmit=e=>e.preventDefault();if(ready)choose()
+  const ready=populate(saved.get('geo-series'));if(ready&&saved.has('geo-series')&&[...pick.options].some(o=>o.value===saved.get('geo-series')))pick.value=saved.get('geo-series');pick.onchange=choose;year.onchange=()=>{stopTime();draw()};if(growthPick)growthPick.onchange=()=>{stopTime();draw()};if(markerPick)markerPick.onchange=draw;if(palettePick)palettePick.onchange=draw;form.onsubmit=e=>e.preventDefault();if(ready)choose()
  }catch(e){console.error(e);status.textContent='Географические данные недоступны для этой версии. Откройте текущую сборку или используйте таблицы.'}
 });
