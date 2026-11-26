@@ -1,0 +1,19 @@
+name: Ember source probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage-iv-workspace]
+    paths: [site/independent_ember.py, .github/workflows/ember-probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch and validate actual public CSV
+        run: python3 site/independent_ember.py
