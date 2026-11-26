@@ -45,6 +45,7 @@ jobs:
           node test-site-search.js
           node test-interface.js
           node test-iv-lab.js
+          node test-iv-pulse.js
           node test-facility-map.js
           node test-bank-directory.js
           node test-company-lookup.js
