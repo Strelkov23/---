@@ -107,6 +107,7 @@ jobs:
           node test-news-map.js
           node test-site-search.js
           node test-interface.js
+          node test-workspace.js
           node test-iv-lab.js
           node test-iv-policy.js
           node test-iv-lab-nav.js
@@ -297,6 +298,7 @@ jobs:
             monitor/public/links.json
             /tmp/*-dom.html
             /tmp/layout-audit/
+            monitor/v-browser-readiness.json
           if-no-files-found: ignore
           retention-days: 14
       - name: Save updated history

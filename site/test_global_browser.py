@@ -15,6 +15,21 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/index.html",wait_until="load")
         assert page.locator(".route-grid article").count()==3
         assert page.locator(".route-steps a").count()==12
+        assert page.locator(".v-first-visit summary").count()==1
+        page.locator(".v-first-visit summary").click()
+        assert page.locator(".v-first-visit li:visible").count()==3
+        page.locator(".v-first-visit summary").click()
+        # Dynamic table enhancement is incremental and must remain idempotent.
+        page.evaluate("""()=>{const root=document.createElement('section');root.id='layout-regression-fixture';root.innerHTML='<table id="layout-regression-table"><tbody><tr><td>Test</td></tr></tbody></table>';document.querySelector('main').append(root)}""")
+        page.wait_for_function("document.querySelector('#layout-regression-table').parentElement.classList.contains('table-scroll')")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("""()=>{const table=document.querySelector('#layout-regression-table');table.style.minWidth='1200px';table.tBodies[0].insertRow().insertCell().textContent='wide';}""")
+        if width==390:
+            page.wait_for_function("document.querySelector('#layout-regression-fixture .table-scroll').dataset.wide==='true'")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("""()=>{const root=document.querySelector('#layout-regression-fixture');root.remove();document.querySelector('main').append(root)}""")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("document.querySelector('#layout-regression-fixture').remove()")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         for route,target in (("company-atlas.html","company-lookup"),("banks.html","bank-capital"),("economic-map.html","regional-map"),("regional-manufacturing.html","rm-ranking"),("project-coverage.html","project-search")):
             page.goto("http://localhost:8765/"+route,wait_until="load")
@@ -33,6 +48,27 @@ with sync_playwright() as p:
         page.locator("#hub-query").fill("")
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/desk.html#v-workspace",wait_until="load")
+        assert page.locator("#v-section-index a").count()==5
+        page.locator("#v-section-index a[href='#brief']").click()
+        assert page.url.endswith("#brief")
+        assert page.locator("#brief .v-index-back").count()==1
+        page.locator("#brief .v-index-back").click()
+        assert page.url.endswith("#v-section-index")
+        assert not page.locator("#v-track-history").is_checked()
+        page.locator("#v-track-history").check()
+        page.goto("http://localhost:8765/iv-lab.html?view=simple",wait_until="load")
+        page.locator("#v-bookmark-toggle").click()
+        assert page.locator("#v-bookmark-toggle").get_attribute("aria-pressed")=="true"
+        page.goto("http://localhost:8765/desk.html#v-workspace",wait_until="load")
+        assert page.locator("#v-bookmarks a[href='iv-lab.html']").count()==1
+        assert page.locator("#v-history a[href='iv-lab.html']").count()==1
+        assert page.locator("#v-track-history").is_checked()
+        page.locator("#v-track-history").uncheck()
+        page.locator("#v-clear-history").click()
+        assert page.locator("#v-history a").count()==0
+        page.locator("#v-bookmarks button").click()
+        assert page.locator("#v-bookmarks a").count()==0
         page.goto("http://localhost:8765/research-projects.html",wait_until="load")
         page.locator("#rp-title").fill("Тестовый проект")
         page.locator("#rp-note").fill("Проверка библиографии")
@@ -862,6 +898,23 @@ with sync_playwright() as p:
         page.locator("#site-search-scope").select_option("tools")
         page.wait_for_function("document.querySelectorAll('#site-search-results section').length===1")
         assert page.locator("#site-search-results article a").count()>0
+        # Real search index, not just synthetic unit fixtures: six representative tasks.
+        from urllib.parse import urlparse
+        tasks=[["Как изменилось производство?","industrial.html"],["Как сравнить регионы?","economic-map.html#geo-dashboard"],["Найти предприятие по ИНН","company-atlas.html"],["Как проверить данные Росстата?","iv-comparison.html"],["Что будет если увеличить выпуск?","iv-lab.html"],["Найти научную статью","papers.html"]]
+        for query,expected in tasks:
+            page.locator("#site-search-q").fill(query)
+            page.locator("#site-search-form button[type=submit]").click()
+            page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
+            top=page.locator("#site-search-results article").first
+            href=urlparse(top.locator("a").get_attribute("href"))
+            actual=href.path.rsplit("/",1)[-1]+("#"+href.fragment if href.fragment else "")
+            assert actual==expected,(query,actual,expected)
+            assert top.locator(".v-search-match").count()==1
+        page.locator("#site-search-q").fill("неизвестныйвопросxyz")
+        page.locator("#site-search-form button[type=submit]").click()
+        page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей: 0')",timeout=30000)
+        assert page.locator("#site-search-results article").count()==0
+        assert "Нет подходящих инструментов" in page.locator("#site-search-results").inner_text()
         page.goto("http://localhost:8765/economic-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#geo-status').textContent.startsWith('Загрузка')")
         if page.locator("#geo-series option").count():
@@ -936,6 +989,15 @@ with sync_playwright() as p:
             page.locator("#geo-palette").select_option("contrast")
             assert page.locator("#geo-map svg").count()==1
             page.locator("#geo-region").select_option("RU-MOW")
+            from urllib.parse import urlparse,parse_qs
+            y=page.locator("#geo-year").input_value()
+            transfer=page.locator("#geo-detail a").filter(has_text="Отраслевая структура отгрузки региона")
+            q=parse_qs(urlparse(transfer.get_attribute("href")).query)
+            assert q["rm-region"]==["RU-MOW"] and q["rm-year"]==[y] and q["v-context-year"]==[y]
+            history=page.locator("#geo-detail a").filter(has_text="Открыть динамику территории")
+            if history.count():
+                q=parse_qs(urlparse(history.get_attribute("href")).query)
+                assert q["hist-rank-year"]==[y] and q["hist-to"]==[y] and q["v-context-region"]==["RU-MOW"]
             page.wait_for_function("document.querySelector('.geo-brief [role=status]').textContent.startsWith('Доступно')",timeout=30000)
             assert page.locator(".geo-brief-item").count()==10
             assert page.locator(".geo-brief-item .geo-trend").count()>0

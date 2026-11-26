@@ -35,8 +35,9 @@ if(typeof module!=='undefined')module.exports=MapViewport;
 (function(){
  if(typeof document==='undefined')return;
  const known='.atlas-table,.table-scroll,#month-list,#stat-list,#pair-table';
- const watched=new WeakSet();
- const resize=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>{for(const e of entries){const wrap=e.target;if(!wrap.isConnected){resize.unobserve(wrap);continue}updateWide(wrap)}}):null;
+ const watched=new Set();
+ const including=(root,selector)=>[...(root.matches?.(selector)?[root]:[]),...root.querySelectorAll(selector)];
+ const resize=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>{for(const e of entries){const wrap=e.target;if(!wrap.isConnected){resize.unobserve(wrap);watched.delete(wrap);continue}updateWide(wrap)}}):null;
  function updateWide(wrap){
   const hint=wrap.previousElementSibling;
   if(!hint||!hint.classList.contains('table-scroll-hint'))return;
@@ -45,24 +46,27 @@ if(typeof module!=='undefined')module.exports=MapViewport;
  function tableHint(wrap){
   if(!watched.has(wrap)){
    watched.add(wrap);
-   const hint=document.createElement('p');hint.className='table-scroll-hint';hint.setAttribute('aria-hidden','true');hint.textContent='↔ Прокрутите таблицу горизонтально, чтобы увидеть все столбцы.';
-   wrap.before(hint);if(resize)resize.observe(wrap);
+   if(!wrap.previousElementSibling?.classList.contains('table-scroll-hint')){const hint=document.createElement('p');hint.className='table-scroll-hint';hint.setAttribute('aria-hidden','true');hint.textContent='↔ Прокрутите таблицу горизонтально, чтобы увидеть все столбцы.';wrap.before(hint)}
+   if(resize)resize.observe(wrap);
   }
   updateWide(wrap);
  }
 
  function enhance(root){
-  for(const table of root.querySelectorAll('table')){
-   if(table.closest(known))continue;
+  const touched=new Set();
+  for(const table of including(root,'table')){
+   const existing=table.closest(known);if(existing){touched.add(existing);continue}
    const parent=table.parentElement;if(!parent)continue;
    const wrap=document.createElement('div');wrap.className='table-scroll';
-   parent.insertBefore(wrap,table);wrap.append(table);
+   parent.insertBefore(wrap,table);wrap.append(table);touched.add(wrap);
   }
-  for(const svg of root.querySelectorAll('.regional-figure-scroll svg')){
+  for(const svg of including(root,'.regional-figure-scroll svg')){
    if(svg.closest('.geo-figure')){MapViewport.mount(svg.parentElement,svg);continue}
    const width=svg.viewBox.baseVal.width;if(width>0&&svg.style.minWidth!==width+'px')svg.style.minWidth=width+'px';
   }
-  for(const wrap of root.querySelectorAll(known)){
+  for(const wrap of including(root,known))touched.add(wrap);
+  const containing=root.closest?.(known);if(containing)touched.add(containing);
+  for(const wrap of touched){
    if(!wrap.querySelector('table'))continue;
    if(!wrap.hasAttribute('tabindex'))wrap.tabIndex=0;
    if(!wrap.hasAttribute('role'))wrap.setAttribute('role','region');
@@ -74,11 +78,31 @@ if(typeof module!=='undefined')module.exports=MapViewport;
   const main=document.querySelector('main');if(!main)return;
   const tools=main.querySelector('.atlas-tools');
   if(tools){for(const section of main.querySelectorAll(':scope > section:not(.mast)')){if(!section.id)continue;const link=document.createElement('a');link.className='atlas-back';link.href='#atlas-tools';link.textContent='↑ К инструментам страницы';section.append(link)}}
+  const index=main.querySelector('#v-section-index');
+  if(index){
+   for(const a of index.querySelectorAll('a[href^="#"]')){
+    const target=document.getElementById(a.hash.slice(1));if(!target)continue;
+    a.addEventListener('click',()=>{if(!target.matches('input,select,button,textarea,a,summary')&&!target.hasAttribute('tabindex'))target.tabIndex=-1;target.focus({preventScroll:true})});
+   }
+   for(const section of main.querySelectorAll(':scope > section[id]')){
+    if(![...index.querySelectorAll('a')].some(a=>a.hash==='#'+section.id))continue;
+    const back=document.createElement('a');back.href='#v-section-index';back.className='v-index-back';back.textContent='↑ К содержанию страницы';section.append(back);
+   }
+  }
   enhance(main);
-  let scheduled=false;
+  let scheduled=false;const pending=new Set();
+  function enqueue(root){if(!root||!main.contains(root))return;for(const item of pending){if(item.contains(root))return;if(root.contains(item))pending.delete(item)}pending.add(root)}
   new MutationObserver(records=>{
-   if(scheduled||!records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches('table,svg')||n.querySelector('table,svg')))))return;
-   scheduled=true;queueMicrotask(()=>{scheduled=false;enhance(main)});
+   // Observe only changed table containers and newly added charts/tables.
+   // A single updated graph no longer rescans every existing table on the page.
+   for(const r of records){
+    const target=r.target.nodeType===1?r.target:r.target.parentElement;
+    const table=target?.closest('table');if(table)enqueue(table.closest(known)||table);
+    for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches('table,svg')||n.querySelector('table,svg')))enqueue(n);
+   }
+   for(const wrap of watched)if(!main.contains(wrap)){resize?.unobserve(wrap);watched.delete(wrap)}
+   if(scheduled||!pending.size)return;
+   scheduled=true;queueMicrotask(()=>{scheduled=false;const roots=[...pending];pending.clear();for(const root of roots)if(main.contains(root))enhance(root)});
   }).observe(main,{childList:true,subtree:true});
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();

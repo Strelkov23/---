@@ -28,6 +28,16 @@ class NavTests(unittest.TestCase):
         self.assertIn("glossary.html#scenario",n.guide("scenario.html"))
         self.assertIn("methodology.html#global-plan-method",n.guide("scenario.html"))
         self.assertEqual(n.guide("unknown.html"),"")
+    def test_section_index(self):
+        self.assertEqual(len(n.SECTION_INDEX),6)
+        for page,tasks in n.SECTION_INDEX.items():
+            body='<section class="mast"><h1>Title</h1></section>'+''.join('<div id="'+target+'"></div>' for target,_ in tasks)
+            result=n.section_index(page,body)
+            self.assertEqual(result.count('id="v-section-index"'),1)
+            self.assertTrue(all('href="#'+target+'"' in result for target,_ in tasks))
+            with self.assertRaises(ValueError):n.section_index(page,'<section></section>')
+            with self.assertRaises(ValueError):n.section_index(page,body+'<div id="'+tasks[0][0]+'"></div>')
+        self.assertEqual(n.section_index("unknown.html","plain"),"plain")
     def test_task_queries(self):
         rows={r["href"]:r for r in n.search_entries()}
         self.assertEqual(len(n.TASK_QUERIES),17)

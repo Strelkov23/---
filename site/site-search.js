@@ -41,16 +41,16 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  async function search(){
   const id=++sequence,query=q.value.trim(),keys=scope.value==='all'?Object.keys(groups):[scope.value];host.replaceChildren();
   const u=new URL(location.href);u.searchParams.set('q',query);u.searchParams.set('site-search-scope',scope.value);history.replaceState(null,'',u);
-  if(!query){status.textContent='Введите запрос.';return}
+  if(!query){status.textContent='Введите запрос или выберите пример вопроса.';return}
   status.textContent='Поиск в выбранных разделах…';
   const results=await Promise.allSettled(keys.map(async key=>({key,rows:(key==='tools'?SiteSearch.findTools:SiteSearch.find)(await get(key),query)})));if(id!==sequence)return;
   let total=0,failed=0;
   results.forEach((result,i)=>{
    const key=keys[i],section=node('section','');section.append(node('h2',groups[key][0]));
    if(result.status==='rejected'){failed++;section.append(node('p','Набор недоступен для этой версии. Повторите запрос.'));host.append(section);return}
-   const rows=result.value.rows;total+=rows.length;section.append(node('p','Найдено: '+rows.length));let limit=10;
+   const rows=result.value.rows;total+=rows.length;section.append(node('p','Найдено: '+rows.length));if(!rows.length){section.append(node('p',key==='tools'?'Нет подходящих инструментов. Попробуйте более короткий запрос или один из примеров.':'Нет совпадений в этом наборе за доступные периоды.'));host.append(section);return}let limit=10;
    const items=node('div',''),more=node('button','Показать ещё');more.type='button';
-   function draw(){items.replaceChildren();for(const r of rows.slice(0,limit)){const article=node('article',''),h=node('h3',''),link=url(r);if(link){const a=node('a',r.title||'Без названия');a.href=link;if(r.external){a.target='_blank';a.rel='noopener noreferrer'}h.append(a)}else h.textContent=r.title||'Без названия';article.append(h,node('p',r.description||''));items.append(article)}more.hidden=rows.length<=limit}
+   function draw(){items.replaceChildren();for(const r of rows.slice(0,limit)){const article=node('article',''),h=node('h3',''),link=url(r);if(link){const a=node('a',r.title||'Без названия');a.href=link;if(r.external){a.target='_blank';a.rel='noopener noreferrer'}h.append(a)}else h.textContent=r.title||'Без названия';article.append(h,node('p',r.description||''));if(key==='tools'&&SiteSearch.questionScore(r,query)>=100){const match=node('small','Маршрут соответствует вопросу');match.className='v-search-match';article.append(match)}items.append(article)}more.hidden=rows.length<=limit}
    more.onclick=()=>{limit+=20;draw()};section.append(items,more);draw();host.append(section)
   });
   status.textContent='Найдено записей: '+total+(failed?' · недоступных наборов: '+failed:'')+'. Записи в разных разделах могут пересекаться.'

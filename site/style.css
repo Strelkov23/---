@@ -464,3 +464,83 @@ html[data-view=analytical] .v-task-guide dl{gap:.55rem 1rem}
 html[data-view=professional] .v-task-guide{font-size:.85rem}
 html[data-view=professional] .v-task-guide summary{font-size:.88rem}
 @media print{#view-mode-description{display:none}.v-task-guide details>summary{display:none}}
+
+/* V.5: local research workspace, responsive controls. */
+#v-bookmark-toggle{background:#e5f1ef;color:#163d43;border-color:#719d9e;padding:.35rem .55rem;font-size:.85rem;max-width:100%;overflow-wrap:anywhere}
+#v-bookmark-status:empty{display:none}
+#v-bookmark-status{flex-basis:100%;color:#d2e9e9}
+.v-workspace-links{display:flex;flex-wrap:wrap;gap:.65rem}
+.v-workspace-links a{padding:.45rem .65rem;border:1px solid #b0c7c9;border-radius:.35rem;background:#fff}
+.v-workspace-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.v-workspace-grid article{min-width:0;margin:0;padding:.9rem}
+.v-workspace-grid ul{padding-left:1.25rem;overflow-wrap:anywhere}
+.v-workspace-grid li{margin:.5rem 0}
+.v-workspace-grid li button{display:block;font-size:.85rem;margin:.25rem 0}
+.v-workspace-grid input[type=file]{display:block;min-width:0;width:100%;max-width:100%}
+.v-workspace-grid label{min-width:0;grid-template-columns:minmax(0,1fr);margin:.6rem 0}
+.v-workspace-grid .v-history-toggle{display:flex;align-items:center;gap:.5rem}
+@media(max-width:700px){.v-workspace-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* V.6: a short operational route, without hiding calculations or inputs. */
+.v-lab-guide{background:#fff;border:1px solid #b8d0d0;border-left:3px solid #398b89;border-radius:.4rem;padding:.8rem;margin:.8rem 0 1.15rem;min-width:0;overflow-wrap:anywhere}
+.v-lab-base{margin:.1rem 0 .6rem;font-size:.9rem}
+.v-lab-guide ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin:0;padding-left:1.4rem}
+.v-lab-guide li{min-width:0;padding:.25rem .4rem}
+.v-lab-guide li strong,.v-lab-guide li span{display:block}
+.v-lab-guide li span{font-size:.88rem;line-height:1.45;margin:.25rem 0 .5rem}
+.v-lab-guide button{font-size:.83rem;white-space:normal;overflow-wrap:anywhere;max-width:100%}
+html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
+@media(max-width:700px){.v-lab-guide ol{grid-template-columns:minmax(0,1fr);gap:.4rem}.v-lab-guide li{padding:.25rem 0}}
+@media print{.v-lab-guide button{display:none}}
+
+/* V.7: expose transferred context, including unavailable periods. */
+.v-transfer-status{padding:.65rem .8rem;border:1px solid #adc9c8;border-left:3px solid #398b89;border-radius:.35rem;background:#edf5f3;color:#193e45;overflow-wrap:anywhere}
+
+/* V.8: compact contents for long analytical pages. */
+.v-section-index{border:1px solid #b3c8cc;border-radius:.4rem;background:#fff;padding:.6rem .8rem;margin:.8rem 0 1.4rem;min-width:0;scroll-margin-top:1rem}
+.v-section-index details{padding:0}
+.v-section-index summary{font-weight:700;color:#164b55}
+.v-section-index ul{display:flex;gap:.4rem;flex-wrap:wrap;list-style:none;padding:0;margin:.65rem 0 .1rem}
+.v-section-index li{min-width:0;max-width:100%}
+.v-section-index a{display:block;padding:.38rem .65rem;background:#edf4f4;border:1px solid #c4d7d8;border-radius:.3rem;overflow-wrap:anywhere;text-decoration:none;min-height:36px;font-size:.9rem}
+.v-section-index a:hover{background:#d9eae8}
+.v-index-back{display:inline-block;margin:1rem 0 .3rem;font-size:.88rem}
+@media(max-width:520px){.v-section-index a{min-height:44px}.v-section-index ul{gap:.35rem}}
+@media print{.v-section-index,.v-index-back{display:none}}
+
+/* V.9: accessible navigation and controls, no forced animation. */
+.v-section-index a:focus-visible,.v-index-back:focus-visible,.v-lab-guide button:focus-visible,#v-bookmark-toggle:focus-visible{outline:3px solid #a06424;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}main *,main *::before,main *::after{scroll-behavior:auto!important;transition-duration:0s!important;animation-duration:0s!important}}
+
+/* V.10: legible result panels. Colour denotes direction/selection, not economic desirability. */
+.iv-workbench>div{min-width:0}
+.iv-result{background:#fff;color:#203d4c;border:1px solid #b7cdd2;border-radius:.55rem;padding:.9rem;min-width:0}
+.iv-result>span{font-size:.93rem;font-weight:600;line-height:1.4}
+.iv-result strong{font-size:clamp(1.5rem,4vw,2.1rem);color:#174b5a;overflow-wrap:anywhere}
+.v-result-axis{position:relative;height:18px;background:#e8eff1;border:1px solid #c5d4d9;border-radius:.25rem;margin-top:.45rem}
+.v-result-axis::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:2px solid #647b86}
+.v-result-bar{position:absolute;top:3px;bottom:3px;background:#347f8c}
+.v-result-bar[data-direction=negative]{background:#a86d47}
+.v-result-marker{position:absolute;top:-3px;bottom:-3px;border-left:2px dashed #182d37;z-index:1}
+.v-axis-labels{display:flex;justify-content:space-between;gap:.4rem;font-size:.73rem;color:#415e69;font-variant-numeric:tabular-nums}
+.v-result-note{font-size:.84rem;line-height:1.45;color:#395867;margin:.4rem 0 0;overflow-wrap:anywhere}
+#pulse-cards .pulse-card{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;background:#fff;color:#213e4a;border:1px solid #bed0d5;padding:.85rem;border-radius:.5rem;min-width:0}
+#pulse-cards .pulse-card h3{margin:0;line-height:1.4}
+#pulse-cards .pulse-card[data-selected=true]{border-color:#398b89;box-shadow:inset 0 3px #398b89}
+#pulse-cards .pulse-card[data-observation=missing] strong{font-size:1.1rem;color:#526975}
+#pulse-cards .pulse-card button{margin-top:auto;min-height:44px;width:100%;white-space:normal;overflow-wrap:anywhere}
+#pulse-cards .pulse-card button[aria-pressed=true]{background:#e1efed;color:#154b51;border-color:#6e9c9a}
+.v-observation-stamp{font-size:.77rem;color:#526b75;font-variant-numeric:tabular-nums}
+#pulse-cards .pulse-card p{margin:.25rem 0;line-height:1.45}
+@media(max-width:520px){.iv-result{padding:.75rem}.v-axis-labels{font-size:.7rem}}
+
+/* V.11: optional first-visit assistance and compact example queries. */
+.v-first-visit,.v-search-examples{border:1px solid #c1d5d8;border-left:3px solid #398b89;border-radius:.4rem;padding:.7rem .85rem;margin:.7rem 0 1rem;background:#fff;color:#203d4c;overflow-wrap:anywhere}
+.v-first-visit summary,.v-search-examples summary{font-weight:700;color:#175e55}
+.v-first-visit li{margin:.35rem 0;line-height:1.5}
+.v-first-visit p,.v-search-examples p{font-size:.9rem;line-height:1.5}
+.v-question-links{display:flex;flex-wrap:wrap;gap:.4rem}
+.v-question-links a{padding:.45rem .65rem;border:1px solid #b7cdd2;border-radius:.3rem;background:#edf4f4;overflow-wrap:anywhere;max-width:100%;font-size:.9rem}
+.v-search-match{display:block;margin-top:.45rem;color:#365e66;font-weight:600}
+@media(max-width:520px){.v-question-links a{min-height:44px}}
+@media print{.v-first-visit,.v-search-examples{display:none}}

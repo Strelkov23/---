@@ -41,6 +41,10 @@ jobs:
           node test-electricity-balance.js
           node test-energy-output.js
           node test-news-map.js
+          node test-workspace.js
+          node test-site-search.js
+          node test-interface.js
+          python3 -m unittest test_navigation.py
           python3 -m pip install scipy==1.15.3
           python3 test_global_reference.py
           rm -rf public
@@ -112,6 +116,7 @@ jobs:
           path: |
             monitor/public/quality.json
             monitor/public/links.json
+            monitor/v-browser-readiness.json
           if-no-files-found: ignore
           retention-days: 14
 

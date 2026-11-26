@@ -1,7 +1,15 @@
 import csv
 """Exercise real IV controls against the offline archive."""
-import os
+import os,json
+from pathlib import Path
 from playwright.sync_api import sync_playwright
+readiness=[]
+def sample(page,width,route,condition):
+    values=page.evaluate("""()=>{const n=performance.getEntriesByType('navigation')[0],r=performance.getEntriesByType('resource');return {ready_ms:Math.round(performance.now()),dom_ms:Math.round(n.domContentLoadedEventEnd),load_ms:Math.round(n.loadEventEnd),requests:r.length,transfer_bytes:r.reduce((a,x)=>a+x.transferSize,0)+n.transferSize,decoded_bytes:r.reduce((a,x)=>a+x.decodedBodySize,0)+n.decodedBodySize,dom_nodes:document.querySelectorAll('*').length}}""")
+    assert all(v>=0 for v in values.values()),values
+    result=dict(width=width,route=route,condition=condition,**values)
+    readiness.append(result)
+    print('V_READINESS '+json.dumps(result,ensure_ascii=False),flush=True)
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=os.environ.get("CHROME_BIN","/usr/bin/google-chrome"),args=["--no-sandbox","--disable-dev-shm-usage"])
     for width in (390,1440):
@@ -29,6 +37,7 @@ with sync_playwright() as p:
         assert page.locator("#iv-workspace-grid article").first.get_attribute("data-workspace")=="overview"
         assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),width
         page.wait_for_function("document.querySelectorAll('#pulse-cards article').length===5")
+        sample(page,width,"index.html","five annual observation cards rendered")
         slider=page.locator("#pulse-year")
         maximum=int(slider.get_attribute("max"))
         minimum=int(slider.get_attribute("min"))
@@ -41,6 +50,12 @@ with sync_playwright() as p:
         page.locator("#pulse-play").click()
         page.locator("#pulse-play").click()
         assert page.locator("#pulse-play").get_attribute("aria-pressed")=="false"
+        assert page.locator("#pulse-cards .v-observation-stamp").count()==5
+        assert page.locator("#pulse-cards .pulse-card[data-selected=true]").count()==1
+        button=page.locator("#pulse-cards button").first
+        button.click()
+        assert page.locator("#pulse-cards button").first.evaluate("e=>document.activeElement===e")
+        assert page.locator("#pulse-cards button").first.get_attribute("aria-pressed")=="true"
         page.wait_for_function("document.querySelectorAll('#iv-evidence-cards article').length===3")
         page.locator("#iv-evidence-month").fill("2024-05")
         page.locator("#iv-evidence-exact").check()
@@ -49,12 +64,29 @@ with sync_playwright() as p:
         page.locator("#iv-evidence-draft").check()
         page.locator("#iv-evidence-draft").uncheck()
         page.goto("http://localhost:8765/iv-lab.html")
+        assert page.locator(".v-lab-guide").count()==5
+        sample(page,width,"iv-lab.html","five guided laboratory sections rendered")
+        assert page.locator(".v-lab-guide button:visible").count()==15
+        page.locator("#basic-lab [data-v-jump='iv-mode']").click()
+        assert page.locator("#iv-mode").evaluate("e=>document.activeElement===e")
         page.locator("#iv-output").fill("10")
         page.locator("#iv-productivity").fill("10")
         assert page.locator("#iv-results strong").first.inner_text()=="0%"
+        page.locator("#basic-lab [data-v-jump='iv-results']").click()
+        assert page.locator("#iv-results").evaluate("e=>document.activeElement===e")
+        assert page.locator("#iv-output").input_value()=="10"
+        with page.expect_download() as basic:
+            page.locator("#iv-export").click()
+        with open(basic.value.path(),encoding="utf-8-sig") as stream:
+            rows=list(csv.reader(stream,delimiter=";"))
+        assert any(row[0]=="Условный результат" and row[1]=="Изменение необходимых человеко-часов" and float(row[2].replace(",","."))==0 for row in rows)
+        assert any(row[0]=="Методика" for row in rows)
         page.locator("#iv-save").click()
         page.locator("#iv-output").fill("20")
         assert "Отличие" in page.locator("#iv-compare").inner_text()
+        assert page.locator("#iv-results .v-result-axis").count()==2
+        assert page.locator("#iv-results .v-result-marker").count()==2
+        assert "Сохранённый вариант:" in page.locator("#iv-results .v-result-note").first.inner_text()
         page.locator("#iv-mode").select_option("budget")
         assert "дефицит" in page.locator("#iv-explain").inner_text()
         page.locator("#policy-save").click()
@@ -217,6 +249,7 @@ with sync_playwright() as p:
         assert page.locator("#iv-power-official").inner_text()=="9,57%"
         page.goto("http://localhost:8765/economic-map.html")
         page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
+        sample(page,width,"economic-map.html","historical map time control ready")
         page.locator("#geo-scale").select_option("history")
         page.locator("#geo-time").fill("0")
         assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
@@ -263,4 +296,6 @@ with sync_playwright() as p:
                 assert page.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth+2"),(route,width,theme)
         page.close()
     browser.close()
+assert len(readiness)==6,readiness
+Path("../v-browser-readiness.json").write_text(json.dumps({"environment":"GitHub Actions localhost, functional test checkpoints; no network or CPU throttling, not comparative benchmarks","records":readiness},ensure_ascii=False,indent=2),encoding="utf-8")
 print("IV browser interaction checks passed")

@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     for(const r of [...new Set(s.values.map(r=>r.region))].sort((a,b)=>a.localeCompare(b,'ru'))){region.add(new Option(r,r));peer.add(new Option(r,r))}
     for(const y of [...new Set(s.values.map(r=>r.year))].sort((a,b)=>b-a))rankYear.add(new Option(String(y),String(y)));
     for(const [j,e] of [region,peer,rankYear].entries()){const preferred=prior[j]||saved.get(e.id);if([...e.options].some(o=>o.value===preferred))e.value=preferred}
-    draw();ranking()
+    draw();ranking();const context=$('hist-transfer-status'),requested=saved.get('v-context-year'),iso=saved.get('v-context-region');if(context&&requested&&/^\d{4}$/.test(requested)){context.hidden=false;const exact=rankYear.value===requested&&region.value===saved.get('hist-region')&&picker.value===saved.get('hist-series');context.textContent=exact?'Период и территория перехода сохранены: '+requested+' · '+region.value+'.':'Запрошенный контекст недоступен полностью. Фактически выбраны '+(rankYear.value||'—')+' · '+(region.value||'—')+'. Сверьте показатель, территорию и год.';if(exact&&/^RU-[A-Z0-9]{2,4}$/.test(iso||'')){const u=new URL('economic-map.html#regional-map',location.href);u.searchParams.set('geo-region',iso);u.searchParams.set('geo-series',picker.value);u.searchParams.set('geo-year',requested);u.searchParams.set('v-context-year',requested);if(pinned)u.searchParams.set('snapshot',pinned);const back=node('a','Вернуться к исходной карте');back.href=u.href;context.append(document.createTextNode(' · '),back)}}
    }catch(e){if(id===generation)status.textContent='Не удалось загрузить файл ряда для данной версии. Откройте текущую сборку.'}
   }
   function draw(){
