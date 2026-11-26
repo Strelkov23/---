@@ -418,3 +418,5 @@ main label:has(input[type=file]){min-width:0;max-width:100%;grid-template-column
 
 /* IV laboratory: allow long Russian product names to wrap and constrain intrinsic select widths. */
 main:has(#allocation-lab) section,main:has(#allocation-lab) .iv-workbench>div,main:has(#allocation-lab) label,main:has(#allocation-lab) details{min-width:0;max-width:100%;overflow-wrap:anywhere}main:has(#allocation-lab) label:not(.iv-slider){grid-template-columns:minmax(0,1fr)}main:has(#allocation-lab) select,main:has(#allocation-lab) input[type=range]{width:100%;min-width:0;max-width:100%}main:has(#allocation-lab) .actions>*{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}main:has(#allocation-lab) .pulse-card strong{overflow-wrap:anywhere}main:has(#allocation-lab) .table-scroll{overflow-x:auto;max-width:100%;min-width:0}main:has(#allocation-lab) .table-scroll table{min-width:620px}
+
+.iv-method-passport{border:1px solid currentColor;border-radius:.5rem;margin:.6rem 0;padding:.8rem;overflow-wrap:anywhere}.iv-method-passport dt{margin-top:.7rem}.iv-method-passport dd{margin:.15rem 0 .4rem}#iv-method-audit select{width:100%;min-width:0;max-width:100%}

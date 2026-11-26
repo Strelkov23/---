@@ -102,6 +102,12 @@ with sync_playwright() as p:
         assert page.locator("#physical-index-result").inner_text()=="100"
         page.locator("#physical-index-year").select_option("2020")
         assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
+        page.locator("#iv-method-mode").select_option("industry")
+        assert page.locator("#iv-method-result").inner_text()=="1%"
+        page.locator("#iv-method-weight").fill("100")
+        assert page.locator("#iv-method-result").inner_text()=="10%"
+        page.locator("#iv-method-mode").select_option("poverty")
+        assert page.locator("#iv-method-result").inner_text()=="30%"
         page.goto("http://localhost:8765/iv-comparison.html")
         page.locator("#iv-audit-pair").select_option("labour")
         assert "Разные измерения" in page.locator("#iv-audit-verdict").inner_text()
