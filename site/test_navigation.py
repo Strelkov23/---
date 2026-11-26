@@ -28,6 +28,13 @@ class NavTests(unittest.TestCase):
         self.assertIn("glossary.html#scenario",n.guide("scenario.html"))
         self.assertIn("methodology.html#global-plan-method",n.guide("scenario.html"))
         self.assertEqual(n.guide("unknown.html"),"")
+    def test_task_queries(self):
+        rows={r["href"]:r for r in n.search_entries()}
+        self.assertEqual(len(n.TASK_QUERIES),17)
+        for href,queries in n.TASK_QUERIES.items():
+            self.assertIn(href,rows)
+            self.assertEqual(rows[href]["questions"],list(queries))
+            self.assertTrue(all(q.strip() for q in queries))
     def test_task_guides(self):
         self.assertEqual(len(n.TASK_GUIDES),10)
         destinations={r["href"] for r in n.search_entries()}
