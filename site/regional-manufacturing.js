@@ -184,6 +184,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   select.replaceChildren(new Option('Выберите регион',''),...mapped.map(f=>new Option(f.name,f.code)));
   for(const id of ['rm-section','rm-group','rm-year','rm-region'])$(id).disabled=false;
   restore(['rm-year','rm-metric','rm-region']);
+  const transfer=$('rm-transfer-status'),requestedYear=query.get('v-context-year'),requestedRegion=query.get('v-context-region');if(transfer&&requestedYear&&/^\d{4}$/.test(requestedYear)){transfer.hidden=false;const actual=$('rm-year').value,exact=actual===requestedYear&&select.value===requestedRegion;transfer.textContent=exact?'Регион и период перехода сохранены: '+requestedYear+'. Выберите отрасль.':'Запрошены '+requestedYear+' год и '+(requestedRegion||'регион')+'; не весь контекст доступен. Выбраны '+(actual||'—')+' год и '+(select.selectedOptions[0]?.textContent||'—')+'. Проверьте параметры перед сравнением.';}
   const deltaTerritories=mapped.map(f=>({key:f.key,code:f.code,name:f.name}));
   for(const [key,name] of [['архангельская область без автономного округа','Архангельская область (без АО)'],['тюменская область без автономных округов','Тюменская область (без АО)']])if(!deltaTerritories.some(t=>t.key===key))deltaTerritories.push({key,name,code:null});
   const startPick=$('rm-delta-start'),endPick=$('rm-delta-end'),deltaMetric=$('rm-delta-metric'),deltaOrder=$('rm-delta-order'),deltaQuery=$('rm-delta-query'),deltaKnown=$('rm-delta-known'),deltaHost=$('rm-delta-table'),deltaChart=$('rm-delta-chart'),deltaStatus=$('rm-delta-status'),deltaExport=$('rm-delta-export');
@@ -397,7 +398,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     detail.append(node('h3',chosen.name+' · '+year),node('p','Разные группы показаны отдельно; доли рассчитаны от итога раздела '+group.section+' ('+section.title+'). Итоги не складываются с подразделами.'));
     const table=node('table',''),head=table.createTHead().insertRow();for(const h of ['Группа','Отгрузка, млн руб.','Доля, %','Локализация'])head.append(node('th',h));
     const body=table.createTBody();for(const g of groups.filter(g=>g.section===group.section)){const r=ManufacturingAtlas.calculate(combined,g.id,year,RegionalStats.sample).rows.get(chosen.key);const tr=body.insertRow();const button=node('button',g.title);button.type='button';button.onclick=()=>{$('rm-group').value=g.id;draw()};tr.insertCell().append(button);for(const v of [r?.value,r?.share,r?.localization])tr.insertCell().textContent=number(v)}
-    const scroll=node('div','');scroll.className='table-scroll';scroll.append(table);detail.append(scroll,link('Открыть экономическую карту региона',current('economic-map.html',{'geo-region':chosen.code,'geo-year':year})));
+    const scroll=node('div','');scroll.className='table-scroll';scroll.append(table);detail.append(scroll,link('Открыть экономическую карту региона',current('economic-map.html',{'geo-region':chosen.code,'geo-year':year,'v-context-year':year,'v-context-region':chosen.code})));
     const sectionYears=years.filter(y=>combined.rows.some(r=>r.year===y&&groups.find(g=>g.id===r.group)?.section===group.section)).sort((a,b)=>a-b);
     if(sectionYears.length>=2){
      const start=sectionYears[0],end=sectionYears.at(-1),t=node('table',''),h=t.createTHead().insertRow(),body=t.createTBody();
