@@ -156,6 +156,27 @@
           3075.3
         ]
       ]
+    },
+    "severstal": {
+      "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+      "reference": "Корпоративный пресс-релиз от 03.02.2025, стр. 1, изображение",
+      "method": "PDF screenshot",
+      "keys": [
+        "steel",
+        "pigiron"
+      ],
+      "rows": [
+        [
+          2023,
+          11273,
+          11301
+        ],
+        [
+          2024,
+          10384,
+          10032
+        ]
+      ]
     }
   },
   "trade": {
@@ -319,7 +340,30 @@
     },
     {
       "id": "severstal",
-      "note": "Годовой отчёт 2025 подтверждает округлённые числа; точная таблица оригинального пресс-релиза 2025 недоступна (502). Статус остаётся предварительным."
+      "year": 2025,
+      "note": "Два точных числа совпадают у BigCapital и Fin-Vista; первичная таблица недоступна. Не считать первичной сверкой.",
+      "source": "https://severstal.com/upload/iblock/611/dg0os1stfqh1ji82yun28xjuu9c6wfwb/Press_release_po_finansovym_rezultatam_za_12_mes_2025_goda.pdf"
     }
-  ]
+  ],
+  "secondary_corporate": {
+    "severstal": {
+      "sources": [
+        "https://bigcapital.org/ru/moex/chmf/2025/",
+        "https://fin-vista.ru/stocks/CHMF/study"
+      ],
+      "original_unavailable": "https://severstal.com/upload/iblock/611/dg0os1stfqh1ji82yun28xjuu9c6wfwb/Press_release_po_finansovym_rezultatam_za_12_mes_2025_goda.pdf",
+      "reference": "Две вторичные таблицы, точные тыс. т; исходный пресс-релиз 502, архив раскрытия недоступен",
+      "keys": [
+        "steel",
+        "pigiron"
+      ],
+      "rows": [
+        [
+          2025,
+          10825,
+          11206
+        ]
+      ]
+    }
+  }
 }
