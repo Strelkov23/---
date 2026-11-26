@@ -11,3 +11,12 @@ assert.deepEqual(I.filterTools(['Валовой региональный про�
 assert.deepEqual(I.filterTools(['А','Б'],''),[true,true]);
 
 assert.equal(I.theme('bogus'),'light');assert.equal(I.effectiveTheme('system',true),'dark');assert.equal(I.effectiveTheme('system',false),'light');assert.equal(I.effectiveTheme('light',true),'light');assert.equal(I.effectiveTheme('dark',false),'dark');
+
+assert.equal(I.preference(null,'analytical'),'analytical');
+assert.equal(I.preference('analytical','professional'),'analytical');
+assert.equal(I.preference('unknown','analytical'),'analytical');
+assert.equal(I.disclosure('simple',true),false);
+assert.equal(I.disclosure('analytical',true),true);
+assert.equal(I.disclosure('analytical',false),false);
+assert.equal(I.disclosure('professional',false),true);
+assert.equal(new Set(['simple','analytical','professional'].map(I.description)).size,3);
