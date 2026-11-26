@@ -57,6 +57,13 @@ with sync_playwright() as p:
         page.locator("#physical-year").fill("0")
         assert page.locator("#physical-index").inner_text()=="100"
         assert page.locator("#physical-yoy").inner_text()=="Нет данных"
+        page.locator("#physical-company").select_option("rzd")
+        assert "1" in page.locator("#physical-value").inner_text()
+        assert "rspp.ru" in page.locator("#physical-source").get_attribute("href")
+        page.locator("#physical-year").fill("0")
+        assert "finolive.ru" in page.locator("#physical-source").get_attribute("href")
+        page.locator("#physical-company").select_option("rosenergoatom")
+        assert "218,35" in page.locator("#physical-value").inner_text()
         page.goto("http://localhost:8765/iv-comparison.html")
         page.locator("#iv-audit-pair").select_option("labour")
         assert "Разные измерения" in page.locator("#iv-audit-verdict").inner_text()

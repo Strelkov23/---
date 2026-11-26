@@ -69,6 +69,117 @@
           "platinum": 667
         }
       ]
+    },
+    {
+      "id": "rosenergoatom",
+      "title": "Росэнергоатом / электроэнергетический дивизион Росатома",
+      "origin": "corporate_disclosure_state_owned",
+      "scope": "Выработка электроэнергии АЭС электроэнергетического дивизиона, без ветровой генерации; корпоративное раскрытие государственного предприятия, не независимая экспертиза",
+      "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+      "page": "10",
+      "metrics": [
+        {
+          "id": "nuclear_generation",
+          "title": "Выработка АЭС",
+          "unit": "млрд кВт·ч"
+        }
+      ],
+      "rows": [
+        {
+          "year": 2021,
+          "nuclear_generation": 222.437,
+          "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+          "reference": "Отчёт 2024, стр. 10"
+        },
+        {
+          "year": 2022,
+          "nuclear_generation": 223.372,
+          "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+          "reference": "Отчёт 2024, стр. 10"
+        },
+        {
+          "year": 2023,
+          "nuclear_generation": 217.398,
+          "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+          "reference": "Отчёт 2024, стр. 10"
+        },
+        {
+          "year": 2024,
+          "nuclear_generation": 215.523,
+          "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+          "reference": "Отчёт 2024, стр. 10"
+        },
+        {
+          "year": 2025,
+          "nuclear_generation": 218.349,
+          "source": "https://report.rosatom.ru/1684.html",
+          "reference": "Ключевые результаты 2025"
+        }
+      ]
+    },
+    {
+      "id": "rzd",
+      "title": "РЖД",
+      "origin": "corporate_disclosure_state_owned",
+      "scope": "Погрузка на сети и общий грузооборот, включая порожний пробег; не весь транспорт России и не оценка производства грузов",
+      "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+      "page": "Анализ операционных результатов",
+      "metrics": [
+        {
+          "id": "loading",
+          "title": "Погрузка",
+          "unit": "млн т"
+        },
+        {
+          "id": "turnover",
+          "title": "Грузооборот, всего",
+          "unit": "млрд ткм"
+        }
+      ],
+      "rows": [
+        {
+          "year": 2020,
+          "loading": 1243.6,
+          "turnover": 3221,
+          "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+          "reference": "Годовой отчёт 2024, анализ операционных результатов"
+        },
+        {
+          "year": 2021,
+          "loading": 1282.8,
+          "turnover": 3320.3,
+          "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+          "reference": "Годовой отчёт 2024, анализ операционных результатов"
+        },
+        {
+          "year": 2022,
+          "loading": 1234.3,
+          "turnover": 3300.9,
+          "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+          "reference": "Годовой отчёт 2024, анализ операционных результатов"
+        },
+        {
+          "year": 2023,
+          "loading": 1232.2,
+          "turnover": 3274.8,
+          "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+          "reference": "Годовой отчёт 2024, анализ операционных результатов"
+        },
+        {
+          "year": 2024,
+          "loading": 1181.4,
+          "turnover": 3113.2,
+          "source": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+          "reference": "Годовой отчёт 2024, анализ операционных результатов"
+        },
+        {
+          "year": 2025,
+          "loading": 1115.8,
+          "turnover": 3075.3,
+          "source": "https://rspp.ru/download/509d241530f496716c4a4b02b45a2348da51aaeccda89a5a/",
+          "reference": "Отчёт об устойчивом развитии 2025, ключевые показатели"
+        }
+      ]
     }
   ]
 }
