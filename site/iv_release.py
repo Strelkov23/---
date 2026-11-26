@@ -63,6 +63,45 @@ def verify_manual(d,kind):
             require(https(r["url"]) and finite(r["level"]) and r["level"]>0 and https(d["official_source"]),"Invalid price observation")
             require(all(len(r["official"][k])==3 and all(finite(v) and v>0 for v in r["official"][k]) for k in ("mom","yoy","ytd")),"Invalid official price index")
     return len(rows)
+def verify_recheck(physical,trade_data,evidence):
+    """Verify numeric correspondence to the dated transcription ledger, not source truth."""
+    require(evidence.get("schema")=="iv-source-recheck-v1","Invalid recheck ledger schema")
+    checked=evidence.get("checked")
+    require(isinstance(checked,str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}",checked),"Invalid recheck date")
+    corporate=evidence["corporate"]
+    verified={c["id"]:c for c in physical["companies"] if c.get("verification")=="source_rechecked"}
+    require(set(verified)==set(corporate),"Corporate status and recheck ledger disagree")
+    corporate_count=0
+    for cid,c in verified.items():
+        record=corporate[cid]
+        keys=record.get("keys",["nuclear_generation"] if cid=="rosenergoatom" else [])
+        require(keys and len(keys)==len(set(keys)) and set(keys)=={m["id"] for m in c["metrics"]},"Corporate recheck metric mismatch: "+cid)
+        require(c.get("verification_date")==checked,"Corporate recheck date mismatch: "+cid)
+        require(bool(record.get("method")) and bool(record.get("reference")),"Missing corporate recheck reference: "+cid)
+        sources=record.get("sources",[record.get("source")])
+        require(bool(sources) and all(https(s) for s in sources) and c["source"] in sources,"Corporate recheck source mismatch: "+cid)
+        rows=record["rows"]
+        require(all(len(r)==len(keys)+1 and type(r[0]) is int and all(finite(v) and v>=0 for v in r[1:]) for r in rows),"Invalid corporate recheck row: "+cid)
+        expected={r[0]:tuple(r[1:]) for r in rows}
+        require(len(expected)==len(rows),"Duplicate corporate recheck year: "+cid)
+        actual={r["year"]:tuple(r.get(k) for k in keys) for r in c["rows"]}
+        require(len(actual)==len(c["rows"]) and actual==expected,"Corporate recheck numbers differ: "+cid)
+        corporate_count+=len(rows)*len(keys)
+    t=evidence["trade"]
+    require(t["source"]==trade.URL and bool(t.get("reference")) and bool(t.get("method")),"Trade recheck source mismatch")
+    expected=[]
+    for yr,values in sorted(t["rows"].items()):
+        require(re.fullmatch(r"\d{4}",yr) and 1<=len(values)<=12,"Invalid recheck trade year")
+        for i,pair in enumerate(values,1):
+            require(len(pair)==2 and all(finite(v) and v>=0 for v in pair),"Invalid trade recheck value")
+            expected.append({"period":f"{yr}-{i:02}","us_exports":pair[0],"us_imports":pair[1]})
+    require(bool(expected) and trade.seed()==expected,"Trade seed differs from dated recheck ledger")
+    require(trade_data.get("seed_verification")=="documented_manual" and trade_data.get("seed_recheck_date")==checked and trade_data.get("seed_recheck_count")==len(expected)*2,"Trade recheck metadata mismatch")
+    if not trade_data["last_success"]:
+        require(trade_data["rows"]==expected,"Published manual trade rows differ from recheck ledger")
+    # Machine-loaded observations may legitimately revise the seed.
+    return {"corporate_values":corporate_count,"trade_seed_values":len(expected)*2}
+
 def check(out,previous,year):
     manifest=read(out/"data-manifest.json")["files"];counts={};warnings=[]
     for name in ASSETS:require((out/name).is_file() and (out/name).stat().st_size>0,"Missing IV asset: "+name)
@@ -80,7 +119,9 @@ def check(out,previous,year):
         else:
             counts[kind]=verify_manual(d,kind)
             warnings.append(kind+": structural validation only; manual source transcription is not independently certified")
-    return {"assets":len(ASSETS),"observations_by_dataset":counts,"warnings":warnings}
+    ledger=read(Path(__file__).resolve().parent.parent/"IV_SOURCE_RECHECK.json")
+    recheck=verify_recheck(read(out/"independent-physical.json"),read(out/"independent-trade.json"),ledger)
+    return {"assets":len(ASSETS),"observations_by_dataset":counts,"document_recheck":recheck,"warnings":warnings}
 if __name__=="__main__":
     import sys
     from datetime import date
