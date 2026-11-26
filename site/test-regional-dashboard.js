@@ -40,3 +40,7 @@ assert.equal(rel.history.length,5);
 
 assert.equal(D.signalClass({score:4,status:'signal'}),'above');assert.equal(D.signalClass({score:-4,status:'signal'}),'below');assert.equal(D.signalClass({score:1,status:'ordinary'}),'ordinary');assert.equal(D.signalClass({score:null}),'missing');
 const geo=['A','B','B','C','D'].map(iso_3166_2=>({properties:{iso_3166_2}}));const mapped=D.mapSignals(geo,[{key:'A',score:4,status:'signal'},{key:'B',score:-4,status:'signal'},{key:'C',score:null}],id=>id==='D'?null:id);assert.deepEqual(mapped.map(x=>x.category),['above','unmatched','unmatched','missing','unmatched']);
+
+const panel={tagName:'DETAILS',open:false,contains:e=>e===panel||e===nested||e===child};const nested={tagName:'DETAILS',open:false,parentElement:panel},child={tagName:'DIV',parentElement:nested},outside={tagName:'DIV'};
+const lookup=id=>({ 'geo-dashboard':panel,'gd-signals':nested,'gd-sig-table':child,'outside':outside }[id]);
+assert.equal(D.reveal(panel,'#outside',lookup),false);assert.equal(panel.open,false);assert.equal(D.reveal(panel,'#%',lookup),false);assert.equal(D.reveal(panel,'#geo-dashboard',lookup),true);assert.equal(panel.open,true);assert.equal(nested.open,false);panel.open=false;assert.equal(D.reveal(panel,'#gd-sig-table',lookup),true);assert.equal(panel.open,true);assert.equal(nested.open,true);
