@@ -28,6 +28,20 @@ class NavTests(unittest.TestCase):
         self.assertIn("glossary.html#scenario",n.guide("scenario.html"))
         self.assertIn("methodology.html#global-plan-method",n.guide("scenario.html"))
         self.assertEqual(n.guide("unknown.html"),"")
+    def test_task_guides(self):
+        self.assertEqual(len(n.TASK_GUIDES),10)
+        destinations={r["href"] for r in n.search_entries()}
+        for page,row in n.TASK_GUIDES.items():
+            self.assertIn(page,destinations)
+            self.assertIn(row[4],destinations)
+            result=n.guide(page)
+            self.assertIn('class="page-guide v-task-guide"',result)
+            self.assertIn("<details open>",result)
+            self.assertEqual(result.count("<dt>"),4)
+            for title in ("Для чего","Что сделать","Как читать результат","Ограничения"):
+                self.assertIn(title,result)
+            self.assertIn('href="'+row[4]+'"',result)
+        self.assertEqual(n.task_guide("unknown.html"),"")
     def test_hubs(self):
         pages={}
         n.publish(lambda name,body:pages.update({name:body}))
