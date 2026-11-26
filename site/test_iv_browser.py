@@ -8,6 +8,18 @@ with sync_playwright() as p:
         errors=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
         page.goto("http://localhost:8765/index.html")
+        page.wait_for_function("!document.getElementById('iv-workspace-tools').hidden")
+        assert page.locator("#iv-workspace-grid article:visible").count()==5
+        page.locator("#iv-workspace-query").fill("воспроизводимость")
+        assert page.locator("#iv-workspace-grid article:visible").count()==1
+        page.locator("#iv-workspace-query").fill("")
+        page.locator("[data-pin='science']").click()
+        assert page.locator("#iv-workspace-grid article").first.get_attribute("data-workspace")=="science"
+        page.reload()
+        page.wait_for_function("document.querySelector('#iv-workspace-grid article').dataset.workspace==='science'")
+        page.locator("#iv-workspace-reset").click()
+        assert page.locator("#iv-workspace-grid article").first.get_attribute("data-workspace")=="overview"
+        assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),width
         page.wait_for_function("document.querySelectorAll('#pulse-cards article').length===5")
         slider=page.locator("#pulse-year")
         maximum=int(slider.get_attribute("max"))
