@@ -15,6 +15,17 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/index.html",wait_until="load")
         assert page.locator(".route-grid article").count()==3
         assert page.locator(".route-steps a").count()==12
+        # Dynamic table enhancement is incremental and must remain idempotent.
+        page.evaluate("""()=>{const root=document.createElement('section');root.id='layout-regression-fixture';root.innerHTML='<table id="layout-regression-table"><tbody><tr><td>Test</td></tr></tbody></table>';document.querySelector('main').append(root)}""")
+        page.wait_for_function("document.querySelector('#layout-regression-table').parentElement.classList.contains('table-scroll')")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("""()=>{const table=document.querySelector('#layout-regression-table');table.style.minWidth='1200px';table.tBodies[0].insertRow().insertCell().textContent='wide';}""")
+        if width==390:
+            page.wait_for_function("document.querySelector('#layout-regression-fixture .table-scroll').dataset.wide==='true'")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("""()=>{const root=document.querySelector('#layout-regression-fixture');root.remove();document.querySelector('main').append(root)}""")
+        assert page.locator("#layout-regression-fixture .table-scroll-hint").count()==1
+        page.evaluate("document.querySelector('#layout-regression-fixture').remove()")
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
         for route,target in (("company-atlas.html","company-lookup"),("banks.html","bank-capital"),("economic-map.html","regional-map"),("regional-manufacturing.html","rm-ranking"),("project-coverage.html","project-search")):
             page.goto("http://localhost:8765/"+route,wait_until="load")
