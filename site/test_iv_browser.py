@@ -58,6 +58,13 @@ with sync_playwright() as p:
         assert page.locator("#allocation-rows tr").count()==19
         page.locator("#allocation-budget").fill("1000")
         assert "opt-budget=1000" in page.locator("#allocation-deep").get_attribute("href")
+        page.wait_for_function("!document.getElementById('trajectory-run').disabled")
+        page.locator("#trajectory-years").fill("2")
+        page.locator("#trajectory-run").click()
+        page.wait_for_function("document.querySelectorAll('#trajectory-rows tr').length===2",timeout=60000)
+        assert "Оба решения" in page.locator("#trajectory-status").inner_text()
+        page.locator("#trajectory-growth").fill("4")
+        assert page.locator("#trajectory-export").is_disabled()
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme)

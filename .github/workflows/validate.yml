@@ -52,6 +52,7 @@ jobs:
           node test-iv-physical-composite.js
           node test-iv-workspaces.js
           node test-iv-allocation.js
+          node test-iv-trajectory.js
           node test-iv-pulse.js
           node test-iv-trade.js
           node test-iv-labour.js
