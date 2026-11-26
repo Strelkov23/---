@@ -495,3 +495,15 @@ html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 
 /* V.7: expose transferred context, including unavailable periods. */
 .v-transfer-status{padding:.65rem .8rem;border:1px solid #adc9c8;border-left:3px solid #398b89;border-radius:.35rem;background:#edf5f3;color:#193e45;overflow-wrap:anywhere}
+
+/* V.8: compact contents for long analytical pages. */
+.v-section-index{border:1px solid #b3c8cc;border-radius:.4rem;background:#fff;padding:.6rem .8rem;margin:.8rem 0 1.4rem;min-width:0;scroll-margin-top:1rem}
+.v-section-index details{padding:0}
+.v-section-index summary{font-weight:700;color:#164b55}
+.v-section-index ul{display:flex;gap:.4rem;flex-wrap:wrap;list-style:none;padding:0;margin:.65rem 0 .1rem}
+.v-section-index li{min-width:0;max-width:100%}
+.v-section-index a{display:block;padding:.38rem .65rem;background:#edf4f4;border:1px solid #c4d7d8;border-radius:.3rem;overflow-wrap:anywhere;text-decoration:none;min-height:36px;font-size:.9rem}
+.v-section-index a:hover{background:#d9eae8}
+.v-index-back{display:inline-block;margin:1rem 0 .3rem;font-size:.88rem}
+@media(max-width:520px){.v-section-index a{min-height:44px}.v-section-index ul{gap:.35rem}}
+@media print{.v-section-index,.v-index-back{display:none}}
