@@ -108,6 +108,13 @@ with sync_playwright() as p:
         assert page.locator("#physical-index-result").inner_text()=="100"
         page.locator("#physical-index-year").select_option("2020")
         assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
+        page.wait_for_function("document.getElementById('energy-structure-status').textContent!=='Загрузка…'")
+        if page.locator("#energy-structure-year").is_disabled():
+            assert "Нет подтверждённого ряда" in page.locator("#energy-structure-status").inner_text()
+            assert page.locator("#energy-structure-export").is_disabled()
+        else:
+            assert page.locator("#energy-structure-cards article").count()==7
+            assert page.locator("#energy-structure-rows tr").count()==9
         page.locator("#iv-method-mode").select_option("industry")
         assert page.locator("#iv-method-result").inner_text()=="1%"
         page.locator("#iv-method-weight").fill("100")

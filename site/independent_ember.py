@@ -62,5 +62,9 @@ def publish(db,out,stamp,refresh,loader=fetch):
 
 if __name__=="__main__":
     from datetime import date
+    from pathlib import Path
+    import argparse
+    ap=argparse.ArgumentParser();ap.add_argument("--snapshot");args=ap.parse_args()
     rows,sha=fetch(date.today().year-1)
+    if args.snapshot:Path(args.snapshot).write_text(json.dumps(dict(schema="iv-ember-v1",source=URL,documentation=DOC,license="CC BY 4.0",origin="external_compilation",unit="TWh",rows=rows,sha256=sha),ensure_ascii=False,allow_nan=False),encoding="utf-8")
     print("Ember source accepted:",len(rows),"years;",len(keys(rows)),"observations; SHA256:",sha)

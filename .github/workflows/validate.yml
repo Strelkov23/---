@@ -56,6 +56,7 @@ jobs:
           node test-iv-tech.js
           node test-iv-methods.js
           node test-iv-origin.js
+          node test-iv-energy-structure.js
           node test-iv-pulse.js
           node test-iv-trade.js
           node test-iv-labour.js

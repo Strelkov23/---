@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [stage-iv-workspace]
-    paths: [site/independent_ember.py, .github/workflows/ember-probe.yml]
+    paths: [site/independent_ember.py, site/iv-energy-structure.js, site/test-iv-energy-structure.js, .github/workflows/ember-probe.yml]
 permissions:
   contents: read
 jobs:
@@ -16,4 +16,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Fetch and validate actual public CSV
-        run: python3 site/independent_ember.py
+        run: python3 site/independent_ember.py --snapshot ember-probe.json
+      - name: Check structural diagnostics on actual CSV
+        run: node site/test-iv-energy-structure.js ember-probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ember-probe-data
+          path: ember-probe.json
