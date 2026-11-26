@@ -151,6 +151,17 @@ with sync_playwright() as p:
         assert "84,57" in page.locator("#physical-value").inner_text()
         assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
         assert page.locator("#physical-index-export").is_disabled()
+        page.locator("#physical-index-verified").click()
+        assert page.locator("#physical-index-weight-4").input_value()=="0"
+        assert page.locator("#physical-index-export").is_enabled()
+        page.locator("#physical-index-sensitivity-rows").locator("xpath=ancestor::details").locator("summary").click()
+        assert page.locator("#physical-index-sensitivity-rows tr").count()==4
+        page.locator("#physical-index-reset").click()
+        page.locator("#physical-index-year").select_option("2024")
+        assert page.locator("#physical-index-export").is_enabled()
+        assert page.locator("#physical-index-sensitivity-rows tr").count()==5
+        page.locator("#physical-index-year").select_option("2025")
+        assert page.locator("#physical-index-export").is_disabled()
         page.locator("#physical-index-draft").check()
         page.locator("#physical-index-base").select_option("2023")
         page.locator("#physical-index-year").select_option("2023")
@@ -168,6 +179,11 @@ with sync_playwright() as p:
         assert page.locator("#iv-method-result").inner_text()=="1%"
         page.locator("#iv-method-weight").fill("100")
         assert page.locator("#iv-method-result").inner_text()=="10%"
+        page.locator("#iv-method-mode").select_option("reweight")
+        assert page.locator("#iv-method-result").inner_text()=="3 п.п."
+        assert "Структура 1: 1%; структура 2: 4%" in page.locator("#iv-method-detail").inner_text()
+        page.locator("#iv-method-weightNew").fill("40")
+        assert page.locator("#iv-method-result").inner_text()=="0 п.п."
         page.locator("#iv-method-mode").select_option("poverty")
         assert page.locator("#iv-method-result").inner_text()=="30%"
         page.goto("http://localhost:8765/iv-comparison.html")
