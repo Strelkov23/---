@@ -192,6 +192,21 @@ with sync_playwright() as p:
         page.locator("#iv-audit-basis").select_option("yoy")
         page.locator("#iv-audit-threshold").fill("20")
         assert "Отмечено 0" in page.locator("#iv-audit-gap-status").inner_text()
+        page.locator("#iv-power-period").select_option("2024-03")
+        page.locator("#iv-power-wage").fill("10")
+        assert page.locator("#iv-power-official").inner_text()=="2,12%"
+        assert page.locator("#iv-power-panel").inner_text()=="-7,72%"
+        assert page.locator("#iv-power-delta").inner_text()=="-9,84 п.п."
+        assert "не оценка реальной зарплаты России" in page.locator("#iv-power-status").inner_text()
+        with page.expect_download() as power:
+            page.locator("#iv-power-export").click()
+        with open(power.value.path(),encoding="utf-8-sig",newline="") as f:
+            power_rows=list(csv.reader(f,delimiter=";"))
+        assert len(power_rows)==2 and len(power_rows[0])==len(power_rows[1])
+        assert power_rows[1][:3]==["2024-03","yoy","10"]
+        page.locator("#iv-audit-basis").select_option("mom")
+        assert page.locator("#iv-power-period").input_value()=="2024-03"
+        assert page.locator("#iv-power-official").inner_text()=="9,57%"
         page.goto("http://localhost:8765/economic-map.html")
         page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
         page.locator("#geo-scale").select_option("history")
