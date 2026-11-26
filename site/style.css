@@ -456,3 +456,11 @@ main:has(#iv-audit-pair) label:not(.iv-slider){grid-template-columns:minmax(0,1f
 .v-task-guide dt{font-size:.8rem;font-weight:700;color:#395f68}
 .v-task-guide dd{margin:.15rem 0 0;line-height:1.45;overflow-wrap:anywhere}
 @media(max-width:600px){.v-task-guide dl{grid-template-columns:minmax(0,1fr);gap:.55rem}.v-task-guide{padding:.7rem}}
+
+/* V.3: three detail levels, all tools remain reachable. */
+#view-mode-description{flex-basis:100%;color:#c1d2dd;line-height:1.4;overflow-wrap:anywhere;max-width:100%}
+html[data-view=analytical] .iv-workspace-card{padding:.85rem}
+html[data-view=analytical] .v-task-guide dl{gap:.55rem 1rem}
+html[data-view=professional] .v-task-guide{font-size:.85rem}
+html[data-view=professional] .v-task-guide summary{font-size:.88rem}
+@media print{#view-mode-description{display:none}.v-task-guide details>summary{display:none}}
