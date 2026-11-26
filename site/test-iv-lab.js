@@ -11,3 +11,5 @@ require('node:assert/strict').equal(exportRows.find(row=>row[0]==='Условн�
 require('node:assert/strict').equal(exportRows.filter(row=>row[0]==='Условная предпосылка').length,4);
 require('node:assert/strict').equal(V6.exportRows('budget',{income:35,expenses:40,gdp:200})[4][3],'трлн руб.');
 require('node:assert/strict').throws(()=>V6.exportRows('budget',{income:35,expenses:40,gdp:0}));
+
+const S=L.scale;assert.deepEqual(S(0),{bound:1,position:50,left:50,width:0,baseline:null});assert.deepEqual(S(-150,50),{bound:200,position:12.5,left:12.5,width:37.5,baseline:62.5});assert.equal(S(250).position<=100,true);assert.equal(S(-3,100).bound,100);assert.throws(()=>S(Infinity));assert.throws(()=>S(1,NaN));
