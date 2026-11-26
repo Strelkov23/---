@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-26T00:08:35+00:00",
+  "built": "2026-11-26T10:16:50+00:00",
   "errors": [],
   "warnings": [
     "Исторические ряды: исключено служебных кодов пропусков и конфиденциальности 2261",
@@ -13,53 +13,48 @@
     "Банковская отчётность balance: проверено 39 из 299 целевых банков",
     "Банковская отчётность profit: проверено 40 из 299 целевых банков",
     "Пилот раскрытия ЦБ: доступность дат форм не подтверждена; числовые нормативы не импортированы",
-    "https://api.worldbank.org/v2/country/RUS/indicator/GB.XPD.RSDV.GD.ZS?format=json&per_page=200",
-    "https://api.worldbank.org/v2/country/RUS/indicator/GC.DOD.TOTL.GD.ZS?format=json&per_page=200",
-    "https://api.worldbank.org/v2/country/RUS/indicator/GC.NLD.TOTL.GD.ZS?format=json&per_page=200",
-    "https://api.worldbank.org/v2/country/RUS/indicator/GC.REV.XGRT.GD.ZS?format=json&per_page=200",
-    "https://api.worldbank.org/v2/country/RUS/indicator/SL.SRV.EMPL.ZS?format=json&per_page=200",
-    "https://api.worldbank.org/v2/country/RUS/indicator/SP.POP.65UP.TO.ZS?format=json&per_page=200",
-    "Вопросы теоретической экономики · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Информатизация в цифровой экономике · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономика сельскохозяйственных и перерабатывающих предприятий · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Вопросы инновационной экономики · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
-    "Экономика и математические методы · Частично проверено: по 1996-01-04",
-    "Вестник Института экономики Российской академии наук · Частично проверено: по 1996-01-04",
-    "Экономическая наука современной России · Crossref HTTP 429; повтор не ранее 2026-11-26T01:04:42+00:00",
-    "Научные труды: Институт народнохозяйственного прогнозирования РАН · Отложено: Crossref HTTP 429, до 2026-11-26T01:04:42+00:00",
+    "Вопросы теоретической экономики · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономика высокотехнологичных производств · Crossref HTTP 429; повтор не ранее 2026-11-26T11:15:20+00:00",
+    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Вопросы инновационной экономики · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономика и математические методы · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Вестник Института экономики Российской академии наук · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Экономическая наука современной России · Отложено: Crossref HTTP 429, до 2026-11-26T11:15:20+00:00",
+    "Научные труды: Институт народнохозяйственного прогнозирования РАН · Частично проверено: по 1996-01-04",
+    "Правовой портал 2026-11-26",
+    "Правовой портал 2026-11-25",
+    "Правовой портал 2026-11-24",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
     "История · Казначейство · Федеральный бюджет · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1011)>",
     "История · Казначейство · Консолидированный бюджет РФ · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1011)>",
     "История · Казначейство · Бюджеты субъектов · Ошибка: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1011)>",
-    "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: https://rosstat.gov.ru/storage/mediabank/Invest_sub_2000-2025.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/Inv_reg_kv_2020-2025.xlsx · HTTP Error 404: Not Found",
-    "История · Годовые итоги федерального бюджета Минфина · Ключей: 57; частичный импорт; исключено годов: 1; Нарушено бюджетное тождество за 2022: доходы 27824.393, расходы 31119.028, сальдо -3295.0276, остаток 0.3927884 млрд руб.",
     "История · Доля городского населения на 1 января · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/36057.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/36057.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/36057.parquet: HTTP Error 404: Not Found",
     "История · Введённые жилые помещения на 1000 человек населения · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/45454.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/45454.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/45454.parquet: HTTP Error 404: Not Found",
     "История · Исполненные расходы консолидированного бюджета субъекта и территориального государственного внебюджетного фонда · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/58441.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/58441.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/58441.parquet: HTTP Error 404: Not Found",
     "История · Индекс физического объёма инвестиций в основной капитал · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/59049.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/59049.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/59049.parquet: HTTP Error 404: Not Found",
     "История · Доля малого и среднего предпринимательства в ВРП · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/60421.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/60421.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/60421.parquet: HTTP Error 404: Not Found",
     "История · ВРП на душу населения (ОКВЭД 2) · Ошибка: API НЦСЭД: Перенаправление вне источников; Карточка НЦСЭД: Перенаправление вне источников; storage.yandexcloud.net csv/61483.csv.gz: HTTP Error 404: Not Found; storage.yandexcloud.net parquet/61483.parquet: HTTP Error 404: Not Found; datalakeiepru-s3-storage-public.storage.yandexcloud.net parquet/61483.parquet: HTTP Error 404: Not Found",
-    "История · Численность населения · Ошибка: https://rosstat.gov.ru/storage/mediabank/popul_1897+.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/Сhisl_MO_01-01-2025.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/popul_monogorod_01-01-2025.xlsx · HTTP Error 404: Not Found"
+    "История · Численность населения · Ошибка: https://rosstat.gov.ru/storage/mediabank/popul_1897+.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/Сhisl_MO_01-01-2025.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/popul_monogorod_01-01-2025.xlsx · HTTP Error 404: Not Found",
+    "История · Инвестиции в основной капитал в фактически действовавших ценах · Ошибка: https://rosstat.gov.ru/storage/mediabank/Invest_sub_2000-2025.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/Inv_reg_kv_2020-2025.xlsx · HTTP Error 404: Not Found",
+    "История · Годовые итоги федерального бюджета Минфина · Ключей: 57; частичный импорт; исключено годов: 1; Нарушено бюджетное тождество за 2022: доходы 27824.393, расходы 31119.028, сальдо -3295.0276, остаток 0.3927884 млрд руб."
   ],
   "counts": {
-    "archive": 9453,
+    "archive": 9590,
     "papers": 10028,
     "indicators": 108,
     "indicators_with_data": 108,
     "monthly_industry": 81,
     "monthly_industry_verified": 81,
-    "cbr_KEY": 763,
+    "cbr_KEY": 764,
     "cbr_USD": 743,
     "national_series": 13,
     "national_observations": 4136,
@@ -136,14 +131,14 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 2327,
-    "freshness_ok": 226,
-    "freshness_unavailable": 68,
+    "freshness_ok": 234,
+    "freshness_unavailable": 69,
     "freshness_partial": 6,
-    "freshness_cached": 19,
     "freshness_archive": 7,
-    "freshness_waiting": 11,
-    "revision_builds": 64,
-    "revision_events": 8,
+    "freshness_waiting": 10,
+    "freshness_cached": 11,
+    "revision_builds": 65,
+    "revision_events": 9,
     "consistency_согласовано": 1489,
     "consistency_нет данных": 204,
     "finance_workbook_years": 9,
@@ -208,13 +203,13 @@
     "sme_profile_pilot_records": 989,
     "sme_profile_pilot_matched": 62,
     "normalized_sources": 5,
-    "normalized_observations": 9109,
-    "normalized_numeric": 9109,
-    "transport_events": 248,
-    "transport_versions": 131,
+    "normalized_observations": 9110,
+    "normalized_numeric": 9110,
+    "transport_events": 260,
+    "transport_versions": 139,
     "transport_failed": 6,
     "pipeline_sources": 10,
-    "pipeline_events": 242,
+    "pipeline_events": 254,
     "pipeline_rejected": 6,
     "infrastructure_loaders": 10,
     "infrastructure_bulk_published": 3,
@@ -232,60 +227,60 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "a4425da58ca2b6e5e5e60039c7eb8e30f524f268e161eb6da6b405184c587808",
-      "bytes": 4681323
+      "sha256": "3967c2269d47cb18f48fac4dcfee72e09f6e5646d5337163024e3c759533e5b3",
+      "bytes": 4724866
     },
     "literature.json": {
-      "sha256": "a20057fdfcc4700d351cdd0a001596d08b26de57a50fc2a184168d64d1305979",
-      "bytes": 6833339
+      "sha256": "819ae3f50205359c4be292bad3e6a890ee82f4f4d56f1881491d292738ea847b",
+      "bytes": 6834154
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
       "bytes": 87681
     },
     "catalog.json": {
-      "sha256": "62c79df389cecaba9cfc9da8eef26eb9f62a157f31af344e28b43b4eefeb6517",
-      "bytes": 47522
+      "sha256": "432d10c2c757f6d3bf2d57e6ba0a36fd3fd69e41983dd0ddee6fc0b87bfa92a0",
+      "bytes": 47516
     },
     "stats.json": {
       "sha256": "a71505439fbcbde6b8a1f7d623e24f3fe73f95ec81ca447e9a7f036de61d5c62",
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "7e18bcc79724f7d295b2be9145ee28888bc929e53f81ea883a781f598ee72470",
+      "sha256": "918d71d260e8026b4ebc7aa17eba86d66fef33c4175930ab5ecb9e52bc7b352b",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "5384ec4265df0d0446505e8d5508f83d3d774f9f3b839ba9c459985e5bbc07f4",
-      "bytes": 55648
+      "sha256": "54ffa6b815f0212d451b1e62f056e2d2188c6ec24d97e105f82b041beaea97d3",
+      "bytes": 55683
     },
     "sectors.json": {
       "sha256": "e7844b2c8c1a9db43c83ffa85b26469e8b20dd06582aa30d4015526b54966ca2",
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "d52c5d731a3950611350a82f889a5dd3124715ef55444cbf5ab5a92307a21a87",
-      "bytes": 40660
+      "sha256": "b33c0017b7f214e36ff7fe6f2ca72097be19215a5b4cf221efe571249ccfe294",
+      "bytes": 39968
     },
     "links.json": {
-      "sha256": "78cb45841ae7ce513d430b34f6b20360a3acbd7a5b9abeaac0155f8c0b9b36b9",
-      "bytes": 1811649
+      "sha256": "5c5d7dcf3207f528bebc5bcb73873d09a353e742eb88ad63c886cf22acff1975",
+      "bytes": 1835841
     },
     "national.json": {
-      "sha256": "5a53040026976f90a2a776afb0d4d1f722a710f8cc1f3f4ccc4c0f82b067953b",
+      "sha256": "9bc0e5044dbf1378439e92c03f0e85c74253d8b1fc69013d00d7b01669fbee2c",
       "bytes": 773411
     },
     "historical.json": {
-      "sha256": "9bd969f7868dc307e58e89225ee7e8d03ab6dd1247b39a193adc9870c705f22e",
+      "sha256": "670c42005c1c35a7b2b9be9e7db0446036a4cbd6d363f44cb5ce333a026e66ac",
       "bytes": 278912
     },
     "industrial.json": {
-      "sha256": "cd4d7b36cd727a83c1297989c478b72a40e9671ee1956e48aa1b538b2cd6948c",
+      "sha256": "cf330619a7458b6ba3897be2dc0be648e32c873a3a9b3cf3057a6a6e02bfc3b0",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "834cdc3c6af7c3230c34ea8f29054249bbdd56b970d5e0863e6d11336282223a",
-      "bytes": 845013
+      "sha256": "fbf431ef6bdfd916b7a6ee7c5a9be3347a03236e583c1639c321f67fda76e0fc",
+      "bytes": 845011
     },
     "regional-boundaries.json": {
       "sha256": "c85272f20f3612a253970f71995f034df6d80de6d3ff7e51cb63d2412e7a90c6",
@@ -312,43 +307,43 @@
       "bytes": 584
     },
     "freshness.json": {
-      "sha256": "c6d9cd08f7a14b6108ecd32b55054d4151249f4040378101c2b8b3d390151e11",
-      "bytes": 210177
+      "sha256": "33d84efd4a0c8a4536d5852373694696639b24a113ce50b7483ae1779cf91d4b",
+      "bytes": 210087
     },
     "stat-revisions.json": {
-      "sha256": "c29b2c302434870af106b803ac305c94cb60b0b2a32fd8a2548c00cc842465a6",
-      "bytes": 21552
+      "sha256": "897387a89dd6086e0e3fcfa9b622a840ff9fa3c012562c7cbddff67abba99d0b",
+      "bytes": 22134
     },
     "consistency.json": {
-      "sha256": "f13e80973e0597313f10fd2029157682a7030f86d226f4f8c2fac51ee238f2dd",
+      "sha256": "79ae4f54adecb5e1151fdb8bdfeac6a12575da01069cf167f8a6d3590ea20af3",
       "bytes": 312499
     },
     "finance-workbooks.json": {
-      "sha256": "2cb2f9d0a8ef6f3704ecda8cd3a9a9128cf00ba016da350e84095f35f6a96f7c",
+      "sha256": "503cbb87e8866ac915e007f1cf13a1b113b38bf3f9bce303a218607e96febde4",
       "bytes": 683539
     },
     "rosstat-workbooks.json": {
-      "sha256": "916c41810032b93b34d955cd1ea703b154396705ab7228fdc5e1778743f49f5c",
+      "sha256": "efb550b56dcedae1d0f19738b669b15a8c449b04703885cbeb5f5134f99d2d5c",
       "bytes": 1184935
     },
     "federal-budget.json": {
-      "sha256": "3da7fbd702c03b1d6d41838de4fe204d88d97249b80c66ecca5d7c62cd372dc8",
+      "sha256": "51e401895afa2d3cf0016d654fe9f61fc9060c6228597b19f6508023106f7bce",
       "bytes": 7354
     },
     "regional-manufacturing.json": {
-      "sha256": "dd666c0f9901889d6e5d27146996d3ac33596bd0d486e71f1eadd3a1c40bba20",
+      "sha256": "c3df98a207efead75df239189be010c286cfae22dedb29baeda22ceeb05a8272",
       "bytes": 1519527
     },
     "regional-mining-energy.json": {
-      "sha256": "0f6113b6ec70d6a502138b711a6352e321d632accea8a99e83f4f02b6e48fd64",
+      "sha256": "9e04f6fd84aac054d308df983937d6b517fdbb62db0bb547dc1090f5c55641b5",
       "bytes": 1115210
     },
     "industrial-parks.json": {
-      "sha256": "23c1023217285998a4baf3887ccd2e213b9b23af8104d25383c0cb5831625f1f",
+      "sha256": "f8692afaf44318b57a5b343bb19966d953941265e8bf2712b84b01729982d81c",
       "bytes": 132614
     },
     "park-certificates.json": {
-      "sha256": "913b7916407547d1b8e8be86347e3206970398edf1876bef3a72ec7c58bd64b3",
+      "sha256": "1f5b3a748296c004f6e91906082b6602cf4a6d239e802850547bb2ba0129a06e",
       "bytes": 5100
     },
     "frp-snapshot.json": {
@@ -356,23 +351,23 @@
       "bytes": 2761
     },
     "investment-projects.json": {
-      "sha256": "eb3b0f772c940c7635abc0f9f1e35fb8afb3cf32d9128eb9b23114367f56cd87",
+      "sha256": "3e5df38807f346b14544689ef5f4535c2eb99f244883a42377200fb413b99b3d",
       "bytes": 44385
     },
     "amur-projects.json": {
-      "sha256": "dfc1696f8439b3940899d149700f8dc1ad4fe0fe83fcf479a4fa070459a2f47c",
+      "sha256": "40f9301285b2663157446bf597db039ab543f9db267fdcd977abab8c5ce673a2",
       "bytes": 219269
     },
     "krasnodar-projects.json": {
-      "sha256": "dd785e3e4b64a7f212cdc42f1b4ee517156f8145af5a008bdfd8ca7d252a1e38",
+      "sha256": "f93e1f25a8828592fd640f7833bc822ab75557df9ffdb391e6ea32b7a72dad02",
       "bytes": 94575
     },
     "project-coverage.json": {
-      "sha256": "55749a414599f81a79c36ae4781a2ae8e558f91d9c194b932dd8420c585b06f9",
+      "sha256": "a191cf4c2b3784b3935e4a245da3c4373bdafaeb973bae786fef6602097635a9",
       "bytes": 130003
     },
     "enterprise-sources.json": {
-      "sha256": "ac1dae8caf740bcd46a64358b92c4ded73fb5c78912976413e26eae71be71ae4",
+      "sha256": "8c09538df2d4515fdb001185281888438cffedd54e9843bf7bd68713a1168cec",
       "bytes": 950
     },
     "amur-enterprises.json": {
@@ -380,8 +375,8 @@
       "bytes": 25290
     },
     "bank-directory.json": {
-      "sha256": "f14f0076cc55b80c841ab144277da198f0602afbf7156eea10a97bb1cd394fec",
-      "bytes": 461086
+      "sha256": "143d01806000b56954fca80cf3027789dd6649c3197104c3d92a0f387043ace5",
+      "bytes": 461090
     },
     "company-sources.json": {
       "sha256": "e15a49631e58625a7e5f4f562aebfc9e38f0d867a5d0b4dc200933710bf6d723",

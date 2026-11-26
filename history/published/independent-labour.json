@@ -1,0 +1,146 @@
+{
+  "schema": "iv-labour-v1",
+  "origin": "platform_primary",
+  "scope": "Россия, активные резюме и вакансии hh.ru",
+  "method": "Отношение среднего количества активных резюме к среднему количеству активных вакансий. Одна платформа; не уровень безработицы и не число уникальных безработных.",
+  "status": "manual_verified_labels",
+  "checked": "2026-11-26",
+  "sources": {
+    "sep": {
+      "url": "https://stats.hh.ru/api/v1/monthly-report/f-6d03ff5e-fa5d-4efb-9779-955077645fa0",
+      "page": 5
+    },
+    "oct": {
+      "url": "https://stats.hh.ru/api/v1/monthly-report/f-b0883127-78b0-4d7c-b6b7-6e785020be20",
+      "page": 5
+    },
+    "oct25": {
+      "url": "https://stats.hh.ru/api/v1/monthly-report/f-b242af0a-22eb-4a8b-bc4d-f60184d4b3a1",
+      "page": 2
+    }
+  },
+  "rows": [
+    {
+      "period": "2019-09",
+      "value": 5.4,
+      "source": "sep"
+    },
+    {
+      "period": "2020-09",
+      "value": 5.9,
+      "source": "sep"
+    },
+    {
+      "period": "2021-09",
+      "value": 3.7,
+      "source": "sep"
+    },
+    {
+      "period": "2022-09",
+      "value": 5,
+      "source": "sep"
+    },
+    {
+      "period": "2023-09",
+      "value": 3.3,
+      "source": "sep"
+    },
+    {
+      "period": "2024-09",
+      "value": 3.6,
+      "source": "sep"
+    },
+    {
+      "period": "2025-09",
+      "value": 6.4,
+      "source": "sep"
+    },
+    {
+      "period": "2019-10",
+      "value": 6.3,
+      "source": "oct"
+    },
+    {
+      "period": "2020-10",
+      "value": 5.9,
+      "source": "oct"
+    },
+    {
+      "period": "2021-10",
+      "value": 3.9,
+      "source": "oct"
+    },
+    {
+      "period": "2022-10",
+      "value": 5.1,
+      "source": "oct"
+    },
+    {
+      "period": "2023-10",
+      "value": 3.4,
+      "source": "oct"
+    },
+    {
+      "period": "2024-10",
+      "value": 3.9,
+      "source": "oct"
+    },
+    {
+      "period": "2025-10",
+      "value": 7.3,
+      "source": "oct"
+    },
+    {
+      "period": "2026-10",
+      "value": 9,
+      "source": "oct"
+    }
+  ],
+  "snapshots": [
+    {
+      "period": "2025-10",
+      "vacancies_yoy": -30,
+      "resumes_yoy": 33,
+      "offered_salary": 81100,
+      "source": "oct25",
+      "page": 2
+    },
+    {
+      "period": "2026-10",
+      "vacancies_yoy": -11,
+      "resumes_yoy": 9,
+      "offered_salary": 90100,
+      "source": "oct",
+      "page": 2
+    }
+  ],
+  "verification": {
+    "date": "2026-11-26",
+    "method": "Визуальная сверка подписей и текста на страницах оригинальных PDF hh.ru",
+    "index_count": 15,
+    "snapshot_values": 6,
+    "documents": [
+      {
+        "source": "sep",
+        "page": 5,
+        "scope": "Сентябрь 2019–2025, семь значений"
+      },
+      {
+        "source": "oct",
+        "page": 5,
+        "scope": "Октябрь 2019–2026, восемь значений"
+      },
+      {
+        "source": "oct25",
+        "page": 2,
+        "scope": "Октябрь 2025, три дополнительных показателя"
+      },
+      {
+        "source": "oct",
+        "page": 2,
+        "scope": "Октябрь 2026, три дополнительных показателя"
+      }
+    ],
+    "limitations": "Ручная сверка опубликованных чисел, не аудит микроданных или репрезентативности. Автоматическая загрузка отчётов не настроена."
+  }
+}
