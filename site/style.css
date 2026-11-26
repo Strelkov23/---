@@ -408,3 +408,5 @@ main label:has(input[type=file]){min-width:0;max-width:100%;grid-template-column
 .hh-bar-row{display:grid;grid-template-columns:3.5rem minmax(0,1fr) 3.5rem;gap:.5rem;align-items:center;margin:.35rem 0}.hh-bar-row meter{width:100%}.hh-bar-row span:last-child{text-align:right;font-variant-numeric:tabular-nums}
 
 .geo-time-panel{margin:1rem 0;padding:1rem;border:1px solid currentColor;border-radius:8px}.geo-time-panel input[type=range]{width:100%;accent-color:#368f99}.geo-time-panel .actions{display:flex;align-items:end;flex-wrap:wrap;gap:.5rem}.geo-time-panel output{font-weight:700;font-variant-numeric:tabular-nums}.geo-time-panel p{font-size:.9rem}
+
+.geo-insight{padding:.85rem;margin:1rem 0;border:1px solid currentColor;border-radius:8px}.geo-insight h5{font-size:.95rem;margin:0 0 .5rem}.geo-insight .pulse-card strong{overflow-wrap:anywhere}.geo-insight .pulse-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,185px),1fr))}

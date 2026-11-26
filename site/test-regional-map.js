@@ -141,3 +141,5 @@ assert.deepEqual(P.capitalRows('energy',cap,2024).assets.map(r=>r.code),['D']);
 assert.deepEqual(P.capitalRows('chemical',cap,2023).products.map(r=>r.year),[2023]);
 
 {const M=require('./regional-map.js');const ys=M.availableYears([{year:2022,value:0},{year:2020,value:1},{year:2021,value:null},{year:2022,value:2},{year:2023,value:NaN}]);require('node:assert/strict').deepEqual(ys,[2020,2022]);require('node:assert/strict').equal(M.temporalPosition(ys,2020),0);require('node:assert/strict').equal(M.temporalPosition(ys,2021),1);}
+
+{const M=require('./regional-map.js'),A=require('node:assert/strict');let r=M.regionalInsight({year:2024,value:20},{year:2023,value:10},[10,20,20,40,NaN],'руб.');A.equal(r.median,20);A.equal(r.rank,2);A.equal(r.count,4);A.equal(r.change.delta,100);A.equal(M.regionalInsight(null,null,[0,1],'%').rank,null);r=M.regionalInsight({year:2024,value:0},{year:2022,value:10},[0,0,4],'руб.');A.equal(r.relative,null);A.equal(r.change,null);A.equal(r.rank,2);r=M.regionalInsight({year:2024,value:98},null,[98,102], '%',true);A.equal(r.change.delta,-2);A.equal(r.median,100);}

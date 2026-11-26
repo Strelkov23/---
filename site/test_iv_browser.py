@@ -50,6 +50,10 @@ with sync_playwright() as p:
         page.locator("#geo-time-next").click()
         assert page.locator("#geo-map .technical-map-intervals").inner_text()==legend
         assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
+        page.locator("#geo-time").fill(page.locator("#geo-time").get_attribute("max"))
+        page.locator("#geo-map svg path[data-region]").first.click()
+        assert page.locator("#geo-insight").is_visible()
+        assert "выбранный показатель" in page.locator("#geo-insight").inner_text()
         assert not errors,errors
         page.close()
     browser.close()

@@ -111,6 +111,13 @@ const RegionalMap=(()=>{
   if(previous.value<=0||current.value<0)return {type:'absolute',delta,base:previous.value,year:previous.year};
   return {type:'relative',delta:100*delta/previous.value,base:previous.value,year:previous.year}
  }
+ // No ranking of economic quality; ranks describe magnitude within comparable contours.
+ function regionalInsight(current,previous,values,unit,index=false){
+  const pool=values.filter(Number.isFinite).sort((a,b)=>a-b),n=pool.length;
+  if(!current||!Number.isFinite(current.value)||!n)return {count:n,value:null,median:null,rank:null,difference:null,relative:null,change:null};
+  const value=current.value,mid=Math.floor(n/2),median=n%2?pool[mid]:pool[mid-1]/2+pool[mid]/2;
+  return {count:n,value,median,rank:1+pool.filter(v=>v>value).length,difference:value-median,relative:median>0&&value>=0?100*(value/median-1):null,change:trend(current,previous,unit,index)};
+ }
  function compareRows(items,codes){
   const ranked=items.filter(x=>Number.isFinite(x.value)).sort((a,b)=>b.value-a.value),base=items.find(x=>x.code===codes[0])?.value;
   return [...new Set(codes.filter(Boolean))].map(code=>{
@@ -149,7 +156,7 @@ const RegionalMap=(()=>{
    return {...spec,inputs:[a,b],year:ok?x.year:null,region:ok?x.region:null,value:ok?(spec.op==='ratio'?spec.factor*x.value/y.value:x.value-y.value):null};
   })
  }
- return {key,project,rings,classes,availableYears,temporalPosition,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,availableYears,temporalPosition,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,regionalInsight,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -515,7 +522,25 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   shape('rect',{width:w,height:h,fill:'#fff'});txt(30,33,'Региональная статистика · '+Y,23);
   chartFitLabel(txt(30,58,series.title+' · '+series.unit,15),1120);
   txt(30,80,'Границы справочные; несопоставимые территории не окрашены.',13);
+  function addInsight(f){
+   const panel=node('section','');panel.className='geo-insight';panel.id='geo-insight';panel.append(node('h4','Что показывает выбранный показатель'));
+   const previous=f.key&&counts.get(f.key)===1?RegionalStats.sample(series.values.filter(v=>v.year===Y-1)).out.get(f.key):null;
+   const a=RegionalMap.regionalInsight(f.r,previous,matched.map(x=>x.r.value),series.unit,RegionalMap.isGrowth(series.code,series.title,series.unit));
+   if(a.value===null){panel.append(node('p','Нет наблюдения за '+Y+' год. Сравнение и выводы недоступны; пропуск не означает нулевое значение.'));details.append(panel);return}
+   const signed=v=>(v>0?'+':'')+fmtValue(v);
+   const grid=node('div','');grid.className='pulse-cards';
+   for(const [label,value,note] of [['Место по величине',a.rank+' из '+a.count,'От большего значения к меньшему; равные значения имеют одинаковое место.'],['Медиана выборки',fmtValue(a.median)+' '+series.unit,'Только однозначно сопоставленные контуры за '+Y+' год.'],['Разница с медианой',signed(a.difference)+' '+series.unit,a.relative===null?'Относительная разница не рассчитана.':'Относительно медианы: '+signed(a.relative)+'%.']]){
+    const card=node('article','');card.className='pulse-card';card.append(node('h5',label),node('strong',value),node('p',note));grid.append(card)
+   }
+   panel.append(grid);
+   const t=a.change;
+   if(t){const u=t.type==='index'||t.type==='points'?'п.п.':t.type==='relative'?'%':series.unit;panel.append(node('p','Изменение: '+signed(t.delta)+' '+u+' · '+(t.type==='index'?'от уровня 100% (предыдущий год)':'к '+t.year+' году')+'.'))}
+   else panel.append(node('p','Нет сопоставимого наблюдения за предыдущий календарный год.'));
+   panel.append(node('p','Значение '+(a.difference>0?'выше':a.difference<0?'ниже':'равно')+' медианы. Это не оценка эффективности, уровня жизни или причины изменения. Номинальные денежные ряды не дефлируются.'));
+   details.append(panel)
+  }
   const select=f=>{const p=f.f.properties,r=f.r;chosenRegion=p.iso_3166_2||'';if(regionPick)regionPick.value=chosenRegion;for(const e of svg.querySelectorAll('[data-region]')){if(e.dataset.region===chosenRegion)e.setAttribute('data-selected','');else e.removeAttribute('data-selected')}details.replaceChildren(node('h3',r?.region||regionName(p)),node('p',r?'Значение: '+fmtValue(r.value)+' '+series.unit+' · '+Y:'Нет однозначно сопоставимого наблюдения'),node('p','Код геометрии: '+(p.iso_3166_2||'—')));
+    addInsight(f);
     if(r){details.append(node('p',[r.sheet,r.row,r.column].filter(v=>v!==null&&v!==undefined).join(' / ')),node('p',r.note||''));const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',series.code);u.searchParams.set('hist-region',r.region);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Открыть динамику территории');a.href=u.href;details.append(a)}
     if(chosenRegion){const u=new URL('regional-manufacturing.html',location.href);u.searchParams.set('rm-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Отраслевая структура отгрузки региона');a.href=u.href;details.append(node('p',''),a)};if(chosenRegion){const u=new URL('industrial-parks.html',location.href);u.searchParams.set('park-iso',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Индустриальные парки и ОЭЗ региона');a.href=u.href;details.append(node('p',''),a)}if(['RU-BU','RU-AMU','RU-KDA'].includes(chosenRegion)){const a=node('a','Инвестиционные проекты региона: актуальная версия реестра');a.href={'RU-BU':'investment-projects.html','RU-AMU':'amur-projects.html','RU-KDA':'krasnodar-projects.html'}[chosenRegion];details.append(node('p',''),a)}if(chosenRegion){const u=new URL('news-map.html',location.href);u.searchParams.set('news-geo-region',chosenRegion);if(pinned)u.searchParams.set('snapshot',pinned);const a=node('a','Новости этого региона');a.href=u.href;details.append(node('p',''),a)}if(f.key&&counts.get(f.key)===1){addBrief(f);addProfile(f,Y)}else if(profileEnabled){details.append(node('p','Для этого контура нет однозначного соответствия статистике.'));}save(activeFields)};
   for(const f of polygons){
