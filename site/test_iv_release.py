@@ -51,3 +51,18 @@ class Release(unittest.TestCase):
         c=next(c for c in physical["companies"] if c["id"]=="severstal")
         c["rows"][-1]["steel"]+=1
         with self.assertRaises(ValueError):R.verify_recheck(physical,t,ledger)
+
+    def test_year_specific_provenance(self):
+        from copy import deepcopy
+        here=R.Path(R.__file__).resolve().parent
+        ledger=R.read(here.parent/"IV_SOURCE_RECHECK.json")
+        physical=R.read(here/"independent-physical.json")
+        t={"rows":R.trade.seed(),"last_success":None,"seed_verification":"documented_manual","seed_recheck_date":ledger["checked"],"seed_recheck_count":66}
+        for cid in ("rzd","novatek","rosenergoatom","severstal"):
+            p=deepcopy(physical)
+            c=next(c for c in p["companies"] if c["id"]==cid)
+            c["rows"][-1]["source"]=c["rows"][0]["source"]
+            with self.subTest(company=cid),self.assertRaises(ValueError):R.verify_recheck(p,t,ledger)
+        e=deepcopy(ledger)
+        del e["corporate"]["rzd"]["year_sources"]["2025"]
+        with self.assertRaises(ValueError):R.verify_recheck(physical,t,e)
