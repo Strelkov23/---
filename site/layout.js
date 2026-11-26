@@ -74,6 +74,17 @@ if(typeof module!=='undefined')module.exports=MapViewport;
   const main=document.querySelector('main');if(!main)return;
   const tools=main.querySelector('.atlas-tools');
   if(tools){for(const section of main.querySelectorAll(':scope > section:not(.mast)')){if(!section.id)continue;const link=document.createElement('a');link.className='atlas-back';link.href='#atlas-tools';link.textContent='↑ К инструментам страницы';section.append(link)}}
+  const index=main.querySelector('#v-section-index');
+  if(index){
+   for(const a of index.querySelectorAll('a[href^="#"]')){
+    const target=document.getElementById(a.hash.slice(1));if(!target)continue;
+    a.addEventListener('click',()=>{if(!target.matches('input,select,button,textarea,a,summary')&&!target.hasAttribute('tabindex'))target.tabIndex=-1;target.focus({preventScroll:true})});
+   }
+   for(const section of main.querySelectorAll(':scope > section[id]')){
+    if(![...index.querySelectorAll('a')].some(a=>a.hash==='#'+section.id))continue;
+    const back=document.createElement('a');back.href='#v-section-index';back.className='v-index-back';back.textContent='↑ К содержанию страницы';section.append(back);
+   }
+  }
   enhance(main);
   let scheduled=false;
   new MutationObserver(records=>{
