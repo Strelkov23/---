@@ -1,7 +1,15 @@
 import csv
 """Exercise real IV controls against the offline archive."""
-import os
+import os,json
+from pathlib import Path
 from playwright.sync_api import sync_playwright
+readiness=[]
+def sample(page,width,route,condition):
+    values=page.evaluate("""()=>{const n=performance.getEntriesByType('navigation')[0],r=performance.getEntriesByType('resource');return {ready_ms:Math.round(performance.now()),dom_ms:Math.round(n.domContentLoadedEventEnd),load_ms:Math.round(n.loadEventEnd),requests:r.length,transfer_bytes:r.reduce((a,x)=>a+x.transferSize,0)+n.transferSize,decoded_bytes:r.reduce((a,x)=>a+x.decodedBodySize,0)+n.decodedBodySize,dom_nodes:document.querySelectorAll('*').length}}""")
+    assert all(v>=0 for v in values.values()),values
+    result=dict(width=width,route=route,condition=condition,**values)
+    readiness.append(result)
+    print('V_READINESS '+json.dumps(result,ensure_ascii=False),flush=True)
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=os.environ.get("CHROME_BIN","/usr/bin/google-chrome"),args=["--no-sandbox","--disable-dev-shm-usage"])
     for width in (390,1440):
@@ -29,6 +37,7 @@ with sync_playwright() as p:
         assert page.locator("#iv-workspace-grid article").first.get_attribute("data-workspace")=="overview"
         assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),width
         page.wait_for_function("document.querySelectorAll('#pulse-cards article').length===5")
+        sample(page,width,"index.html","five annual observation cards rendered")
         slider=page.locator("#pulse-year")
         maximum=int(slider.get_attribute("max"))
         minimum=int(slider.get_attribute("min"))
@@ -56,6 +65,7 @@ with sync_playwright() as p:
         page.locator("#iv-evidence-draft").uncheck()
         page.goto("http://localhost:8765/iv-lab.html")
         assert page.locator(".v-lab-guide").count()==5
+        sample(page,width,"iv-lab.html","five guided laboratory sections rendered")
         assert page.locator(".v-lab-guide button:visible").count()==15
         page.locator("#basic-lab [data-v-jump='iv-mode']").click()
         assert page.locator("#iv-mode").evaluate("e=>document.activeElement===e")
@@ -239,6 +249,7 @@ with sync_playwright() as p:
         assert page.locator("#iv-power-official").inner_text()=="9,57%"
         page.goto("http://localhost:8765/economic-map.html")
         page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
+        sample(page,width,"economic-map.html","historical map time control ready")
         page.locator("#geo-scale").select_option("history")
         page.locator("#geo-time").fill("0")
         assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
@@ -285,4 +296,6 @@ with sync_playwright() as p:
                 assert page.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth+2"),(route,width,theme)
         page.close()
     browser.close()
+assert len(readiness)==6,readiness
+Path("../v-browser-readiness.json").write_text(json.dumps({"environment":"GitHub Actions localhost, functional test checkpoints; no network or CPU throttling, not comparative benchmarks","records":readiness},ensure_ascii=False,indent=2),encoding="utf-8")
 print("IV browser interaction checks passed")
