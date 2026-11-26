@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-26",
+  "compared_revision": "122040cf4970fffb72d9b5abea6336bf346dedb8",
+  "notes": "Сверка значений опубликованных таблиц, не аудит первичных измерений. Показатели Северстали по републикациям; точность 2025 года сверена с републикацией пресс-релиза, не с оригинальным документом.",
+  "groups": [
+    {
+      "id": "nornickel",
+      "keys": [
+        "nickel",
+        "copper",
+        "palladium",
+        "platinum"
+      ],
+      "rows": [
+        [
+          2021,
+          190,
+          407,
+          2616,
+          641
+        ],
+        [
+          2022,
+          219,
+          433,
+          2790,
+          651
+        ],
+        [
+          2023,
+          208,
+          425,
+          2692,
+          664
+        ],
+        [
+          2024,
+          205,
+          433,
+          2762,
+          667
+        ],
+        [
+          2025,
+          198,
+          425,
+          2725,
+          667
+        ]
+      ],
+      "sources": [
+        "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf"
+      ],
+      "scope": "Извлечённые таблицы отчёта 2025, стр. 8–9; исходный PDF не загрузился из-за размера."
+    },
+    {
+      "id": "rosenergoatom",
+      "keys": [
+        "nuclear_generation"
+      ],
+      "rows": [
+        [
+          2021,
+          222.437
+        ],
+        [
+          2022,
+          223.372
+        ],
+        [
+          2023,
+          217.398
+        ],
+        [
+          2024,
+          215.523
+        ],
+        [
+          2025,
+          218.349
+        ]
+      ],
+      "sources": [
+        "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "https://report.rosatom.ru/1684.html"
+      ],
+      "scope": "PDF 2024 стр. 10, сайт публичной отчётности 2025."
+    },
+    {
+      "id": "novatek",
+      "keys": [
+        "gas",
+        "liquids"
+      ],
+      "rows": [
+        [
+          2022,
+          82.14,
+          11.94
+        ],
+        [
+          2023,
+          82.39,
+          12.37
+        ],
+        [
+          2024,
+          84.08,
+          13.79
+        ],
+        [
+          2025,
+          84.57,
+          14.11
+        ]
+      ],
+      "sources": [
+        "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511"
+      ],
+      "scope": "Оригинальные пресс-релизы, предварительные оценки."
+    },
+    {
+      "id": "severstal",
+      "keys": [
+        "steel",
+        "pigiron"
+      ],
+      "rows": [
+        [
+          2023,
+          11273,
+          11301
+        ],
+        [
+          2024,
+          10384,
+          10032
+        ],
+        [
+          2025,
+          10825,
+          11206
+        ]
+      ],
+      "sources": [
+        "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+        "https://bigcapital.org/ru/moex/chmf/2025/",
+        "https://rspp.ru/upload/uf/fab/edupyztz85ko35hvo3nzazwtm6sgkmsm/Severstal_Annual_Report_2025.pdf"
+      ],
+      "scope": "2023–2024 точные числа из републикации пресс-релиза; 2025 — аналитическая републикация, годовой отчёт подтверждает округлённые уровни."
+    }
+  ]
+}
