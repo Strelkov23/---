@@ -747,7 +747,7 @@ with sync_playwright() as p:
                 joint=list(csv.reader(f,delimiter=";"))
             assert len(joint)>1 and all(len(r)==11 for r in joint)
             assert joint[0][-2:]==["Версия данных","Выгружено UTC"]
-            assert all(r[9] and r[10] for r in joint[1:])
+            assert all(r[10] and (r[9]=="sha256:"+r[8] or (len(r[9])==40 and all(ch in "0123456789abcdef" for ch in r[9].lower()))) for r in joint[1:]), "Missing or invalid bank CSV dataset identity"
             assert len({r[0] for r in joint[1:]})==len(joint)-1
             counts=[0,0,0,0]
             for r in joint[1:]:
