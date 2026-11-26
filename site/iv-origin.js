@@ -9,7 +9,7 @@ const IVOrigin=(()=>{
   const lab=data[files[0]],prices=data[files[1]],trade=data[files[2]],physical=data[files[3]],ember=data[files[4]];
   const list=(d,s)=>d?.schema===s&&Array.isArray(d.rows)?d.rows:[];
   let a=list(lab,'iv-labour-v1').filter(x=>finite(x.value));
-  add('hh','hh.ru: резюме на вакансию','platform',a.map(x=>x.period),a.length,'https://stats.hh.ru/about','Ручной перенос; повторная сверка всех чисел не завершена','iv-hh','Охват платформы, не всё население; не уровень безработицы.');
+  add('hh','hh.ru: резюме на вакансию','platform',a.map(x=>x.period),a.length,'https://stats.hh.ru/about',lab?.verification?.index_count===a.length&&lab.verification.snapshot_values===6?'Ручная сверка оригинальных PDF: '+lab.verification.date+'; 15 значений индекса и 6 дополнительных показателей':'Ручной перенос; полный статус сверки не подтверждён','iv-hh','Охват платформы, не всё население; не уровень безработицы.');
   a=list(prices,'iv-prices-v1').filter(x=>finite(x.level));
   add('romir','РОМИР: индекс FMCG','panel',a.map(x=>x.period),a.length,a[0]?.url,prices?.verification?.romir||'Ручная выборка','iv-price-comparison','Периоды индекса FMCG; не общая потребительская корзина.');
   const o=a.filter(x=>x.official&&['mom','yoy','ytd'].every(k=>Array.isArray(x.official[k])&&x.official[k].length===3&&x.official[k].every(finite)));
