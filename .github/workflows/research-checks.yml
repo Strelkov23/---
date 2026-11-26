@@ -82,6 +82,20 @@ jobs:
           assert all(s['results'] for s in forecast['series'] if s['code'] not in ('M2X',))
           assert all(r['holdout'][r['selected']]['n']==5 for s in forecast['series'] for r in s['results'])
           PY
+      - name: Verify IV numerical models and data contracts
+        working-directory: monitor
+        run: |
+          python3 -m unittest test_independent_trade.py test_independent_ember.py test_iv_release.py
+          for script in test-iv-*.js; do node "$script"; done
+          python3 iv_release.py public ../history/published
+      - name: Verify IV laboratory in desktop and mobile browsers
+        working-directory: monitor/public
+        run: |
+          python3 -m pip install playwright==1.51.0
+          python3 -m http.server 8765 >/tmp/iv-http.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ >/dev/null
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_iv_browser.py
       - name: Verify horizon optimizer in desktop and mobile browsers
         working-directory: monitor/public
         run: |
