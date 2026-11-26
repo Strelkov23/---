@@ -36,5 +36,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  }
  button.onclick=()=>{invalidate();const token=serial,v=Object.fromEntries(ids.map(k=>[k,Number($('trajectory-'+k).value)])),goal=objective.value;v.laborEnabled=laborOn.checked;if(v.laborEnabled){for(const k of laborIds)v[k]=$('trajectory-'+k).valueAsNumber;}let a,b;try{a=IVTrajectory.parameters(model.names.length,v,v.investmentA);b=IVTrajectory.parameters(model.names.length,v,v.investmentB)}catch(e){status.textContent=e.message;return}button.disabled=true;status.textContent='Оптимизация варианта A…';run(a,goal,token,x=>{status.textContent='Оптимизация варианта B…';run(b,goal,token,y=>display(x,y,v,goal))})};
  window.addEventListener('pagehide',()=>{serial++;if(worker)worker.terminate()});
- try{model=await load('sectors.json');if(model.names.length!==19)throw Error('Неожиданный размер баланса');ids.forEach(k=>$('trajectory-'+k).disabled=false);objective.disabled=laborOn.disabled=false;syncLabor();invalidate()}catch(e){model=null;status.textContent='Баланс недоступен: '+e.message}
+ try{model=await load('sectors.json');if(model.names.length!==19)throw Error('Неожиданный размер баланса');ids.forEach(k=>$('trajectory-'+k).disabled=false);objective.disabled=laborOn.disabled=false;syncLabor();invalidate();
+ if(typeof IVScenarioStore!=='undefined'){
+  const bounds=[...ids,...laborIds].map(k=>{const e=$('trajectory-'+k);return [k,Number(e.min),Number(e.max),e.step==='any'?0:Number(e.step)]});
+  IVScenarioStore.bind('trajectory',{capture:()=>({...Object.fromEntries([...ids,...laborIds].map(k=>[k,$('trajectory-'+k).valueAsNumber])),laborEnabled:laborOn.checked,objective:objective.value}),validate:v=>{const n=IVScenarioStore.numeric(v,bounds);if(typeof v.laborEnabled!=='boolean'||!['cumulative','terminal'].includes(v.objective))throw Error('Неверный режим');return {...n,laborEnabled:v.laborEnabled,objective:v.objective}},apply:v=>{for(const k of [...ids,...laborIds]){$('trajectory-'+k).value=String(v[k]);const label=$('trajectory-'+k+'-label');if(label)label.textContent=String(v[k])}laborOn.checked=v.laborEnabled;objective.value=v.objective;syncLabor();invalidate()}})
+ }
+ }catch(e){model=null;status.textContent='Баланс недоступен: '+e.message}
 });

@@ -91,6 +91,20 @@ with sync_playwright() as p:
         page.locator("[data-lab=all]").click()
         assert page.locator("#policy-lab").is_visible()
         assert page.locator("#iv-technology-lab").is_visible()
+        page.locator("#policy-stored-save").click()
+        page.locator("#trajectory-stored-save").click()
+        page.reload()
+        page.wait_for_function("!document.getElementById('trajectory-stored-restore').disabled")
+        page.locator("#policy-stored-restore").click()
+        assert page.locator("#policy-horizon").input_value()=="10"
+        assert page.locator("#policy-investment").input_value()=="20"
+        page.locator("#trajectory-stored-restore").click()
+        assert page.locator("#trajectory-growth").input_value()=="4"
+        assert page.locator("#trajectory-export").is_disabled()
+        page.locator("#policy-stored-delete").click()
+        assert page.locator("#policy-stored-restore").is_disabled()
+        page.locator("#trajectory-stored-delete").click()
+        assert page.locator("#trajectory-stored-restore").is_disabled()
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme,page.evaluate("() => [...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>innerWidth+2 && !e.closest('.table-scroll')).slice(0,12).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right])"))

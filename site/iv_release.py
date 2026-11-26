@@ -4,7 +4,7 @@ from pathlib import Path
 import independent_trade as trade
 import independent_ember as ember
 
-ASSETS=["iv-lab.html","independent-statistics.html","iv-comparison.html","iv-lab-nav.js","iv-energy-structure.js","iv-origin.js","iv-ember.js","iv-methods.js","iv-tech.js","iv-trajectory.js","iv-allocation.js","iv-workspaces.js","iv-physical-composite.js","iv-physical.js","iv-comparison.js","iv-evidence.js","iv-policy.js","iv-prices.js","iv-labour.js","iv-trade.js","iv-pulse.js","iv-lab.js"]
+ASSETS=["iv-lab.html","independent-statistics.html","iv-comparison.html","iv-lab-nav.js","iv-scenario-store.js","iv-energy-structure.js","iv-origin.js","iv-ember.js","iv-methods.js","iv-tech.js","iv-trajectory.js","iv-allocation.js","iv-workspaces.js","iv-physical-composite.js","iv-physical.js","iv-comparison.js","iv-evidence.js","iv-policy.js","iv-prices.js","iv-labour.js","iv-trade.js","iv-pulse.js","iv-lab.js"]
 DATASETS=["independent-trade.json","independent-ember.json","independent-prices.json","independent-labour.json","independent-physical.json"]
 def require(ok,msg):
     if not ok:raise ValueError(msg)

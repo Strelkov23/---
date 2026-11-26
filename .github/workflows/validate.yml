@@ -47,6 +47,7 @@ jobs:
           node test-iv-lab.js
           node test-iv-policy.js
           node test-iv-lab-nav.js
+          node test-iv-scenario-store.js
           node test-iv-evidence.js
           node test-iv-comparison.js
           node test-iv-physical.js

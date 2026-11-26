@@ -51,4 +51,5 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  }
  for(const [k,label,min,max,value] of IVPolicy.specs){p[k]=value;const wrap=node('label','');wrap.className='iv-slider';const input=document.createElement('input');input.type='range';input.id='policy-'+k;input.min=min;input.max=max;input.step=1;input.value=value;const out=node('output',String(value));out.setAttribute("for",input.id);wrap.htmlFor=input.id;wrap.append(node('span',label),out,input);fields.append(wrap);inputs[k]=input;outputs[k]=out;input.oninput=()=>{p[k]=Number(input.value);out.textContent=input.value;draw()}}
  $('policy-save').onclick=()=>{baseline=IVPolicy.solve(p);draw()};$('policy-reset').onclick=()=>{baseline=null;for(const [k,l,min,max,v] of IVPolicy.specs){p[k]=v;inputs[k].value=v;outputs[k].textContent=v}draw()};draw();
+ if(typeof IVScenarioStore!=='undefined')IVScenarioStore.bind('policy',{capture:()=>({...p}),validate:v=>IVScenarioStore.numeric(v,IVPolicy.specs.map(([k,l,min,max])=>[k,min,max,1])),apply:v=>{baseline=null;for(const [k,value] of Object.entries(v)){p[k]=value;inputs[k].value=value;outputs[k].textContent=value}draw()}});
 });
