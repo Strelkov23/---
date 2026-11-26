@@ -1,0 +1,277 @@
+{
+  "schema": "iv-source-recheck-v1",
+  "checked": "2026-11-26",
+  "base": "612bfca5edcfe4b74610225f6daffe1f2ecd5a24",
+  "scope": "Сверка опубликованных чисел, не аудит микроданных, полноты или независимости измерения.",
+  "corporate": {
+    "nornickel": {
+      "source": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+      "reference": "Performance highlights, pp. 8–9, extracted tables e1 and e2; screenshot unavailable (file too large)",
+      "method": "extracted_table",
+      "keys": [
+        "nickel",
+        "copper",
+        "palladium",
+        "platinum"
+      ],
+      "rows": [
+        [
+          2021,
+          190,
+          407,
+          2616,
+          641
+        ],
+        [
+          2022,
+          219,
+          433,
+          2790,
+          651
+        ],
+        [
+          2023,
+          208,
+          425,
+          2692,
+          664
+        ],
+        [
+          2024,
+          205,
+          433,
+          2762,
+          667
+        ],
+        [
+          2025,
+          198,
+          425,
+          2725,
+          667
+        ]
+      ]
+    },
+    "novatek": {
+      "sources": [
+        "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511"
+      ],
+      "reference": "Таблицы добычи углеводородов с учетом доли в совместных предприятиях; предварительные пресс-релизы",
+      "method": "published_html_table",
+      "keys": [
+        "gas",
+        "liquids"
+      ],
+      "rows": [
+        [
+          2022,
+          82.14,
+          11.94
+        ],
+        [
+          2023,
+          82.39,
+          12.37
+        ],
+        [
+          2024,
+          84.08,
+          13.79
+        ],
+        [
+          2025,
+          84.57,
+          14.11
+        ]
+      ]
+    },
+    "rosenergoatom": {
+      "method": "PDF screenshot and HTML",
+      "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+      "reference": "2024, printed p.10 (PDF index 6); 2025 official reporting page",
+      "rows": [
+        [
+          2021,
+          222.437
+        ],
+        [
+          2022,
+          223.372
+        ],
+        [
+          2023,
+          217.398
+        ],
+        [
+          2024,
+          215.523
+        ],
+        [
+          2025,
+          218.349
+        ]
+      ]
+    }
+  },
+  "trade": {
+    "source": "https://www.census.gov/foreign-trade/balance/c4621.html",
+    "reference": "HTML tables 2024, 2025, 2026; exports and imports, nominal USD millions, not seasonally adjusted",
+    "method": "published_html_table",
+    "rows": {
+      "2024": [
+        [
+          30.2,
+          244
+        ],
+        [
+          36.2,
+          287.9
+        ],
+        [
+          44.9,
+          426.9
+        ],
+        [
+          34.1,
+          297.5
+        ],
+        [
+          47.6,
+          438.5
+        ],
+        [
+          42.8,
+          187
+        ],
+        [
+          45.8,
+          295.7
+        ],
+        [
+          54.5,
+          84.5
+        ],
+        [
+          53.1,
+          168.1
+        ],
+        [
+          52,
+          314.5
+        ],
+        [
+          49.4,
+          137.4
+        ],
+        [
+          37.9,
+          125.9
+        ]
+      ],
+      "2025": [
+        [
+          35.2,
+          196
+        ],
+        [
+          45.1,
+          344.3
+        ],
+        [
+          46.2,
+          523.2
+        ],
+        [
+          46.5,
+          492.1
+        ],
+        [
+          48.8,
+          539.5
+        ],
+        [
+          52.5,
+          405.2
+        ],
+        [
+          52.5,
+          338.7
+        ],
+        [
+          49.3,
+          201.9
+        ],
+        [
+          55.4,
+          158.5
+        ],
+        [
+          52.3,
+          226.6
+        ],
+        [
+          51.6,
+          190.4
+        ],
+        [
+          47.1,
+          160.2
+        ]
+      ],
+      "2026": [
+        [
+          41.3,
+          212.9
+        ],
+        [
+          37.8,
+          299.6
+        ],
+        [
+          58.3,
+          366.2
+        ],
+        [
+          50.5,
+          413.8
+        ],
+        [
+          46.8,
+          299.6
+        ],
+        [
+          45,
+          160
+        ],
+        [
+          66.4,
+          204
+        ],
+        [
+          47.5,
+          259.6
+        ],
+        [
+          57.2,
+          196
+        ]
+      ]
+    }
+  },
+  "unresolved": [
+    {
+      "id": "rzd",
+      "year": 2025,
+      "metric": "turnover",
+      "archived": 3075.3,
+      "other_publication": 3075.1,
+      "source": "https://www.rzd-partner.ru/zhd-transport/news/pogruzka-na-rzhd-v-2025-godu-snizalas-na-5-6-do-1-12-mlrd-tonn/",
+      "note": "Вторичная публикация приводит 3075,1; указанный в исходном наборе документ РСПП не открылся из-за размера. Возможная редакционная разница, значение не изменено."
+    },
+    {
+      "id": "nornickel",
+      "note": "Извлечённый текст таблиц совпадает, screenshot PDF не получен."
+    }
+  ]
+}

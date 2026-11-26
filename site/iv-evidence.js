@@ -8,7 +8,7 @@ const IVEvidence=(()=>{
  function monthIndex(s){return typeof s==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(s)?Number(s.slice(0,4))*12+Number(s.slice(5))-1:null}
  function select(rows,asof){const limit=monthIndex(asof);if(limit===null)return null;return rows.filter(r=>monthIndex(r.period)!==null&&monthIndex(r.period)<=limit).sort((a,b)=>b.period.localeCompare(a.period))[0]||null}
  function verification(spec,d){
-  if(spec[0]==='trade')return ['downloaded','cached','cached_after_error'].includes(d.status)&&d.last_success&&/^[a-f0-9]{64}$/.test(d.source_sha256||'')?'machine':'pending';
+  if(spec[0]==='trade')return ['downloaded','cached','cached_after_error'].includes(d.status)&&d.last_success&&/^[a-f0-9]{64}$/.test(d.source_sha256||'')?'machine':d.seed_verification==='documented_manual'&&d.seed_recheck_count===66&&d.rows.length===33&&d.seed_recheck_date?'documented_manual':'pending';
   if(spec[0]==='labour')return d.verification?.date&&d.verification.index_count===d.rows.length&&d.verification.snapshot_values===6?'documented_manual':'pending';
   if(spec[0]==='prices')return d.verification?.date&&d.verification.romir&&d.rows.length===3?'documented_manual':'pending';
   return 'pending'
@@ -20,7 +20,7 @@ const IVEvidence=(()=>{
   if(row&&spec[0]==='labour'){if(finite(row.value))value=row.value;source=d.sources?.[row.source]?.url}
   if(row&&spec[0]==='trade'){if(finite(row.us_imports)&&finite(row.us_exports))value=row.us_imports+row.us_exports;source=d.source}
   if(row&&spec[0]==='prices'){if(finite(row.mom))value=row.mom;else if(finite(row.mom_pp)&&finite(row.level)&&row.level-row.mom_pp>0){value=100*(row.level/(row.level-row.mom_pp)-1);derived=true}source=row.url}
-  return {row,value,age,derived,source,status:d.status,verification:verification(spec,d),checked:d.verification?.date||d.last_success||null,error:d.error||null};
+  return {row,value,age,derived,source,status:d.status,verification:verification(spec,d),checked:d.verification?.date||d.last_success||d.seed_recheck_date||null,error:d.error||null};
  }return {specs,monthIndex,select,evaluate,verification};
 })();
 if(typeof module!=='undefined')module.exports=IVEvidence;
@@ -39,7 +39,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
     const show=r.value!==null&&(r.verification!=='pending'||draft.checked)&&(!exact.checked||r.age===0);
     box.append(node('strong',show?f(r.value)+' '+unit:r.value!==null&&r.verification==='pending'&&!draft.checked?'Предварительный ряд скрыт':'Нет наблюдения'),node('p',r.row?'Период: '+r.row.period+' · '+(r.age===0?'выбранный месяц':'ранее на '+r.age+' мес.'):'До выбранного месяца данных нет.'));
     box.append(node('small',id==='trade'?'Сумма экспорта и импорта США с Россией; не вся внешняя торговля.':id==='prices'?(r.derived?'Темп рассчитан из уровня индекса.':'Корзина FMCG, не общий ИПЦ.'):'Не уровень безработицы.'));
-    const update=({manual_verified_labels:'Ручной перенос',manual_published_observations:'Ручной перенос',manual_seed:'Предварительная ручная выборка',downloaded:'Автоматическая загрузка',cached:'Сохранённая загрузка',cached_after_error:'Ошибка обновления: сохранён ряд',seed_after_error:'Ошибка обновления: ручная выборка'})[r.status]||'Статус не определён';
+    const update=({manual_verified_labels:'Ручной перенос',manual_published_observations:'Ручной перенос',manual_seed:'Ручная выборка',downloaded:'Автоматическая загрузка',cached:'Сохранённая загрузка',cached_after_error:'Ошибка обновления: сохранён ряд',seed_after_error:'Ошибка обновления: ручная выборка'})[r.status]||'Статус не определён';
     box.append(node('p',({machine:'Машинный импорт',documented_manual:'Документированная ручная сверка',pending:'Повторная сверка не подтверждена'})[r.verification]+' · '+update+(r.checked?' · '+r.checked:'')));if(r.error)box.append(node('small',r.error));
     if(r.source&&r.source.startsWith('https://')){const link=node('a','Первоисточник');link.href=r.source;box.append(link,node('p',''))}
    }catch(e){box.append(node('p','Набор недоступен или некорректен.'))}box.append(a);host.append(box)

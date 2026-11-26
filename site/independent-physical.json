@@ -1,6 +1,6 @@
 {
   "schema": "iv-physical-v1",
-  "status": "manual_verification_pending",
+  "status": "mixed_document_recheck",
   "companies": [
     {
       "id": "nornickel",
@@ -68,7 +68,9 @@
           "platinum": 667
         }
       ],
-      "verification": "pending"
+      "verification": "source_rechecked",
+      "verification_date": "2026-11-26",
+      "verification_method": "Сверка извлечённых таблиц отчёта, стр. 8–9; изображение PDF недоступно"
     },
     {
       "id": "rosenergoatom",
@@ -116,7 +118,9 @@
           "reference": "Ключевые результаты 2025"
         }
       ],
-      "verification": "pending"
+      "verification": "source_rechecked",
+      "verification_date": "2026-11-26",
+      "verification_method": "Сверка изображения стр. 10 отчёта 2024 и HTML отчёта 2025"
     },
     {
       "id": "rzd",
@@ -188,7 +192,7 @@
       "title": "НОВАТЭК",
       "origin": "corporate_disclosure",
       "scope": "Добыча с учётом доли в совместных предприятиях; данные предварительных пресс-релизов, возможны последующие уточнения. Не вся добыча России.",
-      "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+      "source": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511",
       "page": "Таблица добычи углеводородов",
       "metrics": [
         {
@@ -207,32 +211,34 @@
           "year": 2022,
           "gas": 82.14,
           "liquids": 11.94,
-          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_24=16&id_4=2361&id_4=6252",
+          "source": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
           "reference": "Пресс-релиз за 2023, таблица"
         },
         {
           "year": 2023,
           "gas": 82.39,
           "liquids": 12.37,
-          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_24=16&id_4=2361&id_4=6252",
+          "source": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
           "reference": "Пресс-релиз за 2023, таблица"
         },
         {
           "year": 2024,
           "gas": 84.08,
           "liquids": 13.79,
-          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+          "source": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511",
           "reference": "Пресс-релиз за 2025, таблица"
         },
         {
           "year": 2025,
           "gas": 84.57,
           "liquids": 14.11,
-          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+          "source": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511",
           "reference": "Пресс-релиз за 2025, таблица"
         }
       ],
-      "verification": "pending"
+      "verification": "source_rechecked",
+      "verification_date": "2026-11-26",
+      "verification_method": "Сверка таблиц двух оригинальных пресс-релизов; оценки предварительные"
     },
     {
       "id": "severstal",
@@ -280,7 +286,8 @@
     }
   ],
   "verification": {
-    "status": "pending",
-    "note": "Ручные исследовательские записи; повторное сопоставление каждого значения с первичным документом не завершено. Ссылки являются указателями для сверки, не доказательством точности переноса."
+    "status": "partial",
+    "date": "2026-11-26",
+    "note": "33 значения трёх групп сверены с опубликованными документами; 18 значений РЖД и Северстали остаются предварительными. Сверка переноса не подтверждает репрезентативность или независимость корпоративной отчётности."
   }
 }
