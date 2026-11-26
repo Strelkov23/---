@@ -50,7 +50,14 @@
           2725,
           667
         ]
-      ]
+      ],
+      "year_sources": {
+        "2021": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2022": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2023": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2024": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+        "2025": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf"
+      }
     },
     "novatek": {
       "sources": [
@@ -84,11 +91,16 @@
           84.57,
           14.11
         ]
-      ]
+      ],
+      "year_sources": {
+        "2022": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "2023": "https://www.novatek.ru/ru/press/releases/photo.php?from_4=4&id_4=6252&newsFilterFormMode_4=all",
+        "2024": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511",
+        "2025": "https://www.novatek.ru/ru/press/releases/archive/index.php?id_4=7511"
+      }
     },
     "rosenergoatom": {
       "method": "PDF screenshot and HTML",
-      "source": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
       "reference": "2024, printed p.10 (PDF index 6); 2025 official reporting page",
       "rows": [
         [
@@ -111,7 +123,21 @@
           2025,
           218.349
         ]
-      ]
+      ],
+      "keys": [
+        "nuclear_generation"
+      ],
+      "sources": [
+        "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "https://report.rosatom.ru/1684.html"
+      ],
+      "year_sources": {
+        "2021": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2022": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2023": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2024": "https://www.report.rosatom.ru/go/2024/rea_2024.pdf",
+        "2025": "https://report.rosatom.ru/1684.html"
+      }
     },
     "rzd": {
       "sources": [
@@ -155,7 +181,15 @@
           1115.8,
           3075.3
         ]
-      ]
+      ],
+      "year_sources": {
+        "2020": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2021": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2022": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2023": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2024": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "2025": "https://rspp.ru/upload/uf/e20/j1m9r4nmszlidbi2l4ylbzzwt7tscn1g/%D0%9E%D1%82%D1%87%D0%B5%D1%82%20%D0%BE%D0%B1%20%D1%83%D1%81%D1%82%D0%BE%D0%B9%D1%87%D0%B8%D0%B2%D0%BE%D0%BC%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B8%20%D0%9E%D0%90%D0%9E%20%D0%A0%D0%96%D0%94%20%D0%B7%D0%B0%202025%20%D0%B3%D0%BE%D0%B4.pdf"
+      }
     },
     "severstal": {
       "source": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
@@ -176,7 +210,11 @@
           10384,
           10032
         ]
-      ]
+      ],
+      "year_sources": {
+        "2023": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf",
+        "2024": "https://cdn.financemarker.ru/operations/2024/MOEX/C/CHMF_2024_12_Y.pdf"
+      }
     }
   },
   "trade": {
@@ -363,7 +401,10 @@
           10825,
           11206
         ]
-      ]
+      ],
+      "year_sources": {
+        "2025": "https://bigcapital.org/ru/moex/chmf/2025/"
+      }
     }
   }
 }
