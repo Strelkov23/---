@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
  function links(parent,items){items.filter(i=>valid(i[1])).forEach(([t,u],i)=>{if(i)parent.append(document.createTextNode(' · '));parent.append(link(t,u))})}
  try{
   if(!version){const res=await fetch('version.txt');if(res.ok)version=(await res.text()).trim()}
-  const data=await load('literature.json');
+  const data=pinned?await load('literature.json'):LiteratureDelivery.decode(await load('literature-delivery.json'));
   if(!Array.isArray(data.articles))throw Error('Invalid catalogue');
   const records=data.articles.filter(r=>r&&r.title),reg=data.registry||{},audit=data.links||{};
   const meta=r=>reg[r.journal]||{},check=r=>audit[r.doi]||{},state=r=>check(r).status||'unchecked';
