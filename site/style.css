@@ -511,3 +511,25 @@ html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 /* V.9: accessible navigation and controls, no forced animation. */
 .v-section-index a:focus-visible,.v-index-back:focus-visible,.v-lab-guide button:focus-visible,#v-bookmark-toggle:focus-visible{outline:3px solid #a06424;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}main *,main *::before,main *::after{scroll-behavior:auto!important;transition-duration:0s!important;animation-duration:0s!important}}
+
+/* V.10: legible result panels. Colour denotes direction/selection, not economic desirability. */
+.iv-workbench>div{min-width:0}
+.iv-result{background:#fff;color:#203d4c;border:1px solid #b7cdd2;border-radius:.55rem;padding:.9rem;min-width:0}
+.iv-result>span{font-size:.93rem;font-weight:600;line-height:1.4}
+.iv-result strong{font-size:clamp(1.5rem,4vw,2.1rem);color:#174b5a;overflow-wrap:anywhere}
+.v-result-axis{position:relative;height:18px;background:#e8eff1;border:1px solid #c5d4d9;border-radius:.25rem;margin-top:.45rem}
+.v-result-axis::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:2px solid #647b86}
+.v-result-bar{position:absolute;top:3px;bottom:3px;background:#347f8c}
+.v-result-bar[data-direction=negative]{background:#a86d47}
+.v-result-marker{position:absolute;top:-3px;bottom:-3px;border-left:2px dashed #182d37;z-index:1}
+.v-axis-labels{display:flex;justify-content:space-between;gap:.4rem;font-size:.73rem;color:#415e69;font-variant-numeric:tabular-nums}
+.v-result-note{font-size:.84rem;line-height:1.45;color:#395867;margin:.4rem 0 0;overflow-wrap:anywhere}
+#pulse-cards .pulse-card{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;background:#fff;color:#213e4a;border:1px solid #bed0d5;padding:.85rem;border-radius:.5rem;min-width:0}
+#pulse-cards .pulse-card h3{margin:0;line-height:1.4}
+#pulse-cards .pulse-card[data-selected=true]{border-color:#398b89;box-shadow:inset 0 3px #398b89}
+#pulse-cards .pulse-card[data-observation=missing] strong{font-size:1.1rem;color:#526975}
+#pulse-cards .pulse-card button{margin-top:auto;min-height:44px;width:100%;white-space:normal;overflow-wrap:anywhere}
+#pulse-cards .pulse-card button[aria-pressed=true]{background:#e1efed;color:#154b51;border-color:#6e9c9a}
+.v-observation-stamp{font-size:.77rem;color:#526b75;font-variant-numeric:tabular-nums}
+#pulse-cards .pulse-card p{margin:.25rem 0;line-height:1.45}
+@media(max-width:520px){.iv-result{padding:.75rem}.v-axis-labels{font-size:.7rem}}
