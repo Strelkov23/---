@@ -147,6 +147,9 @@ with sync_playwright() as p:
         page.locator("#geo-diff-base").select_option(page.locator("#geo-year").input_value())
         assert "Сопоставлено" in page.locator("#geo-diff-status").inner_text()
         assert page.locator("#geo-diff-rows tr").count()>0
+        assert page.locator("#geo-diff-dispersion article").count()==5
+        assert "Одинаковая выборка" in page.locator("#geo-diff-dispersion-status").inner_text()
+        assert not page.locator("#geo-diff-dispersion-export").is_disabled()
         assert "выбранный показатель" in page.locator("#geo-insight").inner_text()
         assert not errors,errors
         page.close()

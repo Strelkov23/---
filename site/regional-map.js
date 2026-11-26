@@ -123,6 +123,17 @@ const RegionalMap=(()=>{
   if(relative&&(base<=0||current<0))return null;
   const v=relative?100*(current/base-1):current-base;return Number.isFinite(v)?v:null
  }
+ // Paired territorial sample: no change of composition between the two distributions.
+ function pairedDispersion(pairs){
+  const stats=typeof module!=='undefined'?require('./regional-disparities.js'):RegionalStats;
+  const a=pairs.filter(r=>Number.isFinite(r.base)&&Number.isFinite(r.current)&&Number.isFinite(r.delta));
+  const count=a.length,base=stats.stats(a.map(r=>r.base)),current=stats.stats(a.map(r=>r.current)),changes=stats.stats(a.map(r=>r.delta));
+  const change=(key)=>count>=3&&Number.isFinite(base?.[key])&&Number.isFinite(current?.[key])?current[key]-base[key]:null;
+  const rank=values=>values.map(v=>1+values.filter(x=>x>v).length+(values.filter(x=>x===v).length-1)/2);
+  const x=rank(a.map(r=>r.base)),y=rank(a.map(r=>r.current));
+  return {count,base,current,medianChange:changes?.median??null,up:a.filter(r=>r.delta>0).length,down:a.filter(r=>r.delta<0).length,unchanged:a.filter(r=>r.delta===0).length,
+   cvDelta:change('cv'),giniDelta:change('gini'),spreadDelta:count>=3?(current.q3-current.q1)-(base.q3-base.q1):null,rankCorrelation:stats.pearson(x.map((v,i)=>({x:v,y:y[i]})))};
+ }
  function changeBin(v,threshold){return !Number.isFinite(v)||!Number.isFinite(threshold)||threshold<=0?-1:v< -threshold?0:v<0?1:v===0?2:v<=threshold?3:4}
  function compareRows(items,codes){
   const ranked=items.filter(x=>Number.isFinite(x.value)).sort((a,b)=>b.value-a.value),base=items.find(x=>x.code===codes[0])?.value;
@@ -162,7 +173,7 @@ const RegionalMap=(()=>{
    return {...spec,inputs:[a,b],year:ok?x.year:null,region:ok?x.region:null,value:ok?(spec.op==='ratio'?spec.factor*x.value/y.value:x.value-y.value):null};
   })
  }
- return {key,project,rings,classes,availableYears,temporalPosition,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,regionalInsight,periodChange,changeBin,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
+ return {key,project,rings,classes,availableYears,temporalPosition,bin,theme,industryTheme,industryThemes,palette,inTheme,coverage,isGrowth,growthBin,displayName,profileObservation,rankProfileCandidates,chooseProfileObservation,passportTheme,trend,regionalInsight,periodChange,pairedDispersion,changeBin,compareRows,deriveProfile,regionNames:()=>Object.fromEntries(Object.entries(pairs).map(([k,v])=>['RU-'+k,v]))};
 })();
 if(typeof module!=='undefined')module.exports=RegionalMap;
 
@@ -493,6 +504,17 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    const ranked=[...deltaRows].sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
    $('geo-diff-status').textContent=difference?'Сопоставлено '+deltaRows.length+' контуров за '+baseY+' и '+Y+' годы. Единица: '+diffUnit+'. Порог: ±'+threshold+'. Денежные ряды не дефлированы.':'';
    if(difference)for(const f of ranked.slice(0,10)){const tr=body.insertRow();for(const v of [regionName(f.f.properties),fmtValue(f.base.value),fmtValue(f.r.value),fmtValue(f.delta)+' '+diffUnit])tr.insertCell().textContent=v}
+   const disp=$('geo-diff-dispersion'),dispStatus=$('geo-diff-dispersion-status'),dispExport=$('geo-diff-dispersion-export');
+   if(disp){
+    disp.replaceChildren();dispExport.disabled=true;dispStatus.textContent='';
+    if(difference){
+     const r=RegionalMap.pairedDispersion(deltaRows.map(f=>({base:f.base.value,current:f.r.value,delta:f.delta}))),fmtN=(v,u='')=>Number.isFinite(v)?fmtValue(v)+u:'Нет расчёта';
+     const metrics=[['Медианное изменение региона',r.medianChange,diffUnit],['Изменение коэффициента вариации',r.cvDelta,'п.п.'],['Изменение коэффициента Джини',r.giniDelta,''],['Изменение межквартильного размаха',r.spreadDelta,series.unit],['Ранговая корреляция (Спирмен)',r.rankCorrelation,'']];
+     for(const [title,v,u] of metrics){const card=node('article','');card.className='pulse-card';card.append(node('h4',title),node('strong',fmtN(v,u?' '+u:'')));disp.append(card)}
+     dispStatus.textContent='Одинаковая выборка: '+r.count+' контуров. Увеличение: '+r.up+'; уменьшение: '+r.down+'; без изменений: '+r.unchanged+'. '+(r.count<3?'Менее трёх пар: показатели изменения разброса и ранговая корреляция не рассчитываются.':r.cvDelta===null?'Коэффициент вариации недоступен при отрицательных значениях или неположительном среднем.':r.cvDelta>1e-8?'Относительный разброс по коэффициенту вариации увеличился.':r.cvDelta< -1e-8?'Относительный разброс по коэффициенту вариации уменьшился.':'Относительный разброс по коэффициенту вариации практически не изменился.')+' Это описательная диагностика, не доказательство причин, благополучия или статистической значимости.';
+     dispExport.disabled=!r.count;dispExport.onclick=()=>csv('regional-dispersion-paired-'+series.code+'-'+baseY+'-'+Y+'.csv',[['Показатель',series.title],['Источник',series.source],['База',baseY],['Год',Y],['Режим изменения',diffUnit],['Число пар',r.count],['Увеличение',r.up],['Уменьшение',r.down],['Без изменений',r.unchanged],['Медианное изменение',r.medianChange],['Коэффициент вариации базы, %',r.base?.cv],['Коэффициент вариации текущий, %',r.current?.cv],['Джини базы',r.base?.gini],['Джини текущий',r.current?.gini],...metrics.map(([t,v,u])=>[t,v,u]),['Регион','Базовое значение','Текущее значение','Изменение'],...deltaRows.map(f=>[regionName(f.f.properties),f.base.value,f.r.value,f.delta])]);
+    }
+   }
    const exp=$('geo-diff-export');exp.disabled=!difference||!deltaRows.length;exp.onclick=()=>csv('regional-change-'+series.code+'-'+baseY+'-'+Y+'.csv',[['Базовый год','Год','Код','Регион','База','Текущее','Разница','Единица разницы','Источник','Лист базы','Строка базы','Столбец базы','Лист текущий','Строка текущая','Столбец текущий'],...features.filter(f=>f.key&&counts.get(f.key)===1).map(f=>[baseY,Y,f.f.properties.iso_3166_2,regionName(f.f.properties),f.base?.value??'',f.r?.value??'',f.delta??'',diffUnit,series.source,f.base?.sheet,f.base?.row,f.base?.column,f.r?.sheet,f.r?.row,f.r?.column])])
   }
   const matched=features.filter(x=>x.r),unmapped=[...sample.out].filter(([key])=>counts.get(key)!==1);
