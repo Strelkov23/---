@@ -492,3 +492,6 @@ html[data-view=professional] .v-task-guide summary{font-size:.88rem}
 html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 @media(max-width:700px){.v-lab-guide ol{grid-template-columns:minmax(0,1fr);gap:.4rem}.v-lab-guide li{padding:.25rem 0}}
 @media print{.v-lab-guide button{display:none}}
+
+/* V.7: expose transferred context, including unavailable periods. */
+.v-transfer-status{padding:.65rem .8rem;border:1px solid #adc9c8;border-left:3px solid #398b89;border-radius:.35rem;background:#edf5f3;color:#193e45;overflow-wrap:anywhere}
