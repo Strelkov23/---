@@ -15,6 +15,10 @@ with sync_playwright() as p:
         page.goto("http://localhost:8765/index.html",wait_until="load")
         assert page.locator(".route-grid article").count()==3
         assert page.locator(".route-steps a").count()==12
+        assert page.locator(".v-first-visit summary").count()==1
+        page.locator(".v-first-visit summary").click()
+        assert page.locator(".v-first-visit li:visible").count()==3
+        page.locator(".v-first-visit summary").click()
         # Dynamic table enhancement is incremental and must remain idempotent.
         page.evaluate("""()=>{const root=document.createElement('section');root.id='layout-regression-fixture';root.innerHTML='<table id="layout-regression-table"><tbody><tr><td>Test</td></tr></tbody></table>';document.querySelector('main').append(root)}""")
         page.wait_for_function("document.querySelector('#layout-regression-table').parentElement.classList.contains('table-scroll')")
@@ -894,6 +898,23 @@ with sync_playwright() as p:
         page.locator("#site-search-scope").select_option("tools")
         page.wait_for_function("document.querySelectorAll('#site-search-results section').length===1")
         assert page.locator("#site-search-results article a").count()>0
+        # Real search index, not just synthetic unit fixtures: six representative tasks.
+        from urllib.parse import urlparse
+        tasks=[["Как изменилось производство?","industrial.html"],["Как сравнить регионы?","economic-map.html#geo-dashboard"],["Найти предприятие по ИНН","company-atlas.html"],["Как проверить данные Росстата?","iv-comparison.html"],["Что будет если увеличить выпуск?","iv-lab.html"],["Найти научную статью","papers.html"]]
+        for query,expected in tasks:
+            page.locator("#site-search-q").fill(query)
+            page.locator("#site-search-form button[type=submit]").click()
+            page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей:')",timeout=30000)
+            top=page.locator("#site-search-results article").first
+            href=urlparse(top.locator("a").get_attribute("href"))
+            actual=href.path.rsplit("/",1)[-1]+("#"+href.fragment if href.fragment else "")
+            assert actual==expected,(query,actual,expected)
+            assert top.locator(".v-search-match").count()==1
+        page.locator("#site-search-q").fill("неизвестныйвопросxyz")
+        page.locator("#site-search-form button[type=submit]").click()
+        page.wait_for_function("document.querySelector('#site-search-status').textContent.startsWith('Найдено записей: 0')",timeout=30000)
+        assert page.locator("#site-search-results article").count()==0
+        assert "Нет подходящих инструментов" in page.locator("#site-search-results").inner_text()
         page.goto("http://localhost:8765/economic-map.html",wait_until="load")
         page.wait_for_function("!document.querySelector('#geo-status').textContent.startsWith('Загрузка')")
         if page.locator("#geo-series option").count():
