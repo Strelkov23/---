@@ -71,8 +71,13 @@ with sync_playwright() as p:
         page.locator("#trajectory-laborCap").fill("0")
         page.locator("#trajectory-run").click()
         page.wait_for_function("document.querySelectorAll('#trajectory-rows tr').length===2",timeout=60000)
-        assert page.locator("#trajectory-rows tr").first.locator("td").nth(8).inner_text()=="0"
-        assert page.locator("#trajectory-rows tr").first.locator("td").nth(9).inner_text()=="0"
+        assert "лимит дополнительных человеко-лет: 0" in page.locator("#trajectory-status").inner_text()
+        for row in page.locator("#trajectory-rows tr").all():
+            for attr,col in (("data-labor-a",8),("data-labor-b",9)):
+                raw=row.get_attribute(attr)
+                shown=row.locator("td").nth(col).inner_text()
+                assert raw is not None and abs(float(raw))<=1e-7,(attr,raw,shown,row.inner_text())
+                assert shown.strip() in ("0","-0","−0"),(attr,raw,shown,row.inner_text())
         page.locator("#trajectory-laborEnabled").uncheck()
         assert page.locator("#trajectory-export").is_disabled()
         page.wait_for_function("!document.getElementById('iv-tech-group').disabled")
