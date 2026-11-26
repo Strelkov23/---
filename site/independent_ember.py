@@ -66,5 +66,16 @@ if __name__=="__main__":
     import argparse
     ap=argparse.ArgumentParser();ap.add_argument("--snapshot");args=ap.parse_args()
     rows,sha=fetch(date.today().year-1)
-    if args.snapshot:Path(args.snapshot).write_text(json.dumps(dict(schema="iv-ember-v1",source=URL,documentation=DOC,license="CC BY 4.0",origin="external_compilation",unit="TWh",rows=rows,sha256=sha),ensure_ascii=False,allow_nan=False),encoding="utf-8")
+    if args.snapshot:
+        import sqlite3,tempfile
+        stamp=datetime.now().astimezone().isoformat()
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);db_path=root/"probe.db"
+            with sqlite3.connect(db_path) as db:
+                first=publish(db,root,stamp,True,lambda year:(rows,sha))
+            with sqlite3.connect(db_path) as db:
+                offline=publish(db,root,stamp,False)
+            if first!=offline or offline["rows"]!=rows or offline["sha256"]!=sha:raise ValueError("Ember archive roundtrip mismatch")
+            Path(args.snapshot).write_bytes((root/"independent-ember.json").read_bytes())
+            print("Ember archive roundtrip accepted:",len(offline["rows"]),"years")
     print("Ember source accepted:",len(rows),"years;",len(keys(rows)),"observations; SHA256:",sha)

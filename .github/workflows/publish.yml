@@ -94,7 +94,7 @@ jobs:
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0 xlrd==2.0.2
-          python3 -m unittest test_literature_resume.py test_literature_coverage.py test_nao_project_public.py test_nao_project_import.py test_nao_column_audit.py test_nao_project_schema.py test_sme_profile_public.py test_sme_profile_index.py test_bank_form_queue.py test_journal_evidence.py test_source_acceptance.py test_source_contract.py test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_balance_audit.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_bank_disclosure.py test_bank_report_probe.py test_bank_capital.py test_bank_capital_history.py test_bank_balance.py test_bank_profit.py test_company_sources.py test_company_import.py test_company_index.py test_company_names.py test_sme_finance_public.py test_sme_artifact.py test_group_passports.py test_corporate_watch.py test_corporate_discovery.py
+          python3 -m unittest test_independent_trade.py test_independent_ember.py test_iv_release.py test_literature_resume.py test_literature_coverage.py test_nao_project_public.py test_nao_project_import.py test_nao_column_audit.py test_nao_project_schema.py test_sme_profile_public.py test_sme_profile_index.py test_bank_form_queue.py test_journal_evidence.py test_source_acceptance.py test_source_contract.py test_sme_classification.py test_sme_full_import.py test_sme_finance_join.py test_federal_budget.py test_rosstat_workbooks.py test_finance_workbooks.py test_link_recovery.py test_consistency.py test_stat_revisions.py test_freshness.py test_district_geo.py test_sme_regions.py test_facility_data.py test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_balance_audit.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py test_navigation.py test_regional_geo.py test_regional_manufacturing.py test_regional_industry_extra.py test_industrial_parks.py test_park_certificates.py test_investment_projects.py test_amur_projects.py test_krasnodar_projects.py test_project_coverage.py test_enterprise_sources.py test_amur_enterprises.py test_bank_registry.py test_bank_disclosure.py test_bank_report_probe.py test_bank_capital.py test_bank_capital_history.py test_bank_balance.py test_bank_profit.py test_company_sources.py test_company_import.py test_company_index.py test_company_names.py test_sme_finance_public.py test_sme_artifact.py test_group_passports.py test_corporate_watch.py test_corporate_discovery.py
           python3 -m compileall -q .
           for script in *.js; do node --check "$script"; done
           node test-regional-disparities.js
@@ -107,6 +107,24 @@ jobs:
           node test-news-map.js
           node test-site-search.js
           node test-interface.js
+          node test-iv-lab.js
+          node test-iv-policy.js
+          node test-iv-lab-nav.js
+          node test-iv-evidence.js
+          node test-iv-comparison.js
+          node test-iv-physical.js
+          node test-iv-physical-composite.js
+          node test-iv-workspaces.js
+          node test-iv-allocation.js
+          node test-iv-trajectory.js
+          node test-iv-tech.js
+          node test-iv-methods.js
+          node test-iv-origin.js
+          node test-iv-energy-structure.js
+          node test-iv-pulse.js
+          node test-iv-trade.js
+          node test-iv-labour.js
+          node test-iv-prices.js
           node test-facility-map.js
           node test-bank-directory.js
           node test-bank-capital.js
@@ -159,6 +177,7 @@ jobs:
           node test-energy-output.js
           rm -rf public
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
+          python3 iv_release.py public ../history/published
           node test-price-model.js
           node test-technology.js
           node test-cost-decomposition.js
@@ -265,6 +284,7 @@ jobs:
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ > /dev/null
           CHROME_BIN=$(command -v google-chrome) python3 ../test_global_browser.py
           CHROME_BIN=$(command -v google-chrome) python3 ../test_visual_system.py
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_iv_browser.py
           CHROME_BIN=$(command -v google-chrome) python3 ../layout_audit.py http://localhost:8765/ /tmp/layout-audit
       - name: Retain validation reports
         if: always()
@@ -364,7 +384,7 @@ jobs:
           analytics_sha256=$(python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
-          names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json"]
+          names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json","iv-lab.html","independent-statistics.html","iv-comparison.html","iv-lab-nav.js","iv-energy-structure.js","iv-origin.js","iv-ember.js","iv-methods.js","iv-tech.js","iv-trajectory.js","iv-allocation.js","iv-workspaces.js","iv-physical-composite.js","iv-physical.js","iv-comparison.js","iv-evidence.js","iv-policy.js","iv-prices.js","iv-labour.js","iv-trade.js","iv-pulse.js","iv-lab.js","independent-trade.json","independent-ember.json","independent-prices.json","independent-labour.json","independent-physical.json"]
           print(json.dumps({n:hashlib.sha256((Path("monitor/public")/n).read_bytes()).hexdigest() for n in names},separators=(",",":")))
           PY
           )
@@ -456,7 +476,7 @@ jobs:
           entry=manifest["files"]["federal-budget.csv"]
           get("federal-budget.csv",entry["sha256"],entry["bytes"])
           analytics=json.loads(os.environ["EXPECTED_ANALYTICS_SHA256"])
-          expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json"]
+          expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json","iv-lab.html","independent-statistics.html","iv-comparison.html","iv-lab-nav.js","iv-energy-structure.js","iv-origin.js","iv-ember.js","iv-methods.js","iv-tech.js","iv-trajectory.js","iv-allocation.js","iv-workspaces.js","iv-physical-composite.js","iv-physical.js","iv-comparison.js","iv-evidence.js","iv-policy.js","iv-prices.js","iv-labour.js","iv-trade.js","iv-pulse.js","iv-lab.js","independent-trade.json","independent-ember.json","independent-prices.json","independent-labour.json","independent-physical.json"]
           assert set(analytics)==set(expected_names),"Incomplete analytics hash manifest"
           for name in expected_names:
               get(name,analytics[name])
