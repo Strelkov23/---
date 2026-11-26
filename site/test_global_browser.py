@@ -33,6 +33,21 @@ with sync_playwright() as p:
         page.locator("#hub-query").fill("")
         assert page.locator("#hub-tools article:visible").count()>20
         assert page.locator("body").evaluate("(el)=>el.scrollWidth <= window.innerWidth+2")
+        page.goto("http://localhost:8765/desk.html#v-workspace",wait_until="load")
+        assert not page.locator("#v-track-history").is_checked()
+        page.locator("#v-track-history").check()
+        page.goto("http://localhost:8765/iv-lab.html?view=simple",wait_until="load")
+        page.locator("#v-bookmark-toggle").click()
+        assert page.locator("#v-bookmark-toggle").get_attribute("aria-pressed")=="true"
+        page.goto("http://localhost:8765/desk.html#v-workspace",wait_until="load")
+        assert page.locator("#v-bookmarks a[href='iv-lab.html']").count()==1
+        assert page.locator("#v-history a[href='iv-lab.html']").count()==1
+        assert page.locator("#v-track-history").is_checked()
+        page.locator("#v-track-history").uncheck()
+        page.locator("#v-clear-history").click()
+        assert page.locator("#v-history a").count()==0
+        page.locator("#v-bookmarks button").click()
+        assert page.locator("#v-bookmarks a").count()==0
         page.goto("http://localhost:8765/research-projects.html",wait_until="load")
         page.locator("#rp-title").fill("Тестовый проект")
         page.locator("#rp-note").fill("Проверка библиографии")
