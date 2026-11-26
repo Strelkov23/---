@@ -48,6 +48,7 @@ jobs:
           node test-iv-pulse.js
           node test-iv-trade.js
           node test-iv-labour.js
+          node test-iv-prices.js
           node test-facility-map.js
           node test-bank-directory.js
           node test-company-lookup.js

@@ -33,6 +33,14 @@ with sync_playwright() as p:
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme)
+        page.goto("http://localhost:8765/independent-statistics.html")
+        page.wait_for_function("!document.getElementById('iv-price-period').disabled")
+        page.locator("#iv-price-period").select_option("2024-05")
+        page.locator("#iv-price-share").fill("100")
+        assert page.locator("#iv-price-custom").inner_text()=="1,53%"
+        assert "округлённого" in page.locator("#iv-price-explain").inner_text()
+        page.locator("#iv-price-basis").select_option("yoy")
+        assert page.locator("#iv-price-custom").inner_text()=="8,55%"
         assert not errors,errors
         page.close()
     browser.close()

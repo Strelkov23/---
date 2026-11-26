@@ -1,0 +1,88 @@
+{
+  "schema": "iv-prices-v1",
+  "checked": "2026-11-26",
+  "status": "manual_published_observations",
+  "official_source": "https://www.consultant.ru/document/cons_doc_LAW_19571/d875f624fbeabb2348cee6efd34e248558127767/",
+  "official_origin": "Росстат, републикация КонсультантПлюс",
+  "romir_origin": "Единая панель данных РОМИР, FMCG, январь 2019 = 100",
+  "rows": [
+    {
+      "period": "2024-03",
+      "level": 215.2,
+      "mom": 3.8,
+      "yoy": 19.2,
+      "ytd": 4.6,
+      "url": "https://romir.ru/feed/za-mesyac-deflyator-vyros-na-38",
+      "published": "2024-04-25",
+      "official": {
+        "mom": [
+          100.39,
+          100.22,
+          100.83
+        ],
+        "yoy": [
+          107.72,
+          107.46,
+          108.3
+        ],
+        "ytd": [
+          101.95,
+          101.64,
+          102.7
+        ]
+      }
+    },
+    {
+      "period": "2024-04",
+      "level": 216.4,
+      "mom": 0.6,
+      "yoy": 17.9,
+      "ytd": 5.2,
+      "url": "https://romir.ru/feed/deflyator-pribavil-v-aprele-06",
+      "published": "2024-05-23",
+      "official": {
+        "mom": [
+          100.5,
+          100.45,
+          100.62
+        ],
+        "yoy": [
+          107.84,
+          107.71,
+          108.12
+        ],
+        "ytd": [
+          102.46,
+          102.1,
+          103.34
+        ]
+      }
+    },
+    {
+      "period": "2024-05",
+      "level": 220.6,
+      "mom_pp": 4.2,
+      "yoy_pp": 34.4,
+      "ytd": 6.8,
+      "url": "https://romir.ru/feed/deflyator-pribavil-v-mae-42-pp",
+      "published": "2024-06-27",
+      "official": {
+        "mom": [
+          100.74,
+          100.44,
+          101.53
+        ],
+        "yoy": [
+          108.3,
+          108.19,
+          108.55
+        ],
+        "ytd": [
+          103.22,
+          102.55,
+          104.92
+        ]
+      }
+    }
+  ]
+}
