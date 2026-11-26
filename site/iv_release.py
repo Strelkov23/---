@@ -76,7 +76,7 @@ def verify_recheck(physical,trade_data,evidence):
     corporate_count=0
     for cid,c in verified.items():
         record=corporate[cid]
-        keys=record.get("keys",["nuclear_generation"] if cid=="rosenergoatom" else [])
+        keys=record["keys"]
         require(keys and len(keys)==len(set(keys)) and set(keys)=={m["id"] for m in c["metrics"]},"Corporate recheck metric mismatch: "+cid)
         require(c.get("verification_date")==checked,"Corporate recheck date mismatch: "+cid)
         require(bool(record.get("method")) and bool(record.get("reference")),"Missing corporate recheck reference: "+cid)
@@ -89,6 +89,9 @@ def verify_recheck(physical,trade_data,evidence):
         selected=[r for r in c["rows"] if c["verification"]=="source_rechecked" or r.get("verification")=="source_rechecked"]
         actual={r["year"]:tuple(r.get(k) for k in keys) for r in selected}
         require(len(actual)==len(selected) and actual==expected,"Corporate recheck numbers differ: "+cid)
+        year_sources=record["year_sources"]
+        require(set(year_sources)=={str(y) for y in expected} and all(s in sources for s in year_sources.values()),"Incomplete corporate year sources: "+cid)
+        require(all(r.get("source",c["source"])==year_sources[str(r["year"])] for r in selected),"Corporate year source differs: "+cid)
         corporate_count+=len(rows)*len(keys)
     secondary=evidence.get("secondary_corporate",{})
     secondary_companies={c["id"]:c for c in physical["companies"] if any(r.get("verification")=="secondary_rechecked" for r in c["rows"])}
@@ -103,6 +106,9 @@ def verify_recheck(physical,trade_data,evidence):
         expected={r[0]:tuple(r[1:]) for r in rows}
         actual={r["year"]:tuple(r.get(k) for k in keys) for r in selected}
         require(len(expected)==len(rows) and len(actual)==len(selected) and actual==expected and all(r.get("source") in record["sources"] for r in selected),"Secondary ledger numbers/source differ")
+        year_sources=record["year_sources"]
+        require(set(year_sources)=={str(y) for y in expected} and all(s in record["sources"] for s in year_sources.values()),"Incomplete secondary year sources: "+cid)
+        require(all(r.get("source")==year_sources[str(r["year"])] for r in selected),"Secondary year source differs: "+cid)
         secondary_count+=len(rows)*len(keys)
     t=evidence["trade"]
     require(t["source"]==trade.URL and bool(t.get("reference")) and bool(t.get("method")),"Trade recheck source mismatch")
