@@ -4,3 +4,5 @@ A.equal(C.calculate(d,2025,2023,w).index,null);A.equal(C.calculate(d,2025,2023,w
 A.equal(C.calculate(d,2025,2023,[20,20,0,20,0]).complete,true);A.equal(C.calculate(d,2025,2023,[20,20,0,20,0]).pending,0);
 
 A.equal(C.calculate(d,2025,2023,[20,20,20,20,0]).complete,true);A.equal(C.calculate(d,2025,2023,[20,20,20,20,0]).pending,0);
+
+A.equal(C.calculate(d,2024,2023,w).complete,true);A.equal(C.calculate(d,2024,2023,w).pending,0);A.equal(C.calculate(d,2024,2025,w).blocked,true);
