@@ -22,22 +22,22 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  function read(){return W.parse(localStorage.getItem(W.KEY)||JSON.stringify(W.blank()))}
  function save(next){const validated=W.parse(JSON.stringify(next));localStorage.setItem(W.KEY,JSON.stringify(validated));state=validated}
  try{state=read();if(state.track)save(W.visit(state,current()))}catch(e){locked=true;status('Локальные данные недоступны или повреждены. Старые записи не изменены.')}
- function change(fn){if(locked)return;try{state=read();save(fn(state));draw()}catch(e){status('Изменение не сохранено: '+e.message)}}
+ function change(fn){if(locked)return false;try{state=read();save(fn(state));draw();return true}catch(e){draw();status('Изменение не сохранено: '+e.message);return false}}
  function draw(){
   const marked=state.bookmarks.some(r=>r.route===route);button.hidden=false;button.disabled=locked;button.textContent=marked?'Убрать закладку':'В закладки';button.setAttribute('aria-pressed',String(marked));
   if(!panel)return;
   $('v-track-history').checked=state.track;$('v-track-history').disabled=locked;
   for(const id of ['v-clear-history','v-clear-bookmarks','v-bookmark-export','v-bookmark-import'])$(id).disabled=locked;
-  function renderList(id,rows,removable){const host=$(id);host.replaceChildren();if(!rows.length){const p=document.createElement('p');p.textContent='Пока нет записей.';host.append(p);return}for(const r of rows){const item=document.createElement('li'),a=document.createElement('a'),date=document.createElement('small');a.href=r.route;a.textContent=r.title;date.textContent=' · '+r.date.slice(0,10);item.append(a,date);if(removable){const b=document.createElement('button');b.type='button';b.textContent='Удалить';b.disabled=locked;b.setAttribute('aria-label','Удалить закладку: '+r.title);b.onclick=()=>change(s=>({...s,bookmarks:s.bookmarks.filter(x=>x.route!==r.route)}));item.append(b)}host.append(item)}}
+  function renderList(id,rows,removable){const host=$(id);host.replaceChildren();if(!rows.length){const p=document.createElement('li');p.textContent='Пока нет записей.';host.append(p);return}for(const r of rows){const item=document.createElement('li'),a=document.createElement('a'),date=document.createElement('small');a.href=r.route;a.textContent=r.title;date.textContent=' · '+r.date.slice(0,10);item.append(a,date);if(removable){const b=document.createElement('button');b.type='button';b.textContent='Удалить';b.disabled=locked;b.setAttribute('aria-label','Удалить закладку: '+r.title);b.onclick=()=>change(s=>({...s,bookmarks:s.bookmarks.filter(x=>x.route!==r.route)}));item.append(b)}host.append(item)}}
   renderList('v-bookmarks',state.bookmarks,true);renderList('v-history',state.history,false);
  }
- button.onclick=()=>{change(s=>W.toggle(s,current()));if(!locked)status('Закладки: '+state.bookmarks.length)};
+ button.onclick=()=>{if(change(s=>W.toggle(s,current())))status('Закладки: '+state.bookmarks.length)};
  if(panel){
-  $('v-track-history').onchange=()=>{const track=$('v-track-history').checked;change(s=>({...s,track}));status(track?'История включена. Записываются только посещённые страницы без запросов.':'История выключена. Существующие записи можно очистить отдельно.')};
+  $('v-track-history').onchange=()=>{const track=$('v-track-history').checked;if(change(s=>({...s,track})))status(track?'История включена. Записываются только посещённые страницы без запросов.':'История выключена. Существующие записи можно очистить отдельно.')};
   $('v-clear-history').onclick=()=>change(s=>({...s,history:[]}));
   $('v-clear-bookmarks').onclick=()=>{if(window.confirm('Удалить все закладки этого браузера?'))change(s=>({...s,bookmarks:[]}))};
   $('v-bookmark-export').onclick=()=>{try{state=read();const blob=new Blob([JSON.stringify({schema:1,type:'economic-bookmarks',bookmarks:state.bookmarks},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='economic-bookmarks.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Файл закладок подготовлен. История не включена.')}catch(e){status('Экспорт не выполнен: '+e.message)}};
-  $('v-bookmark-import').onchange=async()=>{const input=$('v-bookmark-import'),file=input.files?.[0];try{if(!file)return;if(file.size>W.MAX_BYTES)throw Error('Файл слишком большой');const added=W.importBookmarks(await file.text());change(s=>({...s,bookmarks:W.merge(s.bookmarks,added)}));}catch(e){status('Импорт не выполнен: '+e.message)}finally{input.value=''}};
+  $('v-bookmark-import').onchange=async()=>{const input=$('v-bookmark-import'),file=input.files?.[0];try{if(!file)return;if(file.size>W.MAX_BYTES)throw Error('Файл слишком большой');const added=W.importBookmarks(await file.text());if(change(s=>({...s,bookmarks:W.merge(s.bookmarks,added)})))status('Закладки объединены без удаления существующих.');}catch(e){status('Импорт не выполнен: '+e.message)}finally{input.value=''}};
  }
  window.addEventListener('storage',e=>{if(e.key===W.KEY&&!locked){try{state=read();draw()}catch(err){locked=true;draw();status('Локальные записи недоступны.')}}});draw()
 });
