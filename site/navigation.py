@@ -353,3 +353,168 @@ def atlas_tools(page,body):
     links=''.join('<a class="atlas-task" href="#'+escape(target,quote=True)+'"><strong>'+escape(title)+'</strong><span>'+escape(desc)+'</span><span class="atlas-task-arrow" aria-hidden="true">↗</span></a>' for target,title,desc in tasks)
     menu='<nav id="atlas-tools" class="atlas-tools" aria-label="Инструменты: '+escape(label,quote=True)+'"><div class="atlas-tools-head"><h2>Что вы хотите сделать?</h2><p>Быстрый переход к нужному инструменту на этой странице.</p></div><div class="atlas-task-grid">'+links+'</div></nav>'
     return body[:first]+menu+body[first:]
+
+
+# V.8: a compact on-page index for long research pages without an existing atlas menu.
+SECTION_INDEX={
+ "historical.html": [
+  [
+   "hist-form",
+   "Динамика показателя"
+  ],
+  [
+   "hist-rank-year",
+   "Сравнение территорий за год"
+  ],
+  [
+   "regional-comparison",
+   "Два показателя региона"
+  ],
+  [
+   "enterprise-diagnostics",
+   "Финансы организаций"
+  ],
+  [
+   "regional-disparities",
+   "Межрегиональные различия"
+  ],
+  [
+   "regional-map",
+   "Карта"
+  ]
+ ],
+ "diagnostics.html": [
+  [
+   "diag-overview",
+   "Общая диагностика"
+  ],
+  [
+   "investment-diagnostics",
+   "Инвестиции"
+  ],
+  [
+   "dependency-diagnostics",
+   "Межотраслевые связи"
+  ],
+  [
+   "diag-signals",
+   "Исторические сигналы"
+  ]
+ ],
+ "scenario.html": [
+  [
+   "scenario-form",
+   "Изменение спроса"
+  ],
+  [
+   "chain-stress",
+   "Стресс-тест цепочек"
+  ],
+  [
+   "reproduction-plan",
+   "Капитал и труд"
+  ],
+  [
+   "resource-plan",
+   "Распределение ресурсов"
+  ],
+  [
+   "dynamic-plan",
+   "Многолетние мощности"
+  ],
+  [
+   "dynamic-strategies",
+   "Инвестиционные стратегии"
+  ],
+  [
+   "global-plan",
+   "Оптимизация горизонта"
+  ]
+ ],
+ "independent-statistics.html": [
+  [
+   "iv-origin",
+   "Происхождение данных"
+  ],
+  [
+   "iv-hh",
+   "Рынок труда"
+  ],
+  [
+   "iv-trade",
+   "Зеркальная торговля"
+  ],
+  [
+   "iv-price-comparison",
+   "Цены и инфляция"
+  ],
+  [
+   "iv-physical",
+   "Выпуск компаний"
+  ],
+  [
+   "iv-physical-composite",
+   "Индекс физической активности"
+  ],
+  [
+   "iv-ember",
+   "Электроэнергетика"
+  ],
+  [
+   "energy-structure",
+   "Структура энергетики"
+  ],
+  [
+   "iv-method-audit",
+   "Методики Росстата"
+  ]
+ ],
+ "iv-comparison.html": [
+  [
+   "iv-audit-pair",
+   "Сопоставимость источников"
+  ],
+  [
+   "iv-audit-basis",
+   "Расхождения ценовых темпов"
+  ],
+  [
+   "iv-power",
+   "Покупательная способность"
+  ]
+ ],
+ "desk.html": [
+  [
+   "desk-filter",
+   "Поиск материалов"
+  ],
+  [
+   "v-workspace",
+   "Закладки и история"
+  ],
+  [
+   "basket-count",
+   "Моя подборка"
+  ],
+  [
+   "brief",
+   "Аналитическая справка"
+  ],
+  [
+   "desk-results",
+   "Результаты поиска"
+  ]
+ ]
+}
+def section_index(page,body):
+    import re
+    tasks=SECTION_INDEX.get(page)
+    if not tasks:return body
+    ids=re.findall(r'\bid=["\']([^"\']+)["\']',body)
+    if any(ids.count(target)!=1 for target,_ in tasks):raise ValueError("Неоднозначный или отсутствующий переход: "+page)
+    first=body.find("</section>")
+    if first<0:raise ValueError("Отсутствует вводный раздел: "+page)
+    first+=len("</section>")
+    links=''.join('<li>'+a("#"+target,title)+'</li>' for target,title in tasks)
+    menu='<nav id="v-section-index" class="v-section-index" aria-label="Содержание страницы"><details open><summary>На этой странице ('+str(len(tasks))+')</summary><ul>'+links+'</ul></details></nav>'
+    return body[:first]+menu+body[first:]
