@@ -1,0 +1,74 @@
+{
+  "schema": "iv-physical-v1",
+  "status": "manual_published_observations",
+  "checked": "2026-11-26",
+  "companies": [
+    {
+      "id": "nornickel",
+      "title": "Норникель",
+      "origin": "corporate_disclosure",
+      "scope": "Группа, производство из собственного сырья; годовые данные, округлённые в отчёте",
+      "source": "https://ar2025.nornickel.com/download/en/ar/full-report/ar_en_annual-report_pages_nornickel_2025.pdf",
+      "page": "8–9",
+      "metrics": [
+        {
+          "id": "nickel",
+          "title": "Никель",
+          "unit": "тыс. т"
+        },
+        {
+          "id": "copper",
+          "title": "Медь",
+          "unit": "тыс. т"
+        },
+        {
+          "id": "palladium",
+          "title": "Палладий",
+          "unit": "тыс. тройских унций"
+        },
+        {
+          "id": "platinum",
+          "title": "Платина",
+          "unit": "тыс. тройских унций"
+        }
+      ],
+      "rows": [
+        {
+          "year": 2021,
+          "nickel": 190,
+          "copper": 407,
+          "palladium": 2616,
+          "platinum": 641
+        },
+        {
+          "year": 2022,
+          "nickel": 219,
+          "copper": 433,
+          "palladium": 2790,
+          "platinum": 651
+        },
+        {
+          "year": 2023,
+          "nickel": 208,
+          "copper": 425,
+          "palladium": 2692,
+          "platinum": 664
+        },
+        {
+          "year": 2024,
+          "nickel": 205,
+          "copper": 433,
+          "palladium": 2762,
+          "platinum": 667
+        },
+        {
+          "year": 2025,
+          "nickel": 198,
+          "copper": 425,
+          "palladium": 2725,
+          "platinum": 667
+        }
+      ]
+    }
+  ]
+}

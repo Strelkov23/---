@@ -51,6 +51,12 @@ with sync_playwright() as p:
         assert "округлённого" in page.locator("#iv-price-explain").inner_text()
         page.locator("#iv-price-basis").select_option("yoy")
         assert page.locator("#iv-price-custom").inner_text()=="8,55%"
+        page.wait_for_function("!document.getElementById('physical-company').disabled")
+        page.locator("#physical-metric").select_option("nickel")
+        assert "198" in page.locator("#physical-value").inner_text()
+        page.locator("#physical-year").fill("0")
+        assert page.locator("#physical-index").inner_text()=="100"
+        assert page.locator("#physical-yoy").inner_text()=="Нет данных"
         page.goto("http://localhost:8765/iv-comparison.html")
         page.locator("#iv-audit-pair").select_option("labour")
         assert "Разные измерения" in page.locator("#iv-audit-verdict").inner_text()
