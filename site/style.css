@@ -464,3 +464,19 @@ html[data-view=analytical] .v-task-guide dl{gap:.55rem 1rem}
 html[data-view=professional] .v-task-guide{font-size:.85rem}
 html[data-view=professional] .v-task-guide summary{font-size:.88rem}
 @media print{#view-mode-description{display:none}.v-task-guide details>summary{display:none}}
+
+/* V.5: local research workspace, responsive controls. */
+#v-bookmark-toggle{background:#e5f1ef;color:#163d43;border-color:#719d9e;padding:.35rem .55rem;font-size:.85rem;max-width:100%;overflow-wrap:anywhere}
+#v-bookmark-status:empty{display:none}
+#v-bookmark-status{flex-basis:100%;color:#d2e9e9}
+.v-workspace-links{display:flex;flex-wrap:wrap;gap:.65rem}
+.v-workspace-links a{padding:.45rem .65rem;border:1px solid #b0c7c9;border-radius:.35rem;background:#fff}
+.v-workspace-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.v-workspace-grid article{min-width:0;margin:0;padding:.9rem}
+.v-workspace-grid ul{padding-left:1.25rem;overflow-wrap:anywhere}
+.v-workspace-grid li{margin:.5rem 0}
+.v-workspace-grid li button{display:block;font-size:.85rem;margin:.25rem 0}
+.v-workspace-grid input[type=file]{display:block;min-width:0;width:100%;max-width:100%}
+.v-workspace-grid label{min-width:0;grid-template-columns:minmax(0,1fr);margin:.6rem 0}
+.v-workspace-grid .v-history-toggle{display:flex;align-items:center;gap:.5rem}
+@media(max-width:700px){.v-workspace-grid{grid-template-columns:minmax(0,1fr)}}
