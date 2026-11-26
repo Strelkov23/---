@@ -82,7 +82,15 @@ const RegionalDashboard=(()=>{
   for(const r of rows){if(by.has(r.key)||duplicates.has(r.key)){by.delete(r.key);duplicates.add(r.key)}else by.set(r.key,r)}
   return features.map(f=>{const id=key(f.properties?.iso_3166_2),eligible=!!id&&counts.get(id)===1,r=eligible?by.get(id)||null:null;return {feature:f,row:r,category:eligible?signalClass(r):'unmatched'}});
  }
- return {specs,matches,summarize,common,matrixRows,percentile,pair,scope,regionalSignals,signalClass,mapSignals};
+ // Deep links to a collapsed tool must reveal its controls, not only scroll to its heading.
+ function reveal(panel,hash,lookup){
+  let id;try{id=decodeURIComponent(String(hash||'').replace(/^#/,''))}catch{return false}
+  if(!id)return false;const target=lookup(id);
+  if(!target||!panel.contains(target))return false;
+  for(let el=target;el;el=el.parentElement){if(el.tagName==='DETAILS')el.open=true;if(el===panel)break}
+  return true
+ }
+ return {specs,matches,summarize,common,matrixRows,percentile,pair,scope,regionalSignals,signalClass,mapSignals,reveal};
 })();
 if(typeof module!=='undefined')module.exports=RegionalDashboard;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',async()=>{
@@ -92,7 +100,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
  const pairA=$('gd-pair-a'),pairB=$('gd-pair-b'),pairHost=$('gd-pair-chart'),pairStatus=$('gd-pair-status'),pairExport=$('gd-pair-export'),heat=$('gd-heat'),pairLegend=$('gd-heat-legend');
  let loaded=false,busy=false;
  function textNum(v){return Number.isFinite(v)?v.toLocaleString('ru',{maximumFractionDigits:3}):'—'}
- panel.addEventListener('toggle',async()=>{
+ async function initialize(){
   if(!panel.open||loaded||busy)return;busy=true;status.textContent='Загрузка проверенных рядов…';
   try{
    const manifest=await Provenance.validateManifest(await load('data-manifest.json'));
@@ -241,5 +249,9 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    for(const e of [...picks,year,scope,mode,sort,direction,view,heat,pairA,pairB])e.onchange=draw;query.oninput=draw;draw();loaded=true;
   }catch(e){status.textContent='Не удалось проверить многомерную выборку: '+String(e.message||e)}
   finally{busy=false}
- });
+ }
+ panel.addEventListener('toggle',initialize);
+ function openRoute(){if(RegionalDashboard.reveal(panel,location.hash,$)&&panel.open)initialize()}
+ window.addEventListener('hashchange',openRoute);
+ openRoute();if(panel.open)initialize();
 });
