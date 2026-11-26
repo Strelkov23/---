@@ -433,3 +433,34 @@ main:has(#allocation-lab) section,main:has(#allocation-lab) .iv-workbench>div,ma
 #pulse-indicator,#iv-audit-pair{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 main:has(#iv-audit-pair) section,main:has(#iv-audit-pair) label,main:has(#iv-audit-pair) .iv-workbench>div{min-width:0;max-width:100%;overflow-wrap:anywhere}
 main:has(#iv-audit-pair) label:not(.iv-slider){grid-template-columns:minmax(0,1fr)}
+
+/* V.1: a single task-first entry above the detailed research dashboard. */
+.home-command:has(+ #start-here){margin-bottom:1.25rem;padding:clamp(.95rem,3vw,1.65rem)!important}
+#start-here{margin-top:0;scroll-margin-top:1rem}
+.v-entry-grid a{position:relative;justify-content:flex-start;gap:.45rem;min-width:0;min-height:155px;padding:1rem;border-left:3px solid #398b89;box-shadow:0 2px 5px #142e3810}
+.v-entry-grid .v-entry-number{font-size:.72rem;font-weight:700;letter-spacing:.06em;color:#486873}
+.v-entry-grid strong{font-size:1.13rem;line-height:1.35}
+.v-entry-grid .v-entry-action{margin-top:auto;font-weight:700;color:#08645e;padding-top:.3rem}
+.v-entry-grid a:focus-visible{outline:3px solid #ad6b28;outline-offset:2px}
+.v-entry-secondary{font-size:.92rem;line-height:1.8}
+.v-status h2{color:inherit;font-size:1.45rem}
+@media(max-width:520px){.v-entry-grid a{min-height:0;padding:.85rem;gap:.3rem}.v-entry-grid strong{font-size:1.04rem}.v-entry-grid .v-entry-action{padding-top:.1rem}}
+@media print{#start-here .quick-search{display:none}}
+
+/* V.2: compact guide with visible limitations; no JS required. */
+.v-task-guide{min-width:0;max-width:100%;border-radius:.35rem}
+.v-task-guide details{padding:0}
+.v-task-guide summary{font-weight:700;color:#175e55}
+.v-task-guide dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem 1.2rem;margin:.7rem 0}
+.v-task-guide dl>div{min-width:0}
+.v-task-guide dt{font-size:.8rem;font-weight:700;color:#395f68}
+.v-task-guide dd{margin:.15rem 0 0;line-height:1.45;overflow-wrap:anywhere}
+@media(max-width:600px){.v-task-guide dl{grid-template-columns:minmax(0,1fr);gap:.55rem}.v-task-guide{padding:.7rem}}
+
+/* V.3: three detail levels, all tools remain reachable. */
+#view-mode-description{flex-basis:100%;color:#c1d2dd;line-height:1.4;overflow-wrap:anywhere;max-width:100%}
+html[data-view=analytical] .iv-workspace-card{padding:.85rem}
+html[data-view=analytical] .v-task-guide dl{gap:.55rem 1rem}
+html[data-view=professional] .v-task-guide{font-size:.85rem}
+html[data-view=professional] .v-task-guide summary{font-size:.88rem}
+@media print{#view-mode-description{display:none}.v-task-guide details>summary{display:none}}

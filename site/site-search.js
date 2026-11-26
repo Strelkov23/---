@@ -8,8 +8,21 @@ const SiteSearch=(()=>{
   return tokens.reduce((s,t)=>s+(title.includes(t)?3:1),0)+(title.includes(norm(q))?4:0)
  }
  function find(rows,q){return rows.map(r=>({r,score:rank(r,q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score||String(b.r.date||'').localeCompare(String(a.r.date||''))||String(a.r.title).localeCompare(String(b.r.title),'ru')).map(x=>x.r)}
+ function questionNorm(q){return norm(q).replace(/[?!.,:;«»"()]/g,' ').replace(/\s+/g,' ').trim()}
+ function questionScore(r,q){
+  const phrase=questionNorm(q),tokens=words(phrase);
+  if(!tokens.length)return -1;
+  let score=-1;
+  for(const alias of (Array.isArray(r.questions)?r.questions:[])){
+   const a=questionNorm(alias);
+   if(phrase===a)score=Math.max(score,100);
+   else if(tokens.length>=2&&tokens.every(t=>a.includes(t)))score=Math.max(score,30+tokens.length);
+  }
+  return score
+ }
+ function findTools(rows,q){return rows.map(r=>({r,score:Math.max(rank(r,questionNorm(q)),questionScore(r,q))})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score||String(a.r.title).localeCompare(String(b.r.title),'ru')).map(x=>x.r)}
  function href(base,key,value){return base+'?'+encodeURIComponent(key)+'='+encodeURIComponent(value)}
- return {norm,words,rank,find,href}
+ return {norm,words,rank,find,findTools,questionScore,href}
 })();
 if(typeof module!=='undefined')module.exports=SiteSearch;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{
@@ -30,7 +43,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
   const u=new URL(location.href);u.searchParams.set('q',query);u.searchParams.set('site-search-scope',scope.value);history.replaceState(null,'',u);
   if(!query){status.textContent='Введите запрос.';return}
   status.textContent='Поиск в выбранных разделах…';
-  const results=await Promise.allSettled(keys.map(async key=>({key,rows:SiteSearch.find(await get(key),query)})));if(id!==sequence)return;
+  const results=await Promise.allSettled(keys.map(async key=>({key,rows:(key==='tools'?SiteSearch.findTools:SiteSearch.find)(await get(key),query)})));if(id!==sequence)return;
   let total=0,failed=0;
   results.forEach((result,i)=>{
    const key=keys[i],section=node('section','');section.append(node('h2',groups[key][0]));
