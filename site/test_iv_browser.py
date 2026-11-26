@@ -66,6 +66,14 @@ with sync_playwright() as p:
         assert "Оба решения" in page.locator("#trajectory-status").inner_text()
         page.locator("#trajectory-growth").fill("4")
         assert page.locator("#trajectory-export").is_disabled()
+        page.locator("#trajectory-laborEnabled").check()
+        page.locator("#trajectory-laborCap").fill("0")
+        page.locator("#trajectory-run").click()
+        page.wait_for_function("document.querySelectorAll('#trajectory-rows tr').length===2",timeout=60000)
+        assert page.locator("#trajectory-rows tr").first.locator("td").nth(8).inner_text()=="0"
+        assert page.locator("#trajectory-rows tr").first.locator("td").nth(9).inner_text()=="0"
+        page.locator("#trajectory-laborEnabled").uncheck()
+        assert page.locator("#trajectory-export").is_disabled()
         page.wait_for_function("!document.getElementById('iv-tech-group').disabled")
         assert page.locator("#iv-tech-rows tr").count()==19
         page.locator("#iv-tech-material").fill("20")
