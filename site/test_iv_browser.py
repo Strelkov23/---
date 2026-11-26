@@ -41,6 +41,12 @@ with sync_playwright() as p:
         page.locator("#pulse-play").click()
         page.locator("#pulse-play").click()
         assert page.locator("#pulse-play").get_attribute("aria-pressed")=="false"
+        assert page.locator("#pulse-cards .v-observation-stamp").count()==5
+        assert page.locator("#pulse-cards .pulse-card[data-selected=true]").count()==1
+        button=page.locator("#pulse-cards button").first
+        button.click()
+        assert page.locator("#pulse-cards button").first.evaluate("e=>document.activeElement===e")
+        assert page.locator("#pulse-cards button").first.get_attribute("aria-pressed")=="true"
         page.wait_for_function("document.querySelectorAll('#iv-evidence-cards article').length===3")
         page.locator("#iv-evidence-month").fill("2024-05")
         page.locator("#iv-evidence-exact").check()
@@ -68,6 +74,9 @@ with sync_playwright() as p:
         page.locator("#iv-save").click()
         page.locator("#iv-output").fill("20")
         assert "Отличие" in page.locator("#iv-compare").inner_text()
+        assert page.locator("#iv-results .v-result-axis").count()==2
+        assert page.locator("#iv-results .v-result-marker").count()==2
+        assert "Сохранённый вариант:" in page.locator("#iv-results .v-result-note").first.inner_text()
         page.locator("#iv-mode").select_option("budget")
         assert "дефицит" in page.locator("#iv-explain").inner_text()
         page.locator("#policy-save").click()
