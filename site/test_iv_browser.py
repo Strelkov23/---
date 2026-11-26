@@ -51,6 +51,12 @@ with sync_playwright() as p:
         assert "округлённого" in page.locator("#iv-price-explain").inner_text()
         page.locator("#iv-price-basis").select_option("yoy")
         assert page.locator("#iv-price-custom").inner_text()=="8,55%"
+        page.goto("http://localhost:8765/iv-comparison.html")
+        page.locator("#iv-audit-pair").select_option("labour")
+        assert "Разные измерения" in page.locator("#iv-audit-verdict").inner_text()
+        page.locator("#iv-audit-basis").select_option("yoy")
+        page.locator("#iv-audit-threshold").fill("20")
+        assert "Отмечено 0" in page.locator("#iv-audit-gap-status").inner_text()
         page.goto("http://localhost:8765/economic-map.html")
         page.wait_for_function("!document.getElementById('geo-time').disabled",timeout=45000)
         page.locator("#geo-scale").select_option("history")
