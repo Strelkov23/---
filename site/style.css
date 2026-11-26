@@ -507,3 +507,7 @@ html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 .v-index-back{display:inline-block;margin:1rem 0 .3rem;font-size:.88rem}
 @media(max-width:520px){.v-section-index a{min-height:44px}.v-section-index ul{gap:.35rem}}
 @media print{.v-section-index,.v-index-back{display:none}}
+
+/* V.9: accessible navigation and controls, no forced animation. */
+.v-section-index a:focus-visible,.v-index-back:focus-visible,.v-lab-guide button:focus-visible,#v-bookmark-toggle:focus-visible{outline:3px solid #a06424;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}main *,main *::before,main *::after{scroll-behavior:auto!important;transition-duration:0s!important;animation-duration:0s!important}}
