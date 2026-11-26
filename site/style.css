@@ -446,3 +446,13 @@ main:has(#iv-audit-pair) label:not(.iv-slider){grid-template-columns:minmax(0,1f
 .v-status h2{color:inherit;font-size:1.45rem}
 @media(max-width:520px){.v-entry-grid a{min-height:0;padding:.85rem;gap:.3rem}.v-entry-grid strong{font-size:1.04rem}.v-entry-grid .v-entry-action{padding-top:.1rem}}
 @media print{#start-here .quick-search{display:none}}
+
+/* V.2: compact guide with visible limitations; no JS required. */
+.v-task-guide{min-width:0;max-width:100%;border-radius:.35rem}
+.v-task-guide details{padding:0}
+.v-task-guide summary{font-weight:700;color:#175e55}
+.v-task-guide dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem 1.2rem;margin:.7rem 0}
+.v-task-guide dl>div{min-width:0}
+.v-task-guide dt{font-size:.8rem;font-weight:700;color:#395f68}
+.v-task-guide dd{margin:.15rem 0 0;line-height:1.45;overflow-wrap:anywhere}
+@media(max-width:600px){.v-task-guide dl{grid-template-columns:minmax(0,1fr);gap:.55rem}.v-task-guide{padding:.7rem}}
