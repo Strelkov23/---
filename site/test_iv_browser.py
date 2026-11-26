@@ -65,6 +65,12 @@ with sync_playwright() as p:
         assert "Оба решения" in page.locator("#trajectory-status").inner_text()
         page.locator("#trajectory-growth").fill("4")
         assert page.locator("#trajectory-export").is_disabled()
+        page.wait_for_function("!document.getElementById('iv-tech-group').disabled")
+        assert page.locator("#iv-tech-rows tr").count()==19
+        page.locator("#iv-tech-material").fill("20")
+        assert "Баланс пересчитан" in page.locator("#iv-tech-status").inner_text()
+        assert not page.locator("#iv-tech-csv").is_disabled()
+        page.locator("#iv-tech-reset").click()
         for theme in ("light","dark"):
             page.locator("#theme-mode").select_option(theme)
             assert page.locator("body").evaluate("e=>e.scrollWidth<=innerWidth+2"),(width,theme)
