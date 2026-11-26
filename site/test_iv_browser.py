@@ -66,6 +66,7 @@ with sync_playwright() as p:
         assert "Оба решения" in page.locator("#trajectory-status").inner_text()
         page.locator("#trajectory-growth").fill("4")
         assert page.locator("#trajectory-export").is_disabled()
+        page.locator("#trajectory-lab summary").filter(has_text="Дополнительные трудовые ограничения").click()
         page.locator("#trajectory-laborEnabled").check()
         page.locator("#trajectory-laborCap").fill("0")
         page.locator("#trajectory-run").click()
