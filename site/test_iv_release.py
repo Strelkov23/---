@@ -23,7 +23,7 @@ class Release(unittest.TestCase):
         physical=R.read(here/"independent-physical.json")
         trade={"rows":R.trade.seed(),"last_success":None,"seed_verification":"documented_manual",
                "seed_recheck_date":ledger["checked"],"seed_recheck_count":66}
-        self.assertEqual(R.verify_recheck(physical,trade,ledger),{"corporate_values":45,"trade_seed_values":66})
+        self.assertEqual(R.verify_recheck(physical,trade,ledger),{"corporate_values":49,"secondary_corporate_values":2,"trade_seed_values":66})
         for change in ("number","missing","status","date","source","trade_number","trade_count","ledger_duplicate"):
             p,t,e=deepcopy(physical),deepcopy(trade),deepcopy(ledger)
             c=p["companies"][0]
@@ -40,3 +40,14 @@ class Release(unittest.TestCase):
         trade["last_success"]="2026-11-26"
         trade["rows"][0]["us_exports"]+=1
         self.assertEqual(R.verify_recheck(physical,trade,ledger)["trade_seed_values"],66)
+
+    def test_partial_corporate_recheck(self):
+        from pathlib import Path
+        here=Path(R.__file__).resolve().parent
+        ledger=R.read(here.parent/"IV_SOURCE_RECHECK.json")
+        physical=R.read(here/"independent-physical.json")
+        t={"rows":R.trade.seed(),"last_success":None,"seed_verification":"documented_manual","seed_recheck_date":ledger["checked"],"seed_recheck_count":66}
+        self.assertEqual(R.verify_manual(physical,"physical"),51)
+        c=next(c for c in physical["companies"] if c["id"]=="severstal")
+        c["rows"][-1]["steel"]+=1
+        with self.assertRaises(ValueError):R.verify_recheck(physical,t,ledger)
