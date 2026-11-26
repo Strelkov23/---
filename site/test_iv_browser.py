@@ -234,5 +234,26 @@ with sync_playwright() as p:
         assert "выбранный показатель" in page.locator("#geo-insight").inner_text()
         assert not errors,errors
         page.close()
+    # Guard the two selectors that blocked production's 320/390px audit.
+    # Wait for actual data before measuring the document, not just its shell.
+    for width in (320,390):
+        page=browser.new_page(viewport={"width":width,"height":900})
+        for route,control,ready in (
+            ("index.html","#pulse-indicator","document.querySelectorAll('#pulse-cards article').length===5"),
+            ("iv-comparison.html","#iv-audit-pair","!document.getElementById('iv-audit-basis').disabled"),
+        ):
+            page.goto("http://localhost:8765/"+route,wait_until="load")
+            page.wait_for_function(ready)
+            field=page.locator(control)
+            assert field.is_visible() and field.is_enabled(),(route,width)
+            longest=field.evaluate("e=>Array.from(e.options).reduce((a,b)=>a.text.length>=b.text.length?a:b).value")
+            field.select_option(longest)
+            for theme in ("light","dark"):
+                page.locator("#theme-mode").select_option(theme)
+                page.wait_for_function("theme=>document.documentElement.dataset.theme===theme",arg=theme)
+                page.evaluate("document.fonts.ready")
+                assert field.evaluate("e=>e.getBoundingClientRect().right<=document.documentElement.clientWidth+2"),(route,width,theme,control)
+                assert page.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth+2"),(route,width,theme)
+        page.close()
     browser.close()
 print("IV browser interaction checks passed")
