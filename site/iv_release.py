@@ -45,11 +45,13 @@ def verify_manual(d,kind):
         require(d["schema"]=="iv-physical-v1","Physical schema");require(d.get("status") in ("manual_verification_pending","mixed_document_recheck"),"Physical verification status");unique(d["companies"],"id");count=0
         for c in d["companies"]:
             require(https(c["source"]),"Missing corporate source")
-            require(c.get("verification") in ("pending","source_rechecked"),"Corporate verification status not supported")
-            if c["verification"]=="source_rechecked":require(bool(c.get("verification_date")) and bool(c.get("verification_method")),"Missing document recheck metadata")
+            require(c.get("verification") in ("pending","source_rechecked","partial"),"Corporate verification status not supported")
+            if c["verification"] in ("source_rechecked","partial"):require(bool(c.get("verification_date")) and bool(c.get("verification_method")),"Missing document recheck metadata")
             unique(c["metrics"],"id");unique(c["rows"],"year")
             for r in c["rows"]:
                 require(type(r["year"]) is int,"Invalid corporate year")
+                if c["verification"]=="partial":require(r.get("verification") in ("source_rechecked","secondary_rechecked","pending"),"Invalid row verification")
+                else:require("verification" not in r,"Unexpected row verification")
                 for m in c["metrics"]:
                     v=r.get(m["id"])
                     if v is not None:require(finite(v) and v>=0,"Invalid physical value");count+=1
@@ -69,7 +71,7 @@ def verify_recheck(physical,trade_data,evidence):
     checked=evidence.get("checked")
     require(isinstance(checked,str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}",checked),"Invalid recheck date")
     corporate=evidence["corporate"]
-    verified={c["id"]:c for c in physical["companies"] if c.get("verification")=="source_rechecked"}
+    verified={c["id"]:c for c in physical["companies"] if c.get("verification") in ("source_rechecked","partial")}
     require(set(verified)==set(corporate),"Corporate status and recheck ledger disagree")
     corporate_count=0
     for cid,c in verified.items():
@@ -84,9 +86,24 @@ def verify_recheck(physical,trade_data,evidence):
         require(all(len(r)==len(keys)+1 and type(r[0]) is int and all(finite(v) and v>=0 for v in r[1:]) for r in rows),"Invalid corporate recheck row: "+cid)
         expected={r[0]:tuple(r[1:]) for r in rows}
         require(len(expected)==len(rows),"Duplicate corporate recheck year: "+cid)
-        actual={r["year"]:tuple(r.get(k) for k in keys) for r in c["rows"]}
-        require(len(actual)==len(c["rows"]) and actual==expected,"Corporate recheck numbers differ: "+cid)
+        selected=[r for r in c["rows"] if c["verification"]=="source_rechecked" or r.get("verification")=="source_rechecked"]
+        actual={r["year"]:tuple(r.get(k) for k in keys) for r in selected}
+        require(len(actual)==len(selected) and actual==expected,"Corporate recheck numbers differ: "+cid)
         corporate_count+=len(rows)*len(keys)
+    secondary=evidence.get("secondary_corporate",{})
+    secondary_companies={c["id"]:c for c in physical["companies"] if any(r.get("verification")=="secondary_rechecked" for r in c["rows"])}
+    require(set(secondary)==set(secondary_companies),"Secondary corporate ledger mismatch")
+    secondary_count=0
+    for cid,c in secondary_companies.items():
+        record=secondary[cid]; keys=record["keys"]; rows=record["rows"]
+        require(c["verification"]=="partial" and len(keys)==len(set(keys)) and set(keys)=={m["id"] for m in c["metrics"]},"Secondary metric/status mismatch")
+        require(len(set(record["sources"]))>=2 and all(https(s) for s in record["sources"]) and https(record["original_unavailable"]) and bool(record["reference"]),"Secondary source metadata")
+        require(all(len(r)==len(keys)+1 and type(r[0]) is int and all(finite(v) and v>=0 for v in r[1:]) for r in rows),"Invalid secondary row")
+        selected=[r for r in c["rows"] if r.get("verification")=="secondary_rechecked"]
+        expected={r[0]:tuple(r[1:]) for r in rows}
+        actual={r["year"]:tuple(r.get(k) for k in keys) for r in selected}
+        require(len(expected)==len(rows) and len(actual)==len(selected) and actual==expected and all(r.get("source") in record["sources"] for r in selected),"Secondary ledger numbers/source differ")
+        secondary_count+=len(rows)*len(keys)
     t=evidence["trade"]
     require(t["source"]==trade.URL and bool(t.get("reference")) and bool(t.get("method")),"Trade recheck source mismatch")
     expected=[]
@@ -100,7 +117,7 @@ def verify_recheck(physical,trade_data,evidence):
     if not trade_data["last_success"]:
         require(trade_data["rows"]==expected,"Published manual trade rows differ from recheck ledger")
     # Machine-loaded observations may legitimately revise the seed.
-    return {"corporate_values":corporate_count,"trade_seed_values":len(expected)*2}
+    return {"corporate_values":corporate_count,"secondary_corporate_values":secondary_count,"trade_seed_values":len(expected)*2}
 
 def check(out,previous,year):
     manifest=read(out/"data-manifest.json")["files"];counts={};warnings=[]
