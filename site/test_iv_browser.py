@@ -142,6 +142,9 @@ with sync_playwright() as p:
         assert "218,35" in page.locator("#physical-value").inner_text()
         page.locator("#physical-company").select_option("novatek")
         assert "84,57" in page.locator("#physical-value").inner_text()
+        assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
+        assert page.locator("#physical-index-export").is_disabled()
+        page.locator("#physical-index-draft").check()
         page.locator("#physical-index-base").select_option("2023")
         page.locator("#physical-index-year").select_option("2023")
         assert page.locator("#physical-index-result").inner_text()=="100"

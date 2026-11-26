@@ -1,7 +1,6 @@
 {
   "schema": "iv-physical-v1",
-  "status": "manual_published_observations",
-  "checked": "2026-11-26",
+  "status": "manual_verification_pending",
   "companies": [
     {
       "id": "nornickel",
@@ -68,7 +67,8 @@
           "palladium": 2725,
           "platinum": 667
         }
-      ]
+      ],
+      "verification": "pending"
     },
     {
       "id": "rosenergoatom",
@@ -115,7 +115,8 @@
           "source": "https://report.rosatom.ru/1684.html",
           "reference": "Ключевые результаты 2025"
         }
-      ]
+      ],
+      "verification": "pending"
     },
     {
       "id": "rzd",
@@ -179,7 +180,8 @@
           "source": "https://rspp.ru/download/509d241530f496716c4a4b02b45a2348da51aaeccda89a5a/",
           "reference": "Отчёт об устойчивом развитии 2025, ключевые показатели"
         }
-      ]
+      ],
+      "verification": "pending"
     },
     {
       "id": "novatek",
@@ -229,7 +231,8 @@
           "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
           "reference": "Пресс-релиз за 2025, таблица"
         }
-      ]
+      ],
+      "verification": "pending"
     },
     {
       "id": "severstal",
@@ -272,7 +275,12 @@
           "source": "https://bigcapital.org/ru/moex/chmf/2025/",
           "reference": "BigCapital, производственные показатели 2025"
         }
-      ]
+      ],
+      "verification": "pending"
     }
-  ]
+  ],
+  "verification": {
+    "status": "pending",
+    "note": "Ручные исследовательские записи; повторное сопоставление каждого значения с первичным документом не завершено. Ссылки являются указателями для сверки, не доказательством точности переноса."
+  }
 }

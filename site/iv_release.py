@@ -42,9 +42,10 @@ def verify_ember(d,old,year):
     return len(ember.keys(rows))
 def verify_manual(d,kind):
     if kind=="physical":
-        require(d["schema"]=="iv-physical-v1","Physical schema");unique(d["companies"],"id");count=0
+        require(d["schema"]=="iv-physical-v1","Physical schema");require(d.get("status")=="manual_verification_pending","Physical verification status");unique(d["companies"],"id");count=0
         for c in d["companies"]:
             require(https(c["source"]),"Missing corporate source")
+            require(c.get("verification")=="pending","Corporate verification status not supported")
             unique(c["metrics"],"id");unique(c["rows"],"year")
             for r in c["rows"]:
                 require(type(r["year"]) is int,"Invalid corporate year")
