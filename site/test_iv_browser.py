@@ -128,6 +128,12 @@ with sync_playwright() as p:
         page.locator("#geo-time").fill(page.locator("#geo-time").get_attribute("max"))
         page.locator("#geo-region").select_option(index=1)
         assert page.locator("#geo-insight").is_visible()
+        page.locator("#geo-scale").select_option("difference")
+        assert page.locator("#geo-diff-panel").is_visible()
+        assert "Шкала изменения" in page.locator("#geo-map .technical-map-legend").inner_text()
+        page.locator("#geo-diff-base").select_option(page.locator("#geo-year").input_value())
+        assert "Сопоставлено" in page.locator("#geo-diff-status").inner_text()
+        assert page.locator("#geo-diff-rows tr").count()>0
         assert "выбранный показатель" in page.locator("#geo-insight").inner_text()
         assert not errors,errors
         page.close()
