@@ -39,8 +39,11 @@ function russianContext(r){
  return r.url.includes('publication.pravo.gov.ru/')||['Правительство России','ФНС России','Банк России','Росстат','Минпромторг России'].includes(r.source)||/росси|россий|москв|рубл|кремл|госдум|минфин|минпромторг|(^|[^а-я])(рф|цб)([^а-я]|$)/iu.test(r.title)
 }
 let version=pinned;
-function csv(name,rows){
- const time=new Date().toISOString();rows=rows.map((r,i)=>i===0?[...r,'Версия данных','Выгружено UTC']:[...r,version,time]);
+function csv(name,rows,verifiedFingerprint=null){
+ // Offline builds may not have a published archive revision. A verified manifest
+ // fingerprint identifies the actual dataset without pretending it is a commit.
+ const revision=version||(/^[a-f0-9]{64}$/.test(verifiedFingerprint||'')?'sha256:'+verifiedFingerprint:'Архивная версия не определена');
+ const time=new Date().toISOString();rows=rows.map((r,i)=>i===0?[...r,'Версия данных','Выгружено UTC']:[...r,revision,time]);
  const quote=value=>{let s=String(value??'');if(typeof value==='string' && /^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'};
  const contents=rows.map(row=>row.map(v=>quote(typeof v==='number'?v.toLocaleString('ru',{useGrouping:false,maximumFractionDigits:12}):v)).join(';')).join('\r\n');
  const url=URL.createObjectURL(new Blob(['\ufeff',contents],{type:'text/csv;charset=utf-8'}));const link=node('a','');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
