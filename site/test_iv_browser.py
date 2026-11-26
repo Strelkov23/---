@@ -64,6 +64,13 @@ with sync_playwright() as p:
         assert "finolive.ru" in page.locator("#physical-source").get_attribute("href")
         page.locator("#physical-company").select_option("rosenergoatom")
         assert "218,35" in page.locator("#physical-value").inner_text()
+        page.locator("#physical-company").select_option("novatek")
+        assert "84,57" in page.locator("#physical-value").inner_text()
+        page.locator("#physical-index-base").select_option("2023")
+        page.locator("#physical-index-year").select_option("2023")
+        assert page.locator("#physical-index-result").inner_text()=="100"
+        page.locator("#physical-index-year").select_option("2020")
+        assert page.locator("#physical-index-result").inner_text()=="Нет расчёта"
         page.goto("http://localhost:8765/iv-comparison.html")
         page.locator("#iv-audit-pair").select_option("labour")
         assert "Разные измерения" in page.locator("#iv-audit-verdict").inner_text()

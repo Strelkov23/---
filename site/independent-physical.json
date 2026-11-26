@@ -180,6 +180,99 @@
           "reference": "Отчёт об устойчивом развитии 2025, ключевые показатели"
         }
       ]
+    },
+    {
+      "id": "novatek",
+      "title": "НОВАТЭК",
+      "origin": "corporate_disclosure",
+      "scope": "Добыча с учётом доли в совместных предприятиях; данные предварительных пресс-релизов, возможны последующие уточнения. Не вся добыча России.",
+      "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+      "page": "Таблица добычи углеводородов",
+      "metrics": [
+        {
+          "id": "gas",
+          "title": "Добыча природного газа",
+          "unit": "млрд м³"
+        },
+        {
+          "id": "liquids",
+          "title": "Добыча жидких углеводородов",
+          "unit": "млн т"
+        }
+      ],
+      "rows": [
+        {
+          "year": 2022,
+          "gas": 82.14,
+          "liquids": 11.94,
+          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_24=16&id_4=2361&id_4=6252",
+          "reference": "Пресс-релиз за 2023, таблица"
+        },
+        {
+          "year": 2023,
+          "gas": 82.39,
+          "liquids": 12.37,
+          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_24=16&id_4=2361&id_4=6252",
+          "reference": "Пресс-релиз за 2023, таблица"
+        },
+        {
+          "year": 2024,
+          "gas": 84.08,
+          "liquids": 13.79,
+          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+          "reference": "Пресс-релиз за 2025, таблица"
+        },
+        {
+          "year": 2025,
+          "gas": 84.57,
+          "liquids": 14.11,
+          "source": "https://www.novatek.ru/ru/press/releases/index.php?from_4=2&id_4=7511&mode_20=90&quarter_3=3",
+          "reference": "Пресс-релиз за 2025, таблица"
+        }
+      ]
+    },
+    {
+      "id": "severstal",
+      "title": "Северсталь",
+      "origin": "corporate_disclosure_republished",
+      "scope": "Годовые производственные показатели компании; републикации корпоративных таблиц Финамом и BigCapital, первичные документы ещё не сверены. Не вся чёрная металлургия.",
+      "source": "https://bigcapital.org/ru/moex/chmf/2025/",
+      "page": "Производственные показатели",
+      "metrics": [
+        {
+          "id": "steel",
+          "title": "Выплавка стали",
+          "unit": "тыс. т"
+        },
+        {
+          "id": "pigiron",
+          "title": "Производство чугуна",
+          "unit": "тыс. т"
+        }
+      ],
+      "rows": [
+        {
+          "year": 2023,
+          "steel": 11273,
+          "pigiron": 11301,
+          "source": "https://www.finam.ru/publications/item/severstal-strategiya-budushchego-rosta-20250207-1300/",
+          "reference": "Финам, таблица операционных результатов 2024"
+        },
+        {
+          "year": 2024,
+          "steel": 10384,
+          "pigiron": 10032,
+          "source": "https://www.finam.ru/publications/item/severstal-strategiya-budushchego-rosta-20250207-1300/",
+          "reference": "Финам, таблица операционных результатов 2024"
+        },
+        {
+          "year": 2025,
+          "steel": 10825,
+          "pigiron": 11206,
+          "source": "https://bigcapital.org/ru/moex/chmf/2025/",
+          "reference": "BigCapital, производственные показатели 2025"
+        }
+      ]
     }
   ]
 }
