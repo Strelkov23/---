@@ -1,0 +1,103 @@
+name: IV live source and deployment probe
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/iv-live-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test actual network import and offline archive roundtrip
+        working-directory: site
+        run: |
+          python3 - <<'PY'
+          import datetime, hashlib, json, pathlib, sqlite3, tempfile
+          import independent_trade as trade
+          import independent_ember as ember
+          import iv_release as release
+          now=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          year=int(now[:4])
+          result={}
+          for name, module in (("trade",trade),("ember",ember)):
+              try:
+                  with tempfile.TemporaryDirectory() as tmp:
+                      folder=pathlib.Path(tmp)
+                      path=folder/"probe.db"
+                      with sqlite3.connect(path) as db:
+                          live=module.publish(db,folder,now,True)
+                      with sqlite3.connect(path) as db:
+                          saved=module.publish(db,folder,now,False)
+                      assert saved["rows"]==live["rows"], "Archive roundtrip differs"
+                      if name=="trade":
+                          count=release.verify_trade(saved,None,year)
+                          assert live["status"]=="downloaded" and saved["status"]=="cached" and saved["last_success"] and not saved["error"], str(live["error"])
+                          assert saved["source_sha256"]==live["source_sha256"]
+                          digest=saved["source_sha256"]
+                          latest=max(r["period"] for r in saved["rows"])
+                      else:
+                          count=release.verify_ember(saved,None,year)
+                          assert saved["success"] and not saved["error"] and saved["rows"], str(live["error"])
+                          assert saved==live
+                          digest=saved["sha256"]
+                          latest=max(r["year"] for r in saved["rows"])
+                      result[name]={"ok":True,"observations":count,"latest":latest,"sha256":digest,"offline_roundtrip":True}
+              except Exception as exc:
+                  result[name]={"ok":False,"error":type(exc).__name__+": "+str(exc)}
+          pathlib.Path("../iv-live-source-probe.json").write_text(json.dumps(result,ensure_ascii=False,indent=2))
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          if not all(r["ok"] for r in result.values()):
+              raise SystemExit("One or more live source probes failed; do not treat fallback data as live imports.")
+          PY
+      - name: Inspect current public archive without modifying it
+        if: always()
+        working-directory: site
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,re,urllib.request
+          base="https://strelkov23.github.io/---/"
+          result={}
+          def fetch(name,limit=20_000_000):
+              req=urllib.request.Request(base+name,headers={"Cache-Control":"no-cache","User-Agent":"EconomicsMonitor/3.0"})
+              with urllib.request.urlopen(req,timeout=25) as response:
+                  if response.geturl()!=base+name or response.status!=200:raise ValueError("Unexpected public response")
+                  raw=response.read(limit+1)
+                  if not 0<len(raw)<=limit:raise ValueError("Invalid public payload length")
+                  return raw
+          try:
+              version=fetch("version.txt",1024).decode().strip()
+              assert re.fullmatch(r"[a-f0-9]{40}",version),"Invalid archive version"
+              manifest_raw=fetch("data-manifest.json")
+              manifest=json.loads(manifest_raw)
+              result={"version":version,"source_revision":manifest.get("source_revision"),"datasets":{}}
+              for name in ("independent-trade.json","independent-ember.json","independent-physical.json"):
+                  raw=fetch(name)
+                  digest=hashlib.sha256(raw).hexdigest()
+                  assert manifest["files"][name]=={"sha256":digest,"bytes":len(raw)},name
+                  data=json.loads(raw)
+                  result["datasets"][name]={"sha256":digest,"rows":len(data.get("rows",[])),"companies":len(data.get("companies",[])),"last_success":data.get("last_success",data.get("success")),"error":data.get("error")}
+              assert fetch("version.txt",1024).decode().strip()==version,"Deployment changed during probe"
+              assert fetch("data-manifest.json")==manifest_raw,"Manifest changed during probe"
+              result["consistent"]=True
+          except Exception as exc:
+              result["consistent"]=False
+              result["error"]=type(exc).__name__+": "+str(exc)
+          pathlib.Path("../iv-public-probe.json").write_text(json.dumps(result,ensure_ascii=False,indent=2))
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iv-live-probe
+          path: |
+            iv-live-source-probe.json
+            iv-public-probe.json
+          if-no-files-found: error
+          retention-days: 14
