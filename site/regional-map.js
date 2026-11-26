@@ -461,7 +461,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
      const indicator=node('p',(change.delta>0?'↑ +':change.delta<0?'↓ ':'= ')+fmtValue(change.delta)+' '+unit+' · '+(change.type==='index'?'к уровню предыдущего года (100%)':'к '+change.year+' г.'));
      indicator.className='geo-trend';indicator.dataset.direction=change.delta>0?'up':change.delta<0?'down':'flat';card.append(indicator)
     }else card.append(node('small','Нет сопоставимой базы предыдущего года'));
-    const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',m.code);u.searchParams.set('hist-region',r.region);u.searchParams.set('hist-rank-year',String(Y));u.searchParams.set('hist-from',String(Math.max(1990,Y-9)));u.searchParams.set('hist-to',String(Y));u.searchParams.set('v-context-year',String(Y));u.searchParams.set('v-context-region',f.f.properties.iso_3166_2);if(pinned)u.searchParams.set('snapshot',pinned);const history=node('a','Динамика');history.href=u.href;card.append(history);
+    const u=new URL('historical.html',location.href);u.searchParams.set('hist-series',m.code);u.searchParams.set('hist-region',r.region);u.searchParams.set('hist-rank-year',String(r.year));u.searchParams.set('hist-from',String(Math.max(1990,r.year-9)));u.searchParams.set('hist-to',String(r.year));u.searchParams.set('v-context-year',String(r.year));u.searchParams.set('v-context-region',f.f.properties.iso_3166_2);if(pinned)u.searchParams.set('snapshot',pinned);const history=node('a','Динамика');history.href=u.href;card.append(history);
     if(/^https?:\/\//i.test(data.source)){card.append(document.createTextNode(' · '),link('Источник',data.source))}
     return true
    }catch{card.append(node('p','Ряд не удалось проверить'));return false}
