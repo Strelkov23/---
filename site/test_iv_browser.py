@@ -9,6 +9,13 @@ with sync_playwright() as p:
         errors=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
         page.goto("http://localhost:8765/index.html")
+        assert page.locator("#v-entry-grid a").count()==6
+        assert page.locator("#start-here").evaluate("e=>Boolean(e.compareDocumentPosition(document.querySelector('#iv-workspaces')) & Node.DOCUMENT_POSITION_FOLLOWING)")
+        expected={"overview":"#pulse-title","regions":"economic-map.html#regional-map","production":"sectors.html","evidence":"iv-comparison.html","planning":"iv-lab.html","research":"research-centre.html"}
+        for key,href in expected.items():
+            link=page.locator("#v-entry-grid a[data-task='"+key+"']")
+            assert link.is_visible() and link.get_attribute("href")==href,(width,key)
+        assert page.locator("#start-here form").get_attribute("action")=="search.html"
         page.wait_for_function("!document.getElementById('iv-workspace-tools').hidden")
         assert page.locator("#iv-workspace-grid article:visible").count()==5
         page.locator("#iv-workspace-query").fill("воспроизводимость")
