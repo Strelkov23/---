@@ -62,12 +62,14 @@ with sync_playwright() as p:
         page.locator("#geo-scale").select_option("history")
         page.locator("#geo-time").fill("0")
         assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
+        assert page.locator("#geo-scale").input_value()=="history"
         legend=page.locator("#geo-map .technical-map-intervals").inner_text()
         page.locator("#geo-time-next").click()
+        assert page.locator("#geo-scale").input_value()=="history"
         assert page.locator("#geo-map .technical-map-intervals").inner_text()==legend
         assert page.locator("#geo-time-label").inner_text()==page.locator("#geo-year").input_value()
         page.locator("#geo-time").fill(page.locator("#geo-time").get_attribute("max"))
-        page.locator("#geo-map svg path[data-region]").first.click()
+        page.locator("#geo-region").select_option(index=1)
         assert page.locator("#geo-insight").is_visible()
         assert "выбранный показатель" in page.locator("#geo-insight").inner_text()
         assert not errors,errors

@@ -498,7 +498,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
   if(fixedHistory&&!historyThresholds){const all=[];for(const y of timeYears){const sampleY=RegionalStats.sample(series.values.filter(r=>r.year===y));for(const [k,r] of sampleY.out)if(counts.get(k)===1&&Number.isFinite(r.value))all.push(r.value)}historyThresholds=RegionalMap.classes(all)}
   const thresholds=fixedHistory?historyThresholds:RegionalMap.classes(matched.map(x=>x.r.value));
   const growth=Boolean(growthPick&&growthPick.value==='growth'&&RegionalMap.isGrowth(series.code,series.title,series.unit)),theme=RegionalMap.theme(series.code,series.source,series.title),palette=RegionalMap.palette(theme,palettePick?.value||'auto',growth);if(palettePick)palettePick.disabled=growth;
-  if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code,series.title,series.unit);if(!RegionalMap.isGrowth(series.code,series.title,series.unit))growthPick.value='quantile'}
+  if(growthPick){growthPick.querySelector('option[value="growth"]').disabled=!RegionalMap.isGrowth(series.code,series.title,series.unit);if(growthPick.value==='growth'&&!RegionalMap.isGrowth(series.code,series.title,series.unit))growthPick.value='quantile'}
   status.textContent='Год: '+Y+' · сопоставлено '+matched.length+' из '+geo.features.length+' контуров · наблюдений без однозначной геометрии: '+unmapped.length;
   const coverageHost=$('geo-coverage-current');
   if(coverageHost){
