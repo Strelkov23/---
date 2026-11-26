@@ -23,7 +23,7 @@ class Release(unittest.TestCase):
         physical=R.read(here/"independent-physical.json")
         trade={"rows":R.trade.seed(),"last_success":None,"seed_verification":"documented_manual",
                "seed_recheck_date":ledger["checked"],"seed_recheck_count":66}
-        self.assertEqual(R.verify_recheck(physical,trade,ledger),{"corporate_values":33,"trade_seed_values":66})
+        self.assertEqual(R.verify_recheck(physical,trade,ledger),{"corporate_values":45,"trade_seed_values":66})
         for change in ("number","missing","status","date","source","trade_number","trade_count","ledger_duplicate"):
             p,t,e=deepcopy(physical),deepcopy(trade),deepcopy(ledger)
             c=p["companies"][0]
