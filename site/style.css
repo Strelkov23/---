@@ -533,3 +533,14 @@ html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 .v-observation-stamp{font-size:.77rem;color:#526b75;font-variant-numeric:tabular-nums}
 #pulse-cards .pulse-card p{margin:.25rem 0;line-height:1.45}
 @media(max-width:520px){.iv-result{padding:.75rem}.v-axis-labels{font-size:.7rem}}
+
+/* V.11: optional first-visit assistance and compact example queries. */
+.v-first-visit,.v-search-examples{border:1px solid #c1d5d8;border-left:3px solid #398b89;border-radius:.4rem;padding:.7rem .85rem;margin:.7rem 0 1rem;background:#fff;color:#203d4c;overflow-wrap:anywhere}
+.v-first-visit summary,.v-search-examples summary{font-weight:700;color:#175e55}
+.v-first-visit li{margin:.35rem 0;line-height:1.5}
+.v-first-visit p,.v-search-examples p{font-size:.9rem;line-height:1.5}
+.v-question-links{display:flex;flex-wrap:wrap;gap:.4rem}
+.v-question-links a{padding:.45rem .65rem;border:1px solid #b7cdd2;border-radius:.3rem;background:#edf4f4;overflow-wrap:anywhere;max-width:100%;font-size:.9rem}
+.v-search-match{display:block;margin-top:.45rem;color:#365e66;font-weight:600}
+@media(max-width:520px){.v-question-links a{min-height:44px}}
+@media print{.v-first-visit,.v-search-examples{display:none}}
