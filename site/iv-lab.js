@@ -11,7 +11,14 @@ const IVLab=(()=>{
   if(mode==='basket'){const f=v.foodshare/100,t=(1-f)*v.serviceshare/100;return [f*v.food+(1-f-t)*v.goods+t*v.services,t*100]}
   return [v.income-v.expenses,100*(v.income-v.expenses)/v.gdp];
  }
- return {specs,calc};
+ function exportRows(mode,values){
+  const s=specs[mode],results=calc(mode,values),unit=i=>mode==='budget'&&i===0?'трлн руб.':'%';
+  return [['Тип','Показатель','Значение','Единица','Модель'],
+   ...s.inputs.map(([key,label])=>['Условная предпосылка',label,values[key],mode==='budget'?'трлн руб.':'%',s.title]),
+   ...results.map((value,i)=>['Условный результат',s.outputs[i],value,unit(i),s.title]),
+   ['Методика',s.method,'','',s.title]];
+ }
+ return {specs,calc,exportRows};
 })();
 if(typeof module!=='undefined')module.exports=IVLab;
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{
@@ -26,5 +33,5 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()
  }
  function reset(){baseline=null;f.replaceChildren();const s=IVLab.specs[sel.value];method.textContent=s.method;vals={};
  for(const [k,l,min,max,value] of s.inputs){vals[k]=value;const label=document.createElement('label');label.className='iv-slider';const name=document.createElement('span');name.textContent=l;const number=document.createElement('output');number.textContent=value+(sel.value==='budget'?'':'%');const input=document.createElement('input');input.type='range';input.min=min;input.max=max;input.step=1;input.value=value;input.id='iv-'+k;label.htmlFor=input.id;number.htmlFor=input.id;input.oninput=()=>{vals[k]=Number(input.value);number.textContent=input.value+(sel.value==='budget'?'':'%');draw()};label.append(name,number,input);f.append(label)}draw()}
- sel.onchange=reset;get('iv-reset').onclick=reset;get('iv-save').onclick=()=>{baseline=IVLab.calc(sel.value,vals);draw()};reset();
+ sel.onchange=reset;get('iv-export').onclick=()=>csv('iv-basic-'+sel.value+'.csv',IVLab.exportRows(sel.value,vals));get('iv-reset').onclick=reset;get('iv-save').onclick=()=>{baseline=IVLab.calc(sel.value,vals);draw()};reset();
 });
