@@ -1,0 +1,157 @@
+{
+  "schema": "iv-source-recheck-v1",
+  "checked": "2026-11-26",
+  "compared_revision": "122040cf4970fffb72d9b5abea6336bf346dedb8",
+  "rzd": {
+    "status": "extracted_tables_match",
+    "count": 12,
+    "keys": [
+      "year",
+      "loading",
+      "turnover"
+    ],
+    "rows": [
+      [
+        2020,
+        1243.6,
+        3221
+      ],
+      [
+        2021,
+        1282.8,
+        3320.3
+      ],
+      [
+        2022,
+        1234.3,
+        3300.9
+      ],
+      [
+        2023,
+        1232.2,
+        3274.8
+      ],
+      [
+        2024,
+        1181.4,
+        3113.2
+      ],
+      [
+        2025,
+        1115.8,
+        3075.3
+      ]
+    ],
+    "sources": [
+      {
+        "url": "https://finolive.ru/docs/56/annual_report_2024.pdf",
+        "reference": "Годовой отчет 2024, анализ операционных результатов, таблица 2020–2024",
+        "method": "PDF extracted text; screenshot request failed (57.6 MB)"
+      },
+      {
+        "url": "https://rspp.ru/upload/uf/e20/j1m9r4nmszlidbi2l4ylbzzwt7tscn1g/Отчет%20об%20устойчивом%20развитии%20ОАО%20РЖД%20за%202025%20год.pdf",
+        "reference": "Отчет об устойчивом развитии 2025, стр. 12–13",
+        "method": "PDF extracted text; screenshot request failed (11.5 MB)"
+      }
+    ],
+    "resolution": "3075.3 is the figure in company annual sustainability disclosure; secondary 3075.1 does not override that document."
+  },
+  "prices": {
+    "status": "published_tables_match",
+    "romir_values": 12,
+    "official_values": 27,
+    "rows": [
+      {
+        "period": "2024-03",
+        "level": 215.2,
+        "mom": 3.8,
+        "yoy": 19.2,
+        "ytd": 4.6,
+        "official": {
+          "mom": [
+            100.39,
+            100.22,
+            100.83
+          ],
+          "yoy": [
+            107.72,
+            107.46,
+            108.3
+          ],
+          "ytd": [
+            101.95,
+            101.64,
+            102.7
+          ]
+        }
+      },
+      {
+        "period": "2024-04",
+        "level": 216.4,
+        "mom": 0.6,
+        "yoy": 17.9,
+        "ytd": 5.2,
+        "official": {
+          "mom": [
+            100.5,
+            100.45,
+            100.62
+          ],
+          "yoy": [
+            107.84,
+            107.71,
+            108.12
+          ],
+          "ytd": [
+            102.46,
+            102.1,
+            103.34
+          ]
+        }
+      },
+      {
+        "period": "2024-05",
+        "level": 220.6,
+        "mom_pp": 4.2,
+        "yoy_pp": 34.4,
+        "ytd": 6.8,
+        "official": {
+          "mom": [
+            100.74,
+            100.44,
+            101.53
+          ],
+          "yoy": [
+            108.3,
+            108.19,
+            108.55
+          ],
+          "ytd": [
+            103.22,
+            102.55,
+            104.92
+          ]
+        }
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://romir.ru/feed/za-mesyac-deflyator-vyros-na-38",
+        "reference": "2024-04-25"
+      },
+      {
+        "url": "https://romir.ru/feed/deflyator-pribavil-v-aprele-06",
+        "reference": "2024-05-23"
+      },
+      {
+        "url": "https://romir.ru/feed/deflyator-pribavil-v-mae-42-pp",
+        "reference": "2024-06-27"
+      },
+      {
+        "url": "https://www.consultant.ru/document/cons_doc_LAW_19571/d875f624fbeabb2348cee6efd34e248558127767/",
+        "reference": "Архив 2022–2025, таблица ИПЦ 2024, март–май; републикация Росстата"
+      }
+    ],
+    "scope": "FMCG vs CPI have distinct coverage; source validation is not a claim of comparability."
+  }
+}
