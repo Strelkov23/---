@@ -951,6 +951,15 @@ with sync_playwright() as p:
             page.locator("#geo-palette").select_option("contrast")
             assert page.locator("#geo-map svg").count()==1
             page.locator("#geo-region").select_option("RU-MOW")
+            from urllib.parse import urlparse,parse_qs
+            y=page.locator("#geo-year").input_value()
+            transfer=page.locator("#geo-detail a").filter(has_text="Отраслевая структура отгрузки региона")
+            q=parse_qs(urlparse(transfer.get_attribute("href")).query)
+            assert q["rm-region"]==["RU-MOW"] and q["rm-year"]==[y] and q["v-context-year"]==[y]
+            history=page.locator("#geo-detail a").filter(has_text="Открыть динамику территории")
+            if history.count():
+                q=parse_qs(urlparse(history.get_attribute("href")).query)
+                assert q["hist-rank-year"]==[y] and q["hist-to"]==[y] and q["v-context-region"]==["RU-MOW"]
             page.wait_for_function("document.querySelector('.geo-brief [role=status]').textContent.startsWith('Доступно')",timeout=30000)
             assert page.locator(".geo-brief-item").count()==10
             assert page.locator(".geo-brief-item .geo-trend").count()>0
