@@ -49,9 +49,22 @@ with sync_playwright() as p:
         page.locator("#iv-evidence-draft").check()
         page.locator("#iv-evidence-draft").uncheck()
         page.goto("http://localhost:8765/iv-lab.html")
+        assert page.locator(".v-lab-guide").count()==5
+        assert page.locator(".v-lab-guide button:visible").count()==15
+        page.locator("#basic-lab [data-v-jump='iv-mode']").click()
+        assert page.locator("#iv-mode").evaluate("e=>document.activeElement===e")
         page.locator("#iv-output").fill("10")
         page.locator("#iv-productivity").fill("10")
         assert page.locator("#iv-results strong").first.inner_text()=="0%"
+        page.locator("#basic-lab [data-v-jump='iv-results']").click()
+        assert page.locator("#iv-results").evaluate("e=>document.activeElement===e")
+        assert page.locator("#iv-output").input_value()=="10"
+        with page.expect_download() as basic:
+            page.locator("#iv-export").click()
+        with open(basic.value.path(),encoding="utf-8-sig") as stream:
+            rows=list(csv.reader(stream,delimiter=";"))
+        assert any(row[0]=="Условный результат" and row[1]=="Изменение необходимых человеко-часов" and float(row[2].replace(",","."))==0 for row in rows)
+        assert any(row[0]=="Методика" for row in rows)
         page.locator("#iv-save").click()
         page.locator("#iv-output").fill("20")
         assert "Отличие" in page.locator("#iv-compare").inner_text()
