@@ -193,9 +193,9 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    vectors.push(Array.from(tensor.data));
   }
   if(token!==seq)return;
-  const ranked=EconomicSearch.semanticRerank(candidates,vectors),ids=new Set(candidates.map(r=>r.href));
+  const ranked=EconomicSearch.semanticRerank(candidates,vectors),selected=new Set(candidates);
   // Preserve all non-candidates and their slots; reorder only the selected research documents.
-  let n=0;rows=rows.map(r=>ids.has(r.href)&&["paper","external","web"].includes(r.kind)&&n<ranked.length?ranked[n++]:r);
+  let n=0;rows=rows.map(r=>selected.has(r)&&n<ranked.length?ranked[n++]:r);
   draw();semanticStatus.textContent="Нейросеть переупорядочила "+ranked.length+" уже найденных исследований по названиям. Остальные результаты сохранены. Не поиск по всему корпусу; сходство не подтверждает качество.";
  }catch{if(token===seq)semanticStatus.textContent="Модель или вычисление недоступны. Обычная выдача сохранена.";}
  finally{semanticBusy=false;semantic.disabled=!lastQuery||!EconomicSearch.semanticCandidates(rows).length;}
