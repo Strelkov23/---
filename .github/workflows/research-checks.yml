@@ -34,7 +34,7 @@ jobs:
           node test-data-registry.js
           node test-economic-ai.js
           node test-economic-ai-series.js
-          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py
+          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js
