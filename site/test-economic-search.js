@@ -26,3 +26,13 @@ assert.equal(core.search(d,"инвестиции",{contentOnly:true,kind:"news"}
 assert.deepEqual(core.search({...d,abstract_postings:undefined},"инвестиции",{contentOnly:true}),[]);
 assert.equal(core.search(d,"investment",{contentOnly:true,expand:true})[0].title,"Региональное развитие");
 console.log("8 abstract content search checks passed");}
+
+{const license="https://creativecommons.org/licenses/by/4.0/",docs=[{title:"Узкое исследование",kind:"paper",abstract_license:license,date:"2024"},{title:"Обширный текст",kind:"paper",abstract_license:license,date:"2025"},{title:"Только заголовок",kind:"paper",date:"2026"}],abstract_postings={инвестиц:[[0,1],[1,1]],рост:[[0,1],[1,1]],банк:[[1,1]],долг:[[1,1]],цена:[[1,1]]},n=2;const idf=p=>Math.log(1+(n-p.length+.5)/(p.length+.5));const index={docs,abstract_postings,abstract_count:n,abstract_norms:docs.map((_,i)=>Math.sqrt(Object.values(abstract_postings).reduce((s,p)=>s+(p.some(x=>x[0]===i)?idf(p)**2:0),0)))};
+const v=core.contentVector(index,"инвестиции рост",{all:true});
+assert.equal(v.length,2);assert.equal(v[0].title,"Узкое исследование");assert.ok(Math.abs(v[0].similarity-1)<1e-8);assert.ok(v[1].similarity<v[0].similarity);
+assert.equal(core.contentVector(index,"investment",{expand:true}).length,2);
+assert.equal(core.contentVector(index,"инвестиции рост",{from:2025}).length,1);
+assert.deepEqual(core.contentVector(index,"инвестиции рост",{kind:"news"}),[]);
+assert.deepEqual(core.contentVector({...index,abstract_norms:[]},"рост"),[]);
+assert.deepEqual(core.contentVector(index,"рост безработица",{all:true}),[]);
+console.log("9 sparse content vector checks passed");}

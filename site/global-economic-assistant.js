@@ -503,7 +503,8 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   if(get(4)&&Array.isArray(get(3)?.articles)){try{
    await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");
    const byDoi=new Map(get(3).articles.map(r=>[r.doi,r]));
-   const content=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,contentOnly:true});
+   const vectors=EconomicSearch.contentVector(get(4),q.value,{kind:"paper",expand:true});
+   const content=[...vectors,...EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,contentOnly:true}).filter(r=>!vectors.some(v=>v.href===r.href))];
    const metadata=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,abstractOnly:true});
    const ranked=[...new Map([...content,...metadata.filter(r=>!content.some(c=>c.href===r.href))].slice(0,2).map(r=>[r.href,r])).values()];
    for(const [i,r] of ranked.entries()){const p=byDoi.get(r.code),a=p?.licensed_abstract;if(!a||a.license!==r.abstract_license||typeof a.text!=="string"||!p.authors||!C.external(r.href))continue;

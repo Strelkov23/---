@@ -55,6 +55,44 @@ const EconomicSearch=(function core(){
    out.push({...r,score:score*(hits.get(i)/groups.length)*(titlePhrase?1.35:1),matched:hits.get(i),expanded:expanded.has(i),exactCode,exactTitle,contentMatch:content})}
   return out.sort((a,b)=>Number(b.exactCode)-Number(a.exactCode)||Number(b.exactTitle)-Number(a.exactTitle)||b.score-a.score||b.matched-a.matched||String(b.date).localeCompare(String(a.date))||a.title.localeCompare(b.title,"ru"));
  }
+ function contentVector(index,q,options={}){
+ const groups=plan(q,!!options.expand),n=index.abstract_count;
+ if(!groups.length||!Number.isInteger(n)||n<=0||!index.abstract_postings||!Array.isArray(index.abstract_norms)||index.abstract_norms.length!==index.docs.length)return [];
+ const postings=index.abstract_postings,idf=p=>Math.log(1+(n-p.length+0.5)/(p.length+0.5)),query=new Map(),evidence=new Map();
+ for(const group of groups){
+  for(const [terms,weight] of [[group.original,1],...group.alternatives.map(t=>[t,.55])]){
+   if(!terms.length)continue;
+   const lists=terms.map(t=>Object.hasOwn(postings,t)?postings[t]:[]);
+   if(lists.some(p=>!p.length))continue;
+   const maps=lists.map(p=>new Set(p.map(x=>x[0]))),matched=[...maps[0]].filter(i=>maps.every(m=>m.has(i)));
+   if(!matched.length)continue;
+   for(const i of matched){
+    if(!evidence.has(i))evidence.set(i,new Map());
+    const perDoc=evidence.get(i);
+    if(!perDoc.has(group))perDoc.set(group,new Map());
+    const perGroup=perDoc.get(group);
+    for(const [k,t] of terms.entries()){
+     const v=weight*idf(lists[k])/Math.sqrt(terms.length);
+     perGroup.set(t,Math.max(perGroup.get(t)||0,v));
+    }
+   }
+   for(const [k,t] of terms.entries())query.set(t,Math.max(query.get(t)||0,weight*idf(lists[k])/Math.sqrt(terms.length)));
+  }
+ }
+ const qnorm=Math.hypot(...query.values());if(!(qnorm>0))return [];
+ const out=[];
+ for(const [i,matched] of evidence){
+  const d=index.docs[i],dn=index.abstract_norms[i];
+  if(!d||d.kind!=="paper"||d.abstract_license!=="https://creativecommons.org/licenses/by/4.0/"||!(dn>0)||options.kind&&options.kind!=="paper"||options.all&&matched.size!==groups.length)continue;
+  if(options.from||options.to){const y=Number(String(d.date||"").slice(0,4));if(!y||options.from&&y<options.from||options.to&&y>options.to)continue;}
+  const terms=new Map();for(const values of matched.values())for(const [term,w] of values)terms.set(term,Math.max(terms.get(term)||0,w));
+  let dot=0;for(const [term,w] of terms)dot+=w*idf(postings[term]);
+  const similarity=Math.min(1,dot/(qnorm*dn));
+  if(!Number.isFinite(similarity)||similarity<=0)continue;
+  out.push({...d,similarity,score:similarity*matched.size/groups.length,matched:matched.size,contentMatch:true,vectorMatch:true,shared:[...terms.keys()].slice(0,12)});
+ }
+ return out.sort((a,b)=>b.score-a.score||b.matched-a.matched||String(b.date||"").localeCompare(String(a.date||""))||a.title.localeCompare(b.title,"ru"));
+}
  function related(index,sourceHref,options={}){
  const kinds=new Set(["paper","external","web"]);
  if(!Array.isArray(index.norms)||index.norms.length!==index.docs.length)return [];
@@ -92,16 +130,16 @@ const EconomicSearch=(function core(){
  }
  return [...scores].filter(([i,s])=>index.norms[i]>0&&s.terms.length>=2).map(([i,s])=>({...index.docs[i],similarity:Math.min(1,s.dot/(qnorm*index.norms[i])),shared:s.terms.slice(0,8)})).sort((a,b)=>b.similarity-a.similarity||a.href.localeCompare(b.href)).slice(0,Math.min(10,Math.max(1,options.limit||5)));
 }
- return {words,search,plan,dictionary,related};
+ return {words,search,plan,dictionary,related,contentVector};
 })();
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("es-"+id),form=$("form");if(!form)return;
- const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only");
+ const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector");
  const labels={tool:"Инструмент",series:"Статистика",news:"Новости и документы",paper:"Научные статьи",discovered:"Новые показатели WDI",external:"Внешние препринты arXiv",web:"Внешние исследования FEDS"};
  let index=null,rows=[],limit=20,fingerprint="",seq=0,manifest=null,papersPromise=null;
  const add=(p,t,v)=>{const e=document.createElement(t);e.textContent=v;p.append(e);return e};
- function draw(){host.replaceChildren();for(const r of rows.slice(0,limit)){const article=add(host,"article",""),h=add(article,"h3","");try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();if(u.origin===location.origin&&typeof pinned!=="undefined"&&pinned&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);const a=add(h,"a",r.title);a.href=u.href;a.rel="noopener noreferrer"}catch{h.textContent=r.title}add(article,"small",labels[r.kind]+" · "+(r.date||"без даты")+" · "+r.source);add(article,"p",r.description);if(r.exactCode)add(article,"small","Точное совпадение кода");else if(r.exactTitle)add(article,"small","Точное совпадение названия");if(r.expanded)add(article,"small","Найдено также по словарю экономических терминов");if(r.contentMatch)add(article,"small","Совпадение в тексте лицензированной аннотации");if(r.abstract_license==="https://creativecommons.org/licenses/by/4.0/"){
+ function draw(){host.replaceChildren();for(const r of rows.slice(0,limit)){const article=add(host,"article",""),h=add(article,"h3","");try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();if(u.origin===location.origin&&typeof pinned!=="undefined"&&pinned&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);const a=add(h,"a",r.title);a.href=u.href;a.rel="noopener noreferrer"}catch{h.textContent=r.title}add(article,"small",labels[r.kind]+" · "+(r.date||"без даты")+" · "+r.source);add(article,"p",r.description);if(r.exactCode)add(article,"small","Точное совпадение кода");else if(r.exactTitle)add(article,"small","Точное совпадение названия");if(r.expanded)add(article,"small","Найдено также по словарю экономических терминов");if(r.contentMatch)add(article,"small","Совпадение в тексте лицензированной аннотации");if(r.vectorMatch)add(article,"small"," · векторное сходство "+r.similarity.toFixed(3)+" · термины: "+r.shared.join(", "));if(r.abstract_license==="https://creativecommons.org/licenses/by/4.0/"){
  const details=add(article,"details",""),summary=add(details,"summary","Читать аннотацию · CC BY 4.0"),content=add(details,"p","");
  details.addEventListener("toggle",async()=>{if(!details.open||content.dataset.loaded)return;content.dataset.loaded="1";content.textContent="Проверка источника…";
  try{if(!papersPromise)papersPromise=Provenance.get(manifest,"literature.json",root).then(x=>new Map(x.data.articles.map(p=>[p.doi,p]))).catch(e=>{papersPromise=null;throw e});
@@ -119,13 +157,13 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  }}more.hidden=rows.length<=limit;}
  async function run(){const id=++seq;host.replaceChildren();more.hidden=true;const query=q.value.trim();expansion.textContent="";if(!query){status.textContent="Введите поисковый запрос.";return}if(from.value&&to.value&&Number(from.value)>Number(to.value)){status.textContent="Начальный год больше конечного.";return}status.textContent="Проверка поискового индекса…";
  try{if(!index){const m=await Provenance.validateManifest(await load("data-manifest.json"));const d=(await Provenance.get(m,"economic-search-index.json",root)).data;if(d.schema!==1||!Array.isArray(d.docs)||!d.postings)throw Error();index=d;manifest=m;fingerprint=m.data_fingerprint}if(id!==seq)return;
- rows=EconomicSearch.search(index,query,{kind:kind.value,from:Number(from.value),to:Number(to.value),all:all.checked,expand:expand.checked,abstractOnly:abstractOnly.checked,contentOnly:contentOnly.checked});const equivalents=EconomicSearch.plan(query,expand.checked).flatMap(x=>x.labels);expansion.textContent=equivalents.length?"Расширение запроса: "+equivalents.slice(0,20).join(" · "):"";limit=20;draw();status.textContent="Найдено: "+rows.length+" из "+index.docs.length+" · SHA-256 "+fingerprint.slice(0,12);if(contentOnly.checked&&!index.abstract_postings)status.textContent+=". Индекс текста отсутствует в закреплённой версии.";else if(!rows.length)status.textContent+=". Попробуйте снять фильтры или изменить запрос.";
- const u=new URL(location.href);u.searchParams.set("q",query);for(const [k,v] of [["kind",kind.value],["from",from.value],["to",to.value],["all",all.checked?"1":""],["expand",expand.checked?"":"0"],["abstract",abstractOnly.checked?"1":""],["content",contentOnly.checked?"1":""]]){if(v)u.searchParams.set(k,v);else u.searchParams.delete(k)}history.replaceState(null,"",u);
+ const options={kind:kind.value,from:Number(from.value),to:Number(to.value),all:all.checked,expand:expand.checked,abstractOnly:abstractOnly.checked,contentOnly:contentOnly.checked};rows=vector.checked?EconomicSearch.contentVector(index,query,options):EconomicSearch.search(index,query,options);const equivalents=EconomicSearch.plan(query,expand.checked).flatMap(x=>x.labels);expansion.textContent=equivalents.length?"Расширение запроса: "+equivalents.slice(0,20).join(" · "):"";limit=20;draw();status.textContent="Найдено: "+rows.length+" из "+index.docs.length+" · SHA-256 "+fingerprint.slice(0,12);if(vector.checked&&!Array.isArray(index.abstract_norms))status.textContent+=". Векторный индекс отсутствует в этой версии.";else if(contentOnly.checked&&!index.abstract_postings)status.textContent+=". Индекс текста отсутствует в закреплённой версии.";else if(!rows.length)status.textContent+=". Попробуйте снять фильтры или изменить запрос.";
+ const u=new URL(location.href);u.searchParams.set("q",query);for(const [k,v] of [["kind",kind.value],["from",from.value],["to",to.value],["all",all.checked?"1":""],["expand",expand.checked?"":"0"],["abstract",abstractOnly.checked?"1":""],["content",contentOnly.checked?"1":""],["vector",vector.checked?"1":""]]){if(v)u.searchParams.set(k,v);else u.searchParams.delete(k)}history.replaceState(null,"",u);
  }catch{if(id===seq)status.textContent="Индекс отсутствует в этой версии или не прошёл контроль. Используйте обычный поиск."}}
  form.onsubmit=e=>{e.preventDefault();run()};more.onclick=()=>{limit+=20;draw()};
  $("ask").onclick=()=>{const field=document.getElementById("gea-question"),toggle=document.getElementById("gea-toggle");if(field&&toggle){field.value=q.value.slice(0,600);field.dispatchEvent(new Event("input"));if(document.getElementById("gea-panel").hidden)toggle.click()}};
  const saved=new URLSearchParams(location.search);q.value=(saved.get("q")||"").slice(0,600);
  if([...kind.options].some(o=>o.value===saved.get("kind")))kind.value=saved.get("kind");
  for(const [key,field] of [["from",from],["to",to]]){const value=saved.get(key);if(/^\d{4}$/.test(value||"")&&Number(value)>=1900&&Number(value)<=2100)field.value=value}
- contentOnly.checked=saved.get("content")==="1";abstractOnly.checked=saved.get("abstract")==="1";all.checked=saved.get("all")==="1";expand.checked=saved.get("expand")!=="0";if(q.value)run();
+ vector.checked=saved.get("vector")==="1";contentOnly.checked=saved.get("content")==="1";abstractOnly.checked=saved.get("abstract")==="1";all.checked=saved.get("all")==="1";expand.checked=saved.get("expand")!=="0";if(q.value)run();
 });

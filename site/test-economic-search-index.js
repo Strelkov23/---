@@ -33,3 +33,7 @@ assert.ok(index.abstract_postings&&typeof index.abstract_postings==="object");
 const abstractTerms=Object.keys(index.abstract_postings);
 for(const term of abstractTerms.slice(0,20)){for(const [i,w] of index.abstract_postings[term]){assert.equal(w,1);assert.equal(index.docs[i].kind,"paper");assert.equal(index.docs[i].abstract_license,"https://creativecommons.org/licenses/by/4.0/")}}
 console.log("Content index terms: "+abstractTerms.length+"; zero means no searchable permitted abstracts, not a relevance score.");
+
+assert.equal(index.abstract_norms.length,index.docs.length);
+assert.equal(index.abstract_count,index.docs.filter(r=>r.abstract_license==="https://creativecommons.org/licenses/by/4.0/").length);
+if(abstractTerms.length){const term=abstractTerms.find(t=>t.length>=2);const rows=Search.contentVector(index,term);assert.ok(rows.every(r=>r.contentMatch&&r.similarity>0&&r.similarity<=1));}

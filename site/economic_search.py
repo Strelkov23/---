@@ -41,7 +41,12 @@ def compile_index(rows,stamp):
     for posting in postings.values():
         idf=math.log(1+(len(docs)-len(posting)+0.5)/(len(posting)+0.5))
         for i,w in posting:norms[i]+=(w*idf)**2
-    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),abstract_postings=dict(abstract_postings),norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
+    abstract_count=sum(r.get("abstract_license")==economic_abstracts.LICENSE for r in docs)
+    abstract_norms=[0.0]*len(docs)
+    for posting in abstract_postings.values():
+        idf=math.log(1+(abstract_count-len(posting)+0.5)/(len(posting)+0.5))
+        for i,w in posting:abstract_norms[i]+=(w*idf)**2
+    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),abstract_postings=dict(abstract_postings),abstract_count=abstract_count,abstract_norms=[round(math.sqrt(v),8) for v in abstract_norms],norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
 def read(out,name):return json.loads((out/name).read_text(encoding="utf-8"))
 def build(out,stamp):
     rows=[]
@@ -82,12 +87,20 @@ def validate(d):
             last=i
     a=d["abstract_postings"]
     if not isinstance(a,dict):raise ValueError("Invalid content index")
+    count=sum(r.get("abstract_license")==economic_abstracts.LICENSE for r in docs)
+    if type(d["abstract_count"]) is not int or d["abstract_count"]!=count:raise ValueError("Invalid abstract count")
+    norms=d["abstract_norms"]
+    if not isinstance(norms,list) or len(norms)!=len(docs) or any(type(v) not in (int,float) or not math.isfinite(v) or v<0 for v in norms):raise ValueError("Invalid abstract norms")
+    squares=[0.0]*len(docs)
     for word,posting in a.items():
         if word not in d["postings"] or not posting:raise ValueError("Invalid content term")
         last=-1;general=dict(d["postings"][word])
         for i,w in posting:
             if type(i) is not int or not last<i<len(docs) or type(w) is not int or w!=1 or i not in general or docs[i]["kind"]!="paper" or docs[i].get("abstract_license")!=economic_abstracts.LICENSE:raise ValueError("Invalid content posting")
             last=i
+        idf=math.log(1+(count-len(posting)+0.5)/(len(posting)+0.5))
+        for i,w in posting:squares[i]+=(w*idf)**2
+    if any(abs(v-round(math.sqrt(s),8))>1e-8 for v,s in zip(norms,squares)):raise ValueError("Abstract norm mismatch")
     return {"documents":len(docs),"terms":len(d["postings"])}
 def publish(out,stamp):
     d=build(out,stamp);validate(d)
