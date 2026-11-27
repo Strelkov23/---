@@ -62,12 +62,14 @@ def build(out,previous,stamp,refresh):
     signals=[r for r in diag["rows"] if r["status"]=="signal"]
     assessed=diag["counts"]["signal"]+diag["counts"]["ordinary"]
     agents.append(agent("diagnostics","attention" if signals else "ok" if assessed else "waiting",{"counts":diag["counts"],"closed_year":diag["closed_year"],"stale":sum(r["age"] is not None and r["age"]>1 for r in diag["rows"]),"note":diag["note"]},["diagnostics.html","economic-ai-diagnostics.json"],diag["rows"]))
+    planning=read(out,"economic-ai-planning.json")
+    agents.append(agent("planning","attention" if planning["counts"]["investigate"] else "waiting" if planning["counts"]["data_required"]+planning["counts"]["refresh_first"]+planning["counts"]["history_required"] else "ok",{"counts":planning["counts"],"note":planning["note"]},["planning-centre.html","economic-ai-planning.json"],planning["rows"]))
     data=dict(schema=1,built=stamp,mode="scheduled_refresh" if refresh else "offline_build",note=NOTE,agents=agents)
     validate(data)
     return data
 def validate(d):
     if d["schema"]!=1 or d["note"]!=NOTE or d["mode"] not in ("scheduled_refresh","offline_build") or datetime.fromisoformat(d["built"]).tzinfo is None:raise ValueError("Invalid agent report")
-    if [r["id"] for r in d["agents"]]!=["coverage","discovery","quality","research","forecast","search","diagnostics"]:raise ValueError("Agent registry")
+    if [r["id"] for r in d["agents"]]!=["coverage","discovery","quality","research","forecast","search","diagnostics","planning"]:raise ValueError("Agent registry")
     for a in d["agents"]:
         if a["state"] not in ("ok","attention","waiting") or not isinstance(a["metrics"],dict) or not isinstance(a["items"],list):raise ValueError("Agent result")
     for d in d["agents"][3]["items"]:

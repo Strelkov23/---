@@ -52,7 +52,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json"];
+  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json"];
   const files=await Promise.allSettled(keys.map(k=>Provenance.get(manifest,k,base)));
   const get=i=>files[i].status==="fulfilled"?files[i].value.data:null;
   const found=[];const tools=get(0);
@@ -83,6 +83,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    const relevant=C.rank(diagnostics.rows.map(r=>({...r,description:r.group+" "+r.note,code:r.codes.join(" ")})),q.value,3);
    for(const [i,r] of relevant.entries()){if(!Number.isFinite(r.value))continue;found.push({id:"diag"+(i+1),kind:"Расчётный показатель WDI",title:r.title,description:r.year+" · "+r.value+" "+r.unit+" · формула "+r.formula+" · статус "+r.status,period:String(r.year),value:r.value,unit:r.unit,limit:r.note+" "+diagnostics.note+(r.age>1?" Устаревшее наблюдение.":""),href:"diagnostics.html"})}
   }
+  if(Array.isArray(get(6)?.rows)){const planning=get(6);const relevant=C.rank(planning.rows.map(r=>({...r,description:r.diagnostic+" "+r.action,code:r.inputs.join(" ")})),q.value,2);for(const [i,r] of relevant.entries()){if(C.internal(r.href))found.push({id:"plan"+(i+1),kind:"Маршрут исследования",title:r.title,description:r.priority+" · "+r.action,href:r.href,limit:r.limit+" "+planning.note})}}
   return {found,context:localContext,failed:files.filter(x=>x.status==="rejected").length,fingerprint:manifest.data_fingerprint};
  }
  function render(r){

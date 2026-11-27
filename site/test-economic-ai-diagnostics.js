@@ -5,7 +5,9 @@ const assert=require("node:assert/strict"),core=require("./economic-ai-diagnosti
  const d=c.build(macro,input,{a:{source:"A"},b:{source:"B"}},"2026-11-27T15:00:00Z");
  assert(d.rows[0].year===2025);assert(d.rows[0].value===6);assert(d.rows[0].change===0);assert(d.rows[0].age===0);assert(d.counts.short===1);assert(d.rows[0].sources[0]==="A");assert(c.build(macro,{a:{values:{}},b:{values:{}}},{},"2026-11-27T15:00:00Z").rows[0].status==="missing");
 })(core,assert.ok);
-const rule=macro.rules[0],a={},b={};for(let y=2010;y<=2025;y++){a[y]=y===2025?100:10+(y%3);b[y]=5}
+const rule=macro.rules[0],a={},b={};for(let y=2010;y<=2025;y++){a[y]=y===2025?100:10+(y%4)**2;b[y]=5}
 const r=core.build(macro,{[rule.a]:{values:a},[rule.b]:{values:b}},{}, "2026-11-27T15:00:00Z").rows[0];
 assert.equal(r.status,"signal");assert.equal(r.year,2025);assert.equal(r.value,95);assert.ok(r.history_count>=5);
-console.log("11 diagnostic checks passed");
+const constant={};for(let y=2010;y<=2025;y++)constant[y]=y===2025?100:10+(y%3);
+assert.equal(core.build(macro,{[rule.a]:{values:constant},[rule.b]:{values:b}},{},"2026-11-27T15:00:00Z").rows[0].status,"constant");
+console.log("12 diagnostic checks passed");
