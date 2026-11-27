@@ -187,6 +187,7 @@ jobs:
           node test-energy-output.js
           rm -rf public
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
+          node test-economic-search-index.js public/economic-search-index.json
           python3 -c "import json,economic_search as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_agents as a; from pathlib import Path; p=Path('public'); assert a.validate(json.loads((p/a.FILE).read_text())); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_discovery as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"

@@ -29,6 +29,17 @@ def main():
             page.locator("#gea-question").fill("динамика ВВП")
             page.locator("#gea-full").click()
             page.wait_for_function("document.querySelector('#eai-question').value === 'динамика ВВП'")
+            page.goto("http://localhost:8765/economic-search.html",wait_until="domcontentloaded")
+            page.locator("#es-query").fill("Сравнение показателей")
+            page.locator("#es-kind").select_option("tool")
+            page.locator("#es-form button[type=submit]").click()
+            page.wait_for_function("document.querySelector('#es-status').textContent.includes('Найдено:')")
+            assert page.locator("#es-results article h3 a").first.get_attribute("href").endswith("compare.html")
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#es-status').textContent.includes('Найдено:')")
+            assert page.locator("#es-kind").input_value()=="tool"
+            page.locator("#es-ask").click()
+            assert page.locator("#gea-question").input_value()=="Сравнение показателей"
             page.close()
         browser.close()
 if __name__=="__main__":main()
