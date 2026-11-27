@@ -287,6 +287,14 @@ import economic_external_research
 economic_external_research.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 import economic_web_crawl
 economic_web_crawl.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_eurostat_trade
+economic_eurostat_trade.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_corporate_monitor
+economic_corporate_monitor.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_corporate_discovery
+economic_corporate_discovery.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_corporate_pdf
+economic_corporate_pdf.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 transport_buffer.flush()
 import_buffer.flush()
 source_journal.publish(page,out,m.DB,m.now())
@@ -297,12 +305,18 @@ import economic_ai_forecast_memory
 economic_ai_forecast_memory.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 import economic_ai_forecast_tournament
 economic_ai_forecast_tournament.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_ai_forecast_trials
+economic_ai_forecast_trials.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_corporate_review
+economic_corporate_review.publish(out,Path('../history/published'),m.now())
 import economic_search
 economic_search.publish(out,m.now())
 import economic_search_audit
 economic_search_audit.publish(out,Path('../history/published'),m.now())
 import subprocess
 subprocess.run(['node','economic-ai-diagnostics.js',str(out),m.now()],check=True)
+subprocess.run(['node','economic-ai-comparability.js',str(out),m.now()],check=True)
+subprocess.run(['node','economic-ai-physical.js',str(out),m.now()],check=True)
 import economic_ai_planning
 economic_ai_planning.publish(out,m.now())
 import economic_ai_memory

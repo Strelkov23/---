@@ -1,0 +1,3 @@
+const A=require("node:assert/strict"),IV=require("./iv-comparison.js"),{build}=require("./economic-ai-comparability.js");
+const d=build(IV,"2026-11-27T15:00:00Z"),by=id=>d.rows.find(r=>r.id===id);
+A.equal(d.rows.length,6);A.equal(by("prices").allowed,"no_direct_comparison");A.equal(by("labour").verdict,"different");A.equal(by("trade").verdict,"unknown");A.equal(by("republished").allowed,"transfer_check_only");A.equal(by("trade-partners").verdict,"different");A.equal(by("trade-partners").checks.find(r=>r.key==="territory").status,"different");A.equal(by("eurostat-balance").allowed,"identity_check_only");A.equal(by("eurostat-balance").distinct_channels,false);A.equal(Object.values(d.counts).reduce((a,b)=>a+b,0),6);console.log("10 comparability checks passed");

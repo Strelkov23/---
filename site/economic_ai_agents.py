@@ -56,10 +56,44 @@ def build(out,previous,stamp,refresh):
       agent("quality","attention" if memory["backlog"] or m["recent_rejected"] else "ok",{"freshness":m["freshness"],"backlog":len(memory["backlog"]),"recent_rejected":m["recent_rejected"]},["freshness.html","source-pipeline.html"],[{k:r.get(k) for k in ("id","title","state","next_check")} for r in memory["backlog"][:10]]),
       agent("research","ok" if news or papers else "waiting",{"news":m["changes"]["news"],"papers":m["changes"]["papers"],"baseline_available":baseline},["index.html","papers.html"],report_items),
       agent("forecast","attention" if any(r["action"]=="review_model" for r in flags) else "ok" if assessed else "waiting",{"frozen":len(forecast["rows"]),"scored":sum(r["first_actual"] is not None for r in forecast["rows"]),"adequate_sample_groups":len(assessed)},["forecast.html","economic-ai-forecast-memory.json"],flags[:30])]
+    eurostat=read(out,"economic-eurostat-trade.json")
+    agents[1]["metrics"]["eurostat"]=[dict(code=k,title=r["title"],status=r["status"],checked=r["checked"],success=r["success"],count=len(r["rows"]),latest=r["rows"][-1] if r["rows"] else None) for k,r in eurostat["series"].items()]
+    agents[1]["metrics"]["eurostat_note"]=eurostat["note"]
+    c=eurostat["comparison"]
+    agents[1]["metrics"]["eurostat_comparison"]={**{k:c[k] for k in ("note","counts","retrieved","source_status")},"latest":c["rows"][-1] if c["rows"] else None}
+    if c["counts"]["review"]:agents[1]["state"]="attention"
+    agents[1]["links"].append("economic-eurostat-trade.json")
+    if any(r["status"]=="error" for r in eurostat["series"].values()):agents[1]["state"]="attention"
+    physical=read(out,"economic-ai-physical.json")
+    agents[0]["metrics"]["physical"]={k:physical[k] for k in ("note","counts","rows","closed_year")}
+    agents[0]["links"].append("economic-ai-physical.json")
+    corporate=read(out,"economic-corporate-monitor.json")
+    agents[2]["metrics"]["corporate"]={"note":corporate["note"],"rows":list(corporate["rows"].values()),"review":sum(r["review"] for r in corporate["rows"].values())}
+    agents[2]["links"].append("economic-corporate-monitor.json")
+    if any(r["review"] or r["status"] in ("error","blocked") for r in corporate["rows"].values()):agents[2]["state"]="attention"
+    corporate_discovery=read(out,"economic-corporate-discovery.json")
+    agents[1]["metrics"]["corporate_discovery"]={"note":corporate_discovery["note"],"sources":list(corporate_discovery["sources"].values()),"count":len(corporate_discovery["rows"]),"recent":sorted(corporate_discovery["rows"].values(),key=lambda r:(r["first_seen"],r["url"]),reverse=True)[:15]}
+    agents[1]["links"].append("economic-corporate-discovery.json")
+    if any(r["status"] in ("error","blocked") for r in corporate_discovery["sources"].values()):agents[1]["state"]="attention"
+    pdf=read(out,"economic-corporate-pdf.json")
+    agents[2]["metrics"]["corporate_pdf"]=pdf
+    agents[2]["links"].append("economic-corporate-pdf.json")
+    if pdf["status"] in ("error","blocked") or any(r["status"]!="match" for r in pdf["comparison"]):agents[2]["state"]="attention"
+    review=read(out,"economic-corporate-review.json")
+    agents[2]["metrics"]["corporate_review"]={"note":review["note"],"counts":review["counts"],"rows":[dict(id=k,**r) for k,r in review["rows"].items() if r["active"]]}
+    agents[2]["links"].append("economic-corporate-review.json")
+    if any(review["counts"].get(k,0) for k in ("review_difference","missing_archive","cached")):agents[2]["state"]="attention"
+    comp=read(out,"economic-ai-comparability.json")
+    agents[2]["metrics"]["comparability"]=comp
+    agents[2]["links"].append("economic-ai-comparability.json")
+    if comp["counts"]["unknown"]:agents[2]["state"]="attention"
     tournament=read(out,"economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament_results"]=tournament["summary"]
+    trials=read(out,"economic-ai-forecast-trials.json")["trials"]
+    agents[4]["metrics"]["trials"]=[dict(code=r["code"],unit=r["unit"],horizon=r["horizon"],candidate=r["candidate"],selected=r["selected"],**r["result"]) for r in trials]
+    agents[4]["links"].append("economic-ai-forecast-trials.json")
     search=read(out,"economic-search-audit.json")
     agents.append(agent("search","attention" if any(r["status"] in ("error","blocked") for r in search["sources"]) else "waiting" if any(r["status"]=="waiting" for r in search["sources"]) else "ok",{"counts":search["counts"],"terms":search["terms"],"index_bytes":search["index_bytes"],"baseline_available":search["baseline_available"],"abstracts":search["abstracts"]},["economic-search.html","economic-search-audit.json"],search["sources"]))
     diag=read(out,"economic-ai-diagnostics.json")

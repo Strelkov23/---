@@ -24,6 +24,7 @@ jobs:
           elif test -f history/monitor.db; then cp history/monitor.db monitor/data/monitor.db; fi
           cd monitor
           python3 -m compileall -q .
+          sudo apt-get update -qq && sudo apt-get install -y poppler-utils
           python3 -m pip install openpyxl==3.1.5 pyarrow==20.0.0
           python3 -m unittest test_electricity_balance.py test_food_balance.py test_cost_structure.py test_financial_state.py test_finance_data.py test_provenance.py test_wdi_metadata.py test_method_passports.py test_capital_data.py test_forecast.py test_labor_data.py test_programme_evidence.py test_budget_diagnostics.py test_budget_programmes.py test_annual_goals.py test_goals.py test_programmes.py test_catalogue.py test_research.py test_quality.py test_national.py test_historical.py test_industrial.py test_sector_passports.py
           for script in *.js; do node --check "$script"; done
@@ -40,8 +41,10 @@ jobs:
           node test-economic-search.js
           node test-economic-ai-diagnostics.js
           node test-economic-ai-scenario.js
+          node test-economic-ai-comparability.js
+          node test-economic-ai-physical.js
           python3 -m unittest test_economic_search.py test_economic_external_research.py test_economic_web_crawl.py test_economic_search_audit.py test_economic_abstracts.py
-          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_forecast_tournament.py test_economic_ai_agents.py test_economic_ai_planning.py
+          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_forecast_tournament.py test_economic_ai_forecast_trials.py test_economic_eurostat_trade.py test_economic_corporate_monitor.py test_economic_corporate_discovery.py test_economic_corporate_pdf.py test_economic_corporate_review.py test_economic_ai_agents.py test_economic_ai_planning.py
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js

@@ -17,6 +17,15 @@ def main():
                 assert page.locator("#gea-results").inner_text().find("Найдено:")>=0
                 page.locator("#gea-close").click()
                 assert not page.locator("#gea-panel").is_visible()
+            page.goto("http://localhost:8765/index.html",wait_until="domcontentloaded")
+            page.locator("#gea-toggle").click()
+            page.locator("#gea-question").fill("сравнить предприятия: 123")
+            page.locator("#gea-search").click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Поиск завершён')")
+            # Offline fixtures may not deploy the full company index.
+            assert any(s in page.locator("#gea-results").inner_text() for s in ("Уточните запрос","Индекс предприятия недоступен"))
+            page.locator("#gea-question").fill("сравнение регионов")
+            page.locator("#gea-close").click()
             page.goto("http://localhost:8765/scenario.html",wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
             page.locator("#gea-context-details summary").click()

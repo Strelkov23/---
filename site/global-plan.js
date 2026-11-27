@@ -104,6 +104,23 @@ const GlobalPlan=(()=>{
   const base=rows[1];
   return {key,step,mode,objective,rows:rows.map(r=>({...r,delta:finite(r.score)&&finite(base.score)?r.score-base.score:null,deltaPP:finite(r.alpha)&&finite(base.alpha)?100*(r.alpha-base.alpha):null}))};
  }
+ function bottleneck(m,p,objective,step,progress=()=>{}){
+ if(!finite(step)||step<=0||step>100)throw Error("Invalid perturbation");
+ const baseline=solve(m,p,objective),specs=[["investment",1],["importLimit",1],["spare",1],["capitalRatio",-1],["depreciation",-1]];
+ const rows=[];
+ for(const [key,dir] of specs){
+  const c=sensitivityCases(p,key,step,"relative").find(x=>x.dir===dir);
+  const meta={key,dir,base:p[key],value:c.value,requested:c.requested,changed:c.changed,clamped:c.clamped};
+  if(!c.changed)rows.push({...meta,status:"unchanged",score:null,delta:null});
+  else try{
+   const r=solve(m,c.params,objective),delta=r.score-baseline.score,tolerance=r.tolerance+baseline.tolerance;
+   if(delta < -tolerance)throw Error("Relaxation reduced optimum");
+   rows.push({...meta,status:"verified",score:r.score,delta,upper:r.upper,gap:r.dualityGap,tolerance:r.tolerance,terminal:r.rows.at(-1).actualDemand,alpha:r.rows.at(-1).alpha,binding:[...new Set(r.rows.flatMap(x=>x.binding))]});
+  }catch(e){rows.push({...meta,status:"error",score:null,delta:null,error:String(e.message||e)})}
+  progress(rows.length,specs.length);
+ }
+ return {objective,step,baseline:{score:baseline.score,upper:baseline.upper,gap:baseline.dualityGap,tolerance:baseline.tolerance,binding:[...new Set(baseline.rows.flatMap(x=>x.binding))]},rows};
+}
  function jointCases(p,keyA,stepA,keyB,stepB,mode='relative'){
   if(keyA===keyB)throw Error('Выберите два разных параметра.');
   const a=sensitivityCases(p,keyA,stepA,mode),b=sensitivityCases(p,keyB,stepB,mode);
@@ -283,6 +300,6 @@ const GlobalPlan=(()=>{
   });
   objective.addEventListener('change',clear);select.addEventListener('change',detail);investmentFocus.addEventListener('change',renderSchedule);clear();return {setParams};
  }
- return {problem,solve,mount,investmentSchedule,sensitivityCases,sensitivity,jointCases,jointSensitivity,fixedSchedule,robustness};
+ return {problem,solve,mount,investmentSchedule,sensitivityCases,sensitivity,jointCases,jointSensitivity,fixedSchedule,robustness,bottleneck};
 })();
 if(typeof module!=='undefined')module.exports=GlobalPlan;
