@@ -52,7 +52,44 @@ const EconomicSearch=(function core(){
    out.push({...r,score:score*(hits.get(i)/groups.length)*(titlePhrase?1.35:1),matched:hits.get(i),expanded:expanded.has(i),exactCode,exactTitle})}
   return out.sort((a,b)=>Number(b.exactCode)-Number(a.exactCode)||Number(b.exactTitle)-Number(a.exactTitle)||b.score-a.score||b.matched-a.matched||String(b.date).localeCompare(String(a.date))||a.title.localeCompare(b.title,"ru"));
  }
- return {words,search,plan,dictionary};
+ function related(index,sourceHref,options={}){
+ const kinds=new Set(["paper","external","web"]);
+ if(!Array.isArray(index.norms)||index.norms.length!==index.docs.length)return [];
+ const source=index.docs.findIndex(r=>r.href===sourceHref&&kinds.has(r.kind));
+ if(source<0)return [];
+ const n=index.docs.length, terms=[];
+ const idf=p=>Math.log(1+(n-p.length+0.5)/(p.length+0.5));
+ // Exclude numeric identifiers and extremely frequent terms; bound query to 24 features.
+ for(const [term,p] of Object.entries(index.postings)){
+  if(term.length<3||/\d/.test(term)||p.length>n*0.35)continue;
+  let lo=0,hi=p.length-1,weight=0;
+  while(lo<=hi){const mid=(lo+hi)>>1;if(p[mid][0]===source){weight=p[mid][1];break}if(p[mid][0]<source)lo=mid+1;else hi=mid-1}
+  if(weight)terms.push({term,weight:weight*idf(p),posting:p});
+ }
+ terms.sort((a,b)=>b.weight-a.weight||a.term.localeCompare(b.term));const top=terms.slice(0,24);
+ const vector=new Map();
+ for(const x of top){
+  const synonyms=options.expand===false?[]:entries.filter(e=>e.some(v=>v.terms.length===1&&v.terms[0]===x.term)).flatMap(e=>e.filter(v=>v.terms.length===1).map(v=>v.terms[0]));
+  for(const term of new Set([x.term,...synonyms])){
+   const p=Object.hasOwn(index.postings,term)?index.postings[term]:null;if(!p||p.length>n*0.35)continue;
+   const weight=x.weight*(term===x.term?1:0.45);
+   if(!vector.has(term)||vector.get(term).weight<weight)vector.set(term,{weight,posting:p});
+  }
+ }
+ const qnorm=Math.hypot(...Array.from(vector.values(),v=>v.weight));
+ if(!(qnorm>0))return [];
+ const scores=new Map();
+ for(const [term,{weight,posting}] of vector){
+  const factor=idf(posting)*weight;
+  for(const [i,w] of posting){
+   if(i===source||index.docs[i].href===sourceHref||!kinds.has(index.docs[i].kind)||options.abstractOnly&&index.docs[i].abstract_license!=="https://creativecommons.org/licenses/by/4.0/")continue;
+   if(!scores.has(i))scores.set(i,{dot:0,terms:[]});
+   const s=scores.get(i);s.dot+=factor*w;s.terms.push(term);
+  }
+ }
+ return [...scores].filter(([i,s])=>index.norms[i]>0&&s.terms.length>=2).map(([i,s])=>({...index.docs[i],similarity:Math.min(1,s.dot/(qnorm*index.norms[i])),shared:s.terms.slice(0,8)})).sort((a,b)=>b.similarity-a.similarity||a.href.localeCompare(b.href)).slice(0,Math.min(10,Math.max(1,options.limit||5)));
+}
+ return {words,search,plan,dictionary,related};
 })();
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -68,7 +105,15 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const p=(await papersPromise).get(r.code),a=p?.licensed_abstract;if(!a||a.license!==r.abstract_license||typeof a.text!=="string"||!p.authors)throw Error();
  content.textContent=a.text;add(details,"p","Авторы: "+p.authors+" · DOI "+r.code+" · Crossref · форматирование нормализовано");const license=add(details,"a","Лицензия CC BY 4.0");license.href=a.license;license.rel="noopener noreferrer";add(details,"small","Лицензия заявлена издателем; аннотация отражает утверждения авторов, не проверенный результат.");
  }catch{content.textContent="Аннотация недоступна или не прошла проверку.";delete content.dataset.loaded}});
- }if(r.code)add(article,"small",r.code)}more.hidden=rows.length<=limit;}
+ }if(r.code)add(article,"small",r.code);if(["paper","external","web"].includes(r.kind)){
+ const d=add(article,"details",""),s=add(d,"summary","Похожие исследования"),holder=add(d,"div","");
+ d.addEventListener("toggle",()=>{if(!d.open||holder.dataset.loaded)return;holder.dataset.loaded="1";const matches=EconomicSearch.related(index,r.href,{expand:expand.checked,abstractOnly:abstractOnly.checked});
+ if(!matches.length){add(holder,"p","Нет достаточных совпадений по терминам в текущем индексе.");return}
+ for(const m of matches){const line=add(holder,"p","");const a=add(line,"a",m.title);try{const u=new URL(m.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();a.href=u.href;a.rel="noopener noreferrer"}catch{a.removeAttribute("href")}
+ add(line,"small"," · сходство "+m.similarity.toFixed(3)+" · общие термины: "+m.shared.join(", "));}
+ add(holder,"small","Лексическое сходство TF-IDF и словарные соответствия; не оценка достоверности или согласия выводов.");
+ });
+ }}more.hidden=rows.length<=limit;}
  async function run(){const id=++seq;host.replaceChildren();more.hidden=true;const query=q.value.trim();expansion.textContent="";if(!query){status.textContent="Введите поисковый запрос.";return}if(from.value&&to.value&&Number(from.value)>Number(to.value)){status.textContent="Начальный год больше конечного.";return}status.textContent="Проверка поискового индекса…";
  try{if(!index){const m=await Provenance.validateManifest(await load("data-manifest.json"));const d=(await Provenance.get(m,"economic-search-index.json",root)).data;if(d.schema!==1||!Array.isArray(d.docs)||!d.postings)throw Error();index=d;manifest=m;fingerprint=m.data_fingerprint}if(id!==seq)return;
  rows=EconomicSearch.search(index,query,{kind:kind.value,from:Number(from.value),to:Number(to.value),all:all.checked,expand:expand.checked,abstractOnly:abstractOnly.checked});const equivalents=EconomicSearch.plan(query,expand.checked).flatMap(x=>x.labels);expansion.textContent=equivalents.length?"Расширение запроса: "+equivalents.slice(0,20).join(" · "):"";limit=20;draw();status.textContent="Найдено: "+rows.length+" из "+index.docs.length+" · SHA-256 "+fingerprint.slice(0,12);if(!rows.length)status.textContent+=". Попробуйте снять фильтры или изменить запрос.";

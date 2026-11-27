@@ -1,5 +1,5 @@
 """Independent local inverted index rebuilt from the economic archive."""
-import json,re
+import json,re,math
 import economic_abstracts
 from collections import Counter,defaultdict
 from urllib.parse import quote,urlsplit
@@ -33,7 +33,11 @@ def compile_index(rows,stamp):
             for w in set(tokens(r[field])):weights[w]+=weight
         for w in set(tokens(r.get("abstract_text",""))):weights[w]+=1
         for w,weight in sorted(weights.items()):postings[w].append([i,weight])
-    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
+    norms=[0.0]*len(docs)
+    for posting in postings.values():
+        idf=math.log(1+(len(docs)-len(posting)+0.5)/(len(posting)+0.5))
+        for i,w in posting:norms[i]+=(w*idf)**2
+    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
 def read(out,name):return json.loads((out/name).read_text(encoding="utf-8"))
 def build(out,stamp):
     rows=[]
@@ -65,6 +69,7 @@ def validate(d):
     if any(r["kind"] not in KINDS or not safe(r["href"]) or not r["title"] for r in docs):raise ValueError("Invalid document")
     if len({(r["kind"],r["href"]) for r in docs})!=len(docs):raise ValueError("Duplicate document")
     if any("abstract_text" in r or "abstract_license" in r and (r["kind"]!="paper" or r["abstract_license"]!=economic_abstracts.LICENSE) for r in docs):raise ValueError("Invalid abstract index metadata")
+    if len(d["norms"])!=len(docs) or any(type(v) not in (int,float) or not math.isfinite(v) or v<0 for v in d["norms"]):raise ValueError("Invalid vector norms")
     for word,posting in d["postings"].items():
         if not re.fullmatch(r"[a-zа-я0-9]+",word) or not posting:raise ValueError("Invalid term")
         last=-1
