@@ -402,3 +402,23 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.answerEvidenceWarning(C.answerEvidenceAudit("0 [fact2]",rows)).includes("не проверка фактов"));
  console.log("13 numerical answer audit checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"fact1",title:"Выпуск",description:"2025 · 100 млн · 7%",value:100,unit:"млн"},{id:"fact2",title:"Инвестиции",description:"2025 · 200 млн · 2 п.п.",value:200,unit:"млн"}];
+ const audit=text=>C.citationEvidenceAudit(text,rows);
+ A.deepEqual(audit("Выпуск 100 млн [fact1]. Инвестиции 200 млн [fact2]."),{unlinked:[],mismatched:[]});
+ A.deepEqual(audit("Выпуск 200 млн [fact1].").mismatched,[{part:1,numbers:["200 млн"],refs:["fact1"]}]);
+ A.deepEqual(C.answerEvidenceAudit("Выпуск 200 млн [fact1].",rows).missing,[]);
+ A.deepEqual(audit("Выпуск 100 млн. Инвестиции 200 млн [fact2].").unlinked,[{part:1,numbers:["100 млн"]}]);
+ A.deepEqual(audit("Изменения 7% и 2 п.п. [fact1] [fact2]."),{unlinked:[],mismatched:[]});
+ A.deepEqual(audit("Выпуск 100 млн [fake].").unlinked,[{part:1,numbers:["100 млн"]}]);
+ A.deepEqual(audit("1. Нет данных.\n2. Выпуск 100 млн [fact1]."),{unlinked:[],mismatched:[]});
+ A.deepEqual(audit("Выпуск 100,00 млн [fact1].").mismatched,[]);
+ A.deepEqual(audit("Рост 2% [fact2].").mismatched[0].numbers,["2%"]);
+ A.deepEqual(audit("Выпуск 100 млн [fact1].\nИнвестиции 200 млн.").unlinked,[{part:2,numbers:["200 млн"]}]);
+ A.ok(C.answerEvidenceWarning(C.answerEvidenceAudit("200 млн [fact1]",rows),audit("200 млн [fact1]")).includes("не найдены в указанных источниках"));
+ A.ok(C.answerEvidenceWarning(C.answerEvidenceAudit("100 млн",rows),audit("100 млн")).includes("без ссылки в том же фрагменте"));
+ A.deepEqual(audit("Сведения отсутствуют."),{unlinked:[],mismatched:[]});
+ A.deepEqual(audit("100 млн [fact1]").mismatched,[]);
+ console.log("14 citation-level numeric audit checks passed");
+}
