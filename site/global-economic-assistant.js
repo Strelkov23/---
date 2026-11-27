@@ -1061,7 +1061,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    for(const [i,r] of ranked.entries()){
     if(!C.external(r.href))continue;
     const methods=r.channels.map(c=>({vector:"TF-IDF аннотации",content:"слова в аннотации",metadata:"общий индекс"}[c])).join(", ");
-    found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+r.authors+" · "+r.date+" · Найдено: "+methods+" · Аннотация (форматирование нормализовано): "+r.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+r.license+"; Crossref, проверка "+r.checked+". Ранжирование не оценка качества исследования."});
+    found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+r.authors+" · "+r.date+" · Найдено: "+methods+" · Аннотация (форматирование нормализовано): "+r.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+r.license+"; Crossref, проверка "+r.checked+". Фильтр ограничивает дату публикации, а не доказывает доступность материала в выбранный исторический момент. Ранжирование не оценка качества исследования."});
    }
   }catch{}}
   if(get(7)?.schema===1&&get(7).series){const d=get(7);const ranked=C.rank(Object.entries(d.series).map(([code,r])=>({...r,code,description:"Eurostat Евростат ЕС Россия торговля экспорт импорт товары"})),q.value,2);
