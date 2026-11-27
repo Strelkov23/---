@@ -64,6 +64,10 @@ def build(out,previous,stamp,refresh):
     if c["counts"]["review"]:agents[1]["state"]="attention"
     agents[1]["links"].append("economic-eurostat-trade.json")
     if any(r["status"]=="error" for r in eurostat["series"].values()):agents[1]["state"]="attention"
+    comp=read(out,"economic-ai-comparability.json")
+    agents[2]["metrics"]["comparability"]=comp
+    agents[2]["links"].append("economic-ai-comparability.json")
+    if comp["counts"]["unknown"]:agents[2]["state"]="attention"
     tournament=read(out,"economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")
