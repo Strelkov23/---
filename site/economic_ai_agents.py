@@ -58,12 +58,16 @@ def build(out,previous,stamp,refresh):
       agent("forecast","attention" if any(r["action"]=="review_model" for r in flags) else "ok" if assessed else "waiting",{"frozen":len(forecast["rows"]),"scored":sum(r["first_actual"] is not None for r in forecast["rows"]),"adequate_sample_groups":len(assessed)},["forecast.html","economic-ai-forecast-memory.json"],flags[:30])]
     search=read(out,"economic-search-audit.json")
     agents.append(agent("search","attention" if any(r["status"] in ("error","blocked") for r in search["sources"]) else "waiting" if any(r["status"]=="waiting" for r in search["sources"]) else "ok",{"counts":search["counts"],"terms":search["terms"],"index_bytes":search["index_bytes"],"baseline_available":search["baseline_available"]},["economic-search.html","economic-search-audit.json"],search["sources"]))
+    diag=read(out,"economic-ai-diagnostics.json")
+    signals=[r for r in diag["rows"] if r["status"]=="signal"]
+    assessed=diag["counts"]["signal"]+diag["counts"]["ordinary"]
+    agents.append(agent("diagnostics","attention" if signals else "ok" if assessed else "waiting",{"counts":diag["counts"],"closed_year":diag["closed_year"],"stale":sum(r["age"] is not None and r["age"]>1 for r in diag["rows"]),"note":diag["note"]},["diagnostics.html","economic-ai-diagnostics.json"],diag["rows"]))
     data=dict(schema=1,built=stamp,mode="scheduled_refresh" if refresh else "offline_build",note=NOTE,agents=agents)
     validate(data)
     return data
 def validate(d):
     if d["schema"]!=1 or d["note"]!=NOTE or d["mode"] not in ("scheduled_refresh","offline_build") or datetime.fromisoformat(d["built"]).tzinfo is None:raise ValueError("Invalid agent report")
-    if [r["id"] for r in d["agents"]]!=["coverage","discovery","quality","research","forecast","search"]:raise ValueError("Agent registry")
+    if [r["id"] for r in d["agents"]]!=["coverage","discovery","quality","research","forecast","search","diagnostics"]:raise ValueError("Agent registry")
     for a in d["agents"]:
         if a["state"] not in ("ok","attention","waiting") or not isinstance(a["metrics"],dict) or not isinstance(a["items"],list):raise ValueError("Agent result")
     for d in d["agents"][3]["items"]:

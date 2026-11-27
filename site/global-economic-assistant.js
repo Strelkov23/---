@@ -52,7 +52,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json"];
+  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json"];
   const files=await Promise.allSettled(keys.map(k=>Provenance.get(manifest,k,base)));
   const get=i=>files[i].status==="fulfilled"?files[i].value.data:null;
   const found=[];const tools=get(0);
@@ -78,6 +78,11 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");const seen=new Set(found.map(r=>r.href));for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"discovered",expand:true}).slice(0,3).entries()){if(!seen.has(r.href)&&C.external(r.href))found.push({id:"index"+(i+1),kind:"Новый показатель WDI",title:r.title,description:r.description,href:r.href,limit:"Метаданные нового ряда; числовые наблюдения не переданы."})}}catch{}}
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"external",expand:true}).slice(0,3).entries()){if(C.external(r.href))found.push({id:"external"+(i+1),kind:"Внешний препринт",title:r.title,description:r.date+" · "+r.description,href:r.href,limit:"Только метаданные; рецензирование и содержание не проверены."})}}catch{}}
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"web",expand:true}).slice(0,3).entries()){if(C.external(r.href))found.push({id:"web"+(i+1),kind:"Внешнее рабочее исследование",title:r.title,description:r.description,href:r.href,limit:"Заголовок и ссылка; содержание и дата публикации не проверены."})}}catch{}}
+  if(Array.isArray(get(5)?.rows)){
+   const diagnostics=get(5);
+   const relevant=C.rank(diagnostics.rows.map(r=>({...r,description:r.group+" "+r.note,code:r.codes.join(" ")})),q.value,3);
+   for(const [i,r] of relevant.entries()){if(!Number.isFinite(r.value))continue;found.push({id:"diag"+(i+1),kind:"Расчётный показатель WDI",title:r.title,description:r.year+" · "+r.value+" "+r.unit+" · формула "+r.formula+" · статус "+r.status,period:String(r.year),value:r.value,unit:r.unit,limit:r.note+" "+diagnostics.note+(r.age>1?" Устаревшее наблюдение.":""),href:"diagnostics.html"})}
+  }
   return {found,context:localContext,failed:files.filter(x=>x.status==="rejected").length,fingerprint:manifest.data_fingerprint};
  }
  function render(r){
