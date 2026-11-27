@@ -1,0 +1,55 @@
+/* Server-built research TITLE embeddings. No abstract/full-text ingestion. */
+"use strict";
+const MODEL=Object.freeze({id:"Xenova/paraphrase-multilingual-MiniLM-L12-v2",revision:"7e3d5398ff67a776281d0a27b2d47a964d5bfffb",runtime:"@xenova/transformers@2.17.2",dimension:384,pooling:"mean",normalize:true,quantized:true,input:"title-v1-600"});
+const SHARDS=64,MAX=512,KINDS=new Set(["paper","external","web"]);
+function identity(d){return JSON.stringify([d.kind,d.href]);}
+function bucket(d){
+ let h=2166136261;
+ for(const c of identity(d)){h=Math.imul(h^c.codePointAt(0),16777619)>>>0;}
+ return h%SHARDS;
+}
+function eligible(d){
+ return d&&KINDS.has(d.kind)&&typeof d.title==="string"&&d.title.trim()&&d.title.length<=350&&typeof d.href==="string"&&d.href.length<=2048&&/^https?:\/\/[^\s/@]+(?:\/|$)/.test(d.href)&&!/[\\\s]/.test(d.href);
+}
+function targets(index,shard){
+ if(index?.schema!==1||!Array.isArray(index.docs)||!Number.isInteger(shard)||shard<0||shard>=SHARDS)throw Error("Invalid input index or shard");
+ const seen=new Set(),out=[];
+ for(const d of index.docs){
+  if(!eligible(d))continue;
+  const key=identity(d);if(seen.has(key))throw Error("Duplicate research identity");seen.add(key);
+  if(bucket(d)===shard)out.push({kind:d.kind,href:d.href,title:d.title});
+ }
+ out.sort((a,b)=>identity(a)<identity(b)?-1:identity(a)>identity(b)?1:0);
+ if(out.length>MAX)throw Error("Shard exceeds bounded capacity");
+ return out;
+}
+function vectorOK(v){
+ return Array.isArray(v)&&v.length===MODEL.dimension&&v.every(Number.isFinite)&&Math.abs(Math.hypot(...v)-1)<.001;
+}
+function digestOK(v){return typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);}
+async function build(index,shard,source,encode){
+ if(!digestOK(source)||typeof encode!=="function")throw Error("Invalid source or encoder");
+ const docs=targets(index,shard),rows=[];
+ for(const d of docs){
+  const v=Array.from(await encode(d.title.slice(0,600)));
+  if(!vectorOK(v))throw Error("Invalid model embedding");
+  rows.push({...d,vector:v.map(x=>Math.round(x*1e7)/1e7)});
+ }
+ const result={schema:1,model:{...MODEL},source_sha256:source,shard,shards:SHARDS,scope:"research-title-only",rows};
+ validate(result,index,source,shard);return result;
+}
+function validate(d,index,source,expectedShard){
+ if(d?.schema!==1||!digestOK(source)||d.source_sha256!==source||d.scope!=="research-title-only"||d.shards!==SHARDS||d.shard!==expectedShard||!Array.isArray(d.rows)||!d.model||Object.keys(d.model).length!==Object.keys(MODEL).length||Object.keys(MODEL).some(k=>d.model[k]!==MODEL[k]))throw Error("Invalid vector shard identity");
+ const expected=targets(index,expectedShard);
+ if(d.rows.length!==expected.length)throw Error("Incomplete shard");
+ for(const [i,row] of d.rows.entries())if(identity(row)!==identity(expected[i])||row.title!==expected[i].title||!vectorOK(row.vector))throw Error("Invalid vector row");
+ return true;
+}
+function rank(query,shards,index,source,limit=20){
+ if(!vectorOK(query)||!Array.isArray(shards)||shards.length>SHARDS||!Number.isInteger(limit)||limit<1||limit>50)throw Error("Invalid vector query");
+ const seen=new Set(),rows=[],norm=Math.hypot(...query);
+ for(const d of shards){if(seen.has(d.shard))throw Error("Duplicate shard");seen.add(d.shard);validate(d,index,source,d.shard);
+  for(const r of d.rows){const similarity=Math.max(-1,Math.min(1,r.vector.reduce((s,v,i)=>s+v*query[i],0)/(norm*Math.hypot(...r.vector))));rows.push({kind:r.kind,href:r.href,title:r.title,similarity});}}
+ return {searched:rows.length,shards:seen.size,complete:seen.size===SHARDS,rows:rows.sort((a,b)=>b.similarity-a.similarity|| (identity(a)<identity(b)?-1:1)).slice(0,limit)};
+}
+module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank};
