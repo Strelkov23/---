@@ -49,7 +49,20 @@ const GlobalEconomicAssistant=(function core(){
  const found=data.map((r,i)=>({id:"company"+(i+1),kind:r.state==="ok"?"Сравнение предприятий ФНС":"Статус поиска предприятия",title:r.title,description:"ИНН "+r.inn+" · "+index.year+" · "+(r.state==="ok"?labels.map((l,j)=>l+": "+fmt(r.values[j],j)).join(" · "):r.state==="missing"?"Не найдено в индексе":"Ошибка проверки блока"),href:"company-atlas.html?inn="+r.inn,limit:note+" Редакция "+index.fingerprint}));
  return {found,table:{year:index.year,labels,rows:data.map(r=>({inn:r.inn,title:r.title,state:r.state,values:r.values.map(fmt)})),note,href:"company-atlas.html?compare-inn="+encodeURIComponent(ids.join(","))},failed:data.filter(r=>r.state==="error").length};
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison}
+ function profileEvidence(p,inn,pinned=false,id="company-profile"){
+ const base={id,kind:"Профиль МСП",title:"Отрасль и регион регистрации · "+inn,href:"company-atlas.html?inn="+inn,limit:"Реестр МСП на дату среза, а не ЕГРЮЛ. ОКВЭД не подтверждает фактическую деятельность или отрасль в финансовом году. Код региона регистрации не означает место производства."+(pinned?" Карточка открывает текущую редакцию сайта.":"")};
+ if(!p||p.status!=="matched")return {...base,description:p?.status==="outside_verified_index"?"Не найдено в проверенном связанном индексе; это не подтверждает отсутствие статуса МСП.":p?.status==="outside_pilot"?"Не найдено в пилотной выборке; это не подтверждает отсутствие статуса МСП.":"Проверенный профиль недоступен."};
+ if(p.inn!==inn||typeof p.edition!=="string"||!p.edition)throw Error("Wrong profile");
+ return {...base,description:"Дата среза "+p.edition+" · "+(p.ogrn?"ОГРН "+p.ogrn+" · ":"")+"код региона "+(p.region??"нет данных")+" · заявительный ОКВЭД "+(p.declared??"нет данных")+" (редакция "+(p.dver??"нет данных")+") · отчётный ОКВЭД "+(p.reported??"нет данных")+" (редакция "+(p.rver??"нет данных")+")",limit:base.limit+" "+(p.scope==="full_diagnostic"?"Проверенный связанный индекс.":"Диагностическая выборка.")+(p.member&&p.sha256?" XML "+p.member+"; SHA-256 "+p.sha256+"; запись "+p.accepted_ordinal+".":"")+" SHA-256 архива "+(p.archive??"не указан")+"."};
+}
+ function profileComparison(profiles,ids){
+ if(profiles.length!==ids.length||new Set(ids).size!==ids.length)throw Error("Invalid profile list");
+ const matched=profiles.filter((p,i)=>p?.status==="matched"&&p.inn===ids[i]);
+ const comparable=matched.length===ids.length&&matched.every(p=>p.declared&&p.dver&&p.edition&&p.edition===matched[0].edition&&p.dver===matched[0].dver);
+ const declared=comparable?(matched.every(p=>p.declared===matched[0].declared)?"same_declared":"different_declared"):"unknown";
+ return {declared,note:declared==="same_declared"?"Заявительные основные ОКВЭД совпадают в одном срезе и редакции. Это не доказывает отраслевую сопоставимость финансов.":declared==="different_declared"?"Заявительные основные ОКВЭД различаются; сравнение финансов не является отраслевым рейтингом.":"Сопоставимость заявительных ОКВЭД не подтверждена."};
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -97,13 +110,36 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   else try{
    const index=(await Provenance.get(manifest,"company-index.json",base)).data;
    if(index.status!=="ready")throw Error("Index unavailable");
+   let linked=null,profileIndex=null,profileFailed=false;
+   async function loadProfiles(){
+    try{
+     if(!Object.hasOwn(manifest.files,"sme-finance.json"))return;
+     linked=(await Provenance.get(manifest,"sme-finance.json",base)).data;
+     if(Object.hasOwn(manifest.files,"sme-profile-index.json")){
+      const m=(await Provenance.get(manifest,"sme-profile-index.json",base)).data;
+      if(m.status==="diagnostic")profileIndex=CompanyLookup.profileManifest(m,index,linked);
+     }
+    }catch{profileFailed=true;profileIndex=null;}
+   }
+   async function getProfile(inn){
+    if(profileFailed)return {status:"unavailable"};
+    try{
+     if(profileIndex)return await CompanyLookup.profileLookup(profileIndex,inn,base);
+     const p=CompanyLookup.smeProfile(linked,index,inn);
+     return p.status==="matched"?{...p,scope:"pilot"}:p;
+    }catch{return {status:"unavailable"};}
+   }
    if(cmd.kind==="compare"){
     let ids;try{ids=CompanyLookup.parseSelection(cmd.value)}catch{note("Уточните запрос","Укажите от 2 до 5 разных корректных десятизначных ИНН.");}
     if(ids){const records=[];for(const inn of ids){try{records.push({status:"fulfilled",value:await CompanyLookup.lookup(index,inn,base)})}catch{records.push({status:"rejected"})}}
-     const c=C.comparison(ids,records,index,CompanyLookup.calculate,C.money,!!base);found.push(...c.found);table=c.table;failed=c.failed;}
+     const c=C.comparison(ids,records,index,CompanyLookup.calculate,C.money,!!base);found.push(...c.found);table=c.table;failed=c.failed;
+     await loadProfiles();const profiles=[];
+     for(let i=0;i<ids.length;i++){const p=records[i].status==="fulfilled"&&records[i].value?await getProfile(ids[i]):{status:"unavailable"};profiles.push(p);found.push(C.profileEvidence(p,ids[i],!!base,"profile"+(i+1)));}
+     const m=C.profileComparison(profiles,ids);table.note+=" "+m.note;found.push({id:"profile-check",kind:"Сопоставимость предприятий",title:"Отраслевая принадлежность по реестру МСП",description:m.note,href:table.href,limit:"Срез МСП не равен финансовому году; фактическая структура выпуска не установлена."});
+    }
    }else if(cmd.kind==="inn"){
     const r=await CompanyLookup.lookup(index,cmd.value,base);
-    if(r){const e=C.companyEvidence(r,index);if(base)e.limit+=" Ссылка на карточку ведёт к текущей редакции сайта, а не закреплённому архиву.";found.push(e);}
+    if(r){const e=C.companyEvidence(r,index);if(base)e.limit+=" Ссылка на карточку ведёт к текущей редакции сайта, а не закреплённому архиву.";found.push(e);await loadProfiles();found.push(C.profileEvidence(await getProfile(cmd.value),cmd.value,!!base));}
     else note("ИНН не найден","В проверенном блоке индекса "+index.year+" нет указанного ИНН.");
    }else{
     const key=CompanyLookup.normalizeName(cmd.value);

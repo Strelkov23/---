@@ -31,3 +31,17 @@ A.equal(er.failed,1);A.ok(er.table.note.includes("текущей редакци�
 A.throws(()=>core.comparison(["7707083893","7707083893"],[],{year:2025},CL.calculate,core.money,false));
 A.throws(()=>core.comparison(["7707083893","7704211201"],[{status:"fulfilled",value:{inn:"7704211201"}},{status:"fulfilled",value:null}],{year:2025},CL.calculate,core.money,false));
 console.log("12 company comparison checks passed");
+
+const pr={status:"matched",inn:"7707083893",edition:"2026-11-10",region:"77",declared:"64.19",dver:"2014",reported:null,rver:null,scope:"full_diagnostic"};
+const pe=core.profileEvidence(pr,pr.inn);
+A.ok(pe.description.includes("64.19"));A.ok(pe.description.includes("отчётный ОКВЭД нет данных"));A.ok(pe.limit.includes("не подтверждает фактическую"));
+A.throws(()=>core.profileEvidence(pr,"7704211201"));
+A.ok(core.profileEvidence({status:"outside_verified_index"},pr.inn).description.includes("не подтверждает отсутствие"));
+A.ok(core.profileEvidence(null,pr.inn).description.includes("недоступен"));
+const pr2={...pr,inn:"7704211201"};
+A.equal(core.profileComparison([pr,pr2],[pr.inn,pr2.inn]).declared,"same_declared");
+A.equal(core.profileComparison([pr,{...pr2,declared:"01.1"}],[pr.inn,pr2.inn]).declared,"different_declared");
+A.equal(core.profileComparison([pr,{...pr2,dver:"2001"}],[pr.inn,pr2.inn]).declared,"unknown");
+A.equal(core.profileComparison([pr,{...pr2,edition:"2026-10-10"}],[pr.inn,pr2.inn]).declared,"unknown");
+A.equal(core.profileComparison([pr,null],[pr.inn,pr2.inn]).declared,"unknown");
+console.log("11 company profile checks passed");
