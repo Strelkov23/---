@@ -148,3 +148,142 @@ A.throws(()=>core.bottleneckEvidence(bc,{...bn,rows:bn.rows.slice(1)},core.horiz
 A.throws(()=>core.bottleneckEvidence(bc,{...bn,baseline:{...bn.baseline,upper:bn.baseline.score+100}},core.horizonHref(bc)));
 A.throws(()=>GP.bottleneck(mm,bc.p,bc.objective,0));
 console.log("16 bottleneck assistant checks passed");
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js");
+const x={title:"Выпуск",period:"2025",value:120,unit:"руб.",url:"https://example.org/",limit:"Паспорт",checked:"2026-01-01",comparison:{period:"2024",value:100,absolute:20,relativePercent:20}};
+A.ok(core.seriesEvidence(x,"fact1").description.includes("относительное изменение 20%"));
+A.ok(core.seriesEvidence({...x,comparison:{...x.comparison,relativePercent:null}},"fact1").description.includes("абсолютное изменение 20"));
+A.ok(!core.seriesEvidence({...x,comparison:{...x.comparison,relativePercent:null}},"fact1").description.includes("относительное изменение"));
+A.ok(core.seriesEvidence({...x,comparison:null},"fact1").description.includes("не подтверждено"));
+A.equal(core.seriesEvidence({...x,value:NaN},"fact1"),null);
+A.equal(core.seriesEvidence({...x,url:"javascript:alert(1)"},"fact1").href,null);
+const row=(period,value,flag="")=>({period,value,flag}),s=(rows,status="ok")=>({rows,status,success:"2026-01-01"}),d={schema:1,unit:"млн евро",source:"https://example.org/",note:"Только товары",series:{MIO_EXP_VAL:s([row("2024",40),row("2025",60,"p"),row("2026",90)]),MIO_IMP_VAL:s([row("2024",60),row("2025",40),row("2026",10)]),MIO_BAL_VAL:s([row("2025",20.1)])}};
+const e=core.tradeEvidence(d,2025);A.equal(e.period,"2025");A.ok(e.description.includes("оборот 100"));A.ok(e.description.includes("в пределах"));A.ok(e.description.includes("предыдущему году 0%"));A.ok(e.limit.includes("p / нет / нет"));
+A.equal(core.tradeEvidence(d,2024).period,"2024");A.ok(core.tradeEvidence(d,2024).description.includes("сальдо источника отсутствует"));
+const change=(key,rows)=>({...d,series:{...d.series,[key]:s(rows)}});
+A.ok(core.tradeEvidence(change("MIO_BAL_VAL",[row("2025",25)]),2025).description.includes("требуется проверка"));
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2023",10)]),2025),null);
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",10),row("2025",20)]),2025),null);
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",-1)]),2025),null);
+A.equal(core.tradeEvidence({...d,unit:"руб."},2025),null);
+A.equal(core.tradeEvidence({...d,source:"javascript:alert(1)"},2025),null);
+A.ok(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",10)]),2025).description.includes("годовой темп не рассчитан"));
+A.equal(core.tradeEvidence({...d,series:{...d.series,MIO_IMP_VAL:{...d.series.MIO_IMP_VAL,success:null}}},2025),null);
+console.log("21 statistical evidence checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),IV=require("./iv-comparison.js");
+const cmd=core.priceCommand("покупательная способность: 2024-05; год; зарплата=10%");
+A.deepEqual(cmd,{kind:"price-power",period:"2024-05",basis:"yoy",wage:10});
+A.equal(core.priceCommand("покупательная способность: 2024-05; месяц; оплата=-5,5").wage,-5.5);
+A.equal(core.priceCommand("покупательная способность: 2024-05; с начала года; зарплата=0").basis,"ytd");
+A.equal(core.priceCommand("инфляция"),null);
+for(const q of ["покупательная способность: 2024-13; год; зарплата=10","покупательная способность: 2024-05; год; зарплата=101","покупательная способность: 2024-05; год; зарплата=-51","покупательная способность: 2024-05; квартал; зарплата=10"])A.equal(core.priceCommand(q).kind,"invalid");
+const r={period:"2024-05",yoy:20,official:{yoy:[110]},url:"https://romir.ru/test"};
+const d={schema:"iv-prices-v1",official_source:"https://example.org/cpi",rows:[r]};
+const e=core.priceEvidence(cmd,d,IV,"2026-11");
+A.equal(e.length,3);A.equal(e[0].value,10);A.equal(e[1].value,20);A.ok(e[2].description.includes("по ИПЦ 0%"));A.ok(e[2].description.includes("−8,3333%")||e[2].description.includes("-8,3333%"));A.ok(e[2].limit.includes("Не оценка ошибки Росстата"));
+A.equal(core.priceEvidence(cmd,d,IV,"2024-05").length,0);
+A.equal(core.priceEvidence({...cmd,period:"2024-06"},d,IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[r,r]},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,yoy:-100}]},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,official_source:"javascript:alert(1)"},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,official:{}}]},IV,"2026-11").length,0);
+console.log("20 purchasing power assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),IV=require("./iv-trade.js");
+const cmd=core.partnerTradeCommand("торговля с США: 2026; месяцев=2");
+A.deepEqual(cmd,{kind:"partner-trade",year:2026,months:2});A.equal(core.partnerTradeCommand("торговля"),null);
+const r=(period,us_exports,us_imports)=>({period,us_exports,us_imports});
+const d={schema:"iv-trade-v1",source:"https://www.census.gov/foreign-trade/balance/c4621.html",origin:"partner_customs",unit:"млн долл. США, текущие цены, без сезонной корректировки",status:"downloaded",last_success:"2026-03-01",source_sha256:"a".repeat(64),rows:[r("2025-01",10,20),r("2025-02",10,20),r("2026-01",20,10),r("2026-02",20,10)]};
+for(const q of ["торговля с США: 1992; месяцев=2","торговля с США: 2026; месяцев=0","торговля с США: 2026; месяцев=13"])A.equal(core.partnerTradeCommand(q).kind,"invalid");
+const e=core.partnerTradeEvidence(cmd,d,IV,"2026-03");
+A.equal(e.length,3);A.ok(e[0].description.includes("100%"));A.ok(e[1].description.includes("-50%"));A.ok(e[2].description.includes("сальдо 20"));A.ok(e[2].description.includes("2 из 2"));
+const partial=core.partnerTradeEvidence(cmd,d,IV,"2026-02");A.ok(partial[0].description.includes("НЕПОЛНЫЙ ПЕРИОД"));A.ok(partial[0].description.includes("02"));
+A.equal(core.partnerTradeEvidence(cmd,d,IV,"2026-01").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,rows:[...d.rows,d.rows[0]]},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,rows:[...d.rows,r("2024-01",-1,0)]},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,source_sha256:null},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,unit:"рубли"},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed",seed_verification:"documented_manual",seed_recheck_date:"2026-03-01"},IV,"2026-03").length,3);
+A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed"},IV,"2026-03").length,0);
+console.log("19 partner trade assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),L=require("./iv-labour.js"),P=require("./iv-physical.js");
+const l=core.labourCommand("рынок труда: 2026-10; база=2025");
+A.deepEqual(l,{kind:"labour",year:"2026",month:"10",base:"2025"});
+A.equal(core.labourCommand("рынок труда: 2026-13; база=2025").kind,"invalid");
+A.equal(core.labourCommand("безработица"),null);
+const r={period:"2026-10",value:9,source:"a"},b={period:"2025-10",value:7.3,source:"a"};
+const d={schema:"iv-labour-v1",origin:"platform_primary",status:"manual_verified_labels",rows:[r,b],snapshots:[],sources:{a:{url:"https://example.org/a",page:5}},verification:{documents:[{source:"a",page:5}]}};
+A.equal(core.labourEvidence(l,d,L,"2026-11").length,3);
+A.equal(core.labourEvidence(l,d,L,"2026-10").length,0);
+A.equal(core.labourEvidence(l,{...d,rows:[r,b,b]},L,"2026-11").length,0);
+A.equal(core.labourEvidence(l,{...d,verification:{documents:[]}},L,"2026-11").length,0);
+A.equal(core.labourEvidence(l,{...d,rows:[r]},L,"2026-11").length,0);
+A.equal(core.labourEvidence({...l,base:"2026"},d,L,"2026-11").length,3);
+const c=core.outputCommand("физический выпуск: nornickel; nickel; 2025; база=2024");
+A.equal(c.kind,"physical-output");A.equal(core.outputCommand("физический выпуск: x").kind,"invalid");
+const company={id:"nornickel",title:"Норникель",source:"https://example.org",scope:"Группа",verification:"source_rechecked",verification_date:"2026-11-26",metrics:[{id:"nickel",title:"Никель",unit:"т"}],rows:[{year:2024,nickel:100},{year:2025,nickel:90}]};
+const p={schema:"iv-physical-v1",companies:[company]};
+A.equal(core.outputEvidence(c,p,P,"2026-11").length,3);
+A.ok(core.outputEvidence(c,p,P,"2026-11")[2].description.includes("90"));
+A.equal(core.outputEvidence(c,p,P,"2025-12").length,0);
+A.equal(core.outputEvidence(c,{...p,companies:[{...company,verification:"pending"}]},P,"2026-11").length,0);
+A.equal(core.outputEvidence({...c,metric:"bad"},p,P,"2026-11").length,0);
+A.equal(core.outputEvidence({...c,base:2023},p,P,"2026-11").length,0);
+console.log("17 independent labour and output assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),P=require("./iv-physical-composite.js"),IV=require("./iv-physical.js");
+const c=core.compositeCommand("индекс выпуска: 2025; база=2024; веса=20,20,20,20,0");
+A.deepEqual(c,{kind:"physical-composite",year:2025,base:2024,weights:[20,20,20,20,0]});
+A.equal(core.compositeCommand("выпуск"),null);
+for(const q of ["индекс выпуска: 2025; база=2024; веса=0,0,0,0,0","индекс выпуска: 2025; база=2024; веса=101,0,0,0,0","индекс выпуска: 2025; база=2024; веса=1,2","индекс выпуска: 1980; база=2024; веса=1,1,1,1,1"])A.equal(core.compositeCommand(q).kind,"invalid");
+const d={schema:"iv-physical-v1",companies:P.specs.map(([id,key,title],i)=>({id,title,source:"https://example.org/"+id,scope:"Группа",verification:i===4?"partial":"source_rechecked",verification_date:"2026-11-26",metrics:[{id:key,title,unit:"ед."}],rows:[{year:2024,[key]:100,verification:"source_rechecked"},{year:2025,[key]:i===0?80:120,verification:i===4?"secondary_rechecked":"source_rechecked"}]}))};
+const a=core.compositeEvidence(c,d,IV,P,"2026-11");
+A.equal(a.length,13);A.equal(a[0].id,"composite-result");A.ok(a[0].description.includes("110"));A.ok(a[0].description.includes("100%"));A.ok(a[0].description.includes("при исключении"));
+const blocked=core.compositeEvidence({...c,weights:[20,20,20,20,20]},d,IV,P,"2026-11");
+A.equal(blocked[0].id,"composite-blocked");A.ok(blocked[0].description.includes("Северсталь"));A.ok(!blocked.some(r=>r.id==="composite-result"));
+A.equal(core.compositeEvidence(c,d,IV,P,"2025-12").length,0);
+const missing={...d,companies:d.companies.slice(1)};
+A.equal(core.compositeEvidence(c,missing,IV,P,"2026-11")[0].id,"composite-blocked");
+const bad={...d,companies:d.companies.map((x,i)=>i===0?{...x,verification_date:"2027-01-01"}:x)};
+A.equal(core.compositeEvidence(c,bad,IV,P,"2026-11")[0].id,"composite-blocked");
+A.equal(core.compositeEvidence({...c,weights:[0,0,0,0,0]},d,IV,P,"2026-11")[0].id,"composite-blocked");
+A.ok(a.filter(r=>r.kind==="Корпоративное наблюдение").every(r=>r.href.startsWith("https://")));
+console.log("19 composite physical index assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),S=require("./iv-energy-structure.js"),E=require("./iv-ember.js");
+const c=core.energyCommand("структура энергетики: 2025; база=2024; порог=5");
+A.deepEqual(c,{kind:"energy-structure",year:2025,base:2024,threshold:5});
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024").threshold,5);
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024; порог=1,5").threshold,1.5);
+A.equal(core.energyCommand("энергетика"),null);
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024; порог=101").kind,"invalid");
+const vals=Object.fromEntries(S.types.map(k=>[k,10]));
+const d={schema:"iv-ember-v1",origin:"external_compilation",unit:"TWh",source:"https://example.org/data",documentation:"https://example.org/method",success:"2026-01-01",sha256:"a".repeat(64),rows:[{year:2024,values:{...vals,total:90}},{year:2025,values:{...vals,total:90}}]};
+const a=core.energyEvidence(c,d,S,E,"2026-11");
+A.equal(a.length,13);A.ok(a[2].description.includes("общий структурный сдвиг 0"));A.ok(a[2].description.includes("9 из 9"));
+const missing={...d,rows:d.rows.map(r=>({...r,values:{...r.values,other_renewables:null}}))};
+const b=core.energyEvidence(c,missing,S,E,"2026-11");
+A.ok(b[2].description.includes("HHI нет расчёта"));A.ok(b[2].description.includes("общий структурный сдвиг нет расчёта"));A.ok(b[2].description.includes("8 из 9"));A.ok(!b.some(r=>r.id==="energy-other_renewables"));
+A.equal(core.energyEvidence(c,d,S,E,"2025-12").length,0);
+A.equal(core.energyEvidence(c,{...d,rows:[d.rows[0]]},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,rows:[...d.rows,d.rows[0]]},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,sha256:null},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,unit:"GWh"},S,E,"2026-11").length,0);
+A.ok(a.at(-1).description.includes("Не переносить"));
+console.log("18 energy structure assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),G=require("./global-plan.js"),T=require("./iv-trajectory.js");
+const c=core.investmentComparisonCommand("сравнить инвестиции: инвестиции A=1000; инвестиции B=1500; импорт=500; горизонт=2; рост=3");
+A.equal(c.kind,"investment-comparison");A.equal(c.p.investment,1000);A.equal(c.budgetB,1500);A.equal(c.p.years,2);A.equal(c.p.growth.length,19);
+A.equal(core.investmentComparisonCommand("инвестиции"),null);
+for(const q of ["сравнить инвестиции: инвестиции A=1; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=2; импорт=5; горизонт=11","сравнить инвестиции: инвестиции A=1; инвестиции A=2; инвестиции B=2; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=100001; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=2; инвестиции=3; импорт=5"])A.equal(core.investmentComparisonCommand(q).kind,"invalid");
+const n=19,m={names:Array.from({length:n},(_,i)=>"Группа "+i),output:Array(n).fill(10000),demand:Array(n).fill(10000),imports:Array(n).fill(100),effects:Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?10000:0))};
+const a=G.solve(m,c.p,c.objective),b=G.solve(m,{...c.p,investment:c.budgetB},c.objective);
+const out=core.investmentComparisonEvidence(c,m,a,b,T);
+A.equal(out.length,5);A.equal(out[0].id,"invest-compare");A.ok(out[0].description.includes("B − A"));A.ok(out[0].limit.includes("не ВВП"));A.ok(out[2].href.includes("dyn-investment=1500"));A.ok(b.score>=a.score-1e-6);
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,upper:b.upper+1e6},T));
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,rows:b.rows.slice(1)},T));
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,maxViolation:-1},T));
+console.log("20 investment comparison assistant checks passed");}
