@@ -31,7 +31,20 @@ async function run(){
  A.throws(()=>V.catalog(index,sha,[{data:d,receipt:{...receipt(d),source_sha256:"b".repeat(64)}}]));
  const complete=V.catalog(index,sha,all.map(pair));
  A.equal(complete.complete,true);A.equal(complete.indexed,250);A.equal(complete.missing.length,0);
- console.log("30 server vector and catalogue checks passed");
+ let calls=0;
+ const fresh="d".repeat(64),again=await V.build(index,s,fresh,async()=>{calls++;return v},d);
+ A.equal(calls,0);A.equal(again.source_sha256,fresh);A.equal(again.rows.length,d.rows.length);
+ const altered={...index,docs:index.docs.map(x=>V.identity(x)===V.identity(d.rows[0])?{...x,title:"New title"}:x)};
+ const updated=await V.build(altered,s,fresh,async()=>{calls++;return v},d);
+ A.equal(calls,1);A.ok(updated.rows.some(x=>x.title==="New title"));
+ const reduced={...index,docs:index.docs.filter(x=>V.identity(x)!==V.identity(d.rows[0]))};
+ const removed=await V.build(reduced,s,fresh,async()=>{calls++;return v},d);
+ A.equal(calls,1);A.equal(removed.rows.length,d.rows.length-1);
+ A.throws(()=>V.reusable({...d,model:{...d.model,revision:"wrong"}},s));
+ A.throws(()=>V.reusable({...d,rows:[...d.rows,d.rows[0]]},s));
+ A.throws(()=>V.reusable(d,(s+1)%64));
+ A.throws(()=>V.reusable({...d,rows:d.rows.map(x=>({...x,vector:Array(384).fill(0)}))},s));
+ console.log("41 server vector and incremental catalogue checks passed");
 }
 module.exports=run;
 if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1;});

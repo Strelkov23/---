@@ -27,11 +27,23 @@ function vectorOK(v){
  return Array.isArray(v)&&v.length===MODEL.dimension&&v.every(Number.isFinite)&&Math.abs(Math.hypot(...v)-1)<.001;
 }
 function digestOK(v){return typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);}
-async function build(index,shard,source,encode){
+function reusable(prior,shard){
+ const map=new Map();
+ if(!prior)return map;
+ if(prior.schema!==1||prior.scope!=="research-title-only"||prior.shard!==shard||prior.shards!==SHARDS||!digestOK(prior.source_sha256)||!prior.model||Object.keys(prior.model).length!==Object.keys(MODEL).length||Object.keys(MODEL).some(k=>prior.model[k]!==MODEL[k])||!Array.isArray(prior.rows)||prior.rows.length>MAX)throw Error("Invalid prior vector shard");
+ for(const r of prior.rows){
+  const key=identity(r);
+  if(!eligible(r)||bucket(r)!==shard||map.has(key)||!vectorOK(r.vector))throw Error("Invalid prior vector row");
+  map.set(key,r);
+ }
+ return map;
+}
+async function build(index,shard,source,encode,prior=null){
  if(!digestOK(source)||typeof encode!=="function")throw Error("Invalid source or encoder");
- const docs=targets(index,shard),rows=[];
+ const docs=targets(index,shard),rows=[],previous=reusable(prior,shard);
  for(const d of docs){
-  const v=Array.from(await encode(d.title.slice(0,600)));
+  const old=previous.get(identity(d));
+  const v=old?.title===d.title?old.vector:Array.from(await encode(d.title.slice(0,600)));
   if(!vectorOK(v))throw Error("Invalid model embedding");
   rows.push({...d,vector:v.map(x=>Math.round(x*1e7)/1e7)});
  }
@@ -67,4 +79,4 @@ function catalog(index,source,parts){
  const missing=Array.from({length:SHARDS},(_,i)=>i).filter(i=>!seen.has(i)),total=expected.reduce((a,b)=>a+b,0),indexed=entries.reduce((a,b)=>a+b.rows,0);
  return {schema:1,scope:"research-title-only",model:{...MODEL},source_sha256:source,shards:SHARDS,complete:missing.length===0,total,indexed,entries,missing};
 }
-module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog};
+module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog,reusable};
