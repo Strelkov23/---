@@ -78,3 +78,21 @@ assert.deepEqual(core.archiveTargets([a,b,c],256,{from:2025}).map(d=>d.href),["b
 const c=core.coverage(index);assert.equal(c.total,5);assert.equal(c.research,4);assert.equal(c.abstracts,1);assert.equal(c.metadataOnly,3);assert.equal(c.undated,2);assert.equal(c.consistent,false);
 const audit={schema:1,baseline_available:true,counts:Object.fromEntries(Object.entries(c.counts).map(([k,n])=>[k,{total:n,added:0,removed:0}])),abstracts:{indexed:1},sources:[{id:"wdi",status:"ok"}]};
 assert.equal(core.coverage(index,audit).consistent,true);assert.equal(core.coverage(index,audit).changes.paper.added,0);assert.equal(core.coverage(index,audit).sources[0].status,"ok");audit.counts.paper.total=9;assert.equal(core.coverage(index,audit).changes,null);assert.throws(()=>core.coverage({schema:1,docs:[{kind:"bad"}]}));assert.equal(core.coverageQuestion("Сколько научных статей в архиве?"),true);assert.equal(core.coverageQuestion("Инвестиции в промышленность"),false);console.log("13 search coverage checks passed");}
+
+{const license="https://creativecommons.org/licenses/by/4.0/",doc={kind:"paper",title:"Инвестиции",code:"10.1234/a",date:"2025-01",href:"https://doi.org/10.1234/a",abstract_license:license},paper={doi:doc.code,title:doc.title,published:doc.date,authors:"A",licensed_abstract:{license,text:"Исследование",checked:"2025-02-01"},access:{licenses:[{version:"vor",url:license,start:"2025-01-01"}]}};
+assert.equal(core.verifiedAbstract(doc,paper,"2026-01-01").text,"Исследование");
+assert.equal(core.verifiedAbstract(doc,{...paper,title:"Другой"},"2026-01-01"),null);
+assert.equal(core.verifiedAbstract(doc,paper,"2024-01-01"),null);
+assert.equal(core.verifiedAbstract(doc,{...paper,access:{licenses:[...paper.access.licenses,{version:"vor",url:"https://example.org",start:"2025-02-01"}]}},"2026-01-01"),null);
+assert.equal(core.verifiedAbstract(doc,{...paper,access:{licenses:[{version:"vor",url:license,start:"2025-02-30"}]}},"2026-01-01"),null);
+assert.equal(core.verifiedAbstract(doc,{...paper,doi:"10.1234/b"},"2026-01-01"),null);
+const idx={schema:1,built:"2026-01-01",docs:[doc],postings:{"инвестиц":[[0,5]]},abstract_postings:{},abstract_count:1,abstract_norms:[0]};
+assert.deepEqual(core.researchEvidence(idx,[paper],"инвестиции","2026-01").map(r=>r.channels),[["metadata"]]);
+assert.equal(core.researchEvidence(idx,[paper],"инвестиции","2024-12").length,0);
+assert.equal(core.researchEvidence(idx,[paper,paper],"инвестиции","2026-01").length,0);
+assert.equal(core.researchEvidence(idx,[{...paper,published:"2025-02"}],"инвестиции","2026-01").length,0);
+const b={...doc,title:"Инвестиции в отрасли",code:"10.1234/b",href:"https://doi.org/10.1234/b"},pb={...paper,title:b.title,doi:b.code};
+const two={...idx,docs:[doc,b],postings:{"инвестиц":[[0,5],[1,1]]},abstract_count:2,abstract_norms:[0,0]};
+assert.deepEqual(core.researchEvidence(two,[{...paper,authors:""},pb],"инвестиции","2026-01",1).map(r=>r.code),[b.code]);
+assert.equal(core.researchEvidence(idx,[paper],"инвестиции","2026-01",6).length,0);
+console.log("12 verified research evidence checks passed");}

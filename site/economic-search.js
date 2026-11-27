@@ -213,7 +213,44 @@ const EconomicSearch=(function core(){
   const s=String(q||"").toLowerCase().replaceAll("ё","е").trim();
   return /(?:охват|покрытие|размер|состояние|статистика|сколько|объем)/u.test(s)&&/(?:поисковик|поискового индекс|научного архив|научных публикаци|научных статей|аннотаци)/u.test(s);
  }
- return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets,touchCache,coverage,coverageQuestion};
+ function verifiedAbstract(doc,paper,stamp){
+  const license="https://creativecommons.org/licenses/by/4.0/";
+  const day=String(stamp||"").slice(0,10),a=paper?.licensed_abstract;
+  const validDay=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
+  if(!validDay(day)||doc?.kind!=="paper"||doc.abstract_license!==license||typeof doc.code!=="string"||doc.code!==paper?.doi||!/^10\.\d{4,9}\/\S+$/.test(doc.code)||typeof paper.title!=="string"||paper.title.slice(0,350)!==doc.title||typeof paper.authors!=="string"||!paper.authors.trim()||a?.license!==license||typeof a.text!=="string"||!a.text.trim()||a.text.length>4000)return null;
+  const licenses=paper.access?.licenses;
+  if(!Array.isArray(licenses))return null;
+  const vor=licenses.filter(r=>r&&String(r.version).toLowerCase()==="vor");
+  if(!vor.length||vor.some(r=>!validDay(r.start)))return null;
+  const active=vor.filter(r=>r.start<=day),allowed=new Set([license,license.slice(0,-1),license.replace("https:","http:"),license.replace("https:","http:").slice(0,-1)]);
+  if(!active.length||active.some(r=>!allowed.has(r.url)))return null;
+  return {text:a.text,authors:paper.authors,license,checked:typeof a.checked==="string"?a.checked:"не указана"};
+ }
+ function researchEvidence(index,papers,query,cutoff,limit=3){
+  if(!Array.isArray(papers)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||!Number.isInteger(limit)||limit<1||limit>5)return [];
+  const stamp=String(index.built||"").slice(0,10),byDoi=new Map(),ambiguous=new Set();
+  for(const p of papers){if(typeof p?.doi!=="string")continue;if(byDoi.has(p.doi))ambiguous.add(p.doi);byDoi.set(p.doi,p);}
+  const options={kind:"paper",expand:true,abstractOnly:true},channels=[
+   ["vector",contentVector(index,query,options)],
+   ["content",search(index,query,{...options,contentOnly:true})],
+   ["metadata",search(index,query,options)]
+  ],pool=new Map();
+  for(const [channel,rows] of channels)for(const [i,doc] of rows.slice(0,50).entries()){
+   if(!pool.has(doc.href))pool.set(doc.href,{doc,channels:[],score:0});
+   const r=pool.get(doc.href);r.channels.push(channel);r.score+=(channel==="metadata"?0.3:1)/(10+i+1);
+  }
+  const ranked=[...pool.values()].sort((a,b)=>Number(b.channels.some(c=>c!=="metadata"))-Number(a.channels.some(c=>c!=="metadata"))||b.score-a.score||a.doc.href.localeCompare(b.doc.href));
+  const result=[],seen=new Set();
+  for(const r of ranked){
+   const d=r.doc,p=byDoi.get(d.code),period=String(d.date||"");
+   if(!/^\d{4}(?:-(?:0[1-9]|1[0-2])(?:-\d{2})?)?$/.test(period)||((period.length===4?period+"-12":period.slice(0,7))>cutoff)||String(p?.published||"").slice(0,10)!==period||ambiguous.has(d.code)||seen.has(d.code))continue;
+   const a=verifiedAbstract(d,p,stamp);if(!a)continue;
+   seen.add(d.code);result.push({...d,...a,channels:r.channels,retrievalScore:r.score});
+   if(result.length>=limit)break;
+  }
+  return result;
+ }
+ return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets,touchCache,coverage,coverageQuestion,verifiedAbstract,researchEvidence};
 })();
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -361,7 +398,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const details=add(article,"details",""),summary=add(details,"summary","Читать аннотацию · CC BY 4.0"),content=add(details,"p","");
  details.addEventListener("toggle",async()=>{if(!details.open||content.dataset.loaded)return;content.dataset.loaded="1";content.textContent="Проверка источника…";
  try{if(!papersPromise)papersPromise=Provenance.get(manifest,"literature.json",root).then(x=>new Map(x.data.articles.map(p=>[p.doi,p]))).catch(e=>{papersPromise=null;throw e});
- const p=(await papersPromise).get(r.code),a=p?.licensed_abstract;if(!a||a.license!==r.abstract_license||typeof a.text!=="string"||!p.authors)throw Error();
+ const p=(await papersPromise).get(r.code),a=EconomicSearch.verifiedAbstract(r,p,index.built);if(!a)throw Error();
  content.textContent=a.text;add(details,"p","Авторы: "+p.authors+" · DOI "+r.code+" · Crossref · форматирование нормализовано");const license=add(details,"a","Лицензия CC BY 4.0");license.href=a.license;license.rel="noopener noreferrer";add(details,"small","Лицензия заявлена издателем; аннотация отражает утверждения авторов, не проверенный результат.");
  }catch{content.textContent="Аннотация недоступна или не прошла проверку.";delete content.dataset.loaded}});
  }if(r.code)add(article,"small",r.code);if(["paper","external","web"].includes(r.kind)){

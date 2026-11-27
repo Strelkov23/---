@@ -510,13 +510,11 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   if(Array.isArray(get(6)?.rows)){const planning=get(6);const relevant=C.rank(planning.rows.map(r=>({...r,description:r.diagnostic+" "+r.action,code:r.inputs.join(" ")})),q.value,2);for(const [i,r] of relevant.entries()){if(C.internal(r.href))found.push({id:"plan"+(i+1),kind:"Маршрут исследования",title:r.title,description:r.priority+" · "+r.action,href:r.href,limit:r.limit+" "+planning.note})}}
   if(get(4)&&Array.isArray(get(3)?.articles)){try{
    await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");
-   const byDoi=new Map(get(3).articles.map(r=>[r.doi,r]));
-   const vectors=EconomicSearch.contentVector(get(4),q.value,{kind:"paper",expand:true});
-   const content=[...vectors,...EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,contentOnly:true}).filter(r=>!vectors.some(v=>v.href===r.href))];
-   const metadata=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,abstractOnly:true});
-   const ranked=[...new Map([...content,...metadata.filter(r=>!content.some(c=>c.href===r.href))].slice(0,2).map(r=>[r.href,r])).values()];
-   for(const [i,r] of ranked.entries()){const p=byDoi.get(r.code),a=p?.licensed_abstract;if(!a||a.license!==r.abstract_license||typeof a.text!=="string"||!p.authors||!C.external(r.href))continue;
-    found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+p.authors+" · "+r.date+" · Аннотация (форматирование нормализовано): "+a.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+a.license+"; Crossref, проверка "+a.checked});
+   const ranked=EconomicSearch.researchEvidence(get(4),get(3).articles,q.value,cutoff,3);
+   for(const [i,r] of ranked.entries()){
+    if(!C.external(r.href))continue;
+    const methods=r.channels.map(c=>({vector:"TF-IDF аннотации",content:"слова в аннотации",metadata:"общий индекс"}[c])).join(", ");
+    found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+r.authors+" · "+r.date+" · Найдено: "+methods+" · Аннотация (форматирование нормализовано): "+r.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+r.license+"; Crossref, проверка "+r.checked+". Ранжирование не оценка качества исследования."});
    }
   }catch{}}
   if(get(7)?.schema===1&&get(7).series){const d=get(7);const ranked=C.rank(Object.entries(d.series).map(([code,r])=>({...r,code,description:"Eurostat Евростат ЕС Россия торговля экспорт импорт товары"})),q.value,2);
