@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict');const core=require('./global-economic-assistant.js');(function checks(c,assert){
+ const r=[{title:"Инвестиции в промышленности",href:"industrial.html"},{title:"Банки",description:"Кредиты",href:"banks.html"},{title:"Сравнение регионов",questions:["где сравнить регионы"],href:"historical.html"}];
+ assert(c.rank(r,"помоги найти инвестиции")[0].href==="industrial.html");assert(c.rank(r,"где сравнить регионы")[0].href==="historical.html");assert(c.rank(r,"что как").length===0);assert(c.internal("historical.html#hist-rank"));assert(!c.internal("../index.html"));assert(!c.internal("https://example.org/a"));assert(!c.external("https://a@b.org"));assert(!c.external("javascript:alert(1)"));assert(c.audit("[tool1] [fake]",[{id:"tool1"}]).join(",")==="fake");assert(c.prompt("x",{},[]).length===2)
+})(core,assert.ok);console.log('10 global assistant checks passed');
