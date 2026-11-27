@@ -273,3 +273,17 @@ A.equal(core.energyEvidence(c,{...d,sha256:null},S,E,"2026-11").length,0);
 A.equal(core.energyEvidence(c,{...d,unit:"GWh"},S,E,"2026-11").length,0);
 A.ok(a.at(-1).description.includes("Не переносить"));
 console.log("18 energy structure assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),G=require("./global-plan.js"),T=require("./iv-trajectory.js");
+const c=core.investmentComparisonCommand("сравнить инвестиции: инвестиции A=1000; инвестиции B=1500; импорт=500; горизонт=2; рост=3");
+A.equal(c.kind,"investment-comparison");A.equal(c.p.investment,1000);A.equal(c.budgetB,1500);A.equal(c.p.years,2);A.equal(c.p.growth.length,19);
+A.equal(core.investmentComparisonCommand("инвестиции"),null);
+for(const q of ["сравнить инвестиции: инвестиции A=1; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=2; импорт=5; горизонт=11","сравнить инвестиции: инвестиции A=1; инвестиции A=2; инвестиции B=2; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=100001; импорт=5","сравнить инвестиции: инвестиции A=1; инвестиции B=2; инвестиции=3; импорт=5"])A.equal(core.investmentComparisonCommand(q).kind,"invalid");
+const n=19,m={names:Array.from({length:n},(_,i)=>"Группа "+i),output:Array(n).fill(10000),demand:Array(n).fill(10000),imports:Array(n).fill(100),effects:Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?10000:0))};
+const a=G.solve(m,c.p,c.objective),b=G.solve(m,{...c.p,investment:c.budgetB},c.objective);
+const out=core.investmentComparisonEvidence(c,m,a,b,T);
+A.equal(out.length,5);A.equal(out[0].id,"invest-compare");A.ok(out[0].description.includes("B − A"));A.ok(out[0].limit.includes("не ВВП"));A.ok(out[2].href.includes("dyn-investment=1500"));A.ok(b.score>=a.score-1e-6);
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,upper:b.upper+1e6},T));
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,rows:b.rows.slice(1)},T));
+A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,maxViolation:-1},T));
+console.log("20 investment comparison assistant checks passed");}

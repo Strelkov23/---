@@ -414,6 +414,36 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,v] of r.variants.entries())found.push({id:"horizon-variant"+(i+1),kind:"Сравнение стратегий",title:v.label,description:"Цель "+f(v.score)+" · спрос последнего периода "+f(v.terminal)+" · инвестиции "+f(v.investment)+" млрд руб.",href,limit:note});
  return found;
 }
+ function investmentComparisonCommand(q){
+ const m=String(q??"").trim().match(/^сравнить инвестиции\s*:\s*(.*)$/iu);
+ if(!m)return null;
+ const invalid={kind:"invalid"},parts=m[1].split(";").map(x=>x.trim()),rest=[],budgets={};
+ for(const p of parts){
+  const v=p.match(/^инвестиции\s+([abав])\s*=\s*(\d{1,6}(?:[.,]\d)?)$/iu);
+  if(!v){rest.push(p);continue;}
+  const key=/^[aа]$/iu.test(v[1])?"a":"b",n=Number(v[2].replace(",","."));
+  if(Object.hasOwn(budgets,key)||n>100000)return invalid;
+  budgets[key]=n;
+ }
+ if(!Object.hasOwn(budgets,"a")||!Object.hasOwn(budgets,"b")||rest.some(x=>/^инвестиции\s*=/iu.test(x)))return invalid;
+ const base=horizonCommand("многолетний план: инвестиции="+budgets.a+"; "+rest.join("; "));
+ if(!base||base.kind!=="horizon"||base.p.years>10)return invalid;
+ return {...base,kind:"investment-comparison",budgetB:budgets.b};
+ }
+ function investmentComparisonEvidence(cmd,m,a,b,T,pinned=false){
+ if(cmd?.kind!=="investment-comparison"||!Number.isFinite(cmd.budgetB)||cmd.budgetB<0||cmd.budgetB>100000)throw Error("Invalid comparison");
+ const other={...cmd,p:{...cmd.p,investment:cmd.budgetB}};
+ horizonEvidence(cmd,m,a,pinned);horizonEvidence(other,m,b,pinned);
+ for(const r of [a,b]){
+  if(r.tolerance<0||r.dualityGap<0||r.maxViolation<0||r.rows.some((x,i)=>x.year!==i+1||x.investment<0||x.actualDemand<0||x.imports<0))throw Error("Invalid plan result");
+ }
+ const result=T.compare(a,b),f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="Два оптимизированных сценария на одной базе МРБ 2021 года, с одинаковым горизонтом, импортом, спросом, технологией и прочими допущениями. Меняется только годовой лимит инвестиций. Трудовое ограничение отключено. Условные периоды, не прогноз, дополнительный конечный спрос не ВВП. "+(pinned?"Ссылка ведёт к текущей редакции.":"");
+ const found=[{id:"invest-compare",kind:"Сравнение условных оптимумов",title:"Эффект изменения инвестиционного лимита",description:"A: "+f(cmd.p.investment)+" · B: "+f(cmd.budgetB)+" млрд руб. в год · цель A "+f(a.score)+" · цель B "+f(b.score)+" · разница B − A "+f(result.deltaScore)+" млрд руб. · покрытие цели последнего периода: изменение "+f(result.terminalDelta)+" п.п. · инвестиции за горизонт A "+f(result.investmentA)+" / B "+f(result.investmentB)+" млрд руб.",href:"scenario.html#global-plan",limit:note}];
+ for(const [i,r] of [a,b].entries())found.push({id:"invest-plan"+(i+1),kind:"Проверенный сценарий",title:"Вариант "+(i?"B":"A"),description:"Цель "+f(r.score)+" · двойственная граница "+f(r.upper)+" · разрыв "+r.dualityGap.toExponential(2)+" · максимальная невязка "+f(r.maxViolation)+" · ежегодный лимит "+f(i?cmd.budgetB:cmd.p.investment)+" млрд руб.",href:horizonHref(i?other:cmd),limit:note});
+ for(const row of result.rows)found.push({id:"invest-period"+row.year,kind:"Сравнение периодов",title:"Условный период "+row.year,description:"Дополнительный спрос A "+f(row.demandA)+" / B "+f(row.demandB)+" млрд руб. · покрытие A "+f(row.a*100)+"% / B "+f(row.b*100)+"% · разница "+f(row.deltaPP)+" п.п. · инвестиции A "+f(row.investmentA)+" / B "+f(row.investmentB)+" млрд руб. · ограничения A: "+(row.bindingA.join("; ")||"нет")+"; B: "+(row.bindingB.join("; ")||"нет"),href:"scenario.html#global-plan",limit:note});
+ return found;
+ }
  function robustnessCommand(q,parse){
  const m=String(q??"").trim().match(/^устойчивость\s*:\s*(.*)$/iu);
  if(!m)return null;
@@ -486,7 +516,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -717,7 +747,32 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Проверенный архив Ember или расчёт недоступны.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findInvestmentComparison(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Сравнение двух инвестиционных календарей",parameters,parameter_note:"Лимиты и рост являются условными допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"invest-status",kind:"Статус расчёта",title:"Сравнение инвестиций",description,href:"scenario.html#global-plan"}];
+  if(cmd.kind==="invalid")found=note("Пример: сравнить инвестиции: инвестиции A=1000; инвестиции B=1500; импорт=500; горизонт=5; рост=3. Оба лимита и импорт обязательны; горизонт 1–10.");
+  else try{
+   await loadScript("iv-trajectory.js",()=>typeof IVTrajectory!=="undefined");
+   const m=(await Provenance.get(manifest,"sectors.json",base)).data;
+   const run=p=>new Promise((resolve,reject)=>{
+    const worker=new Worker("global-plan-worker.js");
+    const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
+    const timer=setTimeout(()=>finish(Error("Time limit")),30000);
+    worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result)};
+    worker.onerror=()=>finish(Error("Worker failed"));
+    try{worker.postMessage({m,p,objective:cmd.objective})}catch(e){finish(e)}
+   });
+   status.textContent="Проверка варианта A…";const a=await run(cmd.p);
+   status.textContent="Проверка варианта B…";const b=await run({...cmd.p,investment:cmd.budgetB});
+   found=C.investmentComparisonEvidence(cmd,m,a,b,IVTrajectory,!!base);
+  }catch{failed=1;found=note("Оба оптимума не подтверждены. Частичное сравнение не публикуется.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const investments=C.investmentComparisonCommand(q.value);if(investments)return findInvestmentComparison(investments,parameters);
   const energy=C.energyCommand(q.value);if(energy)return findEnergy(energy,parameters);
   const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
   const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
