@@ -139,7 +139,7 @@ def current_group(page):
     return next((g for g in GROUPS if any(href==page for href,_,_ in g[3])),None)
 def primary(page):
     group=current_group(page)
-    return a("index.html","Главная",page=="index.html")+a("economic-map.html","Карта России",page=="economic-map.html")+a("search.html","Поиск",page=="search.html")+''.join(a(g[0]+".html",g[1],g==group and page!="economic-map.html") for g in GROUPS)
+    return a("index.html","Главная",page=="index.html")+a("economic-map.html","Карта России",page=="economic-map.html")+a("economic-search.html","Поисковик",page=="economic-search.html")+a("search.html","Поиск",page=="search.html")+''.join(a(g[0]+".html",g[1],g==group and page!="economic-map.html") for g in GROUPS)
 def secondary(page):
     g=current_group(page)
     if not g:return ""

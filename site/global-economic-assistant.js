@@ -47,11 +47,12 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function link(p,r){if(!r.href)return;const a=add(p,"a",r.title);a.href=C.internal(r.href)?localHref(r.href):r.href;a.rel="noopener noreferrer";if(C.external(r.href))a.target="_blank"}
  function reset(){results.replaceChildren();answer.textContent="";last=null;exportButton.disabled=true}
  clear.onclick=()=>{q.value="";try{sessionStorage.removeItem(storageKey)}catch{}reset();status.textContent="Вопрос и результаты очищены."};
+ const searchFull=$("search-full");searchFull.href=localHref("economic-search.html");searchFull.onclick=()=>{searchFull.href=localHref("economic-search.html?q="+encodeURIComponent(q.value));save()};
  full.href=localHref("analyst-cockpit.html#economic-ai");full.onclick=()=>{save();if(page==="analyst-cockpit.html"&&location.hash==="#economic-ai")document.dispatchEvent(new Event("economic-ai-draft-transfer"));};
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const keys=["site-search.json","data-registry.json","archive.json","literature.json"];
+  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json"];
   const files=await Promise.allSettled(keys.map(k=>Provenance.get(manifest,k,base)));
   const get=i=>files[i].status==="fulfilled"?files[i].value.data:null;
   const found=[];const tools=get(0);
@@ -74,6 +75,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }
   const cutoff=new Date().toISOString().slice(0,7);
   for(const [i,kind] of [[2,"news"],[3,"papers"]]){const data=get(i),rows=kind==="news"?data:data?.articles;if(!Array.isArray(rows))continue;for(const r of EconomicAIRetrieval.collect(rows,kind,q.value,cutoff,2)){if(C.external(r.url))found.push({id:r.id,kind:kind==="news"?"Публикация":"Научная статья",title:r.title,description:r.published+" · "+r.source,href:r.url,limit:r.limit})}}
+  if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");const seen=new Set(found.map(r=>r.href));for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"discovered"}).slice(0,3).entries()){if(!seen.has(r.href)&&C.external(r.href))found.push({id:"index"+(i+1),kind:"Новый показатель WDI",title:r.title,description:r.description,href:r.href,limit:"Метаданные нового ряда; числовые наблюдения не переданы."})}}catch{}}
   return {found,context:localContext,failed:files.filter(x=>x.status==="rejected").length,fingerprint:manifest.data_fingerprint};
  }
  function render(r){

@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict');const core=require('./economic-search.js');(function checks(c,assert){
+ const d={docs:[{title:"Инвестиции",kind:"news",date:"2025"},{title:"Инвестиции",kind:"paper",date:"2024"},{title:"Банки",kind:"series",date:"2026"}],postings:{"инвестиц":[[0,5],[1,1]],"банк":[[2,5]]}};
+ assert(c.words("инвестиции")[0]==="инвестиц");assert(c.words("инвестициях")[0]==="инвестиц");assert(c.search(d,"инвестиции").length===2);assert(c.search(d,"инвестиции")[0].kind==="news");assert(c.search(d,"инвестиции",{kind:"paper"}).length===1);assert(c.search(d,"инвестиции",{from:2025}).length===1);assert(c.search(d,"инвестиции банки",{all:true}).length===0);assert(c.search(d,"как что").length===0);assert(c.search(d,"constructor").length===0);
+})(core,assert.ok);console.log('9 search checks passed');
