@@ -273,7 +273,37 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of unique.entries())found.push({id:"robustness"+(i+1),kind:"Условное сочетание",title:"Инвестиции "+f(x.a)+" / импорт "+f(x.b)+" млрд руб.",description:"Повторный оптимум "+f(x.known?x.score:null)+" · изменение к базе "+f(x.known?x.score-center.score:null)+" · фиксированный план "+(x.fixedKnown?f(x.fixed.score):x.fixed?.feasible===false?"недопустим":"не подтверждён")+" · выигрыш от перераспределения "+f(x.known&&x.fixedKnown?Math.max(0,x.score-x.fixed.score):null)+" млрд руб. · ограничения: "+(x.known?(x.allBinding||x.binding||[]).join("; ")||"нет":"не установлены"),href:planHref,limit:note});
  return {found,failed:unique.length-known.length};
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence}
+ function bottleneckCommand(q,parse){
+ const m=String(q??"").trim().match(/^узкие места\s*:\s*(.*)$/iu);
+ if(!m)return null;
+ const invalid={kind:"invalid"},base=[];let step=25,seen=false;
+ for(const part of m[1].split(";").map(x=>x.trim())){
+  const a=part.match(/^шаг\s*=\s*(\d{1,3}(?:[.,]\d)?)\s*%?$/iu);
+  if(!a){base.push(part);continue;}
+  if(seen)return invalid;seen=true;step=Number(a[1].replace(",","."));
+  if(step<=0||step>100)return invalid;
+ }
+ const cmd=parse("многолетний план: "+base.join("; "));
+ return cmd?.kind==="horizon"?{...cmd,kind:"bottleneck",step}:invalid;
+}
+ function bottleneckEvidence(cmd,r,href,pinned=false){
+ const defs=[["investment",1,0,100000,"Инвестиционный лимит","млрд руб."],["importLimit",1,0,100000,"Импортный лимит","млрд руб."],["spare",1,0,100,"Резерв мощности","%"],["capitalRatio",-1,.1,20,"Капиталоёмкость","руб./руб."],["depreciation",-1,0,100,"Выбытие дополнительной мощности","%"]];
+ const valid=x=>[x?.score,x?.upper,x?.gap,x?.tolerance].every(Number.isFinite)&&x.gap>=0&&x.tolerance>=0&&x.gap<=x.tolerance&&Math.abs(x.score-x.upper)<=x.tolerance;
+ if(r.objective!==cmd.objective||r.step!==cmd.step||!valid(r.baseline)||r.rows?.length!==defs.length)throw Error("Invalid bottleneck result");
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const rows=defs.map(([key,dir,lo,hi,label,unit])=>{
+  const matches=r.rows.filter(x=>x.key===key),x=matches[0],base=cmd.p[key],value=Math.max(lo,Math.min(hi,base+dir*base*cmd.step/100));
+  if(matches.length!==1||x.dir!==dir||x.base!==base||!Number.isFinite(x.value)||Math.abs(x.value-value)>1e-8||x.changed!==(value!==base)||!["verified","error","unchanged"].includes(x.status)||(!x.changed)!==(x.status==="unchanged"))throw Error("Invalid sensitivity row");
+  const delta=x.score-r.baseline.score,known=x.status==="verified"&&valid(x)&&Number.isFinite(x.delta)&&Math.abs(delta-x.delta)<=1e-8&&delta>=-(x.tolerance+r.baseline.tolerance);
+  return {...x,label,unit,known,delta:known?delta:null,threshold:known?x.tolerance+r.baseline.tolerance:null};
+ });
+ const verified=rows.filter(x=>x.known).sort((a,b)=>b.delta-a.delta),positive=verified.filter(x=>x.delta>x.threshold);
+ const note="Однофакторные условные расчёты на МРБ 2021 года: пять отдельных изменений при прочих равных, не совместный план. Сопоставление прироста целевой функции не учитывает стоимость, сроки и реализуемость мер. При нулевой базе относительный шаг ничего не меняет. Трудовые ограничения отключены. Нулевой эффект не доказывает отсутствия ограничений: возможны взаимодополняющие меры."+(pinned?" Страница открывает текущую редакцию сайта.":"");
+ const found=[{id:"bottleneck-summary",kind:"Диагностика ограничений",title:"Условный эффект ослабления ограничений",description:"Базовая цель "+f(r.baseline.score)+" млрд руб. · относительный шаг "+f(cmd.step)+"% · проверено "+verified.length+" из 5 · без изменения "+rows.filter(x=>x.status==="unchanged").length+" · положительный эффект сверх численной погрешности "+positive.length+" · максимальный проверенный прирост: "+(positive.length?positive[0].label+" · "+f(positive[0].delta)+" млрд руб.":"не выявлен")+" · ограничения исходного плана: "+(r.baseline.binding.join("; ")||"нет"),href,limit:note}];
+ for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
+ return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -413,22 +443,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   const context={page,heading,description:"Оптимизация инвестиционного календаря",parameters,parameter_note:"Лимиты и рост являются условными допущениями."};
   let found=[],failed=0;
   const note=description=>[{id:"horizon-status",kind:"Статус расчёта",title:"Многолетний план",description,href:"scenario.html#global-plan"}];
-  if(cmd.kind==="invalid")found=note("Пример: многолетний план: горизонт=5; инвестиции=1000; импорт=500; рост=3; рост 9=5; цель=сумма. Инвестиции и импорт обязательны, млрд руб. 0–100000; горизонт 1–15; рост 0–20%; резерв и выбытие 0–100%; капиталоёмкость 0,1–20; цель сумма или финал. Труд не ограничен. Для проверки устойчивости: устойчивость: инвестиции=1000; импорт=500; шаг инвестиций=25; шаг импорта=25. Шаги относительные, 0–100% (строго больше нуля).");
+  if(cmd.kind==="invalid")found=note("Пример: многолетний план: горизонт=5; инвестиции=1000; импорт=500; рост=3; рост 9=5; цель=сумма. Инвестиции и импорт обязательны, млрд руб. 0–100000; горизонт 1–15; рост 0–20%; резерв и выбытие 0–100%; капиталоёмкость 0,1–20; цель сумма или финал. Труд не ограничен. Для проверки устойчивости: устойчивость: инвестиции=1000; импорт=500; шаг инвестиций=25; шаг импорта=25. Шаги относительные, 0–100% (строго больше нуля). Диагностика: узкие места: инвестиции=1000; импорт=500; шаг=25.");
   else try{
    const m=(await Provenance.get(manifest,"sectors.json",base)).data;
    const r=await new Promise((resolve,reject)=>{
     const worker=new Worker("global-plan-worker.js");
     const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
-    const timer=setTimeout(()=>finish(Error("Time limit")),cmd.kind==="robustness"?90000:30000);
-    worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result)};
+    const timer=setTimeout(()=>finish(Error("Time limit")),["robustness","bottleneck"].includes(cmd.kind)?90000:30000);
+    worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result);else if(e.data.progress)status.textContent="Проверено вариантов: "+e.data.progress.done+" из "+e.data.progress.total;};
     worker.onerror=()=>finish(Error("Worker failed"));
-    try{worker.postMessage({m,p:cmd.p,objective:cmd.objective,...(cmd.kind==="robustness"?{joint:cmd.joint}:{})})}catch(e){finish(e)}
+    try{worker.postMessage({m,p:cmd.p,objective:cmd.objective,...(cmd.kind==="robustness"?{joint:cmd.joint}:cmd.kind==="bottleneck"?{bottleneck:{step:cmd.step}}:{})})}catch(e){finish(e)}
    });
-   if(cmd.kind==="robustness"){const result=C.robustnessEvidence(cmd,r,C.horizonHref(cmd),!!base);found=result.found;failed=result.failed;}else found=C.horizonEvidence(cmd,m,r,!!base);
+   if(cmd.kind==="robustness"){const result=C.robustnessEvidence(cmd,r,C.horizonHref(cmd),!!base);found=result.found;failed=result.failed;}else if(cmd.kind==="bottleneck"){const result=C.bottleneckEvidence(cmd,r,C.horizonHref(cmd),!!base);found=result.found;failed=result.failed;}else found=C.horizonEvidence(cmd,m,r,!!base);
   }catch{failed=1;found=note("Проверенный оптимум не получен: матрица, вычислитель или лимит времени. Откройте подробный инструмент.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
  async function find(parameters){
+  const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
   const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
   const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);
   const allocation=C.allocationCommand(q.value);if(allocation)return findAllocation(allocation,parameters);

@@ -131,3 +131,20 @@ const zc=core.robustnessCommand("устойчивость: горизонт=2; �
 const zr=GP.jointSensitivity(mm,zc.p,zc.objective,zc.joint.keyA,zc.joint.stepA,zc.joint.keyB,zc.joint.stepB,zc.joint.mode);
 A.equal(core.robustnessEvidence(zc,zr,core.horizonHref(zc)).found.length,2);
 console.log("16 robustness assistant checks passed");
+
+const bc=core.bottleneckCommand("узкие места: горизонт=3; инвестиции=10; импорт=100; рост=5; резерв=0; капиталоёмкость=1; выбытие=0; шаг=25",core.horizonCommand);
+A.equal(bc.kind,"bottleneck");A.equal(bc.step,25);
+A.equal(core.bottleneckCommand("узкие места: инвестиции=1; импорт=2; шаг=0",core.horizonCommand).kind,"invalid");
+A.equal(core.bottleneckCommand("узкие места: инвестиции=1; импорт=2; шаг=25; шаг=50",core.horizonCommand).kind,"invalid");
+A.equal(core.bottleneckCommand("узкие места: инвестиции=1; импорт=2",core.horizonCommand).step,25);
+A.equal(core.bottleneckCommand("план",core.horizonCommand),null);
+const bn=GP.bottleneck(mm,bc.p,bc.objective,bc.step);
+A.equal(bn.rows.length,5);A.equal(bn.rows.find(x=>x.key==="spare").status,"unchanged");
+A.equal(bn.rows.find(x=>x.key==="depreciation").status,"unchanged");
+A.ok(bn.rows.filter(x=>x.status==="verified").every(x=>x.delta>=-x.tolerance-bn.baseline.tolerance));
+const be=core.bottleneckEvidence(bc,bn,core.horizonHref(bc));
+A.equal(be.found.length,6);A.equal(be.failed,0);A.ok(be.found[0].limit.includes("не учитывает стоимость"));
+A.throws(()=>core.bottleneckEvidence(bc,{...bn,rows:bn.rows.slice(1)},core.horizonHref(bc)));
+A.throws(()=>core.bottleneckEvidence(bc,{...bn,baseline:{...bn.baseline,upper:bn.baseline.score+100}},core.horizonHref(bc)));
+A.throws(()=>GP.bottleneck(mm,bc.p,bc.objective,0));
+console.log("16 bottleneck assistant checks passed");
