@@ -260,17 +260,27 @@ const EconomicSearch=(function core(){
    ["content",search(index,query,{...options,contentOnly:true})],
    ["metadata",search(index,query,options)]
   ],pool=new Map();
-  for(const [channel,rows] of channels)for(const [i,doc] of rows.slice(0,50).entries()){
-   if(!pool.has(doc.href))pool.set(doc.href,{doc,channels:[],score:0});
-   const r=pool.get(doc.href);r.channels.push(channel);r.score+=(channel==="metadata"?0.3:1)/(10+i+1);
+  // Count only eligible and verified records towards each channel's quota.
+  for(const [channel,rows] of channels){
+   let i=0;const channelSeen=new Set();
+   for(const doc of rows){
+    if(channelSeen.has(doc.code))continue;
+    const p=byDoi.get(doc.code),period=String(doc.date||"");
+    if(!/^\d{4}(?:-(?:0[1-9]|1[0-2])(?:-\d{2})?)?$/.test(period)||((period.length===4?period+"-12":period.slice(0,7))>cutoff)||String(p?.published||"").slice(0,10)!==period||ambiguous.has(doc.code))continue;
+    if(period.length===10&&(!Number.isFinite(Date.parse(period))||new Date(period).toISOString().slice(0,10)!==period))continue;
+    if(doc.href!=="https://doi.org/"+doc.code)continue;
+    const a=verifiedAbstract(doc,p,stamp);if(!a)continue;
+    channelSeen.add(doc.code);
+    if(!pool.has(doc.href))pool.set(doc.href,{doc,a,channels:[],score:0});
+    const r=pool.get(doc.href);r.channels.push(channel);r.score+=(channel==="metadata"?0.3:1)/(10+i+1);
+    if(++i===50)break;
+   }
   }
   const ranked=[...pool.values()].sort((a,b)=>Number(b.channels.some(c=>c!=="metadata"))-Number(a.channels.some(c=>c!=="metadata"))||b.score-a.score||a.doc.href.localeCompare(b.doc.href));
   const result=[],seen=new Set();
   for(const r of ranked){
-   const d=r.doc,p=byDoi.get(d.code),period=String(d.date||"");
-   if(!/^\d{4}(?:-(?:0[1-9]|1[0-2])(?:-\d{2})?)?$/.test(period)||((period.length===4?period+"-12":period.slice(0,7))>cutoff)||String(p?.published||"").slice(0,10)!==period||ambiguous.has(d.code)||seen.has(d.code))continue;
-   const a=verifiedAbstract(d,p,stamp);if(!a)continue;
-   seen.add(d.code);result.push({...d,...a,channels:r.channels,retrievalScore:r.score});
+   const d=r.doc;if(seen.has(d.code))continue;
+   seen.add(d.code);result.push({...d,...r.a,channels:r.channels,retrievalScore:r.score});
    if(result.length>=limit)break;
   }
   return result;
