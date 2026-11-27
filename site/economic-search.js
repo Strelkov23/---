@@ -454,24 +454,28 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    const c=(await Provenance.get(manifest,name,root)).data,coverage=V.validateCatalogue(c,index,source,manifest.files);
    if(token!==seq)return;
    if(!coverage.indexed){semanticStatus.textContent="Серверный каталог пуст.";return}
-   const allowed=new Set(index.docs.filter(d=>EconomicSearch.localEligible(d,options)).map(V.identity));
-   if(!allowed.size){semanticStatus.textContent="Нет исследований для выбранных фильтров.";return}
+   const allowed=new Set(index.docs.filter(d=>V.eligible(d)&&EconomicSearch.localEligible(d,options)).map(V.identity));
+   const work=V.planParts(c,index,allowed);
+   if(!work.expected){semanticStatus.textContent="Нет исследований для выбранных фильтров.";return}
+   if(!work.available){semanticStatus.textContent="В опубликованных частях нет названий по фильтрам; обычная выдача сохранена.";return}
+   semanticStatus.textContent="Подготовка модели · нужно частей "+work.entries.length+" из "+c.entries.length+" · "+(work.bytes/1048576).toFixed(1)+" МиБ";
    const encoder=await getEncoder(),qv=await encodeText(encoder,query);
    if(token!==seq)return;
    let best=[],searched=0,loaded=0;
    // Stream one verified shard at a time; retain only the global top 20.
-   for(const e of c.entries){
+   for(const e of work.entries){
     if(token!==seq)return;
     const d=(await Provenance.get(manifest,e.file,root)).data;
     if(token!==seq)return;
     if(d.shard!==e.shard)throw Error("Shard identity mismatch");
     const result=V.rankPart(qv,d,index,source,allowed);
     searched+=result.searched;best=[...best,...result.rows].sort(V.compareRank).slice(0,20);
-    semanticStatus.textContent="Проверено частей "+(++loaded)+" из "+c.entries.length+" · подходящих названий "+searched;
+    semanticStatus.textContent="Проверено нужных частей "+(++loaded)+" из "+work.entries.length+" · подходящих названий "+searched;
    }
    if(token!==seq)return;
    add(localResults,"h3","Поиск по серверному индексу названий");
-   add(localResults,"p","Проверено "+coverage.indexed+" из "+coverage.total+" названий архива; по фильтрам "+searched+". "+(coverage.complete?"Все части снимка доступны.":"Индекс неполный.")+" Это сходство названий, не поиск по полным текстам и не оценка достоверности.");
+   if(searched!==work.available)throw Error("Filtered coverage mismatch");
+   add(localResults,"p","Каталог: "+coverage.indexed+" из "+coverage.total+" названий архива. Проверены и просканированы "+searched+" из "+work.expected+" названий по фильтрам; загружено частей "+loaded+" из "+c.entries.length+" ("+(work.bytes/1048576).toFixed(1)+" МиБ). "+(searched===work.expected?"Выбранные фильтры покрыты полностью.":"Выдача неполная.")+" Ненужные части не загружались. Это сходство названий, не поиск по полным текстам и не оценка достоверности.");
    for(const r of best){
     const line=add(localResults,"p",""),a=add(line,"a",r.title);
     try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();a.href=u.href;a.rel="noopener noreferrer"}catch{a.removeAttribute("href")}
