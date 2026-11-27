@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-27T21:16:13+00:00",
+  "built": "2026-11-27T21:33:51+00:00",
   "errors": [],
   "warnings": [
     "Исторические ряды: исключено служебных кодов пропусков и конфиденциальности 2261",
@@ -13,6 +13,7 @@
     "Банковская отчётность balance: проверено 59 из 299 целевых банков",
     "Банковская отчётность profit: проверено 60 из 299 целевых банков",
     "Пилот раскрытия ЦБ: доступность дат форм не подтверждена; числовые нормативы не импортированы",
+    "https://www.pnp.ru/rss/index.xml",
     "Вопросы теоретической экономики · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Экономика высокотехнологичных производств · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Экономический журнал ВШЭ · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
@@ -22,10 +23,14 @@
     "Экономическая наука современной России · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Научные труды: Институт народнохозяйственного прогнозирования РАН · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Экономика сельскохозяйственных и перерабатывающих предприятий · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
-    "Пространственная экономика · Crossref HTTP 429; повтор не ранее 2026-11-27T22:12:25+00:00",
+    "Пространственная экономика · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Пространственная и региональная экономика · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Экономика региона · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "Информатизация в цифровой экономике · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
+    "Экономическая политика · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
+    "Проблемы прогнозирования · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
+    "Вопросы экономики · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
+    "Журнал Новой экономической ассоциации · Отложено: Crossref HTTP 429, до 2026-11-27T22:12:25+00:00",
     "История · ЕМИСС · Открытые данные · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Паспорт среднегодового населения · Ошибка: HTTP Error 403: Forbidden",
     "История · ЕМИСС · Валовой региональный продукт · Ошибка: HTTP Error 403: Forbidden",
@@ -43,7 +48,7 @@
     "История · Численность населения · Ошибка: https://rosstat.gov.ru/storage/mediabank/popul_1897+.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/Сhisl_MO_01-01-2025.xlsx · HTTP Error 404: Not Found; https://rosstat.gov.ru/storage/mediabank/popul_monogorod_01-01-2025.xlsx · HTTP Error 404: Not Found"
   ],
   "counts": {
-    "archive": 12184,
+    "archive": 12185,
     "papers": 10028,
     "indicators": 108,
     "indicators_with_data": 108,
@@ -126,13 +131,13 @@
     "sme_regions": 89,
     "sme_period": "2026-11-10",
     "district_reference_units": 2327,
-    "freshness_ok": 238,
+    "freshness_ok": 233,
+    "freshness_cached": 14,
     "freshness_unavailable": 72,
     "freshness_partial": 7,
     "freshness_archive": 7,
     "freshness_waiting": 4,
-    "freshness_cached": 9,
-    "revision_builds": 77,
+    "revision_builds": 78,
     "revision_events": 11,
     "consistency_согласовано": 1489,
     "consistency_нет данных": 204,
@@ -200,11 +205,11 @@
     "normalized_sources": 5,
     "normalized_observations": 9112,
     "normalized_numeric": 9112,
-    "transport_events": 483,
-    "transport_versions": 179,
+    "transport_events": 493,
+    "transport_versions": 183,
     "transport_failed": 12,
     "pipeline_sources": 10,
-    "pipeline_events": 450,
+    "pipeline_events": 456,
     "pipeline_rejected": 12,
     "infrastructure_loaders": 10,
     "infrastructure_bulk_published": 3,
@@ -222,12 +227,12 @@
   },
   "files": {
     "archive.json": {
-      "sha256": "2e22bbc2165bfac3dfeec4e634244d5cd42b4719bf4cac14c3ed508ebc017e7d",
-      "bytes": 6496570
+      "sha256": "40cff390cef32b9b006ddbf247127eff13e5f55f629da1411ae89b5a26551a9e",
+      "bytes": 6496893
     },
     "literature.json": {
-      "sha256": "1b0b0a3befd78490dac189ce21f89ab0aa56c501b608fcc1869973b6b865918b",
-      "bytes": 6846070
+      "sha256": "e2d9cf4e87753cbc995d861173d4aeb34f9ecb7b0a188252cce23c5d3de23ad0",
+      "bytes": 6845724
     },
     "compare.json": {
       "sha256": "f62c94ba93807148f5b23ed01a5ccfc7779790f674959ebdb45ce0c417719604",
@@ -242,11 +247,11 @@
       "bytes": 13787
     },
     "industry.json": {
-      "sha256": "920cdecd72a661940ce2618f6d8ac05650d7cee0df18c71d296e0b5a96d22d78",
+      "sha256": "7aa3b0a77b7d3f38a1ed56dd2d94d0c7ef77278a4b21a9a2119372d4c4dd3a0a",
       "bytes": 14385
     },
     "cbr.json": {
-      "sha256": "b61c7d52b5a26a4b7847492406f136c771384b22811f67b151bfa9cedfdb0121",
+      "sha256": "b86d49f11a15306d55720854da32fb567388e81231a223d6b175f16421b7c9fd",
       "bytes": 55756
     },
     "sectors.json": {
@@ -254,27 +259,27 @@
       "bytes": 10783
     },
     "status.json": {
-      "sha256": "3661c50629dea964b83e63a5948ffa4692645f5a575ce91b35ba517d19bfc0a0",
-      "bytes": 39823
+      "sha256": "aeab4e8b9f601c91099f8e247cdd2e7a8e91cb8d17bf84e46288af296e2f16b2",
+      "bytes": 40346
     },
     "links.json": {
-      "sha256": "16a065a9c6cefefca058f0db5ab94bfd050c58c88b7581552d8a17ee1cd9c3f3",
-      "bytes": 2211930
+      "sha256": "f98e94ad5b57f16ea9cbdd01e283ecd1e109d238fa0689ce97493ef4efdb10aa",
+      "bytes": 2213199
     },
     "national.json": {
-      "sha256": "74e24dbae667584a69ac7cb2ace52daa181e728d50a48c54e51f4b81145210e9",
+      "sha256": "0ed5e609f962f483bf618f52184de7309cdbcfbb7f695e190527e9c37c0555bc",
       "bytes": 773411
     },
     "historical.json": {
-      "sha256": "14853d5abed51badc024dda6370306d6b4782e995965ff4a57267a80c49351b3",
+      "sha256": "3bafc4d73d1598b53ce42e4f1a36a2ef49d177b949b65a774a10fbdde1e05c92",
       "bytes": 279215
     },
     "industrial.json": {
-      "sha256": "9d606c9eb550cead53a44e80b0dd06d330be3a57ed8eefa9d2763a135cb6d029",
+      "sha256": "b946326c9a60d39969e306a6bd63755fb9a47ecee9b90faaffd349948f539bac",
       "bytes": 6051460
     },
     "sector-passports.json": {
-      "sha256": "3de187a699acdcb9eeaaba7222c4559d81ed08c9bb45d8f22cb5e1829876796a",
+      "sha256": "ad36cb15b45f02e374022aa5bcae8afe4e3724f9cc01bbabc8273b89ca90862c",
       "bytes": 845011
     },
     "regional-boundaries.json": {
@@ -302,43 +307,43 @@
       "bytes": 584
     },
     "freshness.json": {
-      "sha256": "4fb5f65ec2ec81cbcbbc7ea5f49f36843f87be1c14f9154fb5d49d7ce3237a51",
-      "bytes": 210495
+      "sha256": "1670ff55d708b62f110157a002dbaac9e6f90f3ac9f19083640bdbe0d69efac9",
+      "bytes": 210709
     },
     "stat-revisions.json": {
-      "sha256": "511ffcdbe21a81111edb5550db944fd388bd65d1441e73981ceea3da347e1185",
-      "bytes": 25615
+      "sha256": "0a7b2f9ace834b54df608bbd16d539ae3280de41a5c66b355473d448f102d5e1",
+      "bytes": 25844
     },
     "consistency.json": {
-      "sha256": "6308b86b574080ed458e18a033ff6670d0bb21f9317c8f27957b752125aeb5fd",
+      "sha256": "111bd25a1ea28dba36e0ceac14e79fc88ff8642f328303cdf2e4ac8035a48b0d",
       "bytes": 312499
     },
     "finance-workbooks.json": {
-      "sha256": "2eae5047aefad2e880ac55b410e7807b4884a86df5857ffe85ffb264250cfae5",
+      "sha256": "376e1d4eef2800fad788d1d801ea8b40676fe0038d989a55d0516ff29fb8ba0e",
       "bytes": 683539
     },
     "rosstat-workbooks.json": {
-      "sha256": "90a063c931302fa6d63f2a8eda9307f12da4955415f43680a9b82550c065b599",
+      "sha256": "0ff56c4ff5dba904ab96b688ed89eb5794273f71ae7444bdc47e2d0f141acd21",
       "bytes": 1184935
     },
     "federal-budget.json": {
-      "sha256": "ecb6743ae6bda80742f5683a7648f5ea45839a00ccc092f91a4ae04d84e60036",
+      "sha256": "3adc8ae888ba467ece29708ed3fedbbf9a6ac68669b12b2fd2a5c2da4c7fcfeb",
       "bytes": 7354
     },
     "regional-manufacturing.json": {
-      "sha256": "a614e4f2ba7d9fd05a1fee15257a913e52dcc69ca20c4b3973c8ac6412404bb1",
+      "sha256": "bd80bb7dc1b65d0847dc27b46e94860893aed874db13a31d23b1dfa1ad3ad1d8",
       "bytes": 1519527
     },
     "regional-mining-energy.json": {
-      "sha256": "4c94aff9a193159e61d776ec8f2743431e7a9d7ab404e2b97fe9119f6416cd35",
+      "sha256": "cfbdd67d7c346b651e03127c14b22ca9385371ab77e2417872ce29e20b07e9ab",
       "bytes": 1115210
     },
     "industrial-parks.json": {
-      "sha256": "4b9d98b99dc8f244a5786772403b0dc0c21386be487273c975edb6237c9adf7d",
+      "sha256": "48d78f7ee91f261eacd724518df0d8a1e1009bf7c0abb65b06ea4f226a2b55e3",
       "bytes": 132614
     },
     "park-certificates.json": {
-      "sha256": "b86bfceab06d349d0430866e6e5ddb3e056d01d03cc46e58a5d1b2c50d350e40",
+      "sha256": "91f25210e982058d3ec4ba9bc8c57d6ca35e7381879a628b73dc7d741ac0257e",
       "bytes": 5100
     },
     "frp-snapshot.json": {
@@ -346,23 +351,23 @@
       "bytes": 2761
     },
     "investment-projects.json": {
-      "sha256": "86b229430ff455dd05e783b5a4784178ca4dcebca3d73aae1ef23cbdf3dbd4e2",
+      "sha256": "eba953691db6ac5504fb02c0c59f7006fa2df11f4192d3c6eda891c06b25c08a",
       "bytes": 44385
     },
     "amur-projects.json": {
-      "sha256": "32fc397b7de20b09b8cf239709e7b690bda0d34427f71d51a2471fd63f9e8240",
+      "sha256": "3edb3a06416697fd3d1add4fcc632a09aa5ab5391de3b5e477f9a763aac580f8",
       "bytes": 219269
     },
     "krasnodar-projects.json": {
-      "sha256": "a926ddf379b98899a9283a60512205fc625d343b5d6b004ad2c63ca0735cd936",
+      "sha256": "fc13baf586db61456bbf107f6f8e0d849cd042a4890b96961495b3f4ac47c3e7",
       "bytes": 94575
     },
     "project-coverage.json": {
-      "sha256": "054dd8e0c4535af1e99f2c2e992c9e0dc1d89c4328c0c399a13ed97f899e2135",
+      "sha256": "d559d1bfbf7ac8ed6657c79d52910d3ed85cc5cc1dce09dee2360ab05acc6b01",
       "bytes": 130003
     },
     "enterprise-sources.json": {
-      "sha256": "07828cd54c4a1b623e90dbb2941b05bec8c322d29bc971c97eb243e7e47c78c0",
+      "sha256": "ad999a3ffd07501eb62bbb9a5235f52d4caf625bdca6c88557443efcae236fa9",
       "bytes": 950
     },
     "amur-enterprises.json": {
