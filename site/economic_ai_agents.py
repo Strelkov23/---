@@ -71,6 +71,10 @@ def build(out,previous,stamp,refresh):
     agents[2]["metrics"]["corporate"]={"note":corporate["note"],"rows":list(corporate["rows"].values()),"review":sum(r["review"] for r in corporate["rows"].values())}
     agents[2]["links"].append("economic-corporate-monitor.json")
     if any(r["review"] or r["status"] in ("error","blocked") for r in corporate["rows"].values()):agents[2]["state"]="attention"
+    corporate_discovery=read(out,"economic-corporate-discovery.json")
+    agents[1]["metrics"]["corporate_discovery"]={"note":corporate_discovery["note"],"sources":list(corporate_discovery["sources"].values()),"count":len(corporate_discovery["rows"]),"recent":sorted(corporate_discovery["rows"].values(),key=lambda r:(r["first_seen"],r["url"]),reverse=True)[:15]}
+    agents[1]["links"].append("economic-corporate-discovery.json")
+    if any(r["status"] in ("error","blocked") for r in corporate_discovery["sources"].values()):agents[1]["state"]="attention"
     comp=read(out,"economic-ai-comparability.json")
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")

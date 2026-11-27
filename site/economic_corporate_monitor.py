@@ -40,7 +40,7 @@ def fingerprints(raw,charset):
     text=" ".join("".join(p.parts).split())
     if len(text)<100:raise ValueError("Insufficient visible text")
     return sha(raw),sha(text.encode("utf-8")),len(text)
-def fetch(url):
+def fetch_html(url):
     u=urlsplit(url);host=u.hostname;robots="https://"+host+"/robots.txt"
     try:
         p=download(robots,hosts=(host,),path_check=lambda p:p=="/robots.txt",max_bytes=200_000,timeout=10)
@@ -52,6 +52,9 @@ def fetch(url):
         if e.code!=404:raise
     p=download(url,hosts=(host,),path_check=lambda path:path==u.path,max_bytes=2_000_000,timeout=20)
     if p.final_url!=url or p.media_type not in ("text/html","application/xhtml+xml"):raise ValueError("Unexpected final URL or type")
+    return p
+def fetch(url):
+    p=fetch_html(url)
     return fingerprints(p.raw,p.charset)
 def blank():
     return dict(schema=1,built=None,note=NOTE,rows={k:dict(title=t,url=u,checked=None,success=None,status="waiting",raw_sha=None,text_sha=None,text_chars=None,first_text_sha=None,changed_at=None,review=False,changes=0,error=None) for k,(t,u) in SPECS.items()})
