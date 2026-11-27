@@ -59,3 +59,18 @@ A.ok(pairResult[0].description.includes("60,00%"));
 A.throws(()=>core.industryEvidence(core.industryCommand("отрасль: 10"),sector,{...ix,year:2024},mx,rg,SF,core.money));
 A.throws(()=>core.industryEvidence(core.industryCommand("отрасль: 10"),{...sector,declared:sector.declared.slice(0,1)},ix,mx,rg,SF,core.money));
 console.log("9 industry assistant checks passed");
+
+const BM=require("./balance-matrix.js"),CS=require("./chain-stress.js");
+const mm={names:Array.from({length:19},(_,i)=>"Группа "+(i+1)),output:Array(19).fill(1000),demand:Array(19).fill(500),imports:Array(19).fill(50),flows:Array.from({length:19},()=>Array(19).fill(10)),effects:Array.from({length:19},(_,i)=>Array.from({length:19},(_,j)=>i===j?1000:10))};
+A.deepEqual(core.balanceCommand("мрб: 9"),{kind:"balance",group:9});
+A.deepEqual(core.balanceCommand("шок спроса: 9; -2,5%; предел=0"),{kind:"shock",group:9,shock:-2.5,cap:0});
+A.equal(core.balanceCommand("шок спроса: 9; 21").kind,"invalid");
+A.equal(core.balanceCommand("мрб: 20").kind,"invalid");
+A.equal(core.balanceCommand("выпуск"),null);
+const bal=core.balanceEvidence(core.balanceCommand("мрб: 9"),mm,BM,CS);
+A.equal(bal.length,8);A.ok(bal[0].description.includes("HHI"));
+const shock=core.balanceEvidence(core.balanceCommand("шок спроса: 9; 10; предел=0"),mm,BM,CS);
+A.ok(shock[0].description.includes("допустимый масштаб 0%"));
+A.ok(shock[0].href.includes("stress-shocks="));A.ok(shock[0].limit.includes("не ВВП"));
+A.throws(()=>core.balanceEvidence({kind:"balance",group:20},mm,BM,CS));
+console.log("11 balance assistant checks passed");

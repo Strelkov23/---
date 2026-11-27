@@ -92,7 +92,41 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,r] of rows.filter(r=>r.value!==null).slice(0,5).entries())found.push({id:"industry"+(i+1),kind:"Региональная диагностика МСП",title:names.get(r.region)||"Код "+r.region,description:label+" · "+fmt(r.value)+" · наблюдений "+r.observations+" из "+r.sme_total+" · охват "+coverage(r.coverage),href,limit:note});
  return found;
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence}
+ function balanceCommand(q){
+ const s=String(q??"").trim();
+ if(!/^(?:мрб|шок спроса)\s*:/iu.test(s))return null;
+ const a=s.match(/^мрб\s*:\s*(\d{1,2})$/iu);
+ if(a&&+a[1]>=1&&+a[1]<=19)return {kind:"balance",group:+a[1]};
+ const b=s.match(/^шок спроса\s*:\s*(\d{1,2})\s*;\s*([+-]?\d{1,2}(?:[.,]\d{1,2})?)\s*%?(?:\s*;\s*предел\s*=\s*(\d{1,3}(?:[.,]\d{1,2})?))?$/iu);
+ if(b){const group=+b[1],shock=Number(b[2].replace(",",".")),cap=Number((b[3]??"10").replace(",","."));if(group>=1&&group<=19&&shock>=-20&&shock<=20&&cap>=0&&cap<=100)return {kind:"shock",group,shock,cap}}
+ return {kind:"invalid"};
+}
+ function balanceEvidence(cmd,m,B,S,pinned=false){
+ S.validate(m);const i=cmd.group-1;if(!Number.isInteger(i)||i<0||i>=m.names.length)throw Error("Invalid group");
+ const fmt=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const source="https://rosstat.gov.ru/storage/mediabank/baz_tzv-2021.xlsx";
+ const base="Баланс 2021 года, 19 укрупнённых продуктовых групп. Не фактические договоры предприятий и не текущие потоки. "+(pinned?"Интерактивная страница открывает текущую редакцию сайта. ":"");
+ const found=[];
+ if(cmd.kind==="balance"){
+  const d=B.prepare(m,true),p=d.purchase[i],s=d.supply[i];
+  const note=base+"Только отечественные промежуточные потоки, включая внутригрупповые; доли не включают импорт или конечный спрос. Отрицательные значения блокируют доли соответствующего знаменателя.";
+  const c=S.concentration(d.cells.map(row=>row[i].value));
+  found.push({id:"balance-total",kind:"Межотраслевой баланс",title:m.names[i],description:"Группа "+cmd.group+" · закупки "+fmt(p.total/1000)+" млрд руб. · поставки "+fmt(s.total/1000)+" млрд руб. · HHI закупок "+fmt(c?.hhi)+" · доля трёх групп "+fmt(c?100*c.top3:null)+"%",href:"atlas.html#balance-matrix",limit:note});
+  for(const [direction,cells,key] of [["input",d.cells.map(r=>r[i]),"inputs"],["output",d.cells[i],"outputs"]]){
+   const ranked=cells.filter(x=>x.value>0).sort((a,b)=>b.value-a.value||a.i-b.i||a.j-b.j).slice(0,3);
+   for(const [j,x] of ranked.entries())found.push({id:direction+(j+1),kind:direction==="input"?"Поставщик группы":"Покупатель группы",title:m.names[x.i]+" → "+m.names[x.j],description:"2021 · "+fmt(x.value/1000)+" млрд руб. · доля "+fmt(x[key])+"%",href:"atlas.html#balance-matrix",limit:note});
+  }
+ }else if(cmd.kind==="shock"){
+  const shocks=m.names.map((_,j)=>j===i?cmd.shock:0),caps=m.names.map(()=>cmd.cap);
+  const r=S.calculate(m,shocks,caps),note=base+"Условный шок конечного спроса, фиксированная технология и цены 2021 года. Валовой выпуск не ВВП, импортные затраты не прогноз импорта. Единый предел прироста задан пользователем/по умолчанию, не измеренная мощность. Масштаб применяется ко всему шоку.";
+  const href="scenario.html?stress-shocks="+encodeURIComponent(shocks.join(","))+"&stress-caps="+encodeURIComponent(caps.join(","))+"#chain-stress";
+  found.push({id:"shock-total",kind:"Условный расчёт МРБ",title:m.names[i]+": шок спроса "+fmt(cmd.shock)+"%",description:"Прямой спрос "+fmt(r.direct)+" · валовой выпуск "+fmt(r.total)+" · косвенный эффект "+fmt(r.total-r.direct)+" · импортные затраты "+fmt(r.imports)+" млрд руб. · предел "+fmt(cmd.cap)+"% · допустимый масштаб "+fmt(r.alpha*100)+"% · ограничивают: "+(r.binding.map(j=>m.names[j]).join("; ")||"нет"),href,limit:note});
+  for(const [j,x] of [...r.rows].sort((a,b)=>Number(b.binding)-Number(a.binding)||Math.abs(b.dx)-Math.abs(a.dx)).slice(0,5).entries())found.push({id:"shock"+(j+1),kind:"Расчёт изменения выпуска",title:x.name,description:"Изменение "+fmt(x.dx)+" млрд руб. ("+fmt(x.pct)+"%) · при допустимом масштабе "+fmt(x.scaled)+" млрд руб. · "+(x.binding?"ограничивает масштаб":"не ограничивает масштаб"),href,limit:note});
+ }else throw Error("Unknown command");
+ found.push({id:"balance-source",kind:"Первоисточник",title:"Таблицы затрат — выпуска Росстата за 2021 год",description:"Базовая таблица для модели; не текущая статистика.",href:source,limit:base});
+ return found;
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -198,7 +232,22 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Наборы не доступны, не совпадают по редакции или не содержат необходимых парных наблюдений.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findBalance(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Межотраслевой баланс 2021 года, расчётная диагностика",parameters,parameter_note:"Шок и предел — условные параметры, не наблюдения."};
+  let found=[],failed=0;
+  const note=description=>[{id:"balance-status",kind:"Статус расчёта",title:"Межотраслевой баланс",description,href:"atlas.html#balance-matrix"}];
+  if(cmd.kind==="invalid")found=note("Пример: мрб: 9 или шок спроса: 9; 10; предел=5. Группа 1–19 (номер в атласе, не ОКВЭД), спрос −20…20%, предел 0…100%. По умолчанию предел 10%.");
+  else try{
+   await Promise.all([loadScript("balance-matrix.js",()=>typeof BalanceMatrix!=="undefined"),loadScript("chain-stress.js",()=>typeof ChainStress!=="undefined")]);
+   const m=(await Provenance.get(manifest,"sectors.json",base)).data;
+   found=C.balanceEvidence(cmd,m,BalanceMatrix,ChainStress,!!base);
+  }catch{failed=1;found=note("Матрица или расчёт недоступны; проверьте целостность архива.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const balance=C.balanceCommand(q.value);if(balance)return findBalance(balance,parameters);
   const industry=C.industryCommand(q.value);if(industry)return findIndustry(industry,parameters);
   const cmd=C.companyCommand(q.value);if(cmd)return findCompany(cmd,parameters);
   await modules();
