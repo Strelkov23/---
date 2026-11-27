@@ -40,6 +40,13 @@ def main():
             assert page.locator("#es-kind").input_value()=="tool"
             page.locator("#es-ask").click()
             assert page.locator("#gea-question").input_value()=="Сравнение показателей"
+            page.locator("#gea-panel details").last.locator("summary").click()
+            page.locator("#easc-command").fill("рост=4; горизонт=5; бюджет=25")
+            page.locator("#easc-preview").click()
+            page.wait_for_function("document.querySelector('#easc-status').textContent.includes('Предварительный расчёт готов')")
+            assert "рост: 4" in page.locator("#easc-result").inner_text()
+            page.locator("#easc-apply").click()
+            page.wait_for_function("document.querySelector('#repro-growth')?.value === '4' && document.querySelector('#repro-budget')?.value === '25'")
             page.close()
         browser.close()
 if __name__=="__main__":main()
