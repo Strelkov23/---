@@ -67,6 +67,10 @@ def build(out,previous,stamp,refresh):
     physical=read(out,"economic-ai-physical.json")
     agents[0]["metrics"]["physical"]={k:physical[k] for k in ("note","counts","rows","closed_year")}
     agents[0]["links"].append("economic-ai-physical.json")
+    corporate=read(out,"economic-corporate-monitor.json")
+    agents[2]["metrics"]["corporate"]={"note":corporate["note"],"rows":list(corporate["rows"].values()),"review":sum(r["review"] for r in corporate["rows"].values())}
+    agents[2]["links"].append("economic-corporate-monitor.json")
+    if any(r["review"] or r["status"] in ("error","blocked") for r in corporate["rows"].values()):agents[2]["state"]="attention"
     comp=read(out,"economic-ai-comparability.json")
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")

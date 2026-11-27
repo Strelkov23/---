@@ -289,6 +289,8 @@ import economic_web_crawl
 economic_web_crawl.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 import economic_eurostat_trade
 economic_eurostat_trade.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_corporate_monitor
+economic_corporate_monitor.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 transport_buffer.flush()
 import_buffer.flush()
 source_journal.publish(page,out,m.DB,m.now())
