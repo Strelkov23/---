@@ -180,7 +180,7 @@ jobs:
           node test-economic-ai-comparability.js
           node test-economic-ai-physical.js
           python3 -m unittest test_economic_search.py test_economic_external_research.py test_economic_web_crawl.py test_economic_search_audit.py test_economic_abstracts.py
-          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_forecast_tournament.py test_economic_ai_forecast_trials.py test_economic_eurostat_trade.py test_economic_corporate_monitor.py test_economic_corporate_discovery.py test_economic_corporate_pdf.py test_economic_ai_agents.py test_economic_ai_planning.py
+          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_forecast_tournament.py test_economic_ai_forecast_trials.py test_economic_eurostat_trade.py test_economic_corporate_monitor.py test_economic_corporate_discovery.py test_economic_corporate_pdf.py test_economic_corporate_review.py test_economic_ai_agents.py test_economic_ai_planning.py
           node test-research-projects.js
           node test-provenance.js
           node test-index-builder.js

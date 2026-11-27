@@ -79,6 +79,10 @@ def build(out,previous,stamp,refresh):
     agents[2]["metrics"]["corporate_pdf"]=pdf
     agents[2]["links"].append("economic-corporate-pdf.json")
     if pdf["status"] in ("error","blocked") or any(r["status"]!="match" for r in pdf["comparison"]):agents[2]["state"]="attention"
+    review=read(out,"economic-corporate-review.json")
+    agents[2]["metrics"]["corporate_review"]={"note":review["note"],"counts":review["counts"],"rows":[dict(id=k,**r) for k,r in review["rows"].items() if r["active"]]}
+    agents[2]["links"].append("economic-corporate-review.json")
+    if any(review["counts"].get(k,0) for k in ("review_difference","missing_archive","cached")):agents[2]["state"]="attention"
     comp=read(out,"economic-ai-comparability.json")
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")
