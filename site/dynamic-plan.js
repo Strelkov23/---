@@ -115,6 +115,16 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',as
    try{if(file.size>200000)throw Error('Файл слишком большой');const parsed=LaborCalibration.parse(await file.text(),m);if(token!==calibrationToken)return;calibration=parsed;laborFields.forEach((e,i)=>e.value=String(parsed[i].intensity));$('dyn-laborEnabled').checked=true;draw();calibrationStatus.textContent='Импортировано '+parsed.length+' коэффициентов из пользовательского файла. Проверьте источники; задайте лимит человеко-лет.'}
    catch(e){if(token!==calibrationToken)return;calibrationStatus.textContent='Файл не принят: '+e.message+'; прежние параметры сохранены.'}
   });
+  const qs=new URLSearchParams(location.search);
+  if(qs.has("dyn-growth")){
+   const growth=qs.get("dyn-growth").split(","),keys=["years","spare","investment","capitalRatio","depreciation","importLimit"],values=keys.map(k=>qs.get("dyn-"+k));
+   const range=(v,lo,hi,integer=false)=>typeof v==="string"&&/^\d+(?:\.\d)?$/.test(v)&&Number(v)>=lo&&Number(v)<=hi&&(!integer||Number.isInteger(Number(v)));
+   const ranges=[[1,15,true],[0,100],[0,100000],[.1,20],[0,100],[0,100000]];
+   if(growth.length===fields.length&&growth.every(v=>range(v,0,20))&&values.every((v,i)=>range(v,...ranges[i]))){
+    keys.forEach((k,i)=>$("dyn-"+k).value=values[i]);fields.forEach((e,i)=>e.value=growth[i]);$("dyn-allocation").value="gap";$("dyn-laborEnabled").checked=false;
+    const goal=qs.get("global-objective");if(["cumulative","terminal"].includes(goal))$("global-objective").value=goal;
+   }else calibrationStatus.textContent="Параметры переданного плана некорректны; сохранены исходные значения.";
+  }
   const global=typeof GlobalPlan!=='undefined'?GlobalPlan.mount(m):null;
   function showDetail(){const r=rows.find(r=>r.year===Number(select.value));if(!r){detail.replaceChildren();return}table(detail,['Группа','Требуемый прирост выпуска','Доступный прирост','Реализуемый прирост','Прямой целевой спрос','Инвестиции для следующего года','Доп. мощность следующего года','Ограничение'],r.groups.map(g=>[g.name,...[g.required,g.available,g.realized,g.demand,g.invest,g.nextExtra].map(fmtNum),g.binding?'Связывает сценарий':'—']))}
   function draw(){

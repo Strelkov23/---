@@ -193,7 +193,45 @@ const GlobalEconomicAssistant=(function core(){
  }
  return found;
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence}
+ function horizonCommand(q){
+ const match=String(q??"").trim().match(/^многолетний план\s*:\s*(.*)$/iu);
+ if(!match)return null;
+ const invalid={kind:"invalid"},parts=match[1].split(";").map(x=>x.trim());
+ if(parts.length>30||parts.some(x=>!x))return invalid;
+ const specs={"горизонт":["years",1,15],"инвестиции":["investment",0,100000],"импорт":["importLimit",0,100000],"резерв":["spare",0,100],"капиталоёмкость":["capitalRatio",.1,20],"выбытие":["depreciation",0,100],"рост":["growth",0,20]};
+ const p={years:5,investment:null,importLimit:null,spare:5,capitalRatio:3,depreciation:5,growth:3},seen=new Set(),overrides={};let objective="cumulative";
+ for(const part of parts){
+  const goal=part.match(/^цель\s*=\s*(сумма|финал)$/iu);
+  if(goal){if(seen.has("objective"))return invalid;seen.add("objective");objective=goal[1].toLowerCase()==="финал"?"terminal":"cumulative";continue;}
+  const m=part.match(/^(горизонт|инвестиции|импорт|резерв|капитало[её]мкость|выбытие|рост)(?:\s+(\d{1,2}))?\s*=\s*(\d{1,6}(?:[.,]\d)?)$/iu);
+  if(!m)return invalid;
+  const name=m[1].toLowerCase().replace("капиталоемкость","капиталоёмкость"),[key,lo,hi]=specs[name],v=Number(m[3].replace(",","."));
+  if(v<lo||v>hi||key==="years"&&!Number.isInteger(v))return invalid;
+  if(m[2]){const n=+m[2];if(key!=="growth"||n<1||n>19||Object.hasOwn(overrides,n))return invalid;overrides[n]=v;}
+  else{if(seen.has(key))return invalid;seen.add(key);p[key]=v;}
+ }
+ if(p.investment===null||p.importLimit===null)return invalid;
+ return {kind:"horizon",objective,p:{...p,growth:Array.from({length:19},(_,i)=>overrides[i+1]??p.growth),allocation:"gap",labor:null}};
+}
+ function horizonHref(cmd){
+ const p=cmd.p;
+ return "scenario.html?"+[["dyn-years",p.years],["dyn-investment",p.investment],["dyn-importLimit",p.importLimit],["dyn-spare",p.spare],["dyn-capitalRatio",p.capitalRatio],["dyn-depreciation",p.depreciation],["dyn-growth",p.growth.join(",")],["global-objective",cmd.objective]].map(([k,v])=>k+"="+encodeURIComponent(v)).join("&")+"#global-plan";
+}
+ function horizonEvidence(cmd,m,r,pinned=false){
+ const p=cmd.p,href=horizonHref(cmd),f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ if(r.objective!==cmd.objective||r.rows?.length!==p.years||![r.score,r.upper,r.dualityGap,r.maxViolation,r.tolerance].every(Number.isFinite)||r.dualityGap>r.tolerance||Math.abs(r.score-r.upper)>r.tolerance)throw Error("Unverified optimum");
+ const note="Условные периоды на базе МРБ 2021 года; не календарный прогноз. Фиксированная технология, цены базы, базовый выпуск и замещение базового капитала поддерживаются извне. Инвестиции вводятся в следующем периоде; трудовое ограничение отключено, коэффициенты не заданы. Цель не ВВП и не благосостояние."+(pinned?" Страница открывает текущую редакцию сайта.":"");
+ const found=[{id:"horizon-params",kind:"Условные параметры",title:"Допущения многолетнего плана",description:"Горизонт "+p.years+" · ежегодный лимит инвестиций "+f(p.investment)+" · импорт "+f(p.importLimit)+" млрд руб. · резерв "+f(p.spare)+"% · капиталоёмкость "+f(p.capitalRatio)+" · выбытие "+f(p.depreciation)+"% · труд не ограничен в модели · рост спроса по группам: "+p.growth.map((v,i)=>(i+1)+": "+f(v)+"%").join("; "),href,limit:note}];
+ found.push({id:"horizon-total",kind:"Проверенный условный оптимум",title:cmd.objective==="terminal"?"Максимум спроса последнего периода":"Максимум суммы дополнительного спроса",description:"Цель "+f(r.score)+" млрд руб. · двойственная граница "+f(r.upper)+" · невязка "+r.dualityGap.toExponential(2)+" · последнее значение спроса "+f(r.rows.at(-1).actualDemand)+" · доля целевого спроса "+f(100*r.rows.at(-1).alpha)+"%",href,limit:note});
+ for(const row of r.rows){
+  if(![row.alpha,row.actualDemand,row.demand,row.investment,row.imports,row.realized].every(Number.isFinite)||row.alpha<0||row.alpha>1+1e-8||row.investment>p.investment+1e-6*Math.max(1,p.investment)||row.imports>p.importLimit+1e-6*Math.max(1,p.importLimit))throw Error("Invalid period");
+  const groups=row.groups.filter(x=>x.investment>1e-8).sort((a,b)=>b.investment-a.investment).slice(0,3);
+  found.push({id:"horizon"+row.year,kind:"Период инвестиционного плана",title:"Условный период "+row.year,description:"Спрос "+f(row.actualDemand)+" из "+f(row.demand)+" · выпуск "+f(row.realized)+" · инвестиции "+f(row.investment)+" · импорт "+f(row.imports)+" млрд руб. · доля "+f(row.alpha*100)+"% · ограничения: "+(row.binding.join("; ")||"нет")+" · крупнейшие вложения: "+(groups.map(g=>g.name+" "+f(g.investment)).join("; ")||"нет"),href,limit:note});
+ }
+ for(const [i,v] of r.variants.entries())found.push({id:"horizon-variant"+(i+1),kind:"Сравнение стратегий",title:v.label,description:"Цель "+f(v.score)+" · спрос последнего периода "+f(v.terminal)+" · инвестиции "+f(v.investment)+" млрд руб.",href,limit:note});
+ return found;
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -327,7 +365,29 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Не удалось получить проверенное допустимое и оптимальное решение. Проверьте параметры и доступность матрицы.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findHorizon(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Оптимизация инвестиционного календаря",parameters,parameter_note:"Лимиты и рост являются условными допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"horizon-status",kind:"Статус расчёта",title:"Многолетний план",description,href:"scenario.html#global-plan"}];
+  if(cmd.kind==="invalid")found=note("Пример: многолетний план: горизонт=5; инвестиции=1000; импорт=500; рост=3; рост 9=5; цель=сумма. Инвестиции и импорт обязательны, млрд руб. 0–100000; горизонт 1–15; рост 0–20%; резерв и выбытие 0–100%; капиталоёмкость 0,1–20; цель сумма или финал. Труд не ограничен.");
+  else try{
+   const m=(await Provenance.get(manifest,"sectors.json",base)).data;
+   const r=await new Promise((resolve,reject)=>{
+    const worker=new Worker("global-plan-worker.js");
+    const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
+    const timer=setTimeout(()=>finish(Error("Time limit")),30000);
+    worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result)};
+    worker.onerror=()=>finish(Error("Worker failed"));
+    try{worker.postMessage({m,p:cmd.p,objective:cmd.objective})}catch(e){finish(e)}
+   });
+   found=C.horizonEvidence(cmd,m,r,!!base);
+  }catch{failed=1;found=note("Проверенный оптимум не получен: матрица, вычислитель или лимит времени. Откройте подробный инструмент.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);
   const allocation=C.allocationCommand(q.value);if(allocation)return findAllocation(allocation,parameters);
   const balance=C.balanceCommand(q.value);if(balance)return findBalance(balance,parameters);
   const industry=C.industryCommand(q.value);if(industry)return findIndustry(industry,parameters);

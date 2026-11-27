@@ -103,3 +103,15 @@ A.equal(au.searchParams.get("opt-budget"),"1000");A.equal(au.searchParams.get("o
 const zeroAlloc=core.allocationEvidence(core.allocationCommand("оптимизация: бюджет=0; импорт=0"),mm,RP);
 A.ok(zeroAlloc[1].description.includes("распределение (млрд руб.): нулевое"));
 console.log("23 resource allocation assistant checks passed");
+
+const GP=require("./global-plan.js");
+const hc=core.horizonCommand("многолетний план: горизонт=3; инвестиции=10; импорт=100; рост=5; рост 9=7; резерв=0; капиталоёмкость=1; выбытие=0; цель=финал");
+A.equal(hc.kind,"horizon");A.equal(hc.p.growth[8],7);A.equal(hc.p.growth[0],5);A.equal(hc.objective,"terminal");A.equal(hc.p.labor,null);
+A.equal(core.horizonCommand("план"),null);
+for(const q of ["многолетний план: инвестиции=1","многолетний план: инвестиции=1; импорт=1; горизонт=16","многолетний план: инвестиции=1; импорт=1; рост 20=3","многолетний план: инвестиции=1; импорт=1; рост 1=2; рост 01=3","многолетний план: инвестиции=1; импорт=1; капиталоёмкость=0","многолетний план: инвестиции=1; импорт=1; цель=сумма; цель=финал"])A.equal(core.horizonCommand(q).kind,"invalid");
+const hr=GP.solve(mm,hc.p,hc.objective),he=core.horizonEvidence(hc,mm,hr);
+A.equal(he.filter(x=>/^horizon\d+$/.test(x.id)).length,3);A.ok(he[1].description.includes("двойственная граница"));A.ok(he[1].limit.includes("трудовое ограничение отключено"));
+const hu=new URL(he[0].href,"https://example.org/");
+A.equal(hu.searchParams.get("dyn-growth").split(",")[8],"7");A.equal(hu.searchParams.get("global-objective"),"terminal");
+A.throws(()=>core.horizonEvidence(hc,mm,{...hr,upper:hr.score+100}));
+console.log("18 horizon assistant checks passed");
