@@ -241,6 +241,49 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of r.rows.entries())out.push({id:"tech-sector"+(i+1),kind:"Продуктовая группа",title:x.name,description:"Выпуск "+f(x.base)+" → "+f(x.changed)+" · изменение "+f(x.delta)+" · импорт "+f(x.importBase)+" → "+f(x.importChanged)+" млрд руб. · условный индекс затрат "+f(x.costIndex),href,limit:note});
  return out;
  }
+ function forecastAuditCommand(q){
+ const s=String(q||"").trim();if(!/^точность прогноза\s*:/iu.test(s))return null;
+ const m=s.match(/^точность прогноза\s*:\s*([a-z0-9._-]{1,100})\s*;\s*горизонт\s*=\s*([1-9][0-9]?)$/iu);
+ return m?{kind:"forecast-audit",code:m[1].toUpperCase(),horizon:Number(m[2])}:{kind:"invalid"};
+ }
+ function forecastAuditEvidence(cmd,d,m,t,v){
+ if(cmd?.kind!=="forecast-audit"||!Array.isArray(d?.series)||![m,t,v].every(x=>x?.schema===1)||!Array.isArray(m.rows)||!Array.isArray(t.rows)||!Array.isArray(v.trials))return [];
+ const series=d.series.filter(s=>s.code===cmd.code);
+ if(series.length!==1)return [];
+ const s=series[0],rs=s.results?.filter(r=>r.horizon===cmd.horizon);
+ if(!external(s.source)||!s.unit||!rs||rs.length!==1)return [];
+ const r=rs[0],f=x=>Number.isFinite(x)?x.toLocaleString("ru-RU",{maximumFractionDigits:4}):"нет расчёта",methods=Object.keys(r.holdout||{}),selected=r.selected;
+ if(!methods.includes("last")||!methods.includes(selected)||!methods.every(k=>Object.hasOwn(r.development||{},k)))return [];
+ const key=x=>[x.origin,x.target].join("|"),period=p=>typeof p==="string"&&/^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/.test(p);
+ const verify=(folds,stats)=>{
+  if(!Array.isArray(folds)||!folds.length||stats?.n!==folds.length||new Set(folds.map(key)).size!==folds.length||folds.some(x=>!period(x.origin)||!period(x.target)||x.origin>=x.target||![x.prediction,x.actual,x.error].every(Number.isFinite)||Math.abs(x.error-(x.prediction-x.actual))>1e-8*Math.max(1,Math.abs(x.error))))throw Error("Invalid folds");
+  const mae=folds.reduce((a,x)=>a+Math.abs(x.prediction-x.actual),0)/folds.length;
+  if(!Number.isFinite(stats.mae)||Math.abs(mae-stats.mae)>1e-8*Math.max(1,mae))throw Error("Invalid MAE");
+  return mae;
+ };
+ const early=r.development_folds?.last,late=r.holdout_folds?.last;
+ if(!Array.isArray(early)||!Array.isArray(late)||!period(r.selection_cutoff)||early.some(x=>x.target>r.selection_cutoff)||late.some(x=>x.target<=r.selection_cutoff))return [];
+ for(const k of methods)for(const [folds,reference,stats] of [[r.development_folds?.[k],early,r.development[k]],[r.holdout_folds?.[k],late,r.holdout[k]]]){
+  verify(folds,stats);
+  if(folds.length!==reference.length||folds.some((x,i)=>key(x)!==key(reference[i])||x.actual!==reference[i].actual))throw Error("Unpaired folds");
+ }
+ const note="Ретроспективная проверка на последних редакциях исторических данных, не архив реального информационного набора на дату прогноза. Метод выбран на ранней выборке; поздняя выборка не используется для смены метода. MAE в исходных единицах; не сравнивать разные показатели и горизонты.";
+ const href="forecast.html",out=[{id:"forecast-backtest",kind:"Историческая проверка",title:s.title+" · горизонт "+cmd.horizon,description:"Метод "+(d.methods?.[selected]||selected)+" · ранних проверок "+r.development[selected].n+" · поздних "+r.holdout[selected].n+" · MAE "+f(r.holdout[selected].mae)+" против "+f(r.holdout.last.mae)+" у последнего значения · единица "+s.unit,href:s.source,limit:note}];
+ for(const [i,k] of methods.entries())out.push({id:"forecast-method"+(i+1),kind:"Сравнение методов",title:d.methods?.[k]||k,description:"Ранняя MAE "+f(r.development[k].mae)+" · поздняя MAE "+f(r.holdout[k].mae)+" "+s.unit+(k===selected?" · выбран заранее":""),href,limit:note});
+ const match=x=>x.code===s.code&&x.source===s.source&&x.unit===s.unit&&x.horizon===cmd.horizon;
+ const rows=m.rows.filter(match),trows=t.rows.filter(match),trials=v.trials.filter(match);
+ const validateLedger=(rows,actual,seen)=>{
+  const ids=new Set();
+  for(const x of rows){const id=key(x);if(ids.has(id)||!period(x.origin)||!period(x.target)||x.origin>=x.target||!Number.isFinite(Date.parse(x.issued))||x.issued.slice(0,x.target.length)>=x.target)throw Error("Invalid frozen record");ids.add(id);
+   if(x[actual]===null?x[seen]!==null:(!Number.isFinite(x[actual])||!Number.isFinite(Date.parse(x[seen]))||x[seen].slice(0,x.target.length)<x.target||Date.parse(x[seen])<Date.parse(x.issued)))throw Error("Invalid observed fact");}
+ };
+ validateLedger(rows,"first_actual","first_seen");validateLedger(trows,"actual","seen");
+ const scored=rows.filter(x=>x.first_actual!==null);
+ if(rows.some(x=>![x.point,x.naive,x.low,x.high].every(Number.isFinite)||x.low>x.point||x.point>x.high))throw Error("Invalid point forecast");
+ const mae=k=>scored.length?scored.reduce((a,x)=>a+Math.abs(x[k]-x.first_actual),0)/scored.length:null;
+ out.push({id:"forecast-prospective",kind:"Перспективный журнал",title:"Реальная проверка после публикации",description:"Зафиксировано "+rows.length+" · фактов "+scored.length+" · ожидают "+(rows.length-scored.length)+" · MAE "+f(mae("point"))+" · базовая MAE "+f(mae("naive"))+" · турнир: "+trows.filter(x=>x.actual!==null).length+" из "+trows.length+" оценено · испытаний кандидатов "+trials.length,href,limit:"Первый факт в архиве, не пересмотренная редакция; прогнозы записаны до начала периода. "+(scored.length<10?"Недостаточно завершённых наблюдений для вывода о превосходстве метода.":"Описательная диагностика; не гарантия будущей точности.")});
+ return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -596,7 +639,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -885,7 +928,22 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Технологический сценарий не подтверждён: проверьте параметры и матрицу.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findForecastAudit(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Аудит точности прогнозов",parameters,parameter_note:"Методы не переобучаются и не переключаются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"forecast-audit-status",kind:"Статус проверки",title:"Точность прогноза",description,href:"forecast.html"}];
+  if(cmd.kind==="invalid")found=note("Пример: точность прогноза: NY.GDP.MKTP.KD.ZG; горизонт=1. Код ряда и горизонт от последнего наблюдения.");
+  else try{
+   const files=await Promise.all(["forecast.json","economic-ai-forecast-memory.json","economic-ai-forecast-tournament.json","economic-ai-forecast-trials.json"].map(k=>Provenance.get(manifest,k,base)));
+   found=C.forecastAuditEvidence(cmd,...files.map(x=>x.data));
+   if(!found.length)found=note("Нет однозначного ряда и горизонта или проверка данных не пройдена.");
+  }catch{failed=1;found=note("Журнал или историческая проверка недоступны; вывод о точности не сделан.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const forecastAudit=C.forecastAuditCommand(q.value);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
   const technology=C.technologyCommand(q.value);if(technology)return findTechnology(technology,parameters);
   const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
   const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){

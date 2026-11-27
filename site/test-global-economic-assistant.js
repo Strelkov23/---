@@ -333,3 +333,22 @@ const p=V.params(n,8,10,5,3),r=V.compare(m,p);A.ok(r.delta.output<0);A.ok(r.delt
 A.equal(core.technologyEvidence(c,{...m,year:2022},T,V).length,0);A.equal(core.technologyEvidence(c,{...m,compatible:false},T,V).length,0);A.equal(core.technologyEvidence(c,{...m,source:"javascript:alert(1)"},T,V).length,0);
 A.throws(()=>core.technologyEvidence(c,m,T,{...V,compare:()=>({...r,changed:{...r.changed,residual:100}})}));
 console.log("18 technology assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js");
+const c=core.forecastAuditCommand("точность прогноза: ny.gdp.mktp.kd.zg; горизонт=1");
+A.deepEqual(c,{kind:"forecast-audit",code:"NY.GDP.MKTP.KD.ZG",horizon:1});
+A.equal(core.forecastAuditCommand("прогноз"),null);A.equal(core.forecastAuditCommand("точность прогноза: X; горизонт=0").kind,"invalid");
+const fold=(origin,target,prediction,actual)=>({origin,target,prediction,actual,error:prediction-actual});
+const early=[fold("2020","2021",1,2)],late=[fold("2021","2022",2,3)];
+const r={horizon:1,selected:"last",selection_cutoff:"2021",development:{last:{n:1,mae:1}},holdout:{last:{n:1,mae:1}},development_folds:{last:early},holdout_folds:{last:late}};
+const s={code:c.code,title:"ВВП",source:"https://example.org",unit:"%",results:[r]},d={series:[s]},m={schema:1,rows:[]},t={schema:1,rows:[]},v={schema:1,trials:[]};
+const a=core.forecastAuditEvidence(c,d,m,t,v);A.equal(a.length,3);A.ok(a[2].description.includes("фактов 0"));A.ok(a[2].limit.includes("Недостаточно"));A.equal(core.forecastAuditEvidence({...c,horizon:2},d,m,t,v).length,0);
+A.throws(()=>core.forecastAuditEvidence(c,{series:[{...s,results:[{...r,holdout:{last:{n:1,mae:2}}}]}]},m,t,v));
+A.equal(core.forecastAuditEvidence(c,{series:[{...s,results:[{...r,selection_cutoff:"2022"}]}]},m,t,v).length,0);
+const p={code:c.code,source:s.source,unit:s.unit,horizon:1,origin:"2024",target:"2026",issued:"2025-11-01",point:2,naive:1,low:0,high:4,first_actual:3,first_seen:"2026-03-01"};
+A.ok(core.forecastAuditEvidence(c,d,{...m,rows:[p]},t,v)[2].description.includes("фактов 1"));
+A.throws(()=>core.forecastAuditEvidence(c,d,{...m,rows:[p,p]},t,v));
+A.throws(()=>core.forecastAuditEvidence(c,d,{...m,rows:[{...p,issued:"2026-01-01"}]},t,v));
+A.throws(()=>core.forecastAuditEvidence(c,d,{...m,rows:[{...p,first_seen:"2025-12-01"}]},t,v));
+A.equal(core.forecastAuditEvidence(c,d,{...m,rows:[{...p,unit:"руб."}]},t,v)[2].description.includes("фактов 0"),true);
+console.log("14 forecast audit assistant checks passed");}
