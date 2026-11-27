@@ -36,3 +36,9 @@ assert.deepEqual(core.contentVector(index,"инвестиции рост",{kind:
 assert.deepEqual(core.contentVector({...index,abstract_norms:[]},"рост"),[]);
 assert.deepEqual(core.contentVector(index,"рост безработица",{all:true}),[]);
 console.log("9 sparse content vector checks passed");}
+
+{const docs=[{kind:"paper",href:"a",title:"A"},{kind:"tool",href:"t",title:"T"},{kind:"external",href:"b",title:"B"},{kind:"paper",href:"a",title:"duplicate"},{kind:"web",href:"c",title:"C"}];
+const c=core.semanticCandidates(docs,2);assert.deepEqual(c.map(x=>x.href),["a","b"]);
+const r=core.semanticRerank(c,[[1,0],[0,1],[2,0]],2);assert.equal(r[0].href,"b");assert.equal(r[0].semanticSimilarity,1);assert.equal(r[0].lexicalRank,2);
+assert.throws(()=>core.semanticRerank(c,[[1,0],[0,0],[2,0]],2));assert.throws(()=>core.semanticRerank(c,[[1,0],[NaN,1],[2,0]],2));assert.throws(()=>core.semanticRerank(c,[[1,0],[1,0]],2));assert.throws(()=>core.semanticCandidates(docs,13));
+console.log("8 neural reranking helper checks passed");}
