@@ -92,6 +92,20 @@ function validateCatalogue(c,index,source,files){
  if(c.indexed!==indexed||c.total!==expected.reduce((a,b)=>a+b,0)||c.complete!==(missing.length===0)||JSON.stringify(c.missing)!==JSON.stringify(missing)||bytes>128*1024*1024)throw Error("Invalid vector catalogue coverage");
  return {indexed,total:c.total,complete:c.complete,bytes};
 }
+// Select only shards containing eligible filtered titles. Catalogue metadata must
+// already have been validated; omitted files are not claimed to be byte-verified.
+function planParts(c,index,allowed){
+ if(!(allowed instanceof Set)||!Array.isArray(c?.entries))throw Error("Invalid filter plan");
+ const counts=new Map();
+ for(const d of index.docs){
+  if(!eligible(d)||!allowed.has(identity(d)))continue;
+  const i=bucket(d);counts.set(i,(counts.get(i)||0)+1);
+ }
+ const entries=c.entries.filter(e=>counts.has(e.shard));
+ const expected=[...counts.values()].reduce((a,b)=>a+b,0);
+ const available=entries.reduce((a,e)=>a+counts.get(e.shard),0);
+ return {entries,expected,available,bytes:entries.reduce((a,e)=>a+e.bytes,0)};
+}
 function rankPart(query,data,index,source,allowed,limit=20){
  if(!vectorOK(query)||!(allowed instanceof Set)||!Number.isInteger(limit)||limit<1||limit>50)throw Error("Invalid query or filters");
  validate(data,index,source,data.shard);
@@ -103,6 +117,6 @@ function rankPart(query,data,index,source,allowed,limit=20){
  return {searched:rows.length,rows:rows.sort(compareRank).slice(0,limit)};
 }
 function compareRank(a,b){return b.similarity-a.similarity||(identity(a)<identity(b)?-1:identity(a)>identity(b)?1:0);}
-return {MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog,reusable,validateCatalogue,rankPart,compareRank};
+return {MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog,reusable,validateCatalogue,planParts,rankPart,compareRank};
 })();
 if(typeof module!=="undefined")module.exports=EconomicServerVectors;
