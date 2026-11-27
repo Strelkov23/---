@@ -64,6 +64,9 @@ def build(out,previous,stamp,refresh):
     if c["counts"]["review"]:agents[1]["state"]="attention"
     agents[1]["links"].append("economic-eurostat-trade.json")
     if any(r["status"]=="error" for r in eurostat["series"].values()):agents[1]["state"]="attention"
+    physical=read(out,"economic-ai-physical.json")
+    agents[0]["metrics"]["physical"]={k:physical[k] for k in ("note","counts","rows","closed_year")}
+    agents[0]["links"].append("economic-ai-physical.json")
     comp=read(out,"economic-ai-comparability.json")
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")

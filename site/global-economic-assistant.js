@@ -52,7 +52,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json","economic-eurostat-trade.json","economic-ai-comparability.json"];
+  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json","economic-eurostat-trade.json","economic-ai-comparability.json","economic-ai-physical.json"];
   const files=await Promise.allSettled(keys.map(k=>Provenance.get(manifest,k,base)));
   const get=i=>files[i].status==="fulfilled"?files[i].value.data:null;
   const found=[];const tools=get(0);
@@ -97,6 +97,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }
   if(get(7)?.comparison&&C.external(get(7).source)&&C.rank([{title:"Торговый баланс оборот экспорт импорт Россия ЕС Eurostat Евростат",description:"сальдо внешней торговли"}],q.value,1).length){const d=get(7),c=d.comparison,r=c.rows.filter(x=>Number.isFinite(x.turnover)).at(-1);if(r)found.push({id:"eurostat-check",kind:"Расчёт и внутренний контроль Eurostat",title:"Оборот и сальдо торговли товарами ЕС с Россией",description:r.period+" · оборот "+r.turnover+" · сальдо расчётное "+r.calculated_balance+" · сальдо источника "+(r.reported_balance??"нет данных")+" млн евро · статус "+r.status,href:d.source,limit:c.note+" "+d.note+" Даты получения: "+JSON.stringify(c.retrieved)+"; статусы: "+JSON.stringify(c.source_status)+"; флаги: "+JSON.stringify(r.flags)})}
   if(Array.isArray(get(8)?.rows)){const c=get(8),ranked=C.rank(c.rows.map(r=>({...r,description:r.left+" "+r.right+" "+r.notes})),q.value,3);for(const [i,r] of ranked.entries()){if(C.internal(r.href))found.push({id:"method"+(i+1),kind:"Паспорт сопоставимости",title:r.title,description:r.checks.map(x=>x.title+": "+({match:"совпадает",different:"различается",unknown:"не подтверждено"}[x.status])).join(" · "),href:r.href,limit:r.notes+" "+c.note})}}
+  if(Array.isArray(get(9)?.rows)){const d=get(9),ranked=C.rank(d.rows.map(r=>({...r,description:r.scope+" "+r.unit+" "+r.origin})),q.value,3);for(const [i,r] of ranked.entries()){if(!Number.isFinite(r.value)||!C.external(r.source))continue;found.push({id:"physical"+(i+1),kind:r.verification==="machine_import"?"Ember · внешняя компиляция":"Корпоративное раскрытие",title:r.title,description:r.year+" · "+r.value+" "+r.unit+(Number.isFinite(r.yoy)?" · к предыдущему году "+r.yoy.toFixed(2)+"%":""),period:String(r.year),value:r.value,unit:r.unit,href:r.source,limit:r.scope+" "+r.limit+" Проверка "+r.checked+(r.newer_unverified?"; более новый год требует сверки.":"")+" "+d.note})}}
   return {found,context:localContext,failed:files.filter(x=>x.status==="rejected").length,fingerprint:manifest.data_fingerprint};
  }
  function render(r){

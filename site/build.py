@@ -308,6 +308,7 @@ economic_search_audit.publish(out,Path('../history/published'),m.now())
 import subprocess
 subprocess.run(['node','economic-ai-diagnostics.js',str(out),m.now()],check=True)
 subprocess.run(['node','economic-ai-comparability.js',str(out),m.now()],check=True)
+subprocess.run(['node','economic-ai-physical.js',str(out),m.now()],check=True)
 import economic_ai_planning
 economic_ai_planning.publish(out,m.now())
 import economic_ai_memory
