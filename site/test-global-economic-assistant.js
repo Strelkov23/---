@@ -45,3 +45,17 @@ A.equal(core.profileComparison([pr,{...pr2,dver:"2001"}],[pr.inn,pr2.inn]).decla
 A.equal(core.profileComparison([pr,{...pr2,edition:"2026-10-10"}],[pr.inn,pr2.inn]).declared,"unknown");
 A.equal(core.profileComparison([pr,null],[pr.inn,pr2.inn]).declared,"unknown");
 console.log("11 company profile checks passed");
+
+const SF=require("./sme-finance.js");
+const ix={status:"ready",year:2025,fingerprint:"a"},mx={status:"diagnostic",edition:"2026-11-10",archive_sha256:"b",reference_sha256:"c",declared:[{region:"77",class:"10",count:10},{region:"78",class:"10",count:20}]},rg={period:mx.edition,sha256:"c",rows:[{code:"77",name:"Москва"},{code:"78",name:"Санкт-Петербург"}]};
+const sector={status:"diagnostic",financial_year:2025,financial_fingerprint:"a",sme_edition:mx.edition,sme_archive_sha256:"b",reference_sha256:"c",paired_sums_version:1,declared:[{region:"77",class:"10",sme_total:10,matched:8,income_observations:8,income_sum:"10001",paired_money:6,paired_income_sum:"6000",paired_expense_sum:"3000"},{region:"78",class:"10",sme_total:20,matched:10,income_observations:10,income_sum:"20000",paired_money:9,paired_income_sum:"9000",paired_expense_sum:"6000"}]};
+A.equal(core.industryCommand("отрасль: 10; доходы; заявительный; охват=70").min,70);
+A.equal(core.industryCommand("отрасль: 10; доходы; охват=101").kind,"invalid");
+A.equal(core.industryCommand("производство"),null);
+const sectorResult=core.industryEvidence(core.industryCommand("отрасль: 10; доходы; охват=70"),sector,ix,mx,rg,SF,core.money);
+A.equal(sectorResult.length,2);A.ok(sectorResult[0].description.includes("100,01 руб."));A.ok(sectorResult[0].description.includes("80.00%"));
+const pairResult=core.industryEvidence(core.industryCommand("отрасль: 10; доля расходов"),sector,ix,mx,rg,SF,core.money);
+A.ok(pairResult[0].description.includes("60,00%"));
+A.throws(()=>core.industryEvidence(core.industryCommand("отрасль: 10"),sector,{...ix,year:2024},mx,rg,SF,core.money));
+A.throws(()=>core.industryEvidence(core.industryCommand("отрасль: 10"),{...sector,declared:sector.declared.slice(0,1)},ix,mx,rg,SF,core.money));
+console.log("9 industry assistant checks passed");

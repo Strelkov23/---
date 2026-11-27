@@ -62,7 +62,37 @@ const GlobalEconomicAssistant=(function core(){
  const declared=comparable?(matched.every(p=>p.declared===matched[0].declared)?"same_declared":"different_declared"):"unknown";
  return {declared,note:declared==="same_declared"?"Заявительные основные ОКВЭД совпадают в одном срезе и редакции. Это не доказывает отраслевую сопоставимость финансов.":declared==="different_declared"?"Заявительные основные ОКВЭД различаются; сравнение финансов не является отраслевым рейтингом.":"Сопоставимость заявительных ОКВЭД не подтверждена."};
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison}
+ function industryCommand(q){
+ const s=String(q??"").trim();if(!/^отрасль\s*:/iu.test(s))return null;
+ const m=s.match(/^отрасль\s*:\s*(\d{2})(?:\s*;\s*(доходы|расходы|работники|сальдо|доля расходов|доходы на работника))?(?:\s*;\s*(заявительный|отчётный|отчетный))?(?:\s*;\s*охват\s*=\s*(\d{1,3}))?$/iu);
+ if(!m||Number(m[4]||0)>100)return {kind:"invalid"};
+ const metrics={"доходы":"income","расходы":"expense","работники":"workers","сальдо":"balance","доля расходов":"cost_share","доходы на работника":"income_worker"};
+ return {kind:"industry",cls:m[1],metric:metrics[(m[2]||"доходы").toLowerCase()],basis:m[3]?.toLowerCase().startsWith("отч")?"reported":"declared",min:Number(m[4]||0)};
+}
+ function industryEvidence(cmd,d,index,matrix,regions,S,money,pinned=false){
+ if(d.status!=="diagnostic"||index.status!=="ready"||matrix.status!=="diagnostic"||d.financial_year!==index.year||d.financial_fingerprint!==index.fingerprint||d.sme_edition!==matrix.edition||d.sme_archive_sha256!==matrix.archive_sha256||d.reference_sha256!==matrix.reference_sha256||regions.period!==matrix.edition||regions.sha256!==matrix.reference_sha256)throw Error("Incompatible datasets");
+ const pair=S.pairSpecs.find(x=>x.id===cmd.metric),labels={income:"Доходы",expense:"Расходы",workers:"Среднесписочная численность"};
+ if(!pair&&!labels[cmd.metric])throw Error("Unknown metric");
+ const source=d[cmd.basis].filter(r=>r.class===cmd.cls),expected=new Map(matrix[cmd.basis].filter(r=>r.class===cmd.cls).map(r=>[r.region,r.count]));
+ if(source.length!==expected.size||new Set(source.map(r=>r.region)).size!==source.length)throw Error("Invalid cell coverage");
+ for(const r of source){
+  if(r.sme_total!==expected.get(r.region)||!Number.isSafeInteger(r.sme_total)||r.sme_total<=0||!Number.isSafeInteger(r.matched)||r.matched<0||r.matched>r.sme_total)throw Error("Invalid cell");
+  const count=pair?r[pair.count]:r[cmd.metric+"_observations"],values=pair?[r[pair.a],r[pair.b]]:[r[cmd.metric+"_sum"]];
+  if(!Number.isSafeInteger(count)||count<0||count>r.matched||values.some(v=>count===0?v!==null:typeof v!=="string"||! /^-?\d+$/.test(v)))throw Error("Invalid observations");
+  if(cmd.metric==="workers"&&count&&BigInt(values[0])<0n||cmd.metric==="income_worker"&&count&&BigInt(values[1])<0n)throw Error("Invalid worker count");
+ }
+ const all=pair?S.paired(d,cmd.basis,cmd.cls,cmd.metric):S.compare(d,cmd.basis,cmd.cls,cmd.metric);
+ if(all===null)throw Error("Paired observations unavailable");
+ const rows=S.select(all,cmd.min,"sum"),sum=pair?S.pairSummary(rows,cmd.metric):S.summary(rows);
+ const label=pair?pair.label:labels[cmd.metric],fmt=v=>v===null?"нет данных":cmd.metric==="workers"?v+" чел.":cmd.metric==="cost_share"?money(v).replace(" руб.","%"):cmd.metric==="income_worker"?money(v)+"/чел.":money(v);
+ const coverage=v=>v===null?"нет знаменателя":v.toFixed(2)+"%";
+ const note="Диагностика совпавших ИНН юридических лиц МСП, не итог отрасли или России. Финансовый год "+d.financial_year+"; классификация "+d.sme_edition+" ("+(cmd.basis==="declared"?"заявительный":"отчётный")+" основной ОКВЭД2). Код регистрации не место производства. Пропуски не нули; финансовые отношения не прибыль и не производительность труда. "+(pair?"Парные наблюдения, отношение сумм, не среднее региональных отношений. ":"")+"Минимальный охват "+cmd.min+"%; исключены несверенные территории и регионы ниже порога."+(pinned?" Ссылка открывает текущую редакцию.":"");
+ const href="company-atlas.html#sme-finance",names=new Map(regions.rows.map(r=>[r.code,r.name]));
+ const found=[{id:"industry-total",kind:"Отраслевая диагностика МСП",title:"ОКВЭД "+cmd.cls+" · "+label,description:"Территорий "+rows.length+" из "+all.length+" · ЮЛ МСП "+sum.total+" · наблюдений "+sum.observations+" · охват "+coverage(sum.coverage)+" · "+fmt(pair?sum.value:sum.sum),href,limit:note}];
+ for(const [i,r] of rows.filter(r=>r.value!==null).slice(0,5).entries())found.push({id:"industry"+(i+1),kind:"Региональная диагностика МСП",title:names.get(r.region)||"Код "+r.region,description:label+" · "+fmt(r.value)+" · наблюдений "+r.observations+" из "+r.sme_total+" · охват "+coverage(r.coverage),href,limit:note});
+ return found;
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -154,7 +184,22 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;note("Индекс предприятия недоступен","Не удалось получить или проверить блок. Уточните начало названия либо проверьте доступность каталога.");}
   return {found,context,failed,table,fingerprint:manifest.data_fingerprint};
  }
+ async function findIndustry(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Финансово-отраслевая диагностика МСП",parameters,parameter_note:"Параметры не являются наблюдениями."};
+  let found=[],failed=0;
+  const note=(description)=>[{id:"industry-status",kind:"Статус отраслевого анализа",title:"Отраслевая диагностика",description,href:"company-atlas.html#sme-finance"}];
+  if(cmd.kind==="invalid")found=note("Пример: отрасль: 10; доходы; заявительный; охват=70. Укажите двузначный ОКВЭД и охват от 0 до 100.");
+  else try{
+   await loadScript("sme-finance.js",()=>typeof SmeFinance!=="undefined");
+   const files=await Promise.all(["sme-finance.json","company-index.json","sme-matrix.json","sme-regions.json"].map(k=>Provenance.get(manifest,k,base)));
+   found=C.industryEvidence(cmd,...files.map(r=>r.data),SmeFinance,C.money,!!base);
+  }catch{failed=1;found=note("Наборы не доступны, не совпадают по редакции или не содержат необходимых парных наблюдений.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const industry=C.industryCommand(q.value);if(industry)return findIndustry(industry,parameters);
   const cmd=C.companyCommand(q.value);if(cmd)return findCompany(cmd,parameters);
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
