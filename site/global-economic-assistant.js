@@ -231,7 +231,49 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,v] of r.variants.entries())found.push({id:"horizon-variant"+(i+1),kind:"Сравнение стратегий",title:v.label,description:"Цель "+f(v.score)+" · спрос последнего периода "+f(v.terminal)+" · инвестиции "+f(v.investment)+" млрд руб.",href,limit:note});
  return found;
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence}
+ function robustnessCommand(q,parse){
+ const m=String(q??"").trim().match(/^устойчивость\s*:\s*(.*)$/iu);
+ if(!m)return null;
+ const invalid={kind:"invalid"},parts=m[1].split(";").map(x=>x.trim()),base=[],steps={};
+ for(const part of parts){
+  const step=part.match(/^шаг\s+(инвестиций|импорта)\s*=\s*(\d{1,3}(?:[.,]\d)?)\s*%?$/iu);
+  if(!step){base.push(part);continue;}
+  const key=step[1].toLowerCase(),v=Number(step[2].replace(",","."));
+  if(Object.hasOwn(steps,key)||v<=0||v>100)return invalid;
+  steps[key]=v;
+ }
+ const cmd=parse("многолетний план: "+base.join("; "));
+ if(!cmd||cmd.kind!=="horizon")return invalid;
+ return {...cmd,kind:"robustness",joint:{keyA:"investment",keyB:"importLimit",stepA:steps.инвестиций??25,stepB:steps.импорта??25,mode:"relative"}};
+}
+ function robustnessEvidence(cmd,r,href,pinned=false){
+ const j=cmd.joint,p=cmd.p;
+ if(r.objective!==cmd.objective||r.keyA!==j.keyA||r.keyB!==j.keyB||r.mode!==j.mode||r.rows?.length!==9)throw Error("Wrong sensitivity result");
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const cells=new Set(),distinct=new Map();
+ for(const x of r.rows){
+  if(![-1,0,1].includes(x.dirA)||![-1,0,1].includes(x.dirB))throw Error("Invalid grid");
+  const cell=x.dirA+":"+x.dirB;
+  const a=Math.max(0,Math.min(100000,p.investment*(1+x.dirA*j.stepA/100))),b=Math.max(0,Math.min(100000,p.importLimit*(1+x.dirB*j.stepB/100)));
+  if(cells.has(cell)||Math.abs(x.a-a)>1e-8||Math.abs(x.b-b)>1e-8||!Number.isFinite(x.a)||!Number.isFinite(x.b))throw Error("Wrong scenario parameters");
+  cells.add(cell);
+  const known=!x.error&&[x.score,x.upper,x.gap,x.tolerance,x.alpha].every(Number.isFinite)&&x.gap>=0&&x.tolerance>=0&&x.gap<=x.tolerance&&Math.abs(x.score-x.upper)<=x.tolerance&&x.alpha>=0&&x.alpha<=1+1e-8;
+  const fixed=x.fixed?.feasible===true&&Number.isFinite(x.fixed.score)&&(!known||x.fixed.score<=x.score+x.tolerance);
+  const row={...x,known,fixedKnown:fixed};
+  const key=JSON.stringify([x.a,x.b]),old=distinct.get(key);
+  if(old&&(old.known!==known||old.fixedKnown!==fixed||known&&old.score!==x.score||fixed&&old.fixed.score!==x.fixed.score))throw Error("Conflicting repeated case");
+  distinct.set(key,row);
+ }
+ const unique=[...distinct.values()],known=unique.filter(x=>x.known),fixed=unique.filter(x=>x.fixedKnown),center=distinct.get(JSON.stringify([p.investment,p.importLimit]));
+ if(!center?.known||!center.fixedKnown||Math.abs(center.score-center.fixed.score)>center.tolerance)throw Error("Unverified baseline");
+ const note="Условная проверка девяти комбинаций лимитов на базе МРБ 2021 года; не вероятность и не прогноз. Адаптивный план повторно оптимизируется при каждом сочетании; фиксированный сохраняет исходный календарь. Трудовые ограничения отключены. При нулевой базе относительное изменение не меняет лимит; совпадающие сочетания учитываются один раз."+(pinned?" Подробный инструмент открывает текущую редакцию.":"");
+ const planHref=href.replace(/#global-plan$/,"#global-joint");
+ const range=arr=>arr.length?f(Math.min(...arr))+"–"+f(Math.max(...arr)):"нет расчёта";
+ const found=[{id:"robustness-summary",kind:"Устойчивость инвестиционного плана",title:"Сочетания инвестиций и импорта",description:"База "+f(center.score)+" млрд руб. · уникальных сочетаний "+unique.length+" из 9 · проверенный оптимум "+known.length+" · исходный календарь допустим и проверен "+fixed.length+" · недопустим по лимиту "+unique.filter(x=>x.fixed?.feasible===false).length+" · диапазон адаптивной цели "+range(known.map(x=>x.score))+" · фиксированной цели "+range(fixed.map(x=>x.fixed.score))+" млрд руб. · шаг инвестиций ±"+j.stepA+"%, импорта ±"+j.stepB+"%",href:planHref,limit:note}];
+ for(const [i,x] of unique.entries())found.push({id:"robustness"+(i+1),kind:"Условное сочетание",title:"Инвестиции "+f(x.a)+" / импорт "+f(x.b)+" млрд руб.",description:"Повторный оптимум "+f(x.known?x.score:null)+" · изменение к базе "+f(x.known?x.score-center.score:null)+" · фиксированный план "+(x.fixedKnown?f(x.fixed.score):x.fixed?.feasible===false?"недопустим":"не подтверждён")+" · выигрыш от перераспределения "+f(x.known&&x.fixedKnown?Math.max(0,x.score-x.fixed.score):null)+" млрд руб. · ограничения: "+(x.known?(x.allBinding||x.binding||[]).join("; ")||"нет":"не установлены"),href:planHref,limit:note});
+ return {found,failed:unique.length-known.length};
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -371,22 +413,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   const context={page,heading,description:"Оптимизация инвестиционного календаря",parameters,parameter_note:"Лимиты и рост являются условными допущениями."};
   let found=[],failed=0;
   const note=description=>[{id:"horizon-status",kind:"Статус расчёта",title:"Многолетний план",description,href:"scenario.html#global-plan"}];
-  if(cmd.kind==="invalid")found=note("Пример: многолетний план: горизонт=5; инвестиции=1000; импорт=500; рост=3; рост 9=5; цель=сумма. Инвестиции и импорт обязательны, млрд руб. 0–100000; горизонт 1–15; рост 0–20%; резерв и выбытие 0–100%; капиталоёмкость 0,1–20; цель сумма или финал. Труд не ограничен.");
+  if(cmd.kind==="invalid")found=note("Пример: многолетний план: горизонт=5; инвестиции=1000; импорт=500; рост=3; рост 9=5; цель=сумма. Инвестиции и импорт обязательны, млрд руб. 0–100000; горизонт 1–15; рост 0–20%; резерв и выбытие 0–100%; капиталоёмкость 0,1–20; цель сумма или финал. Труд не ограничен. Для проверки устойчивости: устойчивость: инвестиции=1000; импорт=500; шаг инвестиций=25; шаг импорта=25. Шаги относительные, 0–100% (строго больше нуля).");
   else try{
    const m=(await Provenance.get(manifest,"sectors.json",base)).data;
    const r=await new Promise((resolve,reject)=>{
     const worker=new Worker("global-plan-worker.js");
     const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
-    const timer=setTimeout(()=>finish(Error("Time limit")),30000);
+    const timer=setTimeout(()=>finish(Error("Time limit")),cmd.kind==="robustness"?90000:30000);
     worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result)};
     worker.onerror=()=>finish(Error("Worker failed"));
-    try{worker.postMessage({m,p:cmd.p,objective:cmd.objective})}catch(e){finish(e)}
+    try{worker.postMessage({m,p:cmd.p,objective:cmd.objective,...(cmd.kind==="robustness"?{joint:cmd.joint}:{})})}catch(e){finish(e)}
    });
-   found=C.horizonEvidence(cmd,m,r,!!base);
+   if(cmd.kind==="robustness"){const result=C.robustnessEvidence(cmd,r,C.horizonHref(cmd),!!base);found=result.found;failed=result.failed;}else found=C.horizonEvidence(cmd,m,r,!!base);
   }catch{failed=1;found=note("Проверенный оптимум не получен: матрица, вычислитель или лимит времени. Откройте подробный инструмент.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
  async function find(parameters){
+  const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
   const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);
   const allocation=C.allocationCommand(q.value);if(allocation)return findAllocation(allocation,parameters);
   const balance=C.balanceCommand(q.value);if(balance)return findBalance(balance,parameters);
