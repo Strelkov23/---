@@ -32,6 +32,8 @@ jobs:
           node test-global-plan.js
           node test-labor-calibration.js
           node test-data-registry.js
+          node test-economic-ai.js
+          node test-economic-ai-series.js
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js
@@ -49,6 +51,26 @@ jobs:
           python3 test_global_reference.py
           rm -rf public
           python3 build.py
+          node - <<'JS'
+          const assert=require('node:assert/strict'),fs=require('node:fs');
+          const series=require('./economic-ai-series.js'),registry=require('./data-registry.js');
+          for(const name of ['economic-ai.js','economic-ai-series.js','analyst-cockpit.html']) assert.ok(fs.existsSync('public/'+name),name);
+          const data=JSON.parse(fs.readFileSync('public/data-registry.json','utf8'));
+          const manifest=JSON.parse(fs.readFileSync('public/data-manifest.json','utf8'));
+          const eligible=data.rows.filter(series.eligible);
+          assert.ok(eligible.length>0);
+          const checked=[];
+          for(const group of new Set(eligible.map(r=>r.group))){
+            const row=eligible.find(r=>r.group===group);
+            assert.ok(manifest.files[row.file],row.file);
+            const raw=JSON.parse(fs.readFileSync('public/'+row.file,'utf8'));
+            const observations=registry.observations(row,raw);
+            const result=series.summarize(row,observations,'2100-12');
+            assert.ok(result && Number.isFinite(result.value),row.id);
+            checked.push(group);
+          }
+          console.log('Economic AI catalogue integration:',checked.join(', '),'eligible rows:',eligible.length);
+          JS
           node test-price-model.js
           python3 test_price_reference.py
           node test-technology.js
