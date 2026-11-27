@@ -1,4 +1,5 @@
 import json
+import economic_abstracts
 import re
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -370,6 +371,8 @@ def sync(db, stamp, refresh):
                     if not re.fullmatch(r'10\.\d{4,9}/\S+',doi):continue
                     entries.append((doi,journal,when,title,authors,topics))
                     meta=metadata(item)
+                    licensed=economic_abstracts.extract(item,meta['access'],stamp)
+                    if licensed:meta['licensed_abstract']=licensed
                     prior=db.execute("select payload,checked from literature_meta where doi=?",(doi,)).fetchone()
                     if prior:meta=preserve_bibliography(meta,json.loads(prior[0]),prior[1])
                     details.append((doi,json.dumps(meta,ensure_ascii=False),stamp))

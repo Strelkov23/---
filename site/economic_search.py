@@ -1,10 +1,11 @@
 """Independent local inverted index rebuilt from the economic archive."""
-import json,re
+import json,re,math
+import economic_abstracts
 from collections import Counter,defaultdict
 from urllib.parse import quote,urlsplit
 FILE="economic-search-index.json"
 KINDS=("tool","series","news","paper","discovered","external","web")
-NOTE="Поиск по заголовкам и метаданным опубликованного архива, не по всему интернету."
+NOTE="Поиск по заголовкам, метаданным и лицензированным аннотациям опубликованного архива, не по всему интернету."
 STOP=set("как что где найти мне можно нужно помоги покажи объясни это чем какой какие для при или по на в и с к у о об из за от до а".split())
 SUFFIX=re.compile(r"(иями|ями|ами|ого|его|ему|ому|ыми|ими|иях|иям|ией|ия|ии|ий|ию|ие|ях|ах|ам|ом|ов|ем|ая|ые|ый|ой|ую|а|ы|у|и|е|я|ю)$")
 def tokens(s):
@@ -26,12 +27,17 @@ def compile_index(rows,stamp):
         if not r:continue
         key=(r["kind"],r["href"])
         if key in seen:continue
-        seen.add(key);i=len(docs);docs.append(r)
+        seen.add(key);i=len(docs);docs.append({k:v for k,v in r.items() if k!="abstract_text"})
         weights=Counter()
         for field,weight in (("title",5),("description",1),("source",1),("code",3)):
             for w in set(tokens(r[field])):weights[w]+=weight
+        for w in set(tokens(r.get("abstract_text",""))):weights[w]+=1
         for w,weight in sorted(weights.items()):postings[w].append([i,weight])
-    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
+    norms=[0.0]*len(docs)
+    for posting in postings.values():
+        idf=math.log(1+(len(docs)-len(posting)+0.5)/(len(posting)+0.5))
+        for i,w in posting:norms[i]+=(w*idf)**2
+    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
 def read(out,name):return json.loads((out/name).read_text(encoding="utf-8"))
 def build(out,stamp):
     rows=[]
@@ -43,7 +49,11 @@ def build(out,stamp):
         rows.append(record("news",r.get("title"),r.get("url"),r.get("topics"),r.get("source"),r.get("published")))
     for r in read(out,"literature.json")["articles"]:
         doi=r.get("doi") or ""
-        if re.fullmatch(r"10\.\d{4,9}/\S+",doi):rows.append(record("paper",r.get("title"),"https://doi.org/"+quote(doi,safe="/:().-_;")," · ".join(str(x) for x in (r.get("authors"),r.get("topics")) if x),r.get("journal"),r.get("published"),doi))
+        if re.fullmatch(r"10\.\d{4,9}/\S+",doi):
+            doc=record("paper",r.get("title"),"https://doi.org/"+quote(doi,safe="/:().-_;")," · ".join(str(x) for x in (r.get("authors"),r.get("topics")) if x),r.get("journal"),r.get("published"),doi)
+            if doc and economic_abstracts.eligible(r,stamp):
+                doc.update(abstract_text=r["licensed_abstract"]["text"],abstract_license=economic_abstracts.LICENSE)
+            rows.append(doc)
     for code,r in read(out,"economic-ai-discovery.json")["rows"].items():
         if r["values"] and r["status"] in ("ok","error"):
             rows.append(record("discovered",r["title"],r["url"],r["definition"],"World Bank WDI",max(r["values"]),code))
@@ -58,11 +68,13 @@ def validate(d):
     if d["counts"]!={k:sum(r["kind"]==k for r in docs) for k in KINDS}:raise ValueError("Wrong counts")
     if any(r["kind"] not in KINDS or not safe(r["href"]) or not r["title"] for r in docs):raise ValueError("Invalid document")
     if len({(r["kind"],r["href"]) for r in docs})!=len(docs):raise ValueError("Duplicate document")
+    if any("abstract_text" in r or "abstract_license" in r and (r["kind"]!="paper" or r["abstract_license"]!=economic_abstracts.LICENSE) for r in docs):raise ValueError("Invalid abstract index metadata")
+    if len(d["norms"])!=len(docs) or any(type(v) not in (int,float) or not math.isfinite(v) or v<0 for v in d["norms"]):raise ValueError("Invalid vector norms")
     for word,posting in d["postings"].items():
         if not re.fullmatch(r"[a-zа-я0-9]+",word) or not posting:raise ValueError("Invalid term")
         last=-1
         for i,w in posting:
-            if type(i) is not int or not last<i<len(docs) or type(w) is not int or not 1<=w<=10:raise ValueError("Invalid posting")
+            if type(i) is not int or not last<i<len(docs) or type(w) is not int or not 1<=w<=11:raise ValueError("Invalid posting")
             last=i
     return {"documents":len(docs),"terms":len(d["postings"])}
 def publish(out,stamp):

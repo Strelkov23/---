@@ -13,4 +13,12 @@ class AuditTests(unittest.TestCase):
         current=identities({"docs":[{"kind":"news","href":"a","title":"changed"}]})
         old=identities({"docs":[{"kind":"news","href":"a","title":"old"}]})
         self.assertEqual(diff(current,old)["news"]["added"],0)
+    def test_abstract_coverage(self):
+        stamp="2026-11-27T15:00:00+00:00";license=economic_abstracts.LICENSE
+        p={"doi":"10.1234/test","authors":"Example","licensed_abstract":{"license":license,"text":"Text"},"access":{"licenses":[{"url":license,"version":"vor","start":"2025-01-01"}]}}
+        index={"docs":[{"kind":"paper","code":p["doi"],"abstract_license":license}]}
+        self.assertEqual(abstract_coverage(index,[p],None,stamp)["indexed"],1)
+        self.assertEqual(abstract_coverage(index,[p],index,stamp)["added"],0)
+        self.assertEqual(abstract_coverage({"docs":[]},[p],index,stamp)["removed"],1)
+        with self.assertRaises(ValueError):abstract_coverage(index,[],None,stamp)
 if __name__=="__main__":unittest.main()
