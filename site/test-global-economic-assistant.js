@@ -301,3 +301,22 @@ A.equal(o.length,4);A.ok(o[0].description.includes("человеко-лет"));A
 A.throws(()=>core.laborPlanEvidence(c,m,a,{...b,rows:b.rows.map(r=>({...r,labor:1}))},T));
 A.throws(()=>core.laborPlanEvidence(c,m,a,{...b,upper:b.upper+1e6},T));
 console.log("22 labor-constrained planning assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),L=require("./labor-data.js");
+const c=core.productivityCommand("производительность труда: 2025; база=2019");
+A.deepEqual(c,{kind:"productivity-decomposition",year:2025,base:2019});
+A.equal(core.productivityCommand("производительность"),null);
+A.equal(core.productivityCommand("производительность труда: 2025; база=2025").kind,"invalid");
+A.equal(core.productivityCommand("производительность труда: 2025; база=1990").kind,"invalid");
+const codes=[["agriculture","AGR"],["industry","IND"],["services","SRV"]];
+const rows=[2019,2025].flatMap(year=>codes.map(([sector,k],i)=>({year,sector,title:sector,productivity_usd2015_per_worker:100*(i+1)+(year===2025?20:0),employment_share_pct:[20,30,50][i],productivity_source:"https://api.worldbank.org/v2/country/RUS/indicator/NV."+k+".EMPL.KD",employment_source:"https://api.worldbank.org/v2/country/RUS/indicator/SL."+k+".EMPL.ZS",productivity_checked:"2026-01-01",employment_checked:"2026-01-01"})));
+const d={built:"2026-01-01",broad:rows},e=core.productivityEvidence(c,d,L,"2026-11");
+A.equal(e.length,8);A.equal(e[0].id,"prod-decomposition");A.ok(e[0].description.includes("внутри секторов 20"));A.ok(e[0].description.includes("структура занятости 0"));A.ok(e[7].description.includes("заблокирована"));
+A.equal(core.productivityEvidence(c,d,L,"2025-12").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:rows.slice(1)},L,"2026-11").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:[...rows,rows[0]]},L,"2026-11").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,employment_share_pct:0}:r)},L,"2026-11").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,productivity_source:"https://example.org"}:r)},L,"2026-11").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,employment_checked:null}:r)},L,"2026-11").length,0);
+A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,productivity_checked:"2027-01-01"}:r)},L,"2026-11").length,0);
+console.log("16 productivity decomposition assistant checks passed");}

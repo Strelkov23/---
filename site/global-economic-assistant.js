@@ -195,6 +195,31 @@ const GlobalEconomicAssistant=(function core(){
   out.push({id:"energy-planning",kind:"Маршрут планирования",title:"Проверка энергетических ограничений",description:"Сопоставить физические показатели с балансом электроэнергии и отдельно проверить мощности, коэффициенты использования, потребление и отраслевые ограничения. Не переносить доли генерации автоматически в межотраслевую матрицу.",href:"scenario.html#resource-plan",limit:"Маршрут исследования, не рассчитанный план. Нужны данные о мощностях и технологических коэффициентах."});
   return out;
  }
+ function productivityCommand(q){
+ const s=String(q||"").trim();if(!/^производительность труда\s*:/iu.test(s))return null;
+ const m=s.match(/^производительность труда\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})$/iu);
+ if(!m||Number(m[2])<1991||Number(m[1])<=Number(m[2])||Number(m[1])>2100)return {kind:"invalid"};
+ return {kind:"productivity-decomposition",year:Number(m[1]),base:Number(m[2])};
+ }
+ function productivityEvidence(cmd,d,L,cutoff){
+ if(cmd?.kind!=="productivity-decomposition"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||cmd.base<1991||cmd.base>=cmd.year||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||cmd.year>=Number(cutoff.slice(0,4))||!Array.isArray(d?.broad)||!Number.isFinite(Date.parse(d.built||"")))return [];
+ const codes={agriculture:["NV.AGR.EMPL.KD","SL.AGR.EMPL.ZS"],industry:["NV.IND.EMPL.KD","SL.IND.EMPL.ZS"],services:["NV.SRV.EMPL.KD","SL.SRV.EMPL.ZS"]};
+ const selected=d.broad.filter(r=>[cmd.year,cmd.base].includes(r.year)&&Object.hasOwn(codes,r.sector));
+ const src=(url,code)=>typeof url==="string"&&url.split("?")[0]==="https://api.worldbank.org/v2/country/RUS/indicator/"+code&&!/[\s#]/.test(url);
+ if(selected.length!==6||selected.some(r=>!src(r.productivity_source,codes[r.sector][0])||!src(r.employment_source,codes[r.sector][1])||![r.productivity_checked,r.employment_checked].every(t=>typeof t==="string"&&Number.isFinite(Date.parse(t))&&t.slice(0,7)<=cutoff)))return [];
+ const x=L.decompose(selected,cmd.base,cmd.year);if(!x.valid||!x.parts.every(r=>[r.within,r.between,r.first.productivity,r.last.productivity].every(Number.isFinite)))return [];
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:2}):"нет расчёта";
+ const note="Условный индекс ВДС на занятого по трём укрупнённым секторам WDI, доллары США 2015 года; не официальный ВВП на занятого и не производительность валового выпуска. Симметричное разложение, нормированные доли занятости. Структурный компонент не устанавливает причинность.";
+ const href="labor.html#labor-decomposition";
+ const out=[{id:"prod-decomposition",kind:"Расчёт WDI",title:"Изменение производительности и структуры занятости",description:cmd.base+" → "+cmd.year+" · индекс "+f(x.a.index)+" → "+f(x.b.index)+" долл. 2015 на занятого · изменение "+f(x.actual)+" · внутри секторов "+f(x.within)+" · структура занятости "+f(x.between)+" · невязка "+f(x.residual)+" · исходные суммы долей "+f(x.a.sum)+" / "+f(x.b.sum)+"%",href,limit:note}];
+ for(const [i,r] of x.parts.entries()){
+  const id="prod-sector"+(i+1),a=r.first,b=r.last;
+  out.push({id,kind:"Вклад сектора",title:r.title,description:"ВДС на занятого "+f(a.productivity)+" → "+f(b.productivity)+" долл. 2015 · внутрисекторный вклад "+f(r.within)+" · структурный "+f(r.between),href:a.productivity_source,limit:note+" Проверки "+a.productivity_checked+" / "+b.productivity_checked+"."});
+  out.push({id:id+"-employment",kind:"Доля занятости WDI",title:r.title+" · занятость",description:cmd.base+": "+f(a.employment_share_pct)+"% · "+cmd.year+": "+f(b.employment_share_pct)+"%",href:a.employment_source,limit:note+" Проверки "+a.employment_checked+" / "+b.employment_checked+"."});
+ }
+ out.push({id:"prod-calibration-gate",kind:"Методологический контроль",title:"Калибровка трудоёмкости МРБ",description:"Автоматическая подстановка этих рядов в 19 групп МРБ заблокирована: ВДС не валовой выпуск, доллары 2015 не рубли 2021, занятые не годовые FTE, три сектора не продуктовые группы. Требуются распределённые FTE по продуктам 2021 и документированные источники. Доступен шаблон калибровки.",href:"labor.html#labor-calibration",limit:"Диагностика пригодности данного набора, не утверждение об отсутствии иных источников."});
+ return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -550,7 +575,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -806,7 +831,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Оба оптимума не подтверждены. Частичное сравнение не публикуется.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findProductivity(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Производительность и структура занятости WDI",parameters,parameter_note:"Годы задают сравнение; трудовые коэффициенты МРБ не меняются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"prod-status",kind:"Статус расчёта",title:"Производительность труда",description,href:"labor.html#labor-decomposition"}];
+  if(cmd.kind==="invalid")found=note("Пример: производительность труда: 2025; база=2019. Два разных закрытых года, база раньше выбранного года.");
+  else try{
+   await loadScript("labor-data.js",()=>typeof LaborDiagnostics!=="undefined");
+   const d=(await Provenance.get(manifest,"labor-data.json",base)).data;
+   found=C.productivityEvidence(cmd,d,LaborDiagnostics,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет полных сопоставимых срезов WDI или не подтверждены источники. Пропуски не заполняются.");
+  }catch{failed=1;found=note("Архив производительности или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
   const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){
    if(laborPlan.kind==="invalid"){await loadScript("provenance.js",()=>typeof Provenance!=="undefined");const manifest=await Provenance.validateManifest(await load("data-manifest.json"));return {found:[{id:"labor-plan-status",kind:"Статус расчёта",title:"Трудовой план",description:"Пример: трудовой план: инвестиции=1000; импорт=500; горизонт=3; труд=100000; трудоёмкость=100; трудоёмкость 9=150; производительность=2. Лимит 0–1 млрд человеко-лет, коэффициенты 0–1 млн человеко-лет на млрд руб., производительность −10…20%, горизонт до 10. Условные параметры.",href:"scenario.html#global-plan"}],context:{page,heading,description:"Трудовые ограничения",parameters},failed:0,fingerprint:manifest.data_fingerprint};}
    return findInvestmentComparison(laborPlan,parameters);
