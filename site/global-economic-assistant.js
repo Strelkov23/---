@@ -124,6 +124,33 @@ const GlobalEconomicAssistant=(function core(){
   const flags=[e.flag,i.flag,b?.flag??null].map(v=>v===null?"нет наблюдения":v||"нет").join(" / ");
   return {id:"eurostat-check",kind:"Расчёт и внутренний контроль Eurostat",title:"Оборот и сальдо торговли товарами ЕС с Россией",description:year+" · экспорт ЕС "+num(e.value)+" · импорт ЕС "+num(i.value)+" · оборот "+num(turnover)+" · сальдо расчётное "+num(balance)+" · сальдо источника "+(b?num(b.value):"нет данных")+" млн евро · "+status+(Number.isFinite(growth)?" · изменение номинального оборота к предыдущему году "+num(growth)+"%":" · годовой темп не рассчитан"),href:d.source,limit:String(d.note||"")+" Расчёт только по общему закрытому году; экспорт и импорт со стороны ЕС. Флаги экспорт / импорт / сальдо: "+flags+". Даты и статусы получения: "+meta.map(r=>r.code+" "+(r.success||"нет данных")+" ("+r.status+")").join("; ")+". Внутренний контроль, не независимое измерение. Номинальная стоимость, не физический объём; разные редакции возможны.",period:year,unit:d.unit};
  }
+ // High-precision natural-language routing; never invent missing parameters.
+ // Explicit commands retain precedence. Unrecognised requests remain search.
+ function naturalRoute(q){
+  const input=String(q??"").trim();
+  if(input.length>600||input.includes(":")||/[\r\n;]/u.test(input))return null;
+  const text=input.toLowerCase().replace(/ё/g,"е").replace(/\s+/gu," ").replace(/[?!.]+$/u,"").trim();
+  let m,command,tool,parsed;
+  if((m=text.match(/^(?:покажи|рассчитай|сравни|как изменилась) производительность труда(?: в россии)? в (\d{4}) году (?:по сравнению с|относительно) (\d{4})(?: годом| года| г)?$/u))){
+   command="производительность труда: "+m[1]+"; база="+m[2];tool="productivity";parsed=productivityCommand(command);
+  }else if((m=text.match(/^(?:покажи|рассчитай|сравни|как изменилась) структура энергетики(?: россии)? в (\d{4}) году (?:по сравнению с|относительно) (\d{4})(?: годом| года| г)?$/u))||
+   (m=text.match(/^(?:покажи|рассчитай|сравни) структуру энергетики(?: россии)? в (\d{4}) году (?:по сравнению с|относительно) (\d{4})(?: годом| года| г)?$/u))){
+   command="структура энергетики: "+m[1]+"; база="+m[2];tool="energy";parsed=energyCommand(command);
+  }else if((m=text.match(/^(?:покажи|рассчитай|сравни) торговлю(?: россии)? с сша за первые (\d{1,2}) месяц(?:а|ев)? (\d{4}) года$/u))){
+   command="торговля с сша: "+m[2]+"; месяцев="+m[1];tool="trade";parsed=partnerTradeCommand(command);
+  }else if((m=text.match(/^(?:покажи|рассчитай) рынок труда(?: россии)? за (\d{4}-\d{2}) (?:по сравнению с|относительно) (\d{4})(?: годом| года| г)?$/u))){
+   command="рынок труда: "+m[1]+"; база="+m[2];tool="labour";parsed=labourCommand(command);
+  }else if((m=text.match(/^(?:проверь|оцени|покажи) точность прогноза ([a-z0-9._-]{1,100}) на горизонте (\d{1,2})(?: год| года| лет)?$/u))){
+   command="точность прогноза: "+m[1]+"; горизонт="+m[2];tool="forecast";parsed=forecastAuditCommand(command);
+  }else if(/^(?:покажи|перечисли) приоритетные задачи (?:экономических |аналитических )?агентов$/u.test(text)){
+   command="координация агентов: приоритеты";tool="agents";parsed=agentCommand(command);
+  }else if(/^(?:покажи|перечисли) состояние всех (?:экономических |аналитических )?агентов$/u.test(text)){
+   command="координация агентов: все";tool="agents";parsed=agentCommand(command);
+  }else if((m=text.match(/^(?:покажи|рассчитай) межотраслевой баланс(?: для)? группы (\d{1,2})$/u))){
+   command="мрб: "+m[1];tool="balance";parsed=balanceCommand(command);
+  }
+  return parsed&&parsed.kind!=="invalid"?{tool,command}:null;
+ }
  function priceCommand(q){
   const s=String(q||"").trim();
   if(!/^покупательная способность\s*:/iu.test(s))return null;
@@ -753,7 +780,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -1068,28 +1095,29 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
  async function find(parameters){
-  const agents=C.agentCommand(q.value);if(agents)return findAgents(agents,parameters);
-  const forecastAudit=C.forecastAuditCommand(q.value);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
-  const technology=C.technologyCommand(q.value);if(technology)return findTechnology(technology,parameters);
-  const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
-  const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){
+  const command=C.naturalRoute(q.value)?.command||q.value;
+  const agents=C.agentCommand(command);if(agents)return findAgents(agents,parameters);
+  const forecastAudit=C.forecastAuditCommand(command);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
+  const technology=C.technologyCommand(command);if(technology)return findTechnology(technology,parameters);
+  const productivity=C.productivityCommand(command);if(productivity)return findProductivity(productivity,parameters);
+  const laborPlan=C.laborPlanCommand(command);if(laborPlan){
    if(laborPlan.kind==="invalid"){await loadScript("provenance.js",()=>typeof Provenance!=="undefined");const manifest=await Provenance.validateManifest(await load("data-manifest.json"));return {found:[{id:"labor-plan-status",kind:"Статус расчёта",title:"Трудовой план",description:"Пример: трудовой план: инвестиции=1000; импорт=500; горизонт=3; труд=100000; трудоёмкость=100; трудоёмкость 9=150; производительность=2. Лимит 0–1 млрд человеко-лет, коэффициенты 0–1 млн человеко-лет на млрд руб., производительность −10…20%, горизонт до 10. Условные параметры.",href:"scenario.html#global-plan"}],context:{page,heading,description:"Трудовые ограничения",parameters},failed:0,fingerprint:manifest.data_fingerprint};}
    return findInvestmentComparison(laborPlan,parameters);
   }
-  const investments=C.investmentComparisonCommand(q.value);if(investments)return findInvestmentComparison(investments,parameters);
-  const energy=C.energyCommand(q.value);if(energy)return findEnergy(energy,parameters);
-  const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
-  const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
-  const output=C.outputCommand(q.value);if(output)return findIndependent(output,parameters,"physical");
-  const partner=C.partnerTradeCommand(q.value);if(partner)return findPartnerTrade(partner,parameters);
-  const price=C.priceCommand(q.value);if(price)return findPrice(price,parameters);
-  const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
-  const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
-  const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);
-  const allocation=C.allocationCommand(q.value);if(allocation)return findAllocation(allocation,parameters);
-  const balance=C.balanceCommand(q.value);if(balance)return findBalance(balance,parameters);
-  const industry=C.industryCommand(q.value);if(industry)return findIndustry(industry,parameters);
-  const cmd=C.companyCommand(q.value);if(cmd)return findCompany(cmd,parameters);
+  const investments=C.investmentComparisonCommand(command);if(investments)return findInvestmentComparison(investments,parameters);
+  const energy=C.energyCommand(command);if(energy)return findEnergy(energy,parameters);
+  const composite=C.compositeCommand(command);if(composite)return findComposite(composite,parameters);
+  const labour=C.labourCommand(command);if(labour)return findIndependent(labour,parameters,"labour");
+  const output=C.outputCommand(command);if(output)return findIndependent(output,parameters,"physical");
+  const partner=C.partnerTradeCommand(command);if(partner)return findPartnerTrade(partner,parameters);
+  const price=C.priceCommand(command);if(price)return findPrice(price,parameters);
+  const bottleneck=C.bottleneckCommand(command,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
+  const robust=C.robustnessCommand(command,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
+  const horizon=C.horizonCommand(command);if(horizon)return findHorizon(horizon,parameters);
+  const allocation=C.allocationCommand(command);if(allocation)return findAllocation(allocation,parameters);
+  const balance=C.balanceCommand(command);if(balance)return findBalance(balance,parameters);
+  const industry=C.industryCommand(command);if(industry)return findIndustry(industry,parameters);
+  const cmd=C.companyCommand(command);if(cmd)return findCompany(cmd,parameters);
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
   const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json","economic-eurostat-trade.json","economic-ai-comparability.json","economic-ai-physical.json"];
@@ -1158,7 +1186,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  }
  async function execute(generate){
   if(busy||!q.value.trim())return;save();const id=++epoch;lock(true);reset();status.textContent="Поиск по архиву сайта…";
-  try{const parameters=currentParameters();renderParameters();const r=await find(parameters);if(id!==epoch)return;render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
+  try{const parameters=currentParameters();renderParameters();const r=await find(parameters);if(id!==epoch)return;const route=C.naturalRoute(q.value);if(route){r.context={...r.context,automatic_route:route.command,route_note:"Выбрано по явным параметрам запроса; не самостоятельное решение модели."};r.found.unshift({id:"auto-route",kind:"Выбранный инструмент",title:"Автоматический маршрут запроса",description:route.command,limit:"Параметры взяты из вопроса. Результат расчёта приведён отдельно, если доступен."});}render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
    if(!generate){status.textContent="Поиск завершён, нейросеть не использована.";return}
    if(!r.found.length){status.textContent="Нет данных для объяснения.";return}
    status.textContent="Локальная генерация…";
