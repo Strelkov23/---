@@ -42,3 +42,11 @@ const c=core.semanticCandidates(docs,2);assert.deepEqual(c.map(x=>x.href),["a","
 const r=core.semanticRerank(c,[[1,0],[0,1],[2,0]],2);assert.equal(r[0].href,"b");assert.equal(r[0].semanticSimilarity,1);assert.equal(r[0].lexicalRank,2);
 assert.throws(()=>core.semanticRerank(c,[[1,0],[0,0],[2,0]],2));assert.throws(()=>core.semanticRerank(c,[[1,0],[NaN,1],[2,0]],2));assert.throws(()=>core.semanticRerank(c,[[1,0],[1,0]],2));assert.throws(()=>core.semanticCandidates(docs,13));
 console.log("8 neural reranking helper checks passed");}
+
+{const a="a".repeat(64),b="b".repeat(64),c="c".repeat(64),v=Array.from({length:384},(_,i)=>i===0?1:0),rec=(key,used,vector=v)=>({key,used,vector});
+assert.ok(core.validCachedVector(v));assert.equal(core.validCachedVector(v.slice(1)),false);assert.equal(core.validCachedVector(v.map(()=>0)),false);
+assert.equal(core.validCachedVector([...v.slice(0,-1),NaN]),false);assert.notEqual(core.cacheIdentity("A"),core.cacheIdentity("B"));assert.ok(core.cacheIdentity("A").includes("7e3d5398"));
+assert.throws(()=>core.cacheIdentity(""));assert.deepEqual(core.mergeCache([rec(a,1),rec(b,2)],[rec(a,3),rec(c,4)],2).map(x=>x.key),[c,a]);
+assert.equal(core.mergeCache([rec(a,3)],[rec(a,1)])[0].used,3);assert.deepEqual(core.mergeCache([rec("bad",1),rec(b,-1),rec(c,1,[1])],[]),[]);
+assert.equal(core.mergeCache(Array.from({length:300},(_,i)=>rec(i.toString(16).padStart(64,"0"),i)),[]).length,256);
+assert.throws(()=>core.mergeCache([],[],257));console.log("12 persistent vector cache helper checks passed");}
