@@ -74,3 +74,18 @@ A.ok(shock[0].description.includes("допустимый масштаб 0%"));
 A.ok(shock[0].href.includes("stress-shocks="));A.ok(shock[0].limit.includes("не ВВП"));
 A.throws(()=>core.balanceEvidence({kind:"balance",group:20},mm,BM,CS));
 console.log("11 balance assistant checks passed");
+
+const multi=core.balanceCommand("шоки спроса: 9=10; 2=-2,5; предел=10; предел 9=5");
+A.deepEqual(multi,{kind:"multi",shocks:{9:10,2:-2.5},limits:{9:5},cap:10});
+A.deepEqual(core.balanceCommand("шоки спроса: 1=0"),{kind:"multi",shocks:{1:0},limits:{},cap:10});
+for(const q of ["шоки спроса: 1=1; 01=2","шоки спроса: 20=2","шоки спроса: 1=21","шоки спроса: 1=2; предел 1=-1","шоки спроса: 1=2; предел=10; предел=9","шоки спроса: предел=5","шоки спроса: 1=2;","шоки спроса: 1=2; предел 2=3; предел 02=4"])A.equal(core.balanceCommand(q).kind,"invalid");
+const mr=core.balanceEvidence(multi,mm,BM,CS),total=mr.find(r=>r.id==="shock-total"),params=mr.find(r=>r.id==="shock-params");
+A.ok(params.description.includes("остальные группы: 0%"));
+A.ok(params.description.includes("9: 5%"));
+const url=new URL(total.href,"https://example.org/");
+const sv=url.searchParams.get("stress-shocks").split(",").map(Number),cv=url.searchParams.get("stress-caps").split(",").map(Number);
+A.equal(sv.length,19);A.equal(sv[1],-2.5);A.equal(sv[8],10);A.equal(cv[8],5);A.equal(cv[1],10);
+const expected=CS.calculate(mm,sv,cv);
+A.ok(total.description.includes((expected.alpha*100).toLocaleString("ru-RU",{maximumFractionDigits:3})+"%"));
+A.throws(()=>core.balanceEvidence({kind:"multi",shocks:{20:5},limits:{},cap:10},mm,BM,CS));
+console.log("19 multi-sector scenario checks passed");
