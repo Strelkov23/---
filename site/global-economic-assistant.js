@@ -141,6 +141,35 @@ const GlobalEconomicAssistant=(function core(){
   if(p&&v.yoy!==null&&p.year!==b.year&&p.year!==a.year)out.push({id:"physical-prior",kind:"Корпоративное наблюдение",title:c.title+" · предыдущий год",description:p.year+" · "+fmt(p[m.id])+" "+m.unit+" · "+(p.reference||c.page||"ссылка на отчёт"),period:String(p.year),value:p[m.id],unit:m.unit,href:p.source||c.source,limit:note});
   return out;
  }
+ function compositeCommand(q){
+  const s=String(q||"").trim();if(!/^индекс выпуска\s*:/iu.test(s))return null;
+  const m=s.match(/^индекс выпуска\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})\s*;\s*веса\s*=\s*(\d{1,3}(?:\s*,\s*\d{1,3}){4})$/iu);
+  if(!m)return {kind:"invalid"};
+  const year=Number(m[1]),base=Number(m[2]),weights=m[3].split(",").map(Number);
+  if(Math.min(year,base)<1991||Math.max(year,base)>2100||weights.some(w=>w>100)||!weights.some(w=>w>0))return {kind:"invalid"};
+  return {kind:"physical-composite",year,base,weights};
+ }
+ function compositeEvidence(cmd,d,IV,P,cutoff){
+  if(cmd?.kind!=="physical-composite"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  IV.validate(d);
+  const x=P.calculate(d,cmd.year,cmd.base,cmd.weights,false),fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Пользовательские веса нормируются на их сумму, не являются долями экономики. Индекс = сумма взвешенных отношений физических объёмов к базовому году × 100. Корпоративная выборка, не ВВП, не индекс промышленного производства России. Не суммируются тонны и кВт·ч.";
+  const out=[],bad=[];
+  for(const [i,[id,key,title]] of P.specs.entries()){
+   if(!(cmd.weights[i]>0))continue;
+   const c=d.companies.find(c=>c.id===id),m=c?.metrics.find(m=>m.id===key);
+   const get=y=>{const r=c?.rows.find(r=>r.year===y);return r&&m&&(c.verification==="source_rechecked"||c.verification==="partial"&&r.verification==="source_rechecked")&&/^\d{4}-\d{2}-\d{2}$/.test(c.verification_date||"")&&c.verification_date.slice(0,7)<=cutoff&&external(r.source||c.source)&&Number.isFinite(r[key])&&r[key]>=0?r:null};
+   const a=get(cmd.year),b=get(cmd.base),item=x.items[i];
+   if(!a||!b||!(b[key]>0)||!Number.isFinite(item.index)||!item.verified){bad.push(title);continue;}
+   const sourceNote=c.scope+". Сверка "+c.verification_date+". "+(c.verification_method||"");
+   for(const [j,r] of [a,b].entries())out.push({id:"composite-"+(i+1)+"-"+(j+1),kind:"Корпоративное наблюдение",title:title,description:r.year+" · "+fmt(r[key])+" "+m.unit+" · "+(r.reference||c.page||"ссылка на отчёт"),period:String(r.year),value:r[key],unit:m.unit,href:r.source||c.source,limit:sourceNote});
+   out.push({id:"composite-component"+(i+1),kind:"Компонент индекса",title,description:"Вес "+fmt(item.weight*100)+"% · индекс "+fmt(item.index)+" · вклад в изменение "+fmt(item.contribution)+" п.п.",href:"independent-statistics.html#physical-index-weights",limit:note});
+  }
+  if(bad.length||!x.complete||!Number.isFinite(x.index))return [{id:"composite-blocked",kind:"Статус расчёта",title:"Составной индекс не рассчитан",description:"Не подтверждены все компоненты с положительным весом: "+(bad.join("; ")||"нет полной пары наблюдений")+". Веса не перераспределены.",href:"independent-statistics.html#physical-index-weights",limit:note},...out];
+  const s=P.sensitivity(x);
+  out.unshift({id:"composite-result",kind:"Расчёт индекса",title:"Составной индекс физического выпуска",description:cmd.year+" к "+cmd.base+" · индекс (база=100): "+fmt(x.index)+" · изменение "+fmt(x.index-100)+"% · покрытие "+fmt(x.coverage*100)+"% заданных весов · диапазон компонентов "+fmt(x.min)+" — "+fmt(x.max)+(s?.trials.length?" · при исключении по одному компоненту: "+fmt(s.min)+" — "+fmt(s.max):" · для проверки чувствительности нужен второй компонент"),href:"independent-statistics.html#physical-index-weights",limit:note+" Диапазон чувствительности к составу не доверительный интервал."});
+  return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -432,7 +461,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -633,7 +662,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Проверенный архив или расчёт недоступны.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findComposite(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Составной индекс физических показателей",parameters,parameter_note:"Год, база и веса заданы пользователем. Веса не отражают структуру экономики."};
+  let found=[],failed=0;
+  const note=description=>[{id:"composite-status",kind:"Статус расчёта",title:"Составной индекс выпуска",description,href:"independent-statistics.html#physical-index-weights"}];
+  if(cmd.kind==="invalid")found=note("Пример: индекс выпуска: 2025; база=2024; веса=20,20,20,20,0. Пять целых весов 0–100 в порядке: никель, АЭС, погрузка РЖД, газ НОВАТЭК, сталь Северстали. Хотя бы один положительный вес.");
+  else try{
+   await Promise.all([loadScript("iv-physical.js",()=>typeof IVPhysical!=="undefined"),loadScript("iv-physical-composite.js",()=>typeof IVCompositePhysical!=="undefined")]);
+   const d=(await Provenance.get(manifest,"independent-physical.json",base)).data;
+   found=C.compositeEvidence(cmd,d,IVPhysical,IVCompositePhysical,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет закрытых периодов или допустимых параметров расчёта.");
+  }catch{failed=1;found=note("Архив физических показателей или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
   const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
   const output=C.outputCommand(q.value);if(output)return findIndependent(output,parameters,"physical");
   const partner=C.partnerTradeCommand(q.value);if(partner)return findPartnerTrade(partner,parameters);

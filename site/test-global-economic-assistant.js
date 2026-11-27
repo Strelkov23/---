@@ -232,3 +232,22 @@ A.equal(core.outputEvidence(c,{...p,companies:[{...company,verification:"pending
 A.equal(core.outputEvidence({...c,metric:"bad"},p,P,"2026-11").length,0);
 A.equal(core.outputEvidence({...c,base:2023},p,P,"2026-11").length,0);
 console.log("17 independent labour and output assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),P=require("./iv-physical-composite.js"),IV=require("./iv-physical.js");
+const c=core.compositeCommand("индекс выпуска: 2025; база=2024; веса=20,20,20,20,0");
+A.deepEqual(c,{kind:"physical-composite",year:2025,base:2024,weights:[20,20,20,20,0]});
+A.equal(core.compositeCommand("выпуск"),null);
+for(const q of ["индекс выпуска: 2025; база=2024; веса=0,0,0,0,0","индекс выпуска: 2025; база=2024; веса=101,0,0,0,0","индекс выпуска: 2025; база=2024; веса=1,2","индекс выпуска: 1980; база=2024; веса=1,1,1,1,1"])A.equal(core.compositeCommand(q).kind,"invalid");
+const d={schema:"iv-physical-v1",companies:P.specs.map(([id,key,title],i)=>({id,title,source:"https://example.org/"+id,scope:"Группа",verification:i===4?"partial":"source_rechecked",verification_date:"2026-11-26",metrics:[{id:key,title,unit:"ед."}],rows:[{year:2024,[key]:100,verification:"source_rechecked"},{year:2025,[key]:i===0?80:120,verification:i===4?"secondary_rechecked":"source_rechecked"}]}))};
+const a=core.compositeEvidence(c,d,IV,P,"2026-11");
+A.equal(a.length,13);A.equal(a[0].id,"composite-result");A.ok(a[0].description.includes("110"));A.ok(a[0].description.includes("100%"));A.ok(a[0].description.includes("при исключении"));
+const blocked=core.compositeEvidence({...c,weights:[20,20,20,20,20]},d,IV,P,"2026-11");
+A.equal(blocked[0].id,"composite-blocked");A.ok(blocked[0].description.includes("Северсталь"));A.ok(!blocked.some(r=>r.id==="composite-result"));
+A.equal(core.compositeEvidence(c,d,IV,P,"2025-12").length,0);
+const missing={...d,companies:d.companies.slice(1)};
+A.equal(core.compositeEvidence(c,missing,IV,P,"2026-11")[0].id,"composite-blocked");
+const bad={...d,companies:d.companies.map((x,i)=>i===0?{...x,verification_date:"2027-01-01"}:x)};
+A.equal(core.compositeEvidence(c,bad,IV,P,"2026-11")[0].id,"composite-blocked");
+A.equal(core.compositeEvidence({...c,weights:[0,0,0,0,0]},d,IV,P,"2026-11")[0].id,"composite-blocked");
+A.ok(a.filter(r=>r.kind==="Корпоративное наблюдение").every(r=>r.href.startsWith("https://")));
+console.log("19 composite physical index assistant checks passed");}
