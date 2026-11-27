@@ -20,9 +20,10 @@ if(typeof module!=="undefined")module.exports=EconomicAI;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("eai-"+id),form=$("form");if(!form)return;
  const status=$("status"),month=$("month"),question=$("question"),answer=$("answer"),sources=$("sources"),run=$("run"),init=$("init"),stop=$("stop"),evidenceButton=$("evidence");
- let engine=null,busy=false,epoch=0,registry=[];
+ let engine=null,busy=false,epoch=0,registry=[],discovery=null;
+ const dq=$("discovery-query"),ds=$("discovery-select"),dst=$("discovery-status");
  const seriesQuery=$("series-query"),seriesSelect=$("series-select"),seriesStatus=$("series-status");
- function setBusy(v){busy=v;run.disabled=v||!engine;init.disabled=v||!!engine;month.disabled=v;question.disabled=v;evidenceButton.disabled=v;seriesQuery.disabled=v;seriesSelect.disabled=v;stop.disabled=!v||!engine}
+ function setBusy(v){busy=v;run.disabled=v||!engine;init.disabled=v||!!engine;month.disabled=v;question.disabled=v;evidenceButton.disabled=v;seriesQuery.disabled=v;seriesSelect.disabled=v;dq.disabled=v;ds.disabled=v;stop.disabled=!v||!engine}
  function clear(){answer.textContent="";sources.replaceChildren()}
  month.value=new Date().toISOString().slice(0,7);
  async function manifestNow(){return Provenance.validateManifest(await load("data-manifest.json"))}
@@ -30,6 +31,9 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function renderSearch(){const saved=seriesSelect.value;seriesSelect.replaceChildren(new Option("Не добавлять ряд",""));for(const r of EconomicAISeries.search(registry,seriesQuery.value))seriesSelect.add(new Option(r.title+" · "+r.unit+" · "+r.group,r.id));if(Array.from(seriesSelect.options).some(o=>o.value===saved))seriesSelect.value=saved;seriesStatus.textContent="Показано "+(seriesSelect.options.length-1)+" рядов (до 25). Поиск по названию или коду."}
  seriesQuery.addEventListener("input",renderSearch);
  loadRegistry().then(rows=>{registry=rows;renderSearch()}).catch(()=>{seriesStatus.textContent="Каталог недоступен. Независимые наборы можно проверять отдельно."});
+ function renderDiscovery(){if(!discovery)return;const saved=ds.value;ds.replaceChildren(new Option("Не добавлять",""));for(const [code,r] of EconomicAIDiscovery.list(discovery,dq.value).slice(0,30))ds.add(new Option(r.title+" · "+code,code));if(Array.from(ds.options).some(o=>o.value===saved))ds.value=saved;dst.textContent="Кандидатов: "+Object.keys(discovery.rows).length+" · доступных рядов: "+EconomicAIDiscovery.list(discovery,"").length+" · показано: "+(ds.options.length-1)+" · каталог: "+discovery.catalog_status}
+ dq.addEventListener("input",renderDiscovery);
+ manifestNow().then(m=>Provenance.get(m,"economic-ai-discovery.json",root)).then(x=>{discovery=x.data;renderDiscovery()}).catch(()=>{dst.textContent="Экспериментальный каталог недоступен."});
  function show(records,manifest,failures){
   sources.replaceChildren();
   const p=document.createElement("p");p.textContent="SHA-256 манифеста: "+manifest.data_fingerprint;sources.append(p);
@@ -47,7 +51,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     const rec=EconomicAISeries.summarize(r,DataRegistry.observations(r,data),cutoff);
     if(rec)records.push(rec);else failures.push(r.title+": нет наблюдений за период");
    }catch{failures.push("Выбранный ряд: не прошёл контроль или отсутствует")}
-  }show(records,manifest,failures);return records
+  }if(ds.value){try{const d=(await Provenance.get(manifest,"economic-ai-discovery.json",root)).data;const r=EconomicAIDiscovery.record(ds.value,d.rows[ds.value],cutoff);if(r)records.push(r);else failures.push("Новый ряд: нет допустимого наблюдения")}catch{failures.push("Новый ряд: контроль не пройден")}}show(records,manifest,failures);return records
  }
  init.onclick=async()=>{
   if(busy||engine)return;if(!navigator.gpu){status.textContent="WebGPU недоступен. Используйте совместимый настольный браузер; доказательства доступны без модели.";return}
