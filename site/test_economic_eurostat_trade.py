@@ -22,10 +22,30 @@ class TradeTests(unittest.TestCase):
         d=advance(blank(),STAMP,True,lambda k:raw(fixture(k)))
         original=d["series"][CODE]["rows"][:]
         d=advance(d,"2026-11-28T15:00:00+00:00",True,lambda k:raw(fixture(k)))
+        d=advance(d,"2026-11-29T15:00:00+00:00",True,lambda k:raw(fixture(k)))
         d=advance(d,"2026-12-05T15:00:00+00:00",True,lambda k:b"bad")
         self.assertEqual(d["series"][CODE]["rows"],original)
         self.assertEqual(d["series"][CODE]["status"],"error")
     def test_offline(self):
         d=advance(blank(),STAMP,False,lambda k:self.fail("network"))
         self.assertTrue(all(r["status"]=="waiting" for r in d["series"].values()))
+    def test_signed_balance(self):
+        d=fixture("MIO_BAL_VAL");d["value"]["0"]=-20
+        self.assertEqual(parse(raw(d),"MIO_BAL_VAL",STAMP)[0]["value"],-20)
+    def test_comparison(self):
+        d=blank()
+        def obs(y,v):return dict(period=y,value=v,flag="")
+        d["series"]["MIO_EXP_VAL"]["rows"]=[obs("2023",100),obs("2024",0),obs("2025",30)]
+        d["series"]["MIO_IMP_VAL"]["rows"]=[obs("2023",120),obs("2025",40)]
+        d["series"]["MIO_BAL_VAL"]["rows"]=[obs("2023",-20.1),obs("2024",0),obs("2025",-5)]
+        r=comparison(d)
+        self.assertEqual(r["counts"],{"missing":1,"within_tolerance":1,"review":1})
+        self.assertEqual(r["rows"][0]["turnover"],220)
+        self.assertIsNone(r["rows"][1]["turnover"])
+        self.assertIsNone(r["rows"][2]["turnover_yoy_pct"])
+    def test_growth(self):
+        d=blank()
+        for code in ("MIO_EXP_VAL","MIO_IMP_VAL"):
+            d["series"][code]["rows"]=[dict(period="2024",value=10,flag="p"),dict(period="2025",value=15,flag="")]
+        self.assertEqual(comparison(d)["rows"][-1]["turnover_yoy_pct"],50)
 if __name__=="__main__":unittest.main()

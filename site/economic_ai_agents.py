@@ -59,6 +59,9 @@ def build(out,previous,stamp,refresh):
     eurostat=read(out,"economic-eurostat-trade.json")
     agents[1]["metrics"]["eurostat"]=[dict(code=k,title=r["title"],status=r["status"],checked=r["checked"],success=r["success"],count=len(r["rows"]),latest=r["rows"][-1] if r["rows"] else None) for k,r in eurostat["series"].items()]
     agents[1]["metrics"]["eurostat_note"]=eurostat["note"]
+    c=eurostat["comparison"]
+    agents[1]["metrics"]["eurostat_comparison"]={**{k:c[k] for k in ("note","counts","retrieved","source_status")},"latest":c["rows"][-1] if c["rows"] else None}
+    if c["counts"]["review"]:agents[1]["state"]="attention"
     agents[1]["links"].append("economic-eurostat-trade.json")
     if any(r["status"]=="error" for r in eurostat["series"].values()):agents[1]["state"]="attention"
     tournament=read(out,"economic-ai-forecast-tournament.json")
