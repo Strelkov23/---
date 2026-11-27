@@ -55,7 +55,17 @@ async function run(){
  const allowed=new Set([V.identity(d.rows[0])]),filtered=V.rankPart(v,d,index,sha,allowed);
  A.equal(filtered.searched,1);A.equal(filtered.rows[0].href,d.rows[0].href);A.equal(filtered.rows[0].similarity,1);
  A.equal(V.rankPart(v,d,index,sha,new Set()).searched,0);
- console.log("53 server vector and browser catalogue checks passed");
+ const work=V.planParts(complete,index,allowed);
+ A.equal(work.expected,1);A.equal(work.available,1);A.equal(work.entries.length,1);A.equal(work.entries[0].shard,s);A.equal(work.bytes,100);
+ const empty=V.planParts(complete,index,new Set());A.equal(empty.entries.length,0);A.equal(empty.expected,0);
+ const other=all.find(p=>p.shard!==s&&p.rows.length).rows[0],partial=V.planParts(cat,index,new Set([V.identity(other),...allowed]));
+ A.equal(partial.expected,2);A.equal(partial.available,1);A.equal(partial.entries.length,1);
+ const full=V.planParts(complete,index,new Set(index.docs.map(V.identity)));
+ A.equal(full.expected,250);A.equal(full.available,250);A.equal(full.entries.length,complete.entries.filter(e=>e.rows>0).length);
+ const actual=[];for(const e of work.entries)actual.push(...V.rankPart(v,all[e.shard],index,sha,allowed).rows);
+ A.deepEqual(actual,filtered.rows);
+ A.throws(()=>V.planParts(complete,index,[]));
+ console.log("Server vector, catalogue and filtered download checks passed");
 }
 module.exports=run;
 if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1;});
