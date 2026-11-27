@@ -189,3 +189,21 @@ A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,yoy:-100}]},IV,"2026-11").lengt
 A.equal(core.priceEvidence(cmd,{...d,official_source:"javascript:alert(1)"},IV,"2026-11").length,0);
 A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,official:{}}]},IV,"2026-11").length,0);
 console.log("20 purchasing power assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),IV=require("./iv-trade.js");
+const cmd=core.partnerTradeCommand("торговля с США: 2026; месяцев=2");
+A.deepEqual(cmd,{kind:"partner-trade",year:2026,months:2});A.equal(core.partnerTradeCommand("торговля"),null);
+const r=(period,us_exports,us_imports)=>({period,us_exports,us_imports});
+const d={schema:"iv-trade-v1",source:"https://www.census.gov/foreign-trade/balance/c4621.html",origin:"partner_customs",unit:"млн долл. США, текущие цены, без сезонной корректировки",status:"downloaded",last_success:"2026-03-01",source_sha256:"a".repeat(64),rows:[r("2025-01",10,20),r("2025-02",10,20),r("2026-01",20,10),r("2026-02",20,10)]};
+for(const q of ["торговля с США: 1992; месяцев=2","торговля с США: 2026; месяцев=0","торговля с США: 2026; месяцев=13"])A.equal(core.partnerTradeCommand(q).kind,"invalid");
+const e=core.partnerTradeEvidence(cmd,d,IV,"2026-03");
+A.equal(e.length,3);A.ok(e[0].description.includes("100%"));A.ok(e[1].description.includes("-50%"));A.ok(e[2].description.includes("сальдо 20"));A.ok(e[2].description.includes("2 из 2"));
+const partial=core.partnerTradeEvidence(cmd,d,IV,"2026-02");A.ok(partial[0].description.includes("НЕПОЛНЫЙ ПЕРИОД"));A.ok(partial[0].description.includes("02"));
+A.equal(core.partnerTradeEvidence(cmd,d,IV,"2026-01").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,rows:[...d.rows,d.rows[0]]},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,rows:[...d.rows,r("2024-01",-1,0)]},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,source_sha256:null},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,unit:"рубли"},IV,"2026-03").length,0);
+A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed",seed_verification:"documented_manual",seed_recheck_date:"2026-03-01"},IV,"2026-03").length,3);
+A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed"},IV,"2026-03").length,0);
+console.log("19 partner trade assistant checks passed");}

@@ -71,6 +71,35 @@ const GlobalEconomicAssistant=(function core(){
    {id:"price-scenario",kind:"Условный расчёт",title:"Покупательная способность при заданном изменении оплаты",description:cmd.period+" · "+basis+" · номинальная оплата "+num(cmd.wage)+"% · по ИПЦ "+num(x.official)+"% · по FMCG "+num(x.panel)+"% · разность сценариев "+num(x.delta)+" п.п. · безубыточный рост оплаты по ИПЦ "+num(x.breakEvenOfficial)+"%, по FMCG "+num(x.breakEvenPanel)+"%",href:"independent-statistics.html#iv-price-comparison",limit:note+" Формула: 100 × ((1 + рост оплаты/100)/(1 + темп цен/100) − 1)."}
   ];
  }
+ function partnerTradeCommand(q){
+  const s=String(q||"").trim();
+  if(!/^торговля с сша\s*:/iu.test(s))return null;
+  const m=s.match(/^торговля с сша\s*:\s*(\d{4})\s*;\s*месяцев\s*=\s*(\d{1,2})$/iu);
+  if(!m||Number(m[1])<1993||Number(m[1])>2100||Number(m[2])<1||Number(m[2])>12)return {kind:"invalid"};
+  return {kind:"partner-trade",year:Number(m[1]),months:Number(m[2])};
+ }
+ function partnerTradeEvidence(cmd,d,IV,cutoff){
+  const source="https://www.census.gov/foreign-trade/balance/c4621.html";
+  if(cmd?.kind!=="partner-trade"||!Number.isInteger(cmd.year)||cmd.year<1993||cmd.year>2100||!Number.isInteger(cmd.months)||cmd.months<1||cmd.months>12||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||d?.schema!=="iv-trade-v1"||d.source!==source||d.origin!=="partner_customs"||d.unit!=="млн долл. США, текущие цены, без сезонной корректировки"||!Array.isArray(d.rows))return [];
+  const machine=["downloaded","cached","cached_after_error"].includes(d.status);
+  if(machine?(!/^[a-f0-9]{64}$/.test(d.source_sha256||"")||!Number.isFinite(Date.parse(d.last_success||""))):(!["manual_seed","seed_after_error"].includes(d.status)||d.seed_verification!=="documented_manual"||!/^\d{4}-\d{2}-\d{2}$/.test(d.seed_recheck_date||"")))return [];
+  const seen=new Set(),rows=[];
+  for(const r of d.rows){
+   if(!/^(?:19[9][2-9]|20\d\d)-(0[1-9]|1[0-2])$/.test(r.period)||seen.has(r.period)||![r.us_exports,r.us_imports].every(v=>Number.isFinite(v)&&v>=0))return [];
+   seen.add(r.period);if(r.period<cutoff)rows.push(r);
+  }
+  const v=IV.compare(rows,cmd.year,cmd.months);
+  if(!v.months.length||v.values.some(r=>!Number.isFinite(r.now)||!Number.isFinite(r.before)))return [];
+  const months=v.months.slice().sort(),missing=Array.from({length:cmd.months},(_,i)=>String(i+1).padStart(2,"0")).filter(m=>!months.includes(m));
+  const num=x=>Number(x.toFixed(4)).toLocaleString("ru-RU",{maximumFractionDigits:4});
+  const scope=cmd.year+" и "+(cmd.year-1)+" · совпадающие месяцы "+months.join(", ")+" · "+months.length+" из "+cmd.months+(missing.length?" · НЕПОЛНЫЙ ПЕРИОД; отсутствуют пары: "+missing.join(", "):"");
+  const limit=String(d.limitations||"")+" Номинальная стоимость в млн долл. США, без сезонной корректировки. Только товары США—Россия, направления со стороны США. "+(machine?"Машинный импорт: "+d.last_success:"Документированная ручная сверка: "+d.seed_recheck_date)+". Статус "+d.status+". "+(d.error?"Последняя загрузка не удалась. ":"")+"Прямое сравнение с Eurostat без согласования валют, территорий и методик недопустимо.";
+  const out=v.values.map((r,i)=>({id:"us-trade"+(i+1),kind:"Зеркальная статистика США",title:i?"Импорт США из России":"Экспорт США в Россию",description:scope+" · текущий набор "+num(r.now)+" · предыдущий "+num(r.before)+" млн долл. США · "+(Number.isFinite(r.change)?"изменение "+num(r.change)+"%":"темп не рассчитан"),href:source,limit}));
+  const [e,i]=v.values,total=e.now+i.now,previous=e.before+i.before,change=previous>0?100*(total/previous-1):null;
+  if(!Number.isFinite(total)||!Number.isFinite(previous))return [];
+  out.push({id:"us-trade-balance",kind:"Расчёт по сопоставимым месяцам",title:"Оборот и сальдо торговли со стороны США",description:scope+" · оборот "+num(total)+" · предыдущий оборот "+num(previous)+" · сальдо "+num(e.now-i.now)+" млн долл. США"+(Number.isFinite(change)?" · изменение оборота "+num(change)+"%":""),href:source,limit:limit+" Сальдо = экспорт США минус импорт США; не российское сальдо."});
+  return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -362,7 +391,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -532,7 +561,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Проверенный архив цен или расчёт недоступны.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findPartnerTrade(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Зеркальная статистика торговли США с Россией",parameters,parameter_note:"Год и число месяцев задают окно сравнения."};
+  let found=[],failed=0;
+  const note=description=>[{id:"us-trade-status",kind:"Статус расчёта",title:"Зеркальная торговля США",description,href:"independent-statistics.html#iv-trade"}];
+  if(cmd.kind==="invalid")found=note("Пример: торговля с США: 2026; месяцев=9. Год от 1993, месяцев от 1 до 12.");
+  else try{
+   await loadScript("iv-trade.js",()=>typeof IVTrade!=="undefined");
+   const d=(await Provenance.get(manifest,"independent-trade.json",base)).data;
+   found=C.partnerTradeEvidence(cmd,d,IVTrade,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённых сопоставимых месяцев или архив не прошёл проверку.");
+  }catch{failed=1;found=note("Архив зеркальной торговли недоступен.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const partner=C.partnerTradeCommand(q.value);if(partner)return findPartnerTrade(partner,parameters);
   const price=C.priceCommand(q.value);if(price)return findPrice(price,parameters);
   const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
   const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
