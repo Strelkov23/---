@@ -148,3 +148,25 @@ A.throws(()=>core.bottleneckEvidence(bc,{...bn,rows:bn.rows.slice(1)},core.horiz
 A.throws(()=>core.bottleneckEvidence(bc,{...bn,baseline:{...bn.baseline,upper:bn.baseline.score+100}},core.horizonHref(bc)));
 A.throws(()=>GP.bottleneck(mm,bc.p,bc.objective,0));
 console.log("16 bottleneck assistant checks passed");
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js");
+const x={title:"Выпуск",period:"2025",value:120,unit:"руб.",url:"https://example.org/",limit:"Паспорт",checked:"2026-01-01",comparison:{period:"2024",value:100,absolute:20,relativePercent:20}};
+A.ok(core.seriesEvidence(x,"fact1").description.includes("относительное изменение 20%"));
+A.ok(core.seriesEvidence({...x,comparison:{...x.comparison,relativePercent:null}},"fact1").description.includes("абсолютное изменение 20"));
+A.ok(!core.seriesEvidence({...x,comparison:{...x.comparison,relativePercent:null}},"fact1").description.includes("относительное изменение"));
+A.ok(core.seriesEvidence({...x,comparison:null},"fact1").description.includes("не подтверждено"));
+A.equal(core.seriesEvidence({...x,value:NaN},"fact1"),null);
+A.equal(core.seriesEvidence({...x,url:"javascript:alert(1)"},"fact1").href,null);
+const row=(period,value,flag="")=>({period,value,flag}),s=(rows,status="ok")=>({rows,status,success:"2026-01-01"}),d={schema:1,unit:"млн евро",source:"https://example.org/",note:"Только товары",series:{MIO_EXP_VAL:s([row("2024",40),row("2025",60,"p"),row("2026",90)]),MIO_IMP_VAL:s([row("2024",60),row("2025",40),row("2026",10)]),MIO_BAL_VAL:s([row("2025",20.1)])}};
+const e=core.tradeEvidence(d,2025);A.equal(e.period,"2025");A.ok(e.description.includes("оборот 100"));A.ok(e.description.includes("в пределах"));A.ok(e.description.includes("предыдущему году 0%"));A.ok(e.limit.includes("p / нет / нет"));
+A.equal(core.tradeEvidence(d,2024).period,"2024");A.ok(core.tradeEvidence(d,2024).description.includes("сальдо источника отсутствует"));
+const change=(key,rows)=>({...d,series:{...d.series,[key]:s(rows)}});
+A.ok(core.tradeEvidence(change("MIO_BAL_VAL",[row("2025",25)]),2025).description.includes("требуется проверка"));
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2023",10)]),2025),null);
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",10),row("2025",20)]),2025),null);
+A.equal(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",-1)]),2025),null);
+A.equal(core.tradeEvidence({...d,unit:"руб."},2025),null);
+A.equal(core.tradeEvidence({...d,source:"javascript:alert(1)"},2025),null);
+A.ok(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",10)]),2025).description.includes("годовой темп не рассчитан"));
+A.equal(core.tradeEvidence({...d,series:{...d.series,MIO_IMP_VAL:{...d.series.MIO_IMP_VAL,success:null}}},2025),null);
+console.log("21 statistical evidence checks passed");}
