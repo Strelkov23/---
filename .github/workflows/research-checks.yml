@@ -34,6 +34,7 @@ jobs:
           node test-data-registry.js
           node test-economic-ai.js
           node test-economic-ai-series.js
+          python3 -m unittest test_economic_ai_memory.py
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js
@@ -51,6 +52,7 @@ jobs:
           python3 test_global_reference.py
           rm -rf public
           python3 build.py
+          python3 -c "import json,economic_ai_memory as a; from pathlib import Path; p=Path('public'); d=json.loads((p/a.FILE).read_text()); print(a.validate(d)); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           node - <<'JS'
           const assert=require('node:assert/strict'),fs=require('node:fs');
           const series=require('./economic-ai-series.js'),registry=require('./data-registry.js');
