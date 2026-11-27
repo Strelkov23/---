@@ -323,6 +323,47 @@ def preserve_bibliography(new,old,checked):
     if carried:new["metadata_carried"]=carried
     return new
 
+def abstract_backfill(db,stamp,budget):
+    """One bounded page per refresh, rotate journals and closed/current years.
+    A filter hit is a candidate, never proof of a license.
+    """
+    db.execute("create table if not exists literature_abstract_progress(issn text primary key,year integer not null,offset integer not null,checked text not null)")
+    today=date.fromisoformat(stamp[:10])
+    progress={r[0]:r[1:] for r in db.execute("select issn,year,offset,checked from literature_abstract_progress")}
+    issn=min(JOURNALS,key=lambda k:(progress.get(k,(0,0,""))[2],k))
+    year,offset,_=progress.get(issn,(today.year,0,""))
+    if not 1991<=year<=today.year or not 0<=offset<=9000:raise ValueError("Invalid abstract cursor")
+    filters=["type:journal-article","has-abstract:true","has-license:true","from-pub-date:"+str(year)+"-01-01","until-pub-date:"+str(min(today,date(year,12,31)))]
+    batch=budget(issn,filters,offset)
+    total=batch.get("total-results");items=batch.get("items")
+    if type(total) is not int or total<0 or not isinstance(items,list) or len(items)>1000 or (not items and offset<total):raise ValueError("Invalid abstract search page")
+    dois=set();updates=[]
+    for item in items:
+        doi=str(item.get("DOI") or "").strip().lower()
+        if not re.fullmatch(r"10\.\d{4,9}/\S+",doi) or doi in dois:raise ValueError("Invalid abstract DOI")
+        dois.add(doi)
+        # Backfill existing catalogue records only; do not silently add an unrelated journal.
+        existing=db.execute("select journal,title from literature where doi=?",(doi,)).fetchone()
+        titles=item.get("title") or []
+        if not existing or existing[0]!=JOURNALS[issn] or not titles or tidy(titles[0])!=existing[1]:continue
+        meta=metadata(item)
+        licensed=economic_abstracts.extract(item,meta["access"],stamp)
+        prior=db.execute("select payload,checked from literature_meta where doi=?",(doi,)).fetchone()
+        # A current returned record can also withdraw a formerly accepted abstract.
+        if not licensed and not (prior and json.loads(prior[0]).get("licensed_abstract")):continue
+        if licensed:meta["licensed_abstract"]=licensed
+        if prior:meta=preserve_bibliography(meta,json.loads(prior[0]),prior[1])
+        updates.append((doi,json.dumps(meta,ensure_ascii=False),stamp))
+    next_offset=offset+len(items)
+    # Offset limit is explicit. Never claim a complete scan of a truncated dense year.
+    if next_offset>=total or next_offset>9000:
+        year=year-1 if year>1991 else today.year
+        next_offset=0
+    with db:
+        db.executemany("insert or replace into literature_meta values(?,?,?)",updates)
+        db.execute("insert or replace into literature_abstract_progress values(?,?,?,?)",(issn,year,next_offset,stamp))
+    return len(updates)
+
 def sync(db, stamp, refresh):
     started=time.monotonic()
     db.execute("create table if not exists literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
@@ -343,6 +384,11 @@ def sync(db, stamp, refresh):
     # Backfill one previously imported journal per refresh; existing DOI records are not erased.
     backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
     budget=resume.Budget(fetch_batch)
+    # Reserve one request for targeted backfill only if a catalogue already exists.
+    # Ordinary journal refresh keeps its established ordering and priority.
+    has_catalogue=bool(db.execute("select 1 from literature limit 1").fetchone())
+    if has_catalogue:budget.limit-=1
+    limited=False
     for position,issn in enumerate(ordered):
         journal=JOURNALS[issn]
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
@@ -395,6 +441,7 @@ def sync(db, stamp, refresh):
                 db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
             break
         except CrossrefRateLimited as err:
+            limited=True
             observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
             deadline=retry_deadline(observed,err.retry_after)
             with db:
@@ -405,6 +452,20 @@ def sync(db, stamp, refresh):
             break
         except Exception as err:
             with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,str(err)[:180]))
+
+    # A 429 anywhere stops all Crossref traffic until the persisted deadline.
+    if has_catalogue and not limited:
+        budget.limit+=1
+        try:
+            if budget.available():abstract_backfill(db,stamp,budget)
+        except CrossrefRateLimited as err:
+            observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
+            deadline=retry_deadline(observed,err.retry_after)
+            with db:
+                db.execute("insert or replace into literature_service values(1,?,?)",(observed,deadline))
+                for pending in ordered:defer_journal(db,pending,deadline)
+        except Exception as err:
+            print("Crossref abstract backfill:",str(err)[:180])
 
 def enrich(db, papers):
     lookup={r[0]:dict(json.loads(r[1]),metadata_checked=r[2]) for r in db.execute("select doi,payload,checked from literature_meta")}

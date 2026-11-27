@@ -47,6 +47,280 @@ const GlobalEconomicAssistant=(function core(){
   const flags=[e.flag,i.flag,b?.flag??null].map(v=>v===null?"нет наблюдения":v||"нет").join(" / ");
   return {id:"eurostat-check",kind:"Расчёт и внутренний контроль Eurostat",title:"Оборот и сальдо торговли товарами ЕС с Россией",description:year+" · экспорт ЕС "+num(e.value)+" · импорт ЕС "+num(i.value)+" · оборот "+num(turnover)+" · сальдо расчётное "+num(balance)+" · сальдо источника "+(b?num(b.value):"нет данных")+" млн евро · "+status+(Number.isFinite(growth)?" · изменение номинального оборота к предыдущему году "+num(growth)+"%":" · годовой темп не рассчитан"),href:d.source,limit:String(d.note||"")+" Расчёт только по общему закрытому году; экспорт и импорт со стороны ЕС. Флаги экспорт / импорт / сальдо: "+flags+". Даты и статусы получения: "+meta.map(r=>r.code+" "+(r.success||"нет данных")+" ("+r.status+")").join("; ")+". Внутренний контроль, не независимое измерение. Номинальная стоимость, не физический объём; разные редакции возможны.",period:year,unit:d.unit};
  }
+ function priceCommand(q){
+  const s=String(q||"").trim();
+  if(!/^покупательная способность\s*:/iu.test(s))return null;
+  const m=s.match(/^покупательная способность\s*:\s*(\d{4}-(?:0[1-9]|1[0-2]))\s*;\s*(месяц|год|с начала года)\s*;\s*(?:зарплата|оплата)\s*=\s*([+-]?\d{1,3}(?:[.,]\d{1,2})?)\s*%?$/iu);
+  if(!m)return {kind:"invalid"};
+  const wage=Number(m[3].replace(",","."));
+  if(wage< -50||wage>100||Number(m[1].slice(0,4))<1991)return {kind:"invalid"};
+  return {kind:"price-power",period:m[1],basis:{"месяц":"mom","год":"yoy","с начала года":"ytd"}[m[2].toLowerCase()],wage};
+ }
+ function priceEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="price-power"||!["mom","yoy","ytd"].includes(cmd.basis)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cmd.period)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||cmd.period>=cutoff||d?.schema!=="iv-prices-v1"||!Array.isArray(d.rows)||!external(d.official_source))return [];
+  const matches=d.rows.filter(r=>r.period===cmd.period);
+  if(matches.length!==1||!external(matches[0].url))return [];
+  const [p]=IV.gaps(matches,cmd.basis,0),x=IV.purchasingPower(p,cmd.wage);
+  if(!x||!Object.values(x).every(Number.isFinite))return [];
+  const num=v=>Number(v.toFixed(4)).toLocaleString("ru-RU",{maximumFractionDigits:4});
+  const basis={mom:"к предыдущему месяцу",yoy:"к тому же месяцу прошлого года",ytd:"к декабрю прошлого года"}[cmd.basis];
+  const note="Различные корзины и методы: ИПЦ товаров и услуг и панель покупок FMCG. Не оценка ошибки Росстата, не фактическая реальная зарплата. Номинальный рост задан пользователем за тот же период. Архивная сверка: "+(d.checked||"дата не указана")+".";
+  return [
+   {id:"price-official",kind:"Архивное наблюдение",title:"Росстат · ИПЦ (републикация)",description:cmd.period+" · "+basis+" · "+num(p.b)+"%",value:p.b,unit:"%",period:cmd.period,href:d.official_source,limit:note},
+   {id:"price-panel",kind:"Архивное наблюдение",title:"РОМИР · дефлятор FMCG",description:cmd.period+" · "+basis+" · "+num(p.a)+"%",value:p.a,unit:"%",period:cmd.period,href:p.source,limit:note},
+   {id:"price-scenario",kind:"Условный расчёт",title:"Покупательная способность при заданном изменении оплаты",description:cmd.period+" · "+basis+" · номинальная оплата "+num(cmd.wage)+"% · по ИПЦ "+num(x.official)+"% · по FMCG "+num(x.panel)+"% · разность сценариев "+num(x.delta)+" п.п. · безубыточный рост оплаты по ИПЦ "+num(x.breakEvenOfficial)+"%, по FMCG "+num(x.breakEvenPanel)+"%",href:"independent-statistics.html#iv-price-comparison",limit:note+" Формула: 100 × ((1 + рост оплаты/100)/(1 + темп цен/100) − 1)."}
+  ];
+ }
+ function partnerTradeCommand(q){
+  const s=String(q||"").trim();
+  if(!/^торговля с сша\s*:/iu.test(s))return null;
+  const m=s.match(/^торговля с сша\s*:\s*(\d{4})\s*;\s*месяцев\s*=\s*(\d{1,2})$/iu);
+  if(!m||Number(m[1])<1993||Number(m[1])>2100||Number(m[2])<1||Number(m[2])>12)return {kind:"invalid"};
+  return {kind:"partner-trade",year:Number(m[1]),months:Number(m[2])};
+ }
+ function partnerTradeEvidence(cmd,d,IV,cutoff){
+  const source="https://www.census.gov/foreign-trade/balance/c4621.html";
+  if(cmd?.kind!=="partner-trade"||!Number.isInteger(cmd.year)||cmd.year<1993||cmd.year>2100||!Number.isInteger(cmd.months)||cmd.months<1||cmd.months>12||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||d?.schema!=="iv-trade-v1"||d.source!==source||d.origin!=="partner_customs"||d.unit!=="млн долл. США, текущие цены, без сезонной корректировки"||!Array.isArray(d.rows))return [];
+  const machine=["downloaded","cached","cached_after_error"].includes(d.status);
+  if(machine?(!/^[a-f0-9]{64}$/.test(d.source_sha256||"")||!Number.isFinite(Date.parse(d.last_success||""))):(!["manual_seed","seed_after_error"].includes(d.status)||d.seed_verification!=="documented_manual"||!/^\d{4}-\d{2}-\d{2}$/.test(d.seed_recheck_date||"")))return [];
+  const seen=new Set(),rows=[];
+  for(const r of d.rows){
+   if(!/^(?:19[9][2-9]|20\d\d)-(0[1-9]|1[0-2])$/.test(r.period)||seen.has(r.period)||![r.us_exports,r.us_imports].every(v=>Number.isFinite(v)&&v>=0))return [];
+   seen.add(r.period);if(r.period<cutoff)rows.push(r);
+  }
+  const v=IV.compare(rows,cmd.year,cmd.months);
+  if(!v.months.length||v.values.some(r=>!Number.isFinite(r.now)||!Number.isFinite(r.before)))return [];
+  const months=v.months.slice().sort(),missing=Array.from({length:cmd.months},(_,i)=>String(i+1).padStart(2,"0")).filter(m=>!months.includes(m));
+  const num=x=>Number(x.toFixed(4)).toLocaleString("ru-RU",{maximumFractionDigits:4});
+  const scope=cmd.year+" и "+(cmd.year-1)+" · совпадающие месяцы "+months.join(", ")+" · "+months.length+" из "+cmd.months+(missing.length?" · НЕПОЛНЫЙ ПЕРИОД; отсутствуют пары: "+missing.join(", "):"");
+  const limit=String(d.limitations||"")+" Номинальная стоимость в млн долл. США, без сезонной корректировки. Только товары США—Россия, направления со стороны США. "+(machine?"Машинный импорт: "+d.last_success:"Документированная ручная сверка: "+d.seed_recheck_date)+". Статус "+d.status+". "+(d.error?"Последняя загрузка не удалась. ":"")+"Прямое сравнение с Eurostat без согласования валют, территорий и методик недопустимо.";
+  const out=v.values.map((r,i)=>({id:"us-trade"+(i+1),kind:"Зеркальная статистика США",title:i?"Импорт США из России":"Экспорт США в Россию",description:scope+" · текущий набор "+num(r.now)+" · предыдущий "+num(r.before)+" млн долл. США · "+(Number.isFinite(r.change)?"изменение "+num(r.change)+"%":"темп не рассчитан"),href:source,limit}));
+  const [e,i]=v.values,total=e.now+i.now,previous=e.before+i.before,change=previous>0?100*(total/previous-1):null;
+  if(!Number.isFinite(total)||!Number.isFinite(previous))return [];
+  out.push({id:"us-trade-balance",kind:"Расчёт по сопоставимым месяцам",title:"Оборот и сальдо торговли со стороны США",description:scope+" · оборот "+num(total)+" · предыдущий оборот "+num(previous)+" · сальдо "+num(e.now-i.now)+" млн долл. США"+(Number.isFinite(change)?" · изменение оборота "+num(change)+"%":""),href:source,limit:limit+" Сальдо = экспорт США минус импорт США; не российское сальдо."});
+  return out;
+ }
+ function labourCommand(q){
+  const s=String(q||"").trim();if(!/^рынок труда\s*:/iu.test(s))return null;
+  const m=s.match(/^рынок труда\s*:\s*(\d{4})-(0[1-9]|1[0-2])\s*;\s*база\s*=\s*(\d{4})$/iu);
+  if(!m||Number(m[1])<1991||Number(m[3])<1991)return {kind:"invalid"};
+  return {kind:"labour",year:m[1],month:m[2],base:m[3]};
+ }
+ function labourEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="labour"||d?.schema!=="iv-labour-v1"||d.origin!=="platform_primary"||d.status!=="manual_verified_labels"||!Array.isArray(d.rows)||!Array.isArray(d.snapshots)||!Array.isArray(d.verification?.documents)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff))return [];
+  const period=cmd.year+"-"+cmd.month,base=cmd.base+"-"+cmd.month;
+  if(period>=cutoff||base>=cutoff)return [];
+  const trusted=(r,page)=>{const src=d.sources?.[r.source];return !!(src&&external(src.url)&&Number.isInteger(page)&&page>0&&d.verification.documents.some(x=>x.source===r.source&&x.page===page))};
+  const get=p=>{const rows=d.rows.filter(r=>r.period===p);if(rows.length!==1)return null;const r=rows[0];return Number.isFinite(r.value)&&r.value>=0&&trusted(r,d.sources?.[r.source]?.page)?r:null};
+  const a=get(period),b=get(base);if(!a||!b)return [];
+  const result=IV.relative([a,...(period===base?[]:[b])],cmd.month,cmd.year,cmd.base);
+  const fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Отношение активных резюме к активным вакансиям на одной платформе. Не безработица и не число уникальных людей. Ручная сверка: "+(d.verification.date||"дата не указана")+". "+(d.verification.limitations||"");
+  const out=[a,b].map((r,i)=>({id:"hh-index"+(i+1),kind:"Платформенная статистика",title:i?"Базовый hh.индекс":"hh.индекс",description:r.period+" · "+fmt(r.value)+" резюме на вакансию · "+IV.classify(r.value)+" · стр. "+d.sources[r.source].page,period:r.period,value:r.value,unit:"резюме/вакансия",href:d.sources[r.source].url,limit:note}));
+  out.push({id:"hh-compare",kind:"Сопоставление на одной платформе",title:"Изменение конкуренции за вакансии",description:period+" и "+base+" · индекс (база=100): "+fmt(result.index)+" · разность отношений "+fmt(result.difference),href:"independent-statistics.html#iv-hh",limit:note+" Сопоставлены одинаковые календарные месяцы."});
+  const snapshots=d.snapshots.filter(r=>r.period===period);
+  if(snapshots.length===1){const s=snapshots[0];if(trusted(s,s.page)&&[s.vacancies_yoy,s.resumes_yoy,s.offered_salary].every(Number.isFinite)&&s.offered_salary>=0&&s.vacancies_yoy>-100&&s.resumes_yoy>=-100){
+   out.push({id:"hh-snapshot",kind:"Платформенная статистика",title:"Вакансии, резюме и предлагаемая оплата",description:period+" · вакансии год к году "+fmt(s.vacancies_yoy)+"% · резюме "+fmt(s.resumes_yoy)+"% · медиана предложения "+fmt(s.offered_salary)+" руб. · индекс отношения из темпов "+fmt(IV.balance(s.vacancies_yoy,s.resumes_yoy))+" (прошлый год=100) · стр. "+s.page,href:d.sources[s.source].url,limit:note+" Темпы округлены; предлагаемая оплата не фактическая зарплата."});
+  }}
+  return out;
+ }
+ function outputCommand(q){
+  const s=String(q||"").trim();if(!/^физический выпуск\s*:/iu.test(s))return null;
+  const m=s.match(/^физический выпуск\s*:\s*([a-z0-9_-]{1,60})\s*;\s*([a-z0-9_-]{1,60})\s*;\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})$/iu);
+  return m?{kind:"physical-output",company:m[1].toLowerCase(),metric:m[2].toLowerCase(),year:Number(m[3]),base:Number(m[4])}:{kind:"invalid"};
+ }
+ function outputEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="physical-output"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  IV.validate(d);const c=d.companies.find(c=>c.id===cmd.company),m=c?.metrics.find(m=>m.id===cmd.metric);if(!c||!m)return [];
+  const get=y=>{const r=c.rows.find(r=>r.year===y);return r&&(c.verification==="source_rechecked"||r.verification==="source_rechecked")&&/^\d{4}-\d{2}-\d{2}$/.test(c.verification_date||"")&&c.verification_date.slice(0,7)<=cutoff&&external(r.source||c.source)&&Number.isFinite(r[m.id])&&r[m.id]>=0?r:null};
+  const a=get(cmd.year),b=get(cmd.base),p=get(cmd.year-1);if(!a||!b)return [];
+  const v=IV.compare(c,m.id,cmd.year,cmd.base),fmt=x=>Number.isFinite(x)?Number(x.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note=c.scope+". "+(c.verification_method||"")+" Сверка "+c.verification_date+". Корпоративное раскрытие, не национальный выпуск и не независимый аудит.";
+  const out=[a,b].map((r,i)=>({id:"physical-observation"+(i+1),kind:"Корпоративное наблюдение",title:c.title+" · "+m.title,description:r.year+" · "+fmt(r[m.id])+" "+m.unit+" · "+(r.reference||c.page||"ссылка на отчёт"),period:String(r.year),value:r[m.id],unit:m.unit,href:r.source||c.source,limit:note}));
+  out.push({id:"physical-change",kind:"Расчёт динамики выпуска",title:c.title+" · индекс физического выпуска",description:cmd.year+" к "+cmd.base+" · индекс (база=100): "+fmt(v.index)+" · изменение "+fmt(v.index===null?null:v.index-100)+"% · годовой темп "+fmt(p?v.yoy:null)+(p&&v.yoy!==null?"%":""),href:"independent-statistics.html",limit:note+" Годовой темп только при сверенном наблюдении предыдущего года."});
+  if(p&&v.yoy!==null&&p.year!==b.year&&p.year!==a.year)out.push({id:"physical-prior",kind:"Корпоративное наблюдение",title:c.title+" · предыдущий год",description:p.year+" · "+fmt(p[m.id])+" "+m.unit+" · "+(p.reference||c.page||"ссылка на отчёт"),period:String(p.year),value:p[m.id],unit:m.unit,href:p.source||c.source,limit:note});
+  return out;
+ }
+ function compositeCommand(q){
+  const s=String(q||"").trim();if(!/^индекс выпуска\s*:/iu.test(s))return null;
+  const m=s.match(/^индекс выпуска\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})\s*;\s*веса\s*=\s*(\d{1,3}(?:\s*,\s*\d{1,3}){4})$/iu);
+  if(!m)return {kind:"invalid"};
+  const year=Number(m[1]),base=Number(m[2]),weights=m[3].split(",").map(Number);
+  if(Math.min(year,base)<1991||Math.max(year,base)>2100||weights.some(w=>w>100)||!weights.some(w=>w>0))return {kind:"invalid"};
+  return {kind:"physical-composite",year,base,weights};
+ }
+ function compositeEvidence(cmd,d,IV,P,cutoff){
+  if(cmd?.kind!=="physical-composite"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  IV.validate(d);
+  const x=P.calculate(d,cmd.year,cmd.base,cmd.weights,false),fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Пользовательские веса нормируются на их сумму, не являются долями экономики. Индекс = сумма взвешенных отношений физических объёмов к базовому году × 100. Корпоративная выборка, не ВВП, не индекс промышленного производства России. Не суммируются тонны и кВт·ч.";
+  const out=[],bad=[];
+  for(const [i,[id,key,title]] of P.specs.entries()){
+   if(!(cmd.weights[i]>0))continue;
+   const c=d.companies.find(c=>c.id===id),m=c?.metrics.find(m=>m.id===key);
+   const get=y=>{const r=c?.rows.find(r=>r.year===y);return r&&m&&(c.verification==="source_rechecked"||c.verification==="partial"&&r.verification==="source_rechecked")&&/^\d{4}-\d{2}-\d{2}$/.test(c.verification_date||"")&&c.verification_date.slice(0,7)<=cutoff&&external(r.source||c.source)&&Number.isFinite(r[key])&&r[key]>=0?r:null};
+   const a=get(cmd.year),b=get(cmd.base),item=x.items[i];
+   if(!a||!b||!(b[key]>0)||!Number.isFinite(item.index)||!item.verified){bad.push(title);continue;}
+   const sourceNote=c.scope+". Сверка "+c.verification_date+". "+(c.verification_method||"");
+   for(const [j,r] of [a,b].entries())out.push({id:"composite-"+(i+1)+"-"+(j+1),kind:"Корпоративное наблюдение",title:title,description:r.year+" · "+fmt(r[key])+" "+m.unit+" · "+(r.reference||c.page||"ссылка на отчёт"),period:String(r.year),value:r[key],unit:m.unit,href:r.source||c.source,limit:sourceNote});
+   out.push({id:"composite-component"+(i+1),kind:"Компонент индекса",title,description:"Вес "+fmt(item.weight*100)+"% · индекс "+fmt(item.index)+" · вклад в изменение "+fmt(item.contribution)+" п.п.",href:"independent-statistics.html#physical-index-weights",limit:note});
+  }
+  if(bad.length||!x.complete||!Number.isFinite(x.index))return [{id:"composite-blocked",kind:"Статус расчёта",title:"Составной индекс не рассчитан",description:"Не подтверждены все компоненты с положительным весом: "+(bad.join("; ")||"нет полной пары наблюдений")+". Веса не перераспределены.",href:"independent-statistics.html#physical-index-weights",limit:note},...out];
+  const s=P.sensitivity(x);
+  out.unshift({id:"composite-result",kind:"Расчёт индекса",title:"Составной индекс физического выпуска",description:cmd.year+" к "+cmd.base+" · индекс (база=100): "+fmt(x.index)+" · изменение "+fmt(x.index-100)+"% · покрытие "+fmt(x.coverage*100)+"% заданных весов · диапазон компонентов "+fmt(x.min)+" — "+fmt(x.max)+(s?.trials.length?" · при исключении по одному компоненту: "+fmt(s.min)+" — "+fmt(s.max):" · для проверки чувствительности нужен второй компонент"),href:"independent-statistics.html#physical-index-weights",limit:note+" Диапазон чувствительности к составу не доверительный интервал."});
+  return out;
+ }
+ function energyCommand(q){
+  const s=String(q||"").trim();if(!/^структура энергетики\s*:/iu.test(s))return null;
+  const m=s.match(/^структура энергетики\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})(?:\s*;\s*порог\s*=\s*(\d{1,3}(?:[.,]\d{1,2})?))?$/iu);
+  if(!m)return {kind:"invalid"};
+  const year=Number(m[1]),base=Number(m[2]),threshold=m[3]?Number(m[3].replace(",",".")):5;
+  if(Math.min(year,base)<1992||Math.max(year,base)>2100||threshold>100)return {kind:"invalid"};
+  return {kind:"energy-structure",year,base,threshold};
+ }
+ function energyEvidence(cmd,d,S,E,cutoff){
+  if(cmd?.kind!=="energy-structure"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!Number.isFinite(cmd.threshold)||cmd.threshold<0||cmd.threshold>100||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  if(d?.schema!=="iv-ember-v1"||d.origin!=="external_compilation"||d.unit!=="TWh"||!external(d.source)||!external(d.documentation)||!Number.isFinite(Date.parse(d.success||""))||d.success.slice(0,7)>cutoff||! /^[a-f0-9]{64}$/.test(d.sha256||"")||!Array.isArray(d.rows))return [];
+  const seen=new Set();for(const r of d.rows){if(!Number.isInteger(r.year)||seen.has(r.year)||!r.values||typeof r.values!=="object"||Object.values(r.values).some(v=>v!==null&&(!Number.isFinite(v)||v<0)))return [];seen.add(r.year);}
+  if(!seen.has(cmd.year)||!seen.has(cmd.base))return [];
+  const x=S.compare(d.rows,cmd.year,cmd.base,cmd.threshold),fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Ember: внешняя компиляция, может включать официальную российскую статистику. Не независимый аудит. Территория — Россия, единица ТВт·ч; годовая выработка, не установленная мощность и не потребление. Последний успешный импорт "+d.success+(d.error?" (последняя загрузка не удалась)":"")+".";
+  const out=[];
+  for(const [i,y] of [cmd.year,cmd.base].entries()){
+   const p=i?x.b:x.a;
+   out.push({id:"energy-year"+(i+1),kind:"Внешняя компиляция Ember",title:"Выработка и полнота структуры",description:y+" · общая выработка "+fmt(p.total)+" ТВт·ч · известные компоненты "+fmt(p.coverage)+"% · остаток "+fmt(p.residual)+" ТВт·ч · пропуски: "+(p.missing.map(k=>E.labels[k]||k).join(", ")||"нет")+" · баланс "+(p.consistent?"в пределах допуска":"не подтверждён"),href:d.source,limit:note});
+  }
+  out.push({id:"energy-shift",kind:"Структурная диагностика",title:"Изменение структуры электроэнергетики",description:cmd.year+" к "+cmd.base+" · изменение общей выработки "+fmt(x.totalChange)+"% · доля ископаемого топлива "+fmt(x.a.fossil)+"% · доля ВИЭ "+fmt(x.a.renewables)+"% · HHI "+fmt(x.a.hhi)+" · общий структурный сдвиг "+fmt(x.shift)+" п.п. · сопоставимых категорий "+x.common+" из "+S.types.length+" · выше или равно порогу "+cmd.threshold+" п.п.: "+x.flagged,href:"independent-statistics.html#energy-structure",limit:note+" HHI и полный сдвиг требуют полной структуры; пропуски не нули. Порог описательный, не статистическая значимость. Изменение выработки не равно изменению доступных мощностей."});
+  for(const r of x.items)if(r.delta!==null)out.push({id:"energy-"+r.key,kind:"Доля источника генерации",title:E.labels[r.key]||r.key,description:cmd.base+": "+fmt(r.previous)+"% · "+cmd.year+": "+fmt(r.current)+"% · изменение "+fmt(r.delta)+" п.п."+(r.flag?" · достигнут порог":""),href:d.source,limit:note});
+  out.push({id:"energy-planning",kind:"Маршрут планирования",title:"Проверка энергетических ограничений",description:"Сопоставить физические показатели с балансом электроэнергии и отдельно проверить мощности, коэффициенты использования, потребление и отраслевые ограничения. Не переносить доли генерации автоматически в межотраслевую матрицу.",href:"scenario.html#resource-plan",limit:"Маршрут исследования, не рассчитанный план. Нужны данные о мощностях и технологических коэффициентах."});
+  return out;
+ }
+ function productivityCommand(q){
+ const s=String(q||"").trim();if(!/^производительность труда\s*:/iu.test(s))return null;
+ const m=s.match(/^производительность труда\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})$/iu);
+ if(!m||Number(m[2])<1991||Number(m[1])<=Number(m[2])||Number(m[1])>2100)return {kind:"invalid"};
+ return {kind:"productivity-decomposition",year:Number(m[1]),base:Number(m[2])};
+ }
+ function productivityEvidence(cmd,d,L,cutoff){
+ if(cmd?.kind!=="productivity-decomposition"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||cmd.base<1991||cmd.base>=cmd.year||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||cmd.year>=Number(cutoff.slice(0,4))||!Array.isArray(d?.broad)||!Number.isFinite(Date.parse(d.built||"")))return [];
+ const codes={agriculture:["NV.AGR.EMPL.KD","SL.AGR.EMPL.ZS"],industry:["NV.IND.EMPL.KD","SL.IND.EMPL.ZS"],services:["NV.SRV.EMPL.KD","SL.SRV.EMPL.ZS"]};
+ const selected=d.broad.filter(r=>[cmd.year,cmd.base].includes(r.year)&&Object.hasOwn(codes,r.sector));
+ const src=(url,code)=>typeof url==="string"&&url.split("?")[0]==="https://api.worldbank.org/v2/country/RUS/indicator/"+code&&!/[\s#]/.test(url);
+ if(selected.length!==6||selected.some(r=>!src(r.productivity_source,codes[r.sector][0])||!src(r.employment_source,codes[r.sector][1])||![r.productivity_checked,r.employment_checked].every(t=>typeof t==="string"&&Number.isFinite(Date.parse(t))&&t.slice(0,7)<=cutoff)))return [];
+ const x=L.decompose(selected,cmd.base,cmd.year);if(!x.valid||!x.parts.every(r=>[r.within,r.between,r.first.productivity,r.last.productivity].every(Number.isFinite)))return [];
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:2}):"нет расчёта";
+ const note="Условный индекс ВДС на занятого по трём укрупнённым секторам WDI, доллары США 2015 года; не официальный ВВП на занятого и не производительность валового выпуска. Симметричное разложение, нормированные доли занятости. Структурный компонент не устанавливает причинность.";
+ const href="labor.html#labor-decomposition";
+ const out=[{id:"prod-decomposition",kind:"Расчёт WDI",title:"Изменение производительности и структуры занятости",description:cmd.base+" → "+cmd.year+" · индекс "+f(x.a.index)+" → "+f(x.b.index)+" долл. 2015 на занятого · изменение "+f(x.actual)+" · внутри секторов "+f(x.within)+" · структура занятости "+f(x.between)+" · невязка "+f(x.residual)+" · исходные суммы долей "+f(x.a.sum)+" / "+f(x.b.sum)+"%",href,limit:note}];
+ for(const [i,r] of x.parts.entries()){
+  const id="prod-sector"+(i+1),a=r.first,b=r.last;
+  out.push({id,kind:"Вклад сектора",title:r.title,description:"ВДС на занятого "+f(a.productivity)+" → "+f(b.productivity)+" долл. 2015 · внутрисекторный вклад "+f(r.within)+" · структурный "+f(r.between),href:a.productivity_source,limit:note+" Проверки "+a.productivity_checked+" / "+b.productivity_checked+"."});
+  out.push({id:id+"-employment",kind:"Доля занятости WDI",title:r.title+" · занятость",description:cmd.base+": "+f(a.employment_share_pct)+"% · "+cmd.year+": "+f(b.employment_share_pct)+"%",href:a.employment_source,limit:note+" Проверки "+a.employment_checked+" / "+b.employment_checked+"."});
+ }
+ out.push({id:"prod-calibration-gate",kind:"Методологический контроль",title:"Калибровка трудоёмкости МРБ",description:"Автоматическая подстановка этих рядов в 19 групп МРБ заблокирована: ВДС не валовой выпуск, доллары 2015 не рубли 2021, занятые не годовые FTE, три сектора не продуктовые группы. Требуются распределённые FTE по продуктам 2021 и документированные источники. Доступен шаблон калибровки.",href:"labor.html#labor-calibration",limit:"Диагностика пригодности данного набора, не утверждение об отсутствии иных источников."});
+ return out;
+ }
+ function technologyCommand(q){
+ const s=String(q||"").trim();if(!/^технология\s*:/iu.test(s))return null;
+ const m=s.match(/^технология\s*:\s*(все|[1-9]|1[0-9])\s*;\s*материалы\s*=\s*(-?\d{1,2}(?:[.,]\d)?)\s*;\s*импорт\s*=\s*(-?\d{1,2}(?:[.,]\d)?)\s*;\s*спрос\s*=\s*(\d{1,2}(?:[.,]\d)?)$/iu);
+ if(!m)return {kind:"invalid"};
+ const [material,imported,demand]=m.slice(2).map(v=>Number(v.replace(",",".")));
+ if(material< -20||material>80||imported< -20||imported>80||demand<0||demand>20)return {kind:"invalid"};
+ return {kind:"technology",group:m[1].toLowerCase()==="все"?-1:Number(m[1])-1,material,imported,demand};
+ }
+ function technologyEvidence(cmd,m,T,V){
+ if(cmd?.kind!=="technology"||m?.year!==2021||m.compatible!==true||m.names?.length!==19||!external(m.source)||!Number.isInteger(cmd.group)||cmd.group< -1||cmd.group>=19||![cmd.material,cmd.imported,cmd.demand].every(Number.isFinite))return [];
+ const p=V.params(19,cmd.group,cmd.material,cmd.imported,cmd.demand),r=V.compare(m,p),a=r.base,b=r.changed;
+ const valid=x=>[x.totalOutput,x.totalDomestic,x.totalImports,x.demand,x.residual].every(v=>Number.isFinite(v)&&v>=0)&&x.residual<=1e-7*Math.max(1,...x.output)&&x.totalLabor===null;
+ if(!valid(a)||!valid(b)||Math.abs(a.demand-b.demand)>1e-7*Math.max(1,a.demand)||r.rows.length!==19||r.rows.some(x=>![x.base,x.changed,x.delta,x.importBase,x.importChanged,x.costIndex].every(Number.isFinite)))throw Error("Technology balance unverified");
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="МРБ 2021, фиксированная стоимостная оценка. Пользователь меняет коэффициенты отечественных и импортных промежуточных затрат, а не физическую технологию по измеренным нормам. Одинаковый дополнительный конечный спрос в обоих вариантах. Труд, капитальные затраты внедрения, мощности и эффект на рыночные цены не рассчитаны. Не прогноз ВВП.";
+ const href="scenario.html#technology";
+ const out=[{id:"tech-params",kind:"Условные допущения",title:"Изменение технологии",description:"Группа: "+(cmd.group<0?"все 19":m.names[cmd.group])+" · экономия отечественных затрат "+f(cmd.material)+"% · импортных "+f(cmd.imported)+"% · дополнительный спрос "+f(cmd.demand)+"% базового · общий спрос "+f(a.demand)+" млрд руб.",href:m.source,limit:note},
+ {id:"tech-result",kind:"Проверенный условный расчёт",title:"Ресурсный эффект технологии",description:"Валовой выпуск "+f(a.totalOutput)+" → "+f(b.totalOutput)+" · изменение "+f(r.delta.output)+" · отечественные промежуточные затраты "+f(a.totalDomestic)+" → "+f(b.totalDomestic)+" · изменение "+f(r.delta.domestic)+" · промежуточный импорт "+f(a.totalImports)+" → "+f(b.totalImports)+" · изменение "+f(r.delta.imports)+" млрд руб. · индекс затрат корзины "+f(a.basket)+" → "+f(b.basket)+" · невязки "+a.residual.toExponential(2)+" / "+b.residual.toExponential(2),href,limit:note+" Меньший валовой выпуск при том же спросе может означать экономию промежуточных ресурсов."}];
+ for(const [i,x] of r.rows.entries())out.push({id:"tech-sector"+(i+1),kind:"Продуктовая группа",title:x.name,description:"Выпуск "+f(x.base)+" → "+f(x.changed)+" · изменение "+f(x.delta)+" · импорт "+f(x.importBase)+" → "+f(x.importChanged)+" млрд руб. · условный индекс затрат "+f(x.costIndex),href,limit:note});
+ return out;
+ }
+ function forecastAuditCommand(q){
+ const s=String(q||"").trim();if(!/^точность прогноза\s*:/iu.test(s))return null;
+ const m=s.match(/^точность прогноза\s*:\s*([a-z0-9._-]{1,100})\s*;\s*горизонт\s*=\s*([1-9][0-9]?)$/iu);
+ return m?{kind:"forecast-audit",code:m[1].toUpperCase(),horizon:Number(m[2])}:{kind:"invalid"};
+ }
+ function forecastAuditEvidence(cmd,d,m,t,v){
+ if(cmd?.kind!=="forecast-audit"||!Array.isArray(d?.series)||![m,t,v].every(x=>x?.schema===1)||!Array.isArray(m.rows)||!Array.isArray(t.rows)||!Array.isArray(v.trials))return [];
+ const series=d.series.filter(s=>s.code===cmd.code);
+ if(series.length!==1)return [];
+ const s=series[0],rs=s.results?.filter(r=>r.horizon===cmd.horizon);
+ if(!external(s.source)||!s.unit||!rs||rs.length!==1)return [];
+ const r=rs[0],f=x=>Number.isFinite(x)?x.toLocaleString("ru-RU",{maximumFractionDigits:4}):"нет расчёта",methods=Object.keys(r.holdout||{}),selected=r.selected;
+ if(!methods.includes("last")||!methods.includes(selected)||!methods.every(k=>Object.hasOwn(r.development||{},k)))return [];
+ const key=x=>[x.origin,x.target].join("|"),period=p=>typeof p==="string"&&/^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/.test(p);
+ const verify=(folds,stats)=>{
+  if(!Array.isArray(folds)||!folds.length||stats?.n!==folds.length||new Set(folds.map(key)).size!==folds.length||folds.some(x=>!period(x.origin)||!period(x.target)||x.origin>=x.target||![x.prediction,x.actual,x.error].every(Number.isFinite)||Math.abs(x.error-(x.prediction-x.actual))>1e-8*Math.max(1,Math.abs(x.error))))throw Error("Invalid folds");
+  const mae=folds.reduce((a,x)=>a+Math.abs(x.prediction-x.actual),0)/folds.length;
+  if(!Number.isFinite(stats.mae)||Math.abs(mae-stats.mae)>1e-8*Math.max(1,mae))throw Error("Invalid MAE");
+  return mae;
+ };
+ const early=r.development_folds?.last,late=r.holdout_folds?.last;
+ if(!Array.isArray(early)||!Array.isArray(late)||!period(r.selection_cutoff)||early.some(x=>x.target>r.selection_cutoff)||late.some(x=>x.target<=r.selection_cutoff))return [];
+ for(const k of methods)for(const [folds,reference,stats] of [[r.development_folds?.[k],early,r.development[k]],[r.holdout_folds?.[k],late,r.holdout[k]]]){
+  verify(folds,stats);
+  if(folds.length!==reference.length||folds.some((x,i)=>key(x)!==key(reference[i])||x.actual!==reference[i].actual))throw Error("Unpaired folds");
+ }
+ const note="Ретроспективная проверка на последних редакциях исторических данных, не архив реального информационного набора на дату прогноза. Метод выбран на ранней выборке; поздняя выборка не используется для смены метода. MAE в исходных единицах; не сравнивать разные показатели и горизонты.";
+ const href="forecast.html",out=[{id:"forecast-backtest",kind:"Историческая проверка",title:s.title+" · горизонт "+cmd.horizon,description:"Метод "+(d.methods?.[selected]||selected)+" · ранних проверок "+r.development[selected].n+" · поздних "+r.holdout[selected].n+" · MAE "+f(r.holdout[selected].mae)+" против "+f(r.holdout.last.mae)+" у последнего значения · единица "+s.unit,href:s.source,limit:note}];
+ for(const [i,k] of methods.entries())out.push({id:"forecast-method"+(i+1),kind:"Сравнение методов",title:d.methods?.[k]||k,description:"Ранняя MAE "+f(r.development[k].mae)+" · поздняя MAE "+f(r.holdout[k].mae)+" "+s.unit+(k===selected?" · выбран заранее":""),href,limit:note});
+ const match=x=>x.code===s.code&&x.source===s.source&&x.unit===s.unit&&x.horizon===cmd.horizon;
+ const rows=m.rows.filter(match),trows=t.rows.filter(match),trials=v.trials.filter(match);
+ const validateLedger=(rows,actual,seen)=>{
+  const ids=new Set();
+  for(const x of rows){const id=key(x);if(ids.has(id)||!period(x.origin)||!period(x.target)||x.origin>=x.target||!Number.isFinite(Date.parse(x.issued))||x.issued.slice(0,x.target.length)>=x.target)throw Error("Invalid frozen record");ids.add(id);
+   if(x[actual]===null?x[seen]!==null:(!Number.isFinite(x[actual])||!Number.isFinite(Date.parse(x[seen]))||x[seen].slice(0,x.target.length)<x.target||Date.parse(x[seen])<Date.parse(x.issued)))throw Error("Invalid observed fact");}
+ };
+ validateLedger(rows,"first_actual","first_seen");validateLedger(trows,"actual","seen");
+ const scored=rows.filter(x=>x.first_actual!==null);
+ if(rows.some(x=>![x.point,x.naive,x.low,x.high].every(Number.isFinite)||x.low>x.point||x.point>x.high))throw Error("Invalid point forecast");
+ const mae=k=>scored.length?scored.reduce((a,x)=>a+Math.abs(x[k]-x.first_actual),0)/scored.length:null;
+ out.push({id:"forecast-prospective",kind:"Перспективный журнал",title:"Реальная проверка после публикации",description:"Зафиксировано "+rows.length+" · фактов "+scored.length+" · ожидают "+(rows.length-scored.length)+" · MAE "+f(mae("point"))+" · базовая MAE "+f(mae("naive"))+" · турнир: "+trows.filter(x=>x.actual!==null).length+" из "+trows.length+" оценено · испытаний кандидатов "+trials.length,href,limit:"Первый факт в архиве, не пересмотренная редакция; прогнозы записаны до начала периода. "+(scored.length<10?"Недостаточно завершённых наблюдений для вывода о превосходстве метода.":"Описательная диагностика; не гарантия будущей точности.")});
+ return out;
+ }
+ function agentCommand(q){
+ const s=String(q||"").trim();if(!/^координация агентов\s*:/iu.test(s))return null;
+ const m=s.match(/^координация агентов\s*:\s*(все|приоритеты)$/iu);
+ return m?{kind:"agent-coordination",mode:m[1].toLowerCase()==="все"?"all":"priorities"}:{kind:"invalid"};
+ }
+ function agentEvidence(cmd,d){
+ const ids=["coverage","discovery","quality","research","forecast","search","diagnostics","planning"];
+ if(cmd?.kind!=="agent-coordination"||!["all","priorities"].includes(cmd.mode)||d?.schema!==1||!["scheduled_refresh","offline_build"].includes(d.mode)||!Number.isFinite(Date.parse(d.built||""))||!Array.isArray(d.agents)||d.agents.length!==ids.length||new Set(d.agents.map(a=>a.id)).size!==ids.length||d.agents.some(a=>!ids.includes(a.id)||!["ok","waiting","attention"].includes(a.state)||!a.metrics||!Array.isArray(a.items)))return [];
+ const map=Object.fromEntries(d.agents.map(a=>[a.id,a])),n=x=>Number.isSafeInteger(x)&&x>=0;
+ const q=map.quality.metrics,c=map.coverage.metrics,f=map.forecast.metrics,s=map.search.metrics,p=map.planning.metrics,g=map.diagnostics.metrics,w=map.discovery.metrics;
+ const vals=[q.backlog,q.recent_rejected,c.series_with_values,f.frozen,f.scored,f.adequate_sample_groups,s.abstracts?.indexed,s.abstracts?.catalogue,p.counts?.investigate,p.counts?.refresh_first,p.counts?.data_required,p.counts?.history_required,p.counts?.monitor,g.counts?.signal,w.candidates,w.available];
+ if(!vals.every(n)||f.scored>f.frozen||s.abstracts.indexed>s.abstracts.catalogue||w.available>w.candidates)return [];
+ const note="Отчёт "+d.built+" · "+(d.mode==="scheduled_refresh"?"сборка с обновлением":"офлайн-сборка")+". Агенты — детерминированные программные модули. Очередь действий, не автономное выполнение или управленческое решение. Статусы не гарантируют истинность данных.";
+ const out=[{id:"agents-overview",kind:"Координация модулей",title:"Состояние восьми агентов",description:"Требуют внимания "+d.agents.filter(a=>a.state==="attention").length+" · ожидают "+d.agents.filter(a=>a.state==="waiting").length+" · сформировали отчёт "+d.agents.filter(a=>a.state==="ok").length+" · рядов с данными "+c.series_with_values,href:"economic-ai-agents.json",limit:note}];
+ const tasks=[];
+ const add=(id,priority,title,description,href)=>tasks.push({id:"agent-"+id,priority,kind:priority===1?"1 · Проверка данных":priority===2?"2 · Исследование":"3 · Накопление данных",title,description,href,limit:note});
+ if(q.backlog||q.recent_rejected||map.quality.state==="attention")add("quality",1,"Контроль качества источников","В очереди "+q.backlog+" · отклонённых событий "+q.recent_rejected+". Проверить первичные источники; не использовать отсутствующие наблюдения как нулевые.","freshness.html");
+ if(map.discovery.state==="attention")add("discovery",1,"Проверить сбор новых данных","Статус требует внимания; доступно "+w.available+" из "+w.candidates+" кандидатов.","economic-ai-discovery.json");
+ if(map.search.state==="attention")add("search-source",1,"Проверить источники поисковика","Ошибки или ограничения источников требуют проверки до использования результатов.","economic-search-audit.json");
+ if(p.counts.refresh_first+p.counts.data_required+p.counts.history_required)add("planning-data",1,"Подготовить данные для сценариев","Сначала обновить "+p.counts.refresh_first+" · нужны данные "+p.counts.data_required+" · мало истории "+p.counts.history_required+".","planning-centre.html");
+ if(g.counts.signal||p.counts.investigate){
+  const routes=map.planning.items.filter(x=>x.priority==="investigate"&&typeof x.title==="string"&&typeof x.action==="string"&&typeof x.limit==="string"&&/^[a-z0-9-]+\.html(?:#[a-z0-9-]+)?$/.test(x.href));
+  add("diagnostics",2,"Исследовать диагностические сигналы","Сигналов "+g.counts.signal+" · маршрутов "+p.counts.investigate+". Проверить сопоставимость и причинные гипотезы; не менять коэффициенты автоматически.","diagnostics.html");
+  for(const [i,r] of routes.slice(0,5).entries())add("route"+(i+1),2,r.title,r.action+" Ограничение: "+r.limit,r.href);
+ }
+ if(map.forecast.state==="attention")add("forecast-review",2,"Проверить прогнозные методы","Оценённых "+f.scored+" · групп с выборкой от 10: "+f.adequate_sample_groups+". Не переключать метод по малой выборке.","forecast.html");
+ if(s.abstracts.indexed<s.abstracts.catalogue)add("abstracts",3,"Расширить доступное содержание поиска","Индексированных лицензированных аннотаций "+s.abstracts.indexed+" из "+s.abstracts.catalogue+" статей каталога. Не считать остальные статьи прочитанными; проверять лицензии.","economic-search.html");
+ if(f.scored<f.frozen||!f.adequate_sample_groups)add("forecast-wait",3,"Дождаться фактов для оценки прогнозов","Зафиксировано "+f.frozen+" · оценено "+f.scored+" · ожидают "+(f.frozen-f.scored)+". Новые факты проверяются при обновлении архива.","forecast.html");
+ if(w.available<w.candidates)add("coverage",3,"Расширить статистическое покрытие","Доступно "+w.available+" из "+w.candidates+" кандидатов. Проверить происхождение, единицы и периоды.","economic-ai-discovery.json");
+ tasks.sort((a,b)=>a.priority-b.priority);
+ out.push(...tasks.map(({priority,...r})=>r));
+ if(cmd.mode==="all"){
+ const labels={coverage:"Статистическое покрытие",discovery:"Поиск новых показателей",quality:"Контроль источников",research:"Научные публикации",forecast:"Прогнозирование",search:"Поисковик",diagnostics:"Макродиагностика",planning:"Подготовка сценариев"};
+ for(const id of ids){const a=map[id],href=a.links?.find(x=>typeof x==="string"&&/^[a-z0-9-]+\.(?:html|json)$/.test(x))||"economic-ai-agents.json";out.push({id:"agent-state-"+id,kind:"Статус модуля",title:labels[id],description:({ok:"Отчёт сформирован",attention:"Требует внимания",waiting:"Ожидает данных"})[a.state],href,limit:note});}
+ }
+ return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -266,6 +540,70 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,v] of r.variants.entries())found.push({id:"horizon-variant"+(i+1),kind:"Сравнение стратегий",title:v.label,description:"Цель "+f(v.score)+" · спрос последнего периода "+f(v.terminal)+" · инвестиции "+f(v.investment)+" млрд руб.",href,limit:note});
  return found;
 }
+ function investmentComparisonCommand(q){
+ const m=String(q??"").trim().match(/^сравнить инвестиции\s*:\s*(.*)$/iu);
+ if(!m)return null;
+ const invalid={kind:"invalid"},parts=m[1].split(";").map(x=>x.trim()),rest=[],budgets={};
+ for(const p of parts){
+  const v=p.match(/^инвестиции\s+([abав])\s*=\s*(\d{1,6}(?:[.,]\d)?)$/iu);
+  if(!v){rest.push(p);continue;}
+  const key=/^[aа]$/iu.test(v[1])?"a":"b",n=Number(v[2].replace(",","."));
+  if(Object.hasOwn(budgets,key)||n>100000)return invalid;
+  budgets[key]=n;
+ }
+ if(!Object.hasOwn(budgets,"a")||!Object.hasOwn(budgets,"b")||rest.some(x=>/^инвестиции\s*=/iu.test(x)))return invalid;
+ const base=horizonCommand("многолетний план: инвестиции="+budgets.a+"; "+rest.join("; "));
+ if(!base||base.kind!=="horizon"||base.p.years>10)return invalid;
+ return {...base,kind:"investment-comparison",budgetB:budgets.b};
+ }
+ function investmentComparisonEvidence(cmd,m,a,b,T,pinned=false){
+ if(cmd?.kind!=="investment-comparison"||!Number.isFinite(cmd.budgetB)||cmd.budgetB<0||cmd.budgetB>100000)throw Error("Invalid comparison");
+ const other={...cmd,p:{...cmd.p,investment:cmd.budgetB}};
+ horizonEvidence(cmd,m,a,pinned);horizonEvidence(other,m,b,pinned);
+ for(const r of [a,b]){
+  if(r.tolerance<0||r.dualityGap<0||r.maxViolation<0||r.rows.some((x,i)=>x.year!==i+1||x.investment<0||x.actualDemand<0||x.imports<0))throw Error("Invalid plan result");
+ }
+ const result=T.compare(a,b),f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="Два оптимизированных сценария на одной базе МРБ 2021 года, с одинаковым горизонтом, импортом, спросом, технологией и прочими допущениями. Меняется только годовой лимит инвестиций. Трудовое ограничение отключено. Условные периоды, не прогноз, дополнительный конечный спрос не ВВП. "+(pinned?"Ссылка ведёт к текущей редакции.":"");
+ const found=[{id:"invest-compare",kind:"Сравнение условных оптимумов",title:"Эффект изменения инвестиционного лимита",description:"A: "+f(cmd.p.investment)+" · B: "+f(cmd.budgetB)+" млрд руб. в год · цель A "+f(a.score)+" · цель B "+f(b.score)+" · разница B − A "+f(result.deltaScore)+" млрд руб. · покрытие цели последнего периода: изменение "+f(result.terminalDelta)+" п.п. · инвестиции за горизонт A "+f(result.investmentA)+" / B "+f(result.investmentB)+" млрд руб.",href:"scenario.html#global-plan",limit:note}];
+ for(const [i,r] of [a,b].entries())found.push({id:"invest-plan"+(i+1),kind:"Проверенный сценарий",title:"Вариант "+(i?"B":"A"),description:"Цель "+f(r.score)+" · двойственная граница "+f(r.upper)+" · разрыв "+r.dualityGap.toExponential(2)+" · максимальная невязка "+f(r.maxViolation)+" · ежегодный лимит "+f(i?cmd.budgetB:cmd.p.investment)+" млрд руб.",href:horizonHref(i?other:cmd),limit:note});
+ for(const row of result.rows)found.push({id:"invest-period"+row.year,kind:"Сравнение периодов",title:"Условный период "+row.year,description:"Дополнительный спрос A "+f(row.demandA)+" / B "+f(row.demandB)+" млрд руб. · покрытие A "+f(row.a*100)+"% / B "+f(row.b*100)+"% · разница "+f(row.deltaPP)+" п.п. · инвестиции A "+f(row.investmentA)+" / B "+f(row.investmentB)+" млрд руб. · ограничения A: "+(row.bindingA.join("; ")||"нет")+"; B: "+(row.bindingB.join("; ")||"нет"),href:"scenario.html#global-plan",limit:note});
+ return found;
+ }
+ function laborPlanCommand(q){
+ const match=String(q??"").trim().match(/^трудовой план\s*:\s*(.*)$/iu);
+ if(!match)return null;
+ const invalid={kind:"invalid"},rest=[],values={},overrides={};
+ for(const part of match[1].split(";").map(x=>x.trim())){
+  const m=part.match(/^(труд|трудо[её]мкость|производительность)(?:\s+(\d{1,2}))?\s*=\s*(-?\d{1,10}(?:[.,]\d)?)$/iu);
+  if(!m){rest.push(part);continue;}
+  const k=m[1].toLowerCase().replace("трудоемкость","трудоёмкость"),v=Number(m[3].replace(",","."));
+  const [lo,hi]=k==="труд"?[0,1e9]:k==="трудоёмкость"?[0,1e6]:[-10,20];
+  if(v<lo||v>hi)return invalid;
+  if(m[2]){const n=Number(m[2]);if(k!=="трудоёмкость"||n<1||n>19||Object.hasOwn(overrides,n))return invalid;overrides[n]=v;}
+  else{if(Object.hasOwn(values,k))return invalid;values[k]=v;}
+ }
+ if(!Object.hasOwn(values,"труд")||!Object.hasOwn(values,"трудоёмкость"))return invalid;
+ const base=horizonCommand("многолетний план: "+rest.join("; "));
+ if(!base||base.kind!=="horizon"||base.p.years>10)return invalid;
+ const intensity=Array.from({length:19},(_,i)=>overrides[i+1]??values["трудоёмкость"]);
+ if(!intensity.some(v=>v>0))return invalid;
+ return {...base,kind:"labor-plan",labor:{cap:values["труд"],productivity:values["производительность"]??0,intensity}};
+ }
+ function laborPlanEvidence(cmd,m,a,b,T){
+ if(cmd?.kind!=="labor-plan"||!cmd.labor||cmd.p.labor!==null||cmd.labor.intensity?.length!==19||![cmd.labor.cap,cmd.labor.productivity,...cmd.labor.intensity].every(Number.isFinite))throw Error("Invalid labor plan");
+ const l=cmd.labor;
+ if(l.cap<0||l.cap>1e9||l.productivity< -10||l.productivity>20||l.intensity.some(v=>v<0||v>1e6)||!l.intensity.some(v=>v>0))throw Error("Invalid labor assumptions");
+ horizonEvidence(cmd,m,a);horizonEvidence({...cmd,p:{...cmd.p,labor:l}},m,b);
+ for(const r of [a,b])if(r.tolerance<0||r.dualityGap<0||r.maxViolation<0||r.rows.some((x,i)=>x.year!==i+1||x.actualDemand<0||x.investment<0||x.imports<0))throw Error("Invalid result");
+ if(a.rows.some(x=>x.labor!==null)||b.rows.some(x=>!Number.isFinite(x.labor)||x.labor<0||x.labor>l.cap+1e-7*Math.max(1,l.cap))||b.score>a.score+a.tolerance+b.tolerance)throw Error("Labor feasibility failed");
+ const x=T.compare(a,b),f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="МРБ 2021, фиксированная технология, цены базы. Коэффициенты дополнительных человеко-лет на млрд руб. валового выпуска и рост производительности заданы пользователем, не измерены. Трудовой лимит относится к дополнительному выпуску, не всей занятости. A без трудового лимита; B с лимитом; остальные параметры одинаковы. Условный расчёт, не прогноз ВВП.";
+ const href="scenario.html#global-plan";
+ const out=[{id:"labor-plan-params",kind:"Условные допущения",title:"Трудовые параметры",description:"Лимит "+f(l.cap)+" дополнительных человеко-лет за период · рост производительности "+f(l.productivity)+"% · трудоёмкость по группам: "+l.intensity.map((v,i)=>(i+1)+": "+f(v)).join("; "),href,limit:note+" При переходе в полный инструмент параметры труда задаются вручную."},{id:"labor-plan-total",kind:"Сравнение проверенных оптимумов",title:"Влияние трудового ограничения",description:"Цель A "+f(a.score)+" · B "+f(b.score)+" · разница B − A "+f(x.deltaScore)+" млрд руб. · изменение покрытия цели последнего периода "+f(x.terminalDelta)+" п.п. · двойственные границы A "+f(a.upper)+" / B "+f(b.upper)+" · разрывы "+a.dualityGap.toExponential(2)+" / "+b.dualityGap.toExponential(2),href,limit:note}];
+ for(const row of x.rows)out.push({id:"labor-plan-period"+row.year,kind:"Условный период",title:"Период "+row.year,description:"Спрос A "+f(row.demandA)+" / B "+f(row.demandB)+" млрд руб. · покрытие A "+f(row.a*100)+"% / B "+f(row.b*100)+"% · труд B "+f(row.laborB)+" из "+f(l.cap)+" человеко-лет · ограничения B: "+(row.bindingB.join("; ")||"нет"),href,limit:note});
+ return out;
+ }
  function robustnessCommand(q,parse){
  const m=String(q??"").trim().match(/^устойчивость\s*:\s*(.*)$/iu);
  if(!m)return null;
@@ -338,7 +676,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -493,7 +831,181 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Проверенный оптимум не получен: матрица, вычислитель или лимит времени. Откройте подробный инструмент.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findPrice(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Сценарное сравнение покупательной способности по двум ценовым корзинам",parameters,parameter_note:"Рост оплаты — условное допущение, не фактическая зарплата."};
+  let found=[],failed=0;
+  const note=description=>[{id:"price-status",kind:"Статус расчёта",title:"Ценовые корзины и покупательная способность",description,href:"independent-statistics.html#iv-price-comparison"}];
+  if(cmd.kind==="invalid")found=note("Пример: покупательная способность: 2024-05; год; зарплата=10%. База: месяц, год или с начала года. Рост оплаты от −50% до 100%.");
+  else try{
+   await loadScript("iv-comparison.js",()=>typeof IVCompare!=="undefined");
+   const d=(await Provenance.get(manifest,"independent-prices.json",base)).data;
+   found=C.priceEvidence(cmd,d,IVCompare,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённой пары ценовых наблюдений за указанный закрытый период. Другой месяц не подставляется.");
+  }catch{failed=1;found=note("Проверенный архив цен или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findPartnerTrade(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Зеркальная статистика торговли США с Россией",parameters,parameter_note:"Год и число месяцев задают окно сравнения."};
+  let found=[],failed=0;
+  const note=description=>[{id:"us-trade-status",kind:"Статус расчёта",title:"Зеркальная торговля США",description,href:"independent-statistics.html#iv-trade"}];
+  if(cmd.kind==="invalid")found=note("Пример: торговля с США: 2026; месяцев=9. Год от 1993, месяцев от 1 до 12.");
+  else try{
+   await loadScript("iv-trade.js",()=>typeof IVTrade!=="undefined");
+   const d=(await Provenance.get(manifest,"independent-trade.json",base)).data;
+   found=C.partnerTradeEvidence(cmd,d,IVTrade,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённых сопоставимых месяцев или архив не прошёл проверку.");
+  }catch{failed=1;found=note("Архив зеркальной торговли недоступен.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findIndependent(cmd,parameters,type){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const labour=type==="labour",title=labour?"Рынок труда hh.ru":"Физический выпуск предприятия",href=labour?"independent-statistics.html#iv-hh":"independent-statistics.html";
+  const context={page,heading,description:title,parameters,parameter_note:"Период и база — параметры сравнения; пропуски не заполняются."};
+  let found=[],failed=0;
+  const note=description=>[{id:type+"-status",kind:"Статус расчёта",title,description,href}];
+  if(cmd.kind==="invalid")found=note(labour?"Пример: рынок труда: 2026-10; база=2025":"Пример: физический выпуск: nornickel; nickel; 2025; база=2024. Идентификаторы компании и продукта из набора физических показателей.");
+  else try{
+   if(labour)await loadScript("iv-labour.js",()=>typeof IVLabour!=="undefined");else await loadScript("iv-physical.js",()=>typeof IVPhysical!=="undefined");
+   const d=(await Provenance.get(manifest,labour?"independent-labour.json":"independent-physical.json",base)).data,cutoff=new Date().toISOString().slice(0,7);
+   found=labour?C.labourEvidence(cmd,d,IVLabour,cutoff):C.outputEvidence(cmd,d,IVPhysical,cutoff);
+   if(!found.length)found=note("Нет сверенной пары наблюдений за указанные периоды или показатель не найден.");
+  }catch{failed=1;found=note("Проверенный архив или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findComposite(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Составной индекс физических показателей",parameters,parameter_note:"Год, база и веса заданы пользователем. Веса не отражают структуру экономики."};
+  let found=[],failed=0;
+  const note=description=>[{id:"composite-status",kind:"Статус расчёта",title:"Составной индекс выпуска",description,href:"independent-statistics.html#physical-index-weights"}];
+  if(cmd.kind==="invalid")found=note("Пример: индекс выпуска: 2025; база=2024; веса=20,20,20,20,0. Пять целых весов 0–100 в порядке: никель, АЭС, погрузка РЖД, газ НОВАТЭК, сталь Северстали. Хотя бы один положительный вес.");
+  else try{
+   await Promise.all([loadScript("iv-physical.js",()=>typeof IVPhysical!=="undefined"),loadScript("iv-physical-composite.js",()=>typeof IVCompositePhysical!=="undefined")]);
+   const d=(await Provenance.get(manifest,"independent-physical.json",base)).data;
+   found=C.compositeEvidence(cmd,d,IVPhysical,IVCompositePhysical,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет закрытых периодов или допустимых параметров расчёта.");
+  }catch{failed=1;found=note("Архив физических показателей или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findEnergy(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Структурный анализ выработки электроэнергии по Ember",parameters,parameter_note:"Периоды и порог задаёт пользователь. Пропущенные категории не восстанавливаются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"energy-status",kind:"Статус расчёта",title:"Структура электроэнергетики",description,href:"independent-statistics.html#energy-structure"}];
+  if(cmd.kind==="invalid")found=note("Пример: структура энергетики: 2025; база=2024; порог=5. Порог 0–100 п.п., по умолчанию 5.");
+  else try{
+   await Promise.all([loadScript("iv-energy-structure.js",()=>typeof IVEnergyStructure!=="undefined"),loadScript("iv-ember.js",()=>typeof IVEmber!=="undefined")]);
+   const d=(await Provenance.get(manifest,"independent-ember.json",base)).data;
+   found=C.energyEvidence(cmd,d,IVEnergyStructure,IVEmber,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённых наблюдений обоих закрытых лет.");
+  }catch{failed=1;found=note("Проверенный архив Ember или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findInvestmentComparison(cmd,parameters){
+  const labor=cmd.kind==="labor-plan";
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:labor?"Сравнение планов с трудовым ограничением и без него":"Сравнение двух инвестиционных календарей",parameters,parameter_note:"Лимиты, коэффициенты и рост являются условными допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"invest-status",kind:"Статус расчёта",title:"Сравнение инвестиций",description,href:"scenario.html#global-plan"}];
+  if(cmd.kind==="invalid")found=note("Пример: сравнить инвестиции: инвестиции A=1000; инвестиции B=1500; импорт=500; горизонт=5; рост=3. Оба лимита и импорт обязательны; горизонт 1–10.");
+  else try{
+   await loadScript("iv-trajectory.js",()=>typeof IVTrajectory!=="undefined");
+   const m=(await Provenance.get(manifest,"sectors.json",base)).data;
+   const run=p=>new Promise((resolve,reject)=>{
+    const worker=new Worker("global-plan-worker.js");
+    const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
+    const timer=setTimeout(()=>finish(Error("Time limit")),30000);
+    worker.onmessage=e=>{if(e.data.error)finish(Error(e.data.error));else if(e.data.result)finish(null,e.data.result)};
+    worker.onerror=()=>finish(Error("Worker failed"));
+    try{worker.postMessage({m,p,objective:cmd.objective})}catch(e){finish(e)}
+   });
+   status.textContent="Проверка варианта A…";const a=await run(cmd.p);
+   status.textContent="Проверка варианта B…";const b=await run(labor?{...cmd.p,labor:cmd.labor}:{...cmd.p,investment:cmd.budgetB});
+   found=labor?C.laborPlanEvidence(cmd,m,a,b,IVTrajectory):C.investmentComparisonEvidence(cmd,m,a,b,IVTrajectory,!!base);
+  }catch{failed=1;found=note("Оба оптимума не подтверждены. Частичное сравнение не публикуется.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findProductivity(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Производительность и структура занятости WDI",parameters,parameter_note:"Годы задают сравнение; трудовые коэффициенты МРБ не меняются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"prod-status",kind:"Статус расчёта",title:"Производительность труда",description,href:"labor.html#labor-decomposition"}];
+  if(cmd.kind==="invalid")found=note("Пример: производительность труда: 2025; база=2019. Два разных закрытых года, база раньше выбранного года.");
+  else try{
+   await loadScript("labor-data.js",()=>typeof LaborDiagnostics!=="undefined");
+   const d=(await Provenance.get(manifest,"labor-data.json",base)).data;
+   found=C.productivityEvidence(cmd,d,LaborDiagnostics,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет полных сопоставимых срезов WDI или не подтверждены источники. Пропуски не заполняются.");
+  }catch{failed=1;found=note("Архив производительности или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findTechnology(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Сценарное изменение технологии МРБ",parameters,parameter_note:"Коэффициенты являются условными допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"tech-status",kind:"Статус расчёта",title:"Технология производства",description,href:"scenario.html#technology"}];
+  if(cmd.kind==="invalid")found=note("Пример: технология: 9; материалы=10; импорт=5; спрос=3. Группа 1–19 или все; экономия −20…80%; прирост спроса 0–20%.");
+  else try{
+   await loadScript("labor-calibration.js",()=>typeof LaborCalibration!=="undefined");
+   await Promise.all([loadScript("price-model.js",()=>typeof PriceModel!=="undefined"),loadScript("resource-plan.js",()=>typeof ResourcePlan!=="undefined")]);
+   await loadScript("technology.js",()=>typeof Technology!=="undefined");
+   await loadScript("iv-tech.js",()=>typeof IVTech!=="undefined");
+   const m=(await Provenance.get(manifest,"price-data.json",base)).data;
+   found=C.technologyEvidence(cmd,m,Technology,IVTech);
+   if(!found.length)found=note("Не подтверждена исходная матрица или параметры.");
+  }catch{failed=1;found=note("Технологический сценарий не подтверждён: проверьте параметры и матрицу.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findForecastAudit(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Аудит точности прогнозов",parameters,parameter_note:"Методы не переобучаются и не переключаются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"forecast-audit-status",kind:"Статус проверки",title:"Точность прогноза",description,href:"forecast.html"}];
+  if(cmd.kind==="invalid")found=note("Пример: точность прогноза: NY.GDP.MKTP.KD.ZG; горизонт=1. Код ряда и горизонт от последнего наблюдения.");
+  else try{
+   const files=await Promise.all(["forecast.json","economic-ai-forecast-memory.json","economic-ai-forecast-tournament.json","economic-ai-forecast-trials.json"].map(k=>Provenance.get(manifest,k,base)));
+   found=C.forecastAuditEvidence(cmd,...files.map(x=>x.data));
+   if(!found.length)found=note("Нет однозначного ряда и горизонта или проверка данных не пройдена.");
+  }catch{failed=1;found=note("Журнал или историческая проверка недоступны; вывод о точности не сделан.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
+ async function findAgents(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Координация восьми аналитических модулей",parameters,parameter_note:"Очередь рекомендаций, не выполнение действий."};
+  let found=[],failed=0;
+  const note=description=>[{id:"agents-status",kind:"Статус",title:"Координация агентов",description,href:"economic-ai-agents.json"}];
+  if(cmd.kind==="invalid")found=note("Пример: координация агентов: приоритеты. Для статусов всех восьми модулей: координация агентов: все.");
+  else try{const d=(await Provenance.get(manifest,"economic-ai-agents.json",base)).data;found=C.agentEvidence(cmd,d);if(!found.length)found=note("Отчёт не прошёл проверку структуры и счётчиков.");}
+  catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const agents=C.agentCommand(q.value);if(agents)return findAgents(agents,parameters);
+  const forecastAudit=C.forecastAuditCommand(q.value);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
+  const technology=C.technologyCommand(q.value);if(technology)return findTechnology(technology,parameters);
+  const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
+  const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){
+   if(laborPlan.kind==="invalid"){await loadScript("provenance.js",()=>typeof Provenance!=="undefined");const manifest=await Provenance.validateManifest(await load("data-manifest.json"));return {found:[{id:"labor-plan-status",kind:"Статус расчёта",title:"Трудовой план",description:"Пример: трудовой план: инвестиции=1000; импорт=500; горизонт=3; труд=100000; трудоёмкость=100; трудоёмкость 9=150; производительность=2. Лимит 0–1 млрд человеко-лет, коэффициенты 0–1 млн человеко-лет на млрд руб., производительность −10…20%, горизонт до 10. Условные параметры.",href:"scenario.html#global-plan"}],context:{page,heading,description:"Трудовые ограничения",parameters},failed:0,fingerprint:manifest.data_fingerprint};}
+   return findInvestmentComparison(laborPlan,parameters);
+  }
+  const investments=C.investmentComparisonCommand(q.value);if(investments)return findInvestmentComparison(investments,parameters);
+  const energy=C.energyCommand(q.value);if(energy)return findEnergy(energy,parameters);
+  const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
+  const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
+  const output=C.outputCommand(q.value);if(output)return findIndependent(output,parameters,"physical");
+  const partner=C.partnerTradeCommand(q.value);if(partner)return findPartnerTrade(partner,parameters);
+  const price=C.priceCommand(q.value);if(price)return findPrice(price,parameters);
   const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
   const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
   const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);
