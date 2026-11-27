@@ -14,6 +14,8 @@ const GlobalEconomicAssistant=(function core(){
  function audit(answer,rows){const known=new Set(rows.map(r=>r.id));return [...new Set(Array.from(String(answer||"").matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi),m=>m[1]))].filter(id=>!known.has(id))}
  function companyCommand(q){
  const s=String(q??"").trim();
+ const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
+ if(compare)return {kind:"compare",value:compare[1]};
  const m=s.match(/^(?:инн\s*[:=]?\s*|)(\d{10})$/iu);
  if(m)return {kind:"inn",value:m[1]};
  const n=s.match(/^(?:компания|предприятие|организация)\s*:\s*(.+)$/iu);
@@ -31,7 +33,23 @@ const GlobalEconomicAssistant=(function core(){
  const scope="Открытые наборы ФНС за "+index.year+" год. Не ЕГРЮЛ: регистрация и текущая деятельность не подтверждены. Доходы минус расходы не равны чистой прибыли; среднесписочная численность не является числом рабочих мест.";
  return {id:"company1",kind:"Данные предприятия ФНС",title:r.income_name||r.employment_name||r.inn,description:"ИНН "+r.inn+" · "+index.year+" · доходы "+money(r.income_cents)+" · расходы "+money(r.expense_cents)+" · среднесписочная численность "+(r.workers??"нет данных"),href:"company-atlas.html?inn="+r.inn,limit:scope+" Редакция индекса: "+index.fingerprint+"."};
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence}
+ function comparison(ids,records,index,calculate,format,pinned){
+ if(ids.length<2||ids.length>5||new Set(ids).size!==ids.length||records.length!==ids.length||!Number.isInteger(index.year))throw Error("Invalid comparison");
+ const data=records.map((record,i)=>{
+  if(record.status!=="fulfilled")return {inn:ids[i],state:"error",title:ids[i],values:Array(6).fill(null)};
+  const r=record.value;
+  if(r===null)return {inn:ids[i],state:"missing",title:ids[i],values:Array(6).fill(null)};
+  if(r.inn!==ids[i])throw Error("Wrong company");
+  const c=calculate(r);
+  return {inn:r.inn,state:"ok",title:r.income_name||r.employment_name||r.inn,values:[r.income_cents,r.expense_cents,r.workers,c.difference,c.incomePerWorker,c.expenseShare].map(v=>v??null)};
+ });
+ const labels=["Доходы","Расходы","Среднесписочная численность","Доходы минус расходы","Доходы на работника","Расходы / доходы"];
+ const fmt=(v,i)=>v===null?"нет данных":i===2?String(v)+" чел.":i===5?format(v).replace(" руб.","%"):format(v);
+ const note="Один год и одна редакция открытых наборов ФНС, но отрасли, масштабы и состав юридических лиц могут различаться. Доходы минус расходы не чистая прибыль, доходы на работника не производительность труда. Не рейтинг эффективности. Пропуски не нули; текущая деятельность не подтверждена."+(pinned?" Карточки ведут к текущей редакции.":"");
+ const found=data.map((r,i)=>({id:"company"+(i+1),kind:r.state==="ok"?"Сравнение предприятий ФНС":"Статус поиска предприятия",title:r.title,description:"ИНН "+r.inn+" · "+index.year+" · "+(r.state==="ok"?labels.map((l,j)=>l+": "+fmt(r.values[j],j)).join(" · "):r.state==="missing"?"Не найдено в индексе":"Ошибка проверки блока"),href:"company-atlas.html?inn="+r.inn,limit:note+" Редакция "+index.fingerprint}));
+ return {found,table:{year:index.year,labels,rows:data.map(r=>({inn:r.inn,title:r.title,state:r.state,values:r.values.map(fmt)})),note,href:"company-atlas.html?compare-inn="+encodeURIComponent(ids.join(","))},failed:data.filter(r=>r.state==="error").length};
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -73,13 +91,17 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   await loadScript("company-lookup.js",()=>typeof CompanyLookup!=="undefined");
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
   const context={page,heading,description:"Адресный поиск юридических лиц по открытому индексу ФНС",parameters,parameter_note:"Параметры не являются наблюдениями."};
-  const found=[];let failed=0;
+  const found=[];let failed=0,table=null;
   const note=(title,description)=>found.push({id:"company-status",kind:"Статус поиска предприятия",title,description,href:"company-atlas.html",limit:"Отсутствие результата не подтверждает отсутствие юридического лица."});
   if(cmd.kind==="invalid"||cmd.kind==="inn"&&!CompanyLookup.validInn(cmd.value)){note("Некорректный запрос","Введите корректный десятизначный ИНН либо компания: название.");}
   else try{
    const index=(await Provenance.get(manifest,"company-index.json",base)).data;
    if(index.status!=="ready")throw Error("Index unavailable");
-   if(cmd.kind==="inn"){
+   if(cmd.kind==="compare"){
+    let ids;try{ids=CompanyLookup.parseSelection(cmd.value)}catch{note("Уточните запрос","Укажите от 2 до 5 разных корректных десятизначных ИНН.");}
+    if(ids){const records=[];for(const inn of ids){try{records.push({status:"fulfilled",value:await CompanyLookup.lookup(index,inn,base)})}catch{records.push({status:"rejected"})}}
+     const c=C.comparison(ids,records,index,CompanyLookup.calculate,C.money,!!base);found.push(...c.found);table=c.table;failed=c.failed;}
+   }else if(cmd.kind==="inn"){
     const r=await CompanyLookup.lookup(index,cmd.value,base);
     if(r){const e=C.companyEvidence(r,index);if(base)e.limit+=" Ссылка на карточку ведёт к текущей редакции сайта, а не закреплённому архиву.";found.push(e);}
     else note("ИНН не найден","В проверенном блоке индекса "+index.year+" нет указанного ИНН.");
@@ -94,7 +116,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     }
    }
   }catch{failed=1;note("Индекс предприятия недоступен","Не удалось получить или проверить блок. Уточните начало названия либо проверьте доступность каталога.");}
-  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+  return {found,context,failed,table,fingerprint:manifest.data_fingerprint};
  }
  async function find(parameters){
   const cmd=C.companyCommand(q.value);if(cmd)return findCompany(cmd,parameters);
@@ -151,6 +173,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function render(r){
   results.replaceChildren();
   add(results,"p","Найдено: "+r.found.length+" · SHA-256 "+r.fingerprint.slice(0,12)+(r.failed?" · недоступных архивов: "+r.failed:""));
+  if(r.table){const t=r.table,box=add(results,"div","");box.style.overflowX="auto";add(box,"p","Сравнение · "+t.year);const tbl=add(box,"table","");const head=tbl.createTHead().insertRow();for(const v of ["Показатель",...t.rows.map(x=>x.title+" ("+x.inn+")")]){const th=add(head,"th",v);th.scope="col"}const body=tbl.createTBody();const status=body.insertRow();status.insertCell().textContent="Статус";for(const x of t.rows)status.insertCell().textContent=({ok:"Данные получены",missing:"Не найдено",error:"Ошибка"})[x.state];for(const [i,l] of t.labels.entries()){const tr=body.insertRow();tr.insertCell().textContent=l;for(const x of t.rows)tr.insertCell().textContent=x.values[i]}add(results,"p",t.note);const a=add(results,"a","Открыть подробное сравнение");a.href=localHref(t.href);}
   for(const x of r.found){const article=add(results,"article","");const title=add(article,"p","["+x.id+"] "+x.kind+" · ");if(x.href)link(title,x);else title.append(document.createTextNode(x.title));add(article,"p",x.description||"");if(x.limit)add(article,"small",x.limit)}
   if(!r.found.length)add(results,"p","Нет совпадений. Попробуйте короткий запрос, название показателя или раздела.");
  }
