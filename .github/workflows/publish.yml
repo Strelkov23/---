@@ -170,7 +170,8 @@ jobs:
           node test-data-registry.js
           node test-economic-ai.js
           node test-economic-ai-series.js
-          python3 -m unittest test_economic_ai_memory.py
+          node test-economic-ai-retrieval.js
+          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_agents.py
           node test-research-projects.js
           node test-provenance.js
           node test-index-builder.js
@@ -182,6 +183,8 @@ jobs:
           node test-energy-output.js
           rm -rf public
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
+          python3 -c "import json,economic_ai_agents as a; from pathlib import Path; p=Path('public'); assert a.validate(json.loads((p/a.FILE).read_text())); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
+          python3 -c "import json,economic_ai_discovery as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_memory as a; from pathlib import Path; p=Path('public'); d=json.loads((p/a.FILE).read_text()); print(a.validate(d)); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 iv_release.py public ../history/published
           node test-price-model.js
