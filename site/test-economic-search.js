@@ -50,3 +50,12 @@ assert.throws(()=>core.cacheIdentity(""));assert.deepEqual(core.mergeCache([rec(
 assert.equal(core.mergeCache([rec(a,3)],[rec(a,1)])[0].used,3);assert.deepEqual(core.mergeCache([rec("bad",1),rec(b,-1),rec(c,1,[1])],[]),[]);
 assert.equal(core.mergeCache(Array.from({length:300},(_,i)=>rec(i.toString(16).padStart(64,"0"),i)),[]).length,256);
 assert.throws(()=>core.mergeCache([],[],257));console.log("12 persistent vector cache helper checks passed");}
+
+{const v=Array.from({length:384},(_,i)=>i===0?1:0),w=Array.from({length:384},(_,i)=>i===1?1:0),a={kind:"paper",href:"a",title:"A",date:"2025",abstract_license:"https://creativecommons.org/licenses/by/4.0/"},b={kind:"external",href:"b",title:"B",date:"2024"};
+assert.equal(core.localEligible(a,{from:2025,abstractOnly:true}),true);
+assert.equal(core.localEligible(b,{from:2025}),false);assert.equal(core.localEligible(b,{abstractOnly:true}),false);
+assert.equal(core.localEligible(a,{all:true}),false);assert.equal(core.localEligible(a,{contentOnly:true}),false);assert.equal(core.localEligible(a,{vector:true}),false);
+assert.equal(core.localEligible(a,{kind:"external"}),false);
+const rows=core.localRank(v,[{doc:b,vector:w},{doc:a,vector:v},{doc:a,vector:v}]);assert.deepEqual(rows.map(r=>r.href),["a","b"]);assert.equal(rows[0].semanticSimilarity,1);assert.equal(rows[0].localSemantic,true);
+assert.throws(()=>core.localRank([1],[]));const key="a".repeat(64),cache=core.mergeCache([],[{key,used:1,vector:v,href:a.href,kind:a.kind}]);assert.equal(cache[0].href,"a");assert.equal(cache[0].kind,"paper");assert.equal(core.mergeCache(cache,[{key,used:2,vector:v}])[0].href,"a");
+console.log("14 local neural index checks passed");}
