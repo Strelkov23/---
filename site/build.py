@@ -295,6 +295,8 @@ import data_infrastructure
 data_infrastructure.publish(page,out,m.now())
 import economic_ai_forecast_memory
 economic_ai_forecast_memory.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
+import economic_ai_forecast_tournament
+economic_ai_forecast_tournament.publish(out,Path('../history/published'),m.now(),'--refresh' in sys.argv)
 import economic_search
 economic_search.publish(out,m.now())
 import economic_search_audit
