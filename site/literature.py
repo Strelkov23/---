@@ -384,19 +384,11 @@ def sync(db, stamp, refresh):
     # Backfill one previously imported journal per refresh; existing DOI records are not erased.
     backfill=next((issn for issn in JOURNALS if db.execute("select success from journal_checks where issn=? and success is not null",(issn,)).fetchone() and not db.execute("select 1 from literature_meta_checks where issn=?",(issn,)).fetchone()),None) if refresh else None
     budget=resume.Budget(fetch_batch)
-    # Share the existing global budget. A single focused query cannot bypass cooldown.
-    try:
-        if budget.available():abstract_backfill(db,stamp,budget)
-    except CrossrefRateLimited as err:
-        observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
-        deadline=retry_deadline(observed,err.retry_after)
-        with db:
-            db.execute("insert or replace into literature_service values(1,?,?)",(observed,deadline))
-            for pending in ordered:defer_journal(db,pending,deadline)
-        return
-    except Exception as err:
-        # A failed targeted query must not advance the cursor or erase metadata.
-        print("Crossref abstract backfill:",str(err)[:180])
+    # Reserve one request for targeted backfill only if a catalogue already exists.
+    # Ordinary journal refresh keeps its established ordering and priority.
+    has_catalogue=bool(db.execute("select 1 from literature limit 1").fetchone())
+    if has_catalogue:budget.limit-=1
+    limited=False
     for position,issn in enumerate(ordered):
         journal=JOURNALS[issn]
         last=db.execute("select success from journal_checks where issn=?",(issn,)).fetchone()
@@ -449,6 +441,7 @@ def sync(db, stamp, refresh):
                 db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,"Лимит запросов сборки; интервал не завершён"))
             break
         except CrossrefRateLimited as err:
+            limited=True
             observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
             deadline=retry_deadline(observed,err.retry_after)
             with db:
@@ -459,6 +452,20 @@ def sync(db, stamp, refresh):
             break
         except Exception as err:
             with db:db.execute("insert into journal_checks values(?,null,?,?) on conflict(issn) do update set checked=excluded.checked,status=excluded.status",(issn,stamp,str(err)[:180]))
+
+    # A 429 anywhere stops all Crossref traffic until the persisted deadline.
+    if has_catalogue and not limited:
+        budget.limit+=1
+        try:
+            if budget.available():abstract_backfill(db,stamp,budget)
+        except CrossrefRateLimited as err:
+            observed=(stamp_dt(stamp)+timedelta(seconds=max(0,time.monotonic()-started))).isoformat(timespec='seconds')
+            deadline=retry_deadline(observed,err.retry_after)
+            with db:
+                db.execute("insert or replace into literature_service values(1,?,?)",(observed,deadline))
+                for pending in ordered:defer_journal(db,pending,deadline)
+        except Exception as err:
+            print("Crossref abstract backfill:",str(err)[:180])
 
 def enrich(db, papers):
     lookup={r[0]:dict(json.loads(r[1]),metadata_checked=r[2]) for r in db.execute("select doi,payload,checked from literature_meta")}

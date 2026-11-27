@@ -63,4 +63,35 @@ class AbstractBackfillTests(unittest.TestCase):
         with self.assertRaises(self.lit.CrossrefRateLimited):
             self.lit.abstract_backfill(self.db,STAMP,fail)
         self.assertIsNone(self.db.execute("select * from literature_abstract_progress").fetchone())
+class AbstractSchedulingTests(unittest.TestCase):
+    def test_existing_catalogue_normal_first(self):
+        import sqlite3,literature as l
+        from unittest.mock import patch
+        db=sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        l.sync(db,STAMP,False)
+        issn="0042-8736"
+        db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/old",l.JOURNALS[issn],"2025","Saved","A",""))
+        calls=[]
+        def fetch(issn,filters,offset=0):
+            calls.append(filters)
+            return {"total-results":0,"items":[]}
+        with patch.dict(l.JOURNALS,{issn:l.JOURNALS[issn]},clear=True),patch.object(l,"fetch_batch",side_effect=fetch):
+            l.sync(db,STAMP,True)
+        self.assertEqual(len(calls),2)
+        self.assertNotIn("has-abstract:true",calls[0])
+        self.assertIn("has-abstract:true",calls[1])
+    def test_normal_429_skips_targeted(self):
+        import sqlite3,literature as l
+        from unittest.mock import patch
+        db=sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        l.sync(db,STAMP,False)
+        issn="0042-8736"
+        db.execute("insert into literature values(?,?,?,?,?,?)",("10.1234/old",l.JOURNALS[issn],"2025","Saved","A",""))
+        with patch.dict(l.JOURNALS,{issn:l.JOURNALS[issn]},clear=True),patch.object(l,"fetch_batch",side_effect=l.CrossrefRateLimited("120")) as fetch:
+            l.sync(db,STAMP,True)
+            self.assertEqual(fetch.call_count,1)
+            self.assertNotIn("has-abstract:true",fetch.call_args.args[1])
+        self.assertTrue(l.service_status(db,STAMP)["cooldown"])
 if __name__=="__main__":unittest.main()
