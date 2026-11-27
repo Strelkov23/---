@@ -282,7 +282,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const $=id=>document.getElementById("es-"+id),form=$("form");if(!form)return;
  const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector"),semantic=$("semantic"),semanticStatus=$("semantic-status"),clearSemantic=$("semantic-clear"),localSemantic=$("local-semantic"),localResults=$("local-results"),buildSemantic=$("semantic-build"),stopSemantic=$("semantic-stop"),buildStatus=$("semantic-build-status"),buildLimit=$("semantic-build-limit"),buildFiltered=$("semantic-build-filtered"),coverageHost=$("coverage"),coverageRefresh=$("coverage-refresh");
  const labels={tool:"Инструмент",series:"Статистика",news:"Новости и документы",paper:"Научные статьи",discovered:"Новые показатели WDI",external:"Внешние препринты arXiv",web:"Внешние исследования FEDS"};
- const abstractSemantic=$("abstract-semantic");
+ const abstractSemantic=$("abstract-semantic"),serverSemantic=$("server-semantic");
  let index=null,rows=[],limit=20,fingerprint="",seq=0,manifest=null,papersPromise=null,lastQuery="",encoderPromise=null,semanticBusy=false,baselineRows=[],lastOptions=null,buildStop=false,buildActive=false,indexPromise=null;
  const add=(p,t,v)=>{const e=document.createElement(t);e.textContent=v;p.append(e);return e};
  // Only public document title embeddings are stored, never query vectors or text.
@@ -315,6 +315,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   semantic.disabled=semanticBusy||!lastQuery||!EconomicSearch.semanticCandidates(baselineRows).length;
   if(abstractSemantic)abstractSemantic.disabled=semanticBusy||!lastQuery||!baselineRows.some(r=>r.kind==="paper"&&r.abstract_license==="https://creativecommons.org/licenses/by/4.0/");
   localSemantic.disabled=semanticBusy||!lastQuery||!lastOptions||lastOptions.all||lastOptions.contentOnly||lastOptions.vector||!!lastOptions.kind&&!["paper","external","web"].includes(lastOptions.kind);
+  if(serverSemantic)serverSemantic.disabled=semanticBusy||!lastQuery||!lastOptions||lastOptions.all||lastOptions.contentOnly||lastOptions.vector||!!lastOptions.kind&&!["paper","external","web"].includes(lastOptions.kind);
   clearSemantic.disabled=semanticBusy;buildSemantic.disabled=semanticBusy;buildLimit.disabled=semanticBusy;buildFiltered.disabled=semanticBusy;stopSemantic.disabled=!buildActive||buildStop;
  }
  async function getEncoder(){
@@ -442,6 +443,44 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const options={kind:kind.value,from:Number(from.value),to:Number(to.value),all:all.checked,expand:expand.checked,abstractOnly:abstractOnly.checked,contentOnly:contentOnly.checked,vector:vector.checked};rows=vector.checked?EconomicSearch.contentVector(index,query,options):EconomicSearch.search(index,query,options);const equivalents=EconomicSearch.plan(query,expand.checked).flatMap(x=>x.labels);expansion.textContent=equivalents.length?"Расширение запроса: "+equivalents.slice(0,20).join(" · "):"";limit=20;lastQuery=query;lastOptions=options;baselineRows=rows.slice();draw();controls();status.textContent="Найдено: "+rows.length+" из "+index.docs.length+" · SHA-256 "+fingerprint.slice(0,12);if(vector.checked&&!Array.isArray(index.abstract_norms))status.textContent+=". Векторный индекс отсутствует в этой версии.";else if(contentOnly.checked&&!index.abstract_postings)status.textContent+=". Индекс текста отсутствует в закреплённой версии.";else if(!rows.length)status.textContent+=". Попробуйте снять фильтры или изменить запрос.";
  const u=new URL(location.href);u.searchParams.set("q",query);for(const [k,v] of [["kind",kind.value],["from",from.value],["to",to.value],["all",all.checked?"1":""],["expand",expand.checked?"":"0"],["abstract",abstractOnly.checked?"1":""],["content",contentOnly.checked?"1":""],["vector",vector.checked?"1":""]]){if(v)u.searchParams.set(k,v);else u.searchParams.delete(k)}history.replaceState(null,"",u);
  }catch{if(id===seq)status.textContent="Индекс отсутствует в этой версии или не прошёл контроль. Используйте обычный поиск."}}
+ if(serverSemantic)serverSemantic.onclick=async()=>{
+  if(semanticBusy||!lastQuery||serverSemantic.disabled)return;
+  const token=seq,query=lastQuery,options=lastOptions;
+  semanticBusy=true;controls();localResults.replaceChildren();semanticStatus.textContent="Проверка серверного каталога…";
+  try{
+   const V=EconomicServerVectors,source=manifest.files["economic-search-index.json"].sha256;
+   const name="research-title-catalog.json";
+   if(!manifest.files[name]){semanticStatus.textContent="Серверный индекс не опубликован для этого снимка. Доступны обычный и локальный поиск.";return}
+   const c=(await Provenance.get(manifest,name,root)).data,coverage=V.validateCatalogue(c,index,source,manifest.files);
+   if(token!==seq)return;
+   if(!coverage.indexed){semanticStatus.textContent="Серверный каталог пуст.";return}
+   const allowed=new Set(index.docs.filter(d=>EconomicSearch.localEligible(d,options)).map(V.identity));
+   if(!allowed.size){semanticStatus.textContent="Нет исследований для выбранных фильтров.";return}
+   const encoder=await getEncoder(),qv=await encodeText(encoder,query);
+   if(token!==seq)return;
+   let best=[],searched=0,loaded=0;
+   // Stream one verified shard at a time; retain only the global top 20.
+   for(const e of c.entries){
+    if(token!==seq)return;
+    const d=(await Provenance.get(manifest,e.file,root)).data;
+    if(token!==seq)return;
+    if(d.shard!==e.shard)throw Error("Shard identity mismatch");
+    const result=V.rankPart(qv,d,index,source,allowed);
+    searched+=result.searched;best=[...best,...result.rows].sort(V.compareRank).slice(0,20);
+    semanticStatus.textContent="Проверено частей "+(++loaded)+" из "+c.entries.length+" · подходящих названий "+searched;
+   }
+   if(token!==seq)return;
+   add(localResults,"h3","Поиск по серверному индексу названий");
+   add(localResults,"p","Проверено "+coverage.indexed+" из "+coverage.total+" названий архива; по фильтрам "+searched+". "+(coverage.complete?"Все части снимка доступны.":"Индекс неполный.")+" Это сходство названий, не поиск по полным текстам и не оценка достоверности.");
+   for(const r of best){
+    const line=add(localResults,"p",""),a=add(line,"a",r.title);
+    try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();a.href=u.href;a.rel="noopener noreferrer"}catch{a.removeAttribute("href")}
+    add(line,"small"," · "+labels[r.kind]+" · косинус "+r.similarity.toFixed(3));
+   }
+   semanticStatus.textContent="Серверный поиск завершён. Обычная выдача сохранена.";
+  }catch{if(token===seq){localResults.replaceChildren();semanticStatus.textContent="Серверный индекс или модель не прошли проверку; обычная выдача сохранена.";}}
+  finally{semanticBusy=false;controls();}
+ };
  if(abstractSemantic)abstractSemantic.onclick=async()=>{
   if(semanticBusy||!lastQuery||abstractSemantic.disabled)return;
   const token=seq,query=lastQuery,baseline=baselineRows.slice();

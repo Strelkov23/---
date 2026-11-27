@@ -1,4 +1,5 @@
 /* Server-built research TITLE embeddings. No abstract/full-text ingestion. */
+const EconomicServerVectors=(()=>{
 "use strict";
 const MODEL=Object.freeze({id:"Xenova/paraphrase-multilingual-MiniLM-L12-v2",revision:"7e3d5398ff67a776281d0a27b2d47a964d5bfffb",runtime:"@xenova/transformers@2.17.2",dimension:384,pooling:"mean",normalize:true,quantized:true,input:"title-v1-600"});
 const SHARDS=64,MAX=512,KINDS=new Set(["paper","external","web"]);
@@ -79,4 +80,29 @@ function catalog(index,source,parts){
  const missing=Array.from({length:SHARDS},(_,i)=>i).filter(i=>!seen.has(i)),total=expected.reduce((a,b)=>a+b,0),indexed=entries.reduce((a,b)=>a+b.rows,0);
  return {schema:1,scope:"research-title-only",model:{...MODEL},source_sha256:source,shards:SHARDS,complete:missing.length===0,total,indexed,entries,missing};
 }
-module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog,reusable};
+function validateCatalogue(c,index,source,files){
+ if(c?.schema!==1||c.scope!=="research-title-only"||c.source_sha256!==source||!digestOK(source)||c.shards!==SHARDS||!c.model||Object.keys(c.model).length!==Object.keys(MODEL).length||Object.keys(MODEL).some(k=>c.model[k]!==MODEL[k])||!Array.isArray(c.entries)||c.entries.length>SHARDS||!Array.isArray(c.missing)||!files)throw Error("Invalid vector catalogue");
+ const expected=Array.from({length:SHARDS},(_,i)=>targets(index,i).length),seen=new Set();let indexed=0,bytes=0;
+ for(const e of c.entries){
+  const i=e.shard,name="research-title-shard-"+String(i).padStart(2,"0")+".json";
+  if(!Number.isInteger(i)||i<0||i>=SHARDS||seen.has(i)||e.file!==name||e.rows!==expected[i]||!digestOK(e.sha256)||!Number.isSafeInteger(e.bytes)||e.bytes<1||e.bytes>8*1024*1024||files[name]?.sha256!==e.sha256||files[name]?.bytes!==e.bytes)throw Error("Invalid vector catalogue entry");
+  seen.add(i);indexed+=e.rows;bytes+=e.bytes;
+ }
+ const missing=Array.from({length:SHARDS},(_,i)=>i).filter(i=>!seen.has(i));
+ if(c.indexed!==indexed||c.total!==expected.reduce((a,b)=>a+b,0)||c.complete!==(missing.length===0)||JSON.stringify(c.missing)!==JSON.stringify(missing)||bytes>128*1024*1024)throw Error("Invalid vector catalogue coverage");
+ return {indexed,total:c.total,complete:c.complete,bytes};
+}
+function rankPart(query,data,index,source,allowed,limit=20){
+ if(!vectorOK(query)||!(allowed instanceof Set)||!Number.isInteger(limit)||limit<1||limit>50)throw Error("Invalid query or filters");
+ validate(data,index,source,data.shard);
+ const norm=Math.hypot(...query),rows=[];
+ for(const r of data.rows){if(!allowed.has(identity(r)))continue;
+  const similarity=Math.max(-1,Math.min(1,r.vector.reduce((s,v,i)=>s+v*query[i],0)/(norm*Math.hypot(...r.vector))));
+  rows.push({kind:r.kind,href:r.href,title:r.title,similarity});
+ }
+ return {searched:rows.length,rows:rows.sort(compareRank).slice(0,limit)};
+}
+function compareRank(a,b){return b.similarity-a.similarity||(identity(a)<identity(b)?-1:identity(a)>identity(b)?1:0);}
+return {MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog,reusable,validateCatalogue,rankPart,compareRank};
+})();
+if(typeof module!=="undefined")module.exports=EconomicServerVectors;

@@ -44,7 +44,18 @@ async function run(){
  A.throws(()=>V.reusable({...d,rows:[...d.rows,d.rows[0]]},s));
  A.throws(()=>V.reusable(d,(s+1)%64));
  A.throws(()=>V.reusable({...d,rows:d.rows.map(x=>({...x,vector:Array(384).fill(0)}))},s));
- console.log("41 server vector and incremental catalogue checks passed");
+ const files=Object.fromEntries(cat.entries.map(e=>[e.file,{sha256:e.sha256,bytes:e.bytes}]));
+ const cov=V.validateCatalogue(cat,index,sha,files);
+ A.equal(cov.indexed,d.rows.length);A.equal(cov.complete,false);A.equal(cov.total,250);
+ A.throws(()=>V.validateCatalogue(cat,index,"b".repeat(64),files));
+ A.throws(()=>V.validateCatalogue(cat,index,sha,{}));
+ A.throws(()=>V.validateCatalogue({...cat,complete:true},index,sha,files));
+ A.throws(()=>V.validateCatalogue({...cat,missing:[]},index,sha,files));
+ A.throws(()=>V.validateCatalogue({...cat,indexed:250},index,sha,files));
+ const allowed=new Set([V.identity(d.rows[0])]),filtered=V.rankPart(v,d,index,sha,allowed);
+ A.equal(filtered.searched,1);A.equal(filtered.rows[0].href,d.rows[0].href);A.equal(filtered.rows[0].similarity,1);
+ A.equal(V.rankPart(v,d,index,sha,new Set()).searched,0);
+ console.log("53 server vector and browser catalogue checks passed");
 }
 module.exports=run;
 if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1;});
