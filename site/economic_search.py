@@ -5,7 +5,7 @@ from collections import Counter,defaultdict
 from urllib.parse import quote,urlsplit
 FILE="economic-search-index.json"
 KINDS=("tool","series","news","paper","discovered","external","web")
-NOTE="Поиск по заголовкам и метаданным опубликованного архива, не по всему интернету."
+NOTE="Поиск по заголовкам, метаданным и лицензированным аннотациям опубликованного архива, не по всему интернету."
 STOP=set("как что где найти мне можно нужно помоги покажи объясни это чем какой какие для при или по на в и с к у о об из за от до а".split())
 SUFFIX=re.compile(r"(иями|ями|ами|ого|его|ему|ому|ыми|ими|иях|иям|ией|ия|ии|ий|ию|ие|ях|ах|ам|ом|ов|ем|ая|ые|ый|ой|ую|а|ы|у|и|е|я|ю)$")
 def tokens(s):
@@ -64,6 +64,7 @@ def validate(d):
     if d["counts"]!={k:sum(r["kind"]==k for r in docs) for k in KINDS}:raise ValueError("Wrong counts")
     if any(r["kind"] not in KINDS or not safe(r["href"]) or not r["title"] for r in docs):raise ValueError("Invalid document")
     if len({(r["kind"],r["href"]) for r in docs})!=len(docs):raise ValueError("Duplicate document")
+    if any("abstract_text" in r or "abstract_license" in r and (r["kind"]!="paper" or r["abstract_license"]!=economic_abstracts.LICENSE) for r in docs):raise ValueError("Invalid abstract index metadata")
     for word,posting in d["postings"].items():
         if not re.fullmatch(r"[a-zа-я0-9]+",word) or not posting:raise ValueError("Invalid term")
         last=-1

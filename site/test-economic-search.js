@@ -14,3 +14,5 @@ const assert=require('node:assert/strict');const core=require('./economic-search
  assert.equal(core.search(d,"инвестиции",{from:2025})[0].title,"Инвестиции в промышленности");
  console.log("5 ranking checks passed");
 })();
+
+{const license="https://creativecommons.org/licenses/by/4.0/",d={docs:[{title:"Рост",kind:"paper",date:"2025",abstract_license:license},{title:"Рост",kind:"paper",date:"2026"},{title:"Рост",kind:"news",date:"2025",abstract_license:license}],postings:{"рост":[[0,5],[1,5],[2,5]]}};assert.equal(core.search(d,"рост",{abstractOnly:true}).length,1);assert.equal(core.search(d,"рост",{abstractOnly:true})[0].abstract_license,license);assert.equal(core.search(d,"рост",{abstractOnly:true,kind:"news"}).length,0);console.log("3 abstract filter checks passed");}

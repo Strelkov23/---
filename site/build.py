@@ -126,6 +126,9 @@ with m.connect() as db:
     literature.reclassify(db)
     papers=[dict(r) for r in db.execute("select * from literature order by published desc,title,doi")]
     literature.enrich(db,papers)
+    import economic_abstracts
+    for paper in papers:
+        if not economic_abstracts.eligible(paper,m.now()):paper.pop('licensed_abstract',None)
     import literature_quality
     literature_quality.decorate(papers,m.now())
     import openalex_access

@@ -57,7 +57,7 @@ def build(out,previous,stamp,refresh):
       agent("research","ok" if news or papers else "waiting",{"news":m["changes"]["news"],"papers":m["changes"]["papers"],"baseline_available":baseline},["index.html","papers.html"],report_items),
       agent("forecast","attention" if any(r["action"]=="review_model" for r in flags) else "ok" if assessed else "waiting",{"frozen":len(forecast["rows"]),"scored":sum(r["first_actual"] is not None for r in forecast["rows"]),"adequate_sample_groups":len(assessed)},["forecast.html","economic-ai-forecast-memory.json"],flags[:30])]
     search=read(out,"economic-search-audit.json")
-    agents.append(agent("search","attention" if any(r["status"] in ("error","blocked") for r in search["sources"]) else "waiting" if any(r["status"]=="waiting" for r in search["sources"]) else "ok",{"counts":search["counts"],"terms":search["terms"],"index_bytes":search["index_bytes"],"baseline_available":search["baseline_available"]},["economic-search.html","economic-search-audit.json"],search["sources"]))
+    agents.append(agent("search","attention" if any(r["status"] in ("error","blocked") for r in search["sources"]) else "waiting" if any(r["status"]=="waiting" for r in search["sources"]) else "ok",{"counts":search["counts"],"terms":search["terms"],"index_bytes":search["index_bytes"],"baseline_available":search["baseline_available"],"abstracts":search["abstracts"]},["economic-search.html","economic-search-audit.json"],search["sources"]))
     diag=read(out,"economic-ai-diagnostics.json")
     signals=[r for r in diag["rows"] if r["status"]=="signal"]
     assessed=diag["counts"]["signal"]+diag["counts"]["ordinary"]
