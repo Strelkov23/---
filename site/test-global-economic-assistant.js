@@ -366,3 +366,21 @@ const edit=(id,metrics)=>({...d,agents:d.agents.map(x=>x.id===id?{...x,metrics:{
 A.equal(core.agentEvidence(c,edit("quality",{backlog:-1})).length,0);A.equal(core.agentEvidence(c,edit("forecast",{scored:8})).length,0);A.equal(core.agentEvidence(c,edit("search",{abstracts:{indexed:11,catalogue:10}})).length,0);
 A.ok(!core.agentEvidence(c,{...d,agents:d.agents.map(x=>x.id==="planning"?{...x,items:[{...x.items[0],href:"javascript:alert(1)"}]}:x)}).some(r=>r.id==="agent-route1"));
 console.log("16 agent coordination checks passed");}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const meta={id:"paper1",kind:"Научная статья",href:"https://doi.org/10.1234/ABC",title:"A"};
+ const abstract={...meta,id:"abstract1",kind:"Лицензированная аннотация",href:"https://dx.doi.org/10.1234/abc",description:"Текст"};
+ const fact={id:"fact1",kind:"Наблюдение",href:meta.href,value:10},fact2={...fact,id:"fact2",value:20};
+ A.deepEqual(C.researchDedup([meta,fact,abstract,fact2]),[abstract,fact,fact2]);
+ A.deepEqual(C.researchDedup([abstract,meta]),[abstract]);
+ A.deepEqual(C.researchDedup([fact,fact2]),[fact,fact2]);
+ const a={id:"external1",kind:"Внешний препринт",href:"https://arxiv.org/abs/1234.5678v1"},b={...a,id:"external2",href:"https://arxiv.org/abs/1234.5678v2"},c={...a,id:"external3",href:a.href+"#abstract"};
+ A.deepEqual(C.researchDedup([a,b,c]),[a,b]);
+ const d={...a,id:"external4",href:a.href+"?version=3"};
+ A.deepEqual(C.researchDedup([a,d]),[a,d]);
+ const invalid={...meta,href:"https://doi.org/not-a-doi"};
+ A.equal(C.researchDedup([invalid,invalid]).length,2);
+ A.equal(C.researchDedup([{...meta,href:"javascript:alert(1)"},meta]).length,2);
+ A.deepEqual(C.researchDedup([]),[]);
+ console.log("8 research evidence deduplication checks passed");
+}
