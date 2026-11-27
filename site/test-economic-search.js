@@ -112,3 +112,23 @@ const v=i=>Array.from({length:384},(_,j)=>Number(j===i));
 const ranked=S.abstractRank(v(0),[{doc:{title:"B"},vectors:[v(1)]},{doc:{title:"A"},vectors:[v(0),v(1)]}]);
 A.equal(ranked[0].title,"A");A.equal(ranked[0].abstractSimilarity,.5);A.equal(ranked[0].bestChunk,1);A.equal(ranked[0].chunkCount,2);A.throws(()=>S.abstractRank(v(0),[{doc:d,vectors:[]}]));
 console.log("14 abstract semantic comparison checks passed");}
+
+{const A=require("node:assert/strict"),S=require("./economic-search.js"),lic="https://creativecommons.org/licenses/by/4.0/";
+ const make=(i,date="2025-01")=>({kind:"paper",title:"Инвестиции "+i,code:"10.1234/"+i,href:"https://doi.org/10.1234/"+i,date,abstract_license:lic});
+ const paper=d=>({doi:d.code,title:d.title,published:d.date,authors:"A",licensed_abstract:{license:lic,text:"Аннотация "+d.title},access:{licenses:[{version:"vor",url:lic,start:"2020-01-01"}]}});
+ const docs=[...Array.from({length:60},(_,i)=>make(i,"2026-01")),make(60,"2024-01"),make(61,"2024-02")];
+ const index=docs=>({schema:1,built:"2026-11-27",docs,postings:{"инвестиц":docs.map((d,i)=>[i,100-i])},abstract_postings:{},abstract_count:docs.length,abstract_norms:docs.map(()=>0)});
+ const papers=docs.map(paper);
+ A.deepEqual(S.researchEvidence(index(docs),papers,"инвестиции","2024-12").map(r=>r.code),[docs[60].code,docs[61].code],"future records");
+ const invalid=docs.map((d,i)=>i<60?{...d,date:"2024-01"}:d);
+ const missing=invalid.map(paper).map((p,i)=>i<60?{...p,authors:""}:p);
+ A.equal(S.researchEvidence(index(invalid),missing,"инвестиции","2024-12").length,2,"invalid authors");
+ A.equal(S.researchEvidence(index(invalid),[...missing,missing[60]],"инвестиции","2024-12").length,1,"ambiguous DOI");
+ const badDate={...docs[60],date:"2024-02-30"},badHref={...docs[61],href:"https://example.org/not-doi"};
+ A.equal(S.researchEvidence(index([badDate,badHref]),[paper(badDate),paper(badHref)],"2024-12").length,0,"invalid date or URL");
+ const old=make(90,"2024");
+ A.equal(S.researchEvidence(index([old]),[paper(old)],"инвестиции","2024-11").length,0,"year precision before December");
+ A.equal(S.researchEvidence(index([old]),[paper(old)],"инвестиции","2024-12").length,1,"year precision in December");
+ A.equal(S.researchEvidence(index([docs[60],docs[60],docs[61]]),papers,"инвестиции","2024-12").length,2,"duplicate indexed record");
+ console.log("7 historical research retrieval checks passed");
+}
