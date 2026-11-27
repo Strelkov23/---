@@ -100,6 +100,47 @@ const GlobalEconomicAssistant=(function core(){
   out.push({id:"us-trade-balance",kind:"Расчёт по сопоставимым месяцам",title:"Оборот и сальдо торговли со стороны США",description:scope+" · оборот "+num(total)+" · предыдущий оборот "+num(previous)+" · сальдо "+num(e.now-i.now)+" млн долл. США"+(Number.isFinite(change)?" · изменение оборота "+num(change)+"%":""),href:source,limit:limit+" Сальдо = экспорт США минус импорт США; не российское сальдо."});
   return out;
  }
+ function labourCommand(q){
+  const s=String(q||"").trim();if(!/^рынок труда\s*:/iu.test(s))return null;
+  const m=s.match(/^рынок труда\s*:\s*(\d{4})-(0[1-9]|1[0-2])\s*;\s*база\s*=\s*(\d{4})$/iu);
+  if(!m||Number(m[1])<1991||Number(m[3])<1991)return {kind:"invalid"};
+  return {kind:"labour",year:m[1],month:m[2],base:m[3]};
+ }
+ function labourEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="labour"||d?.schema!=="iv-labour-v1"||d.origin!=="platform_primary"||d.status!=="manual_verified_labels"||!Array.isArray(d.rows)||!Array.isArray(d.snapshots)||!Array.isArray(d.verification?.documents)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff))return [];
+  const period=cmd.year+"-"+cmd.month,base=cmd.base+"-"+cmd.month;
+  if(period>=cutoff||base>=cutoff)return [];
+  const trusted=(r,page)=>{const src=d.sources?.[r.source];return !!(src&&external(src.url)&&Number.isInteger(page)&&page>0&&d.verification.documents.some(x=>x.source===r.source&&x.page===page))};
+  const get=p=>{const rows=d.rows.filter(r=>r.period===p);if(rows.length!==1)return null;const r=rows[0];return Number.isFinite(r.value)&&r.value>=0&&trusted(r,d.sources?.[r.source]?.page)?r:null};
+  const a=get(period),b=get(base);if(!a||!b)return [];
+  const result=IV.relative([a,...(period===base?[]:[b])],cmd.month,cmd.year,cmd.base);
+  const fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Отношение активных резюме к активным вакансиям на одной платформе. Не безработица и не число уникальных людей. Ручная сверка: "+(d.verification.date||"дата не указана")+". "+(d.verification.limitations||"");
+  const out=[a,b].map((r,i)=>({id:"hh-index"+(i+1),kind:"Платформенная статистика",title:i?"Базовый hh.индекс":"hh.индекс",description:r.period+" · "+fmt(r.value)+" резюме на вакансию · "+IV.classify(r.value)+" · стр. "+d.sources[r.source].page,period:r.period,value:r.value,unit:"резюме/вакансия",href:d.sources[r.source].url,limit:note}));
+  out.push({id:"hh-compare",kind:"Сопоставление на одной платформе",title:"Изменение конкуренции за вакансии",description:period+" и "+base+" · индекс (база=100): "+fmt(result.index)+" · разность отношений "+fmt(result.difference),href:"independent-statistics.html#iv-hh",limit:note+" Сопоставлены одинаковые календарные месяцы."});
+  const snapshots=d.snapshots.filter(r=>r.period===period);
+  if(snapshots.length===1){const s=snapshots[0];if(trusted(s,s.page)&&[s.vacancies_yoy,s.resumes_yoy,s.offered_salary].every(Number.isFinite)&&s.offered_salary>=0&&s.vacancies_yoy>-100&&s.resumes_yoy>=-100){
+   out.push({id:"hh-snapshot",kind:"Платформенная статистика",title:"Вакансии, резюме и предлагаемая оплата",description:period+" · вакансии год к году "+fmt(s.vacancies_yoy)+"% · резюме "+fmt(s.resumes_yoy)+"% · медиана предложения "+fmt(s.offered_salary)+" руб. · индекс отношения из темпов "+fmt(IV.balance(s.vacancies_yoy,s.resumes_yoy))+" (прошлый год=100) · стр. "+s.page,href:d.sources[s.source].url,limit:note+" Темпы округлены; предлагаемая оплата не фактическая зарплата."});
+  }}
+  return out;
+ }
+ function outputCommand(q){
+  const s=String(q||"").trim();if(!/^физический выпуск\s*:/iu.test(s))return null;
+  const m=s.match(/^физический выпуск\s*:\s*([a-z0-9_-]{1,60})\s*;\s*([a-z0-9_-]{1,60})\s*;\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})$/iu);
+  return m?{kind:"physical-output",company:m[1].toLowerCase(),metric:m[2].toLowerCase(),year:Number(m[3]),base:Number(m[4])}:{kind:"invalid"};
+ }
+ function outputEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="physical-output"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  IV.validate(d);const c=d.companies.find(c=>c.id===cmd.company),m=c?.metrics.find(m=>m.id===cmd.metric);if(!c||!m)return [];
+  const get=y=>{const r=c.rows.find(r=>r.year===y);return r&&(c.verification==="source_rechecked"||r.verification==="source_rechecked")&&/^\d{4}-\d{2}-\d{2}$/.test(c.verification_date||"")&&c.verification_date.slice(0,7)<=cutoff&&external(r.source||c.source)&&Number.isFinite(r[m.id])&&r[m.id]>=0?r:null};
+  const a=get(cmd.year),b=get(cmd.base),p=get(cmd.year-1);if(!a||!b)return [];
+  const v=IV.compare(c,m.id,cmd.year,cmd.base),fmt=x=>Number.isFinite(x)?Number(x.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note=c.scope+". "+(c.verification_method||"")+" Сверка "+c.verification_date+". Корпоративное раскрытие, не национальный выпуск и не независимый аудит.";
+  const out=[a,b].map((r,i)=>({id:"physical-observation"+(i+1),kind:"Корпоративное наблюдение",title:c.title+" · "+m.title,description:r.year+" · "+fmt(r[m.id])+" "+m.unit+" · "+(r.reference||c.page||"ссылка на отчёт"),period:String(r.year),value:r[m.id],unit:m.unit,href:r.source||c.source,limit:note}));
+  out.push({id:"physical-change",kind:"Расчёт динамики выпуска",title:c.title+" · индекс физического выпуска",description:cmd.year+" к "+cmd.base+" · индекс (база=100): "+fmt(v.index)+" · изменение "+fmt(v.index===null?null:v.index-100)+"% · годовой темп "+fmt(p?v.yoy:null)+(p&&v.yoy!==null?"%":""),href:"independent-statistics.html",limit:note+" Годовой темп только при сверенном наблюдении предыдущего года."});
+  if(p&&v.yoy!==null&&p.year!==b.year&&p.year!==a.year)out.push({id:"physical-prior",kind:"Корпоративное наблюдение",title:c.title+" · предыдущий год",description:p.year+" · "+fmt(p[m.id])+" "+m.unit+" · "+(p.reference||c.page||"ссылка на отчёт"),period:String(p.year),value:p[m.id],unit:m.unit,href:p.source||c.source,limit:note});
+  return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -391,7 +432,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -576,7 +617,25 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Архив зеркальной торговли недоступен.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findIndependent(cmd,parameters,type){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const labour=type==="labour",title=labour?"Рынок труда hh.ru":"Физический выпуск предприятия",href=labour?"independent-statistics.html#iv-hh":"independent-statistics.html";
+  const context={page,heading,description:title,parameters,parameter_note:"Период и база — параметры сравнения; пропуски не заполняются."};
+  let found=[],failed=0;
+  const note=description=>[{id:type+"-status",kind:"Статус расчёта",title,description,href}];
+  if(cmd.kind==="invalid")found=note(labour?"Пример: рынок труда: 2026-10; база=2025":"Пример: физический выпуск: nornickel; nickel; 2025; база=2024. Идентификаторы компании и продукта из набора физических показателей.");
+  else try{
+   if(labour)await loadScript("iv-labour.js",()=>typeof IVLabour!=="undefined");else await loadScript("iv-physical.js",()=>typeof IVPhysical!=="undefined");
+   const d=(await Provenance.get(manifest,labour?"independent-labour.json":"independent-physical.json",base)).data,cutoff=new Date().toISOString().slice(0,7);
+   found=labour?C.labourEvidence(cmd,d,IVLabour,cutoff):C.outputEvidence(cmd,d,IVPhysical,cutoff);
+   if(!found.length)found=note("Нет сверенной пары наблюдений за указанные периоды или показатель не найден.");
+  }catch{failed=1;found=note("Проверенный архив или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
+  const output=C.outputCommand(q.value);if(output)return findIndependent(output,parameters,"physical");
   const partner=C.partnerTradeCommand(q.value);if(partner)return findPartnerTrade(partner,parameters);
   const price=C.priceCommand(q.value);if(price)return findPrice(price,parameters);
   const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);

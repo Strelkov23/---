@@ -207,3 +207,28 @@ A.equal(core.partnerTradeEvidence(cmd,{...d,unit:"рубли"},IV,"2026-03").len
 A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed",seed_verification:"documented_manual",seed_recheck_date:"2026-03-01"},IV,"2026-03").length,3);
 A.equal(core.partnerTradeEvidence(cmd,{...d,status:"manual_seed"},IV,"2026-03").length,0);
 console.log("19 partner trade assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),L=require("./iv-labour.js"),P=require("./iv-physical.js");
+const l=core.labourCommand("рынок труда: 2026-10; база=2025");
+A.deepEqual(l,{kind:"labour",year:"2026",month:"10",base:"2025"});
+A.equal(core.labourCommand("рынок труда: 2026-13; база=2025").kind,"invalid");
+A.equal(core.labourCommand("безработица"),null);
+const r={period:"2026-10",value:9,source:"a"},b={period:"2025-10",value:7.3,source:"a"};
+const d={schema:"iv-labour-v1",origin:"platform_primary",status:"manual_verified_labels",rows:[r,b],snapshots:[],sources:{a:{url:"https://example.org/a",page:5}},verification:{documents:[{source:"a",page:5}]}};
+A.equal(core.labourEvidence(l,d,L,"2026-11").length,3);
+A.equal(core.labourEvidence(l,d,L,"2026-10").length,0);
+A.equal(core.labourEvidence(l,{...d,rows:[r,b,b]},L,"2026-11").length,0);
+A.equal(core.labourEvidence(l,{...d,verification:{documents:[]}},L,"2026-11").length,0);
+A.equal(core.labourEvidence(l,{...d,rows:[r]},L,"2026-11").length,0);
+A.equal(core.labourEvidence({...l,base:"2026"},d,L,"2026-11").length,3);
+const c=core.outputCommand("физический выпуск: nornickel; nickel; 2025; база=2024");
+A.equal(c.kind,"physical-output");A.equal(core.outputCommand("физический выпуск: x").kind,"invalid");
+const company={id:"nornickel",title:"Норникель",source:"https://example.org",scope:"Группа",verification:"source_rechecked",verification_date:"2026-11-26",metrics:[{id:"nickel",title:"Никель",unit:"т"}],rows:[{year:2024,nickel:100},{year:2025,nickel:90}]};
+const p={schema:"iv-physical-v1",companies:[company]};
+A.equal(core.outputEvidence(c,p,P,"2026-11").length,3);
+A.ok(core.outputEvidence(c,p,P,"2026-11")[2].description.includes("90"));
+A.equal(core.outputEvidence(c,p,P,"2025-12").length,0);
+A.equal(core.outputEvidence(c,{...p,companies:[{...company,verification:"pending"}]},P,"2026-11").length,0);
+A.equal(core.outputEvidence({...c,metric:"bad"},p,P,"2026-11").length,0);
+A.equal(core.outputEvidence({...c,base:2023},p,P,"2026-11").length,0);
+console.log("17 independent labour and output assistant checks passed");}
