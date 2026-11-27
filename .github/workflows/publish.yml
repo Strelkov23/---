@@ -174,7 +174,7 @@ jobs:
           node test-global-economic-assistant.js
           node test-economic-ai-page-context.js
           node test-economic-search.js
-          python3 -m unittest test_economic_search.py
+          python3 -m unittest test_economic_search.py test_economic_external_research.py
           python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_agents.py
           node test-research-projects.js
           node test-provenance.js

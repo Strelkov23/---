@@ -551,3 +551,7 @@ html[data-view=professional] .v-lab-guide li span{font-size:.82rem}
 .gea-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem}.gea-panel p{margin:.5rem 0}.gea-panel a{color:#175e55;overflow-wrap:anywhere}.gea-panel textarea{width:100%;box-sizing:border-box;resize:vertical;font:inherit;color:#203d4c;background:#fff;border:1px solid #a6c4c6}.gea-actions{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.4rem}.gea-panel button{min-height:44px;white-space:normal}.gea-panel article{border-top:1px solid #cfdddf;padding:.4rem 0;overflow-wrap:anywhere}.gea-panel article p{margin:.25rem 0}.gea-panel #gea-answer{white-space:pre-wrap;overflow-wrap:anywhere}.gea-panel button:focus-visible,.gea-toggle:focus-visible{outline:3px solid #a06424;outline-offset:2px}
 @media(max-width:520px){.gea-panel{right:8px;left:8px;width:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 54px);max-height:calc(100dvh - 75px);padding:.7rem}.gea-toggle{right:8px}}
 @media print{.gea-toggle,.gea-panel{display:none!important}}
+
+/* Keep the entry point in the header: never cover active economic controls. */
+.gea-toggle{position:static;right:auto;bottom:auto;z-index:auto;box-shadow:none;flex-shrink:0}.system-header{flex-wrap:wrap}.gea-panel{bottom:max(12px,env(safe-area-inset-bottom))}
+@media(max-width:520px){.gea-panel{bottom:8px}.gea-toggle{right:auto}}
