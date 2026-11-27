@@ -47,6 +47,30 @@ const GlobalEconomicAssistant=(function core(){
   const flags=[e.flag,i.flag,b?.flag??null].map(v=>v===null?"нет наблюдения":v||"нет").join(" / ");
   return {id:"eurostat-check",kind:"Расчёт и внутренний контроль Eurostat",title:"Оборот и сальдо торговли товарами ЕС с Россией",description:year+" · экспорт ЕС "+num(e.value)+" · импорт ЕС "+num(i.value)+" · оборот "+num(turnover)+" · сальдо расчётное "+num(balance)+" · сальдо источника "+(b?num(b.value):"нет данных")+" млн евро · "+status+(Number.isFinite(growth)?" · изменение номинального оборота к предыдущему году "+num(growth)+"%":" · годовой темп не рассчитан"),href:d.source,limit:String(d.note||"")+" Расчёт только по общему закрытому году; экспорт и импорт со стороны ЕС. Флаги экспорт / импорт / сальдо: "+flags+". Даты и статусы получения: "+meta.map(r=>r.code+" "+(r.success||"нет данных")+" ("+r.status+")").join("; ")+". Внутренний контроль, не независимое измерение. Номинальная стоимость, не физический объём; разные редакции возможны.",period:year,unit:d.unit};
  }
+ function priceCommand(q){
+  const s=String(q||"").trim();
+  if(!/^покупательная способность\s*:/iu.test(s))return null;
+  const m=s.match(/^покупательная способность\s*:\s*(\d{4}-(?:0[1-9]|1[0-2]))\s*;\s*(месяц|год|с начала года)\s*;\s*(?:зарплата|оплата)\s*=\s*([+-]?\d{1,3}(?:[.,]\d{1,2})?)\s*%?$/iu);
+  if(!m)return {kind:"invalid"};
+  const wage=Number(m[3].replace(",","."));
+  if(wage< -50||wage>100||Number(m[1].slice(0,4))<1991)return {kind:"invalid"};
+  return {kind:"price-power",period:m[1],basis:{"месяц":"mom","год":"yoy","с начала года":"ytd"}[m[2].toLowerCase()],wage};
+ }
+ function priceEvidence(cmd,d,IV,cutoff){
+  if(cmd?.kind!=="price-power"||!["mom","yoy","ytd"].includes(cmd.basis)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cmd.period)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||cmd.period>=cutoff||d?.schema!=="iv-prices-v1"||!Array.isArray(d.rows)||!external(d.official_source))return [];
+  const matches=d.rows.filter(r=>r.period===cmd.period);
+  if(matches.length!==1||!external(matches[0].url))return [];
+  const [p]=IV.gaps(matches,cmd.basis,0),x=IV.purchasingPower(p,cmd.wage);
+  if(!x||!Object.values(x).every(Number.isFinite))return [];
+  const num=v=>Number(v.toFixed(4)).toLocaleString("ru-RU",{maximumFractionDigits:4});
+  const basis={mom:"к предыдущему месяцу",yoy:"к тому же месяцу прошлого года",ytd:"к декабрю прошлого года"}[cmd.basis];
+  const note="Различные корзины и методы: ИПЦ товаров и услуг и панель покупок FMCG. Не оценка ошибки Росстата, не фактическая реальная зарплата. Номинальный рост задан пользователем за тот же период. Архивная сверка: "+(d.checked||"дата не указана")+".";
+  return [
+   {id:"price-official",kind:"Архивное наблюдение",title:"Росстат · ИПЦ (републикация)",description:cmd.period+" · "+basis+" · "+num(p.b)+"%",value:p.b,unit:"%",period:cmd.period,href:d.official_source,limit:note},
+   {id:"price-panel",kind:"Архивное наблюдение",title:"РОМИР · дефлятор FMCG",description:cmd.period+" · "+basis+" · "+num(p.a)+"%",value:p.a,unit:"%",period:cmd.period,href:p.source,limit:note},
+   {id:"price-scenario",kind:"Условный расчёт",title:"Покупательная способность при заданном изменении оплаты",description:cmd.period+" · "+basis+" · номинальная оплата "+num(cmd.wage)+"% · по ИПЦ "+num(x.official)+"% · по FMCG "+num(x.panel)+"% · разность сценариев "+num(x.delta)+" п.п. · безубыточный рост оплаты по ИПЦ "+num(x.breakEvenOfficial)+"%, по FMCG "+num(x.breakEvenPanel)+"%",href:"independent-statistics.html#iv-price-comparison",limit:note+" Формула: 100 × ((1 + рост оплаты/100)/(1 + темп цен/100) − 1)."}
+  ];
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -338,7 +362,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -493,7 +517,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Проверенный оптимум не получен: матрица, вычислитель или лимит времени. Откройте подробный инструмент.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findPrice(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Сценарное сравнение покупательной способности по двум ценовым корзинам",parameters,parameter_note:"Рост оплаты — условное допущение, не фактическая зарплата."};
+  let found=[],failed=0;
+  const note=description=>[{id:"price-status",kind:"Статус расчёта",title:"Ценовые корзины и покупательная способность",description,href:"independent-statistics.html#iv-price-comparison"}];
+  if(cmd.kind==="invalid")found=note("Пример: покупательная способность: 2024-05; год; зарплата=10%. База: месяц, год или с начала года. Рост оплаты от −50% до 100%.");
+  else try{
+   await loadScript("iv-comparison.js",()=>typeof IVCompare!=="undefined");
+   const d=(await Provenance.get(manifest,"independent-prices.json",base)).data;
+   found=C.priceEvidence(cmd,d,IVCompare,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённой пары ценовых наблюдений за указанный закрытый период. Другой месяц не подставляется.");
+  }catch{failed=1;found=note("Проверенный архив цен или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const price=C.priceCommand(q.value);if(price)return findPrice(price,parameters);
   const bottleneck=C.bottleneckCommand(q.value,C.horizonCommand);if(bottleneck)return findHorizon(bottleneck,parameters);
   const robust=C.robustnessCommand(q.value,C.horizonCommand);if(robust)return findHorizon(robust,parameters);
   const horizon=C.horizonCommand(q.value);if(horizon)return findHorizon(horizon,parameters);

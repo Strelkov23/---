@@ -170,3 +170,22 @@ A.equal(core.tradeEvidence({...d,source:"javascript:alert(1)"},2025),null);
 A.ok(core.tradeEvidence(change("MIO_IMP_VAL",[row("2025",10)]),2025).description.includes("годовой темп не рассчитан"));
 A.equal(core.tradeEvidence({...d,series:{...d.series,MIO_IMP_VAL:{...d.series.MIO_IMP_VAL,success:null}}},2025),null);
 console.log("21 statistical evidence checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),IV=require("./iv-comparison.js");
+const cmd=core.priceCommand("покупательная способность: 2024-05; год; зарплата=10%");
+A.deepEqual(cmd,{kind:"price-power",period:"2024-05",basis:"yoy",wage:10});
+A.equal(core.priceCommand("покупательная способность: 2024-05; месяц; оплата=-5,5").wage,-5.5);
+A.equal(core.priceCommand("покупательная способность: 2024-05; с начала года; зарплата=0").basis,"ytd");
+A.equal(core.priceCommand("инфляция"),null);
+for(const q of ["покупательная способность: 2024-13; год; зарплата=10","покупательная способность: 2024-05; год; зарплата=101","покупательная способность: 2024-05; год; зарплата=-51","покупательная способность: 2024-05; квартал; зарплата=10"])A.equal(core.priceCommand(q).kind,"invalid");
+const r={period:"2024-05",yoy:20,official:{yoy:[110]},url:"https://romir.ru/test"};
+const d={schema:"iv-prices-v1",official_source:"https://example.org/cpi",rows:[r]};
+const e=core.priceEvidence(cmd,d,IV,"2026-11");
+A.equal(e.length,3);A.equal(e[0].value,10);A.equal(e[1].value,20);A.ok(e[2].description.includes("по ИПЦ 0%"));A.ok(e[2].description.includes("−8,3333%")||e[2].description.includes("-8,3333%"));A.ok(e[2].limit.includes("Не оценка ошибки Росстата"));
+A.equal(core.priceEvidence(cmd,d,IV,"2024-05").length,0);
+A.equal(core.priceEvidence({...cmd,period:"2024-06"},d,IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[r,r]},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,yoy:-100}]},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,official_source:"javascript:alert(1)"},IV,"2026-11").length,0);
+A.equal(core.priceEvidence(cmd,{...d,rows:[{...r,official:{}}]},IV,"2026-11").length,0);
+console.log("20 purchasing power assistant checks passed");}
