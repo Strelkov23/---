@@ -21,7 +21,17 @@ async function run(){
  A.throws(()=>V.rank(v,[d,d],index,sha));
  const all=await Promise.all(parts.map((_,i)=>V.build(index,i,sha,async()=>v)));
  A.equal(V.rank(v,all,index,sha).complete,true);A.equal(V.rank(v,all,index,sha).searched,250);
- console.log("18 server vector index checks passed");
+ const receipt=x=>({schema:1,source_sha256:sha,shard:x.shard,rows:x.rows.length,file:"research-title-shard-"+String(x.shard).padStart(2,"0")+".json",sha256:"c".repeat(64),bytes:100,model:V.MODEL});
+ const pair=x=>({data:x,receipt:receipt(x)});
+ const cat=V.catalog(index,sha,[pair(d)]);
+ A.equal(cat.complete,false);A.equal(cat.indexed,d.rows.length);A.equal(cat.total,250);A.equal(cat.missing.length,63);A.equal(cat.entries[0].shard,s);
+ A.throws(()=>V.catalog(index,sha,[pair(d),pair(d)]));
+ A.throws(()=>V.catalog(index,sha,[{data:d,receipt:{...receipt(d),file:"../bad"}}]));
+ A.throws(()=>V.catalog(index,sha,[{data:d,receipt:{...receipt(d),rows:0}}]));
+ A.throws(()=>V.catalog(index,sha,[{data:d,receipt:{...receipt(d),source_sha256:"b".repeat(64)}}]));
+ const complete=V.catalog(index,sha,all.map(pair));
+ A.equal(complete.complete,true);A.equal(complete.indexed,250);A.equal(complete.missing.length,0);
+ console.log("30 server vector and catalogue checks passed");
 }
 module.exports=run;
 if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1;});

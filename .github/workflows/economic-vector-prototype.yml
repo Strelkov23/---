@@ -22,6 +22,7 @@ jobs:
           node-version: '22'
       - run: |
           node --check site/economic-vector-build.js
+          node --check site/economic-vector-pack.js
           node site/test-economic-vector.js
   encode:
     needs: checks
@@ -41,9 +42,12 @@ jobs:
           git fetch origin main --depth=1
           git archive FETCH_HEAD history/published/data-manifest.json history/published/economic-search-index.json | tar -x -C "$RUNNER_TEMP"
           node site/economic-vector-build.js "$RUNNER_TEMP/history/published" "$RUNNER_TEMP/vector-output" "$SHARD" "$RUNNER_TEMP/vector-runtime"
+      - name: Assemble verified catalogue
+        run: |
+          node site/economic-vector-pack.js "$RUNNER_TEMP/history/published" "$RUNNER_TEMP/vector-catalog" "$RUNNER_TEMP/vector-output"
       - uses: actions/upload-artifact@v4
         with:
           name: economic-research-title-vectors
-          path: ${{ runner.temp }}/vector-output/
+          path: ${{ runner.temp }}/vector-catalog/
           if-no-files-found: error
           retention-days: 7

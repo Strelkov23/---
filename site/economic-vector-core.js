@@ -52,4 +52,19 @@ function rank(query,shards,index,source,limit=20){
   for(const r of d.rows){const similarity=Math.max(-1,Math.min(1,r.vector.reduce((s,v,i)=>s+v*query[i],0)/(norm*Math.hypot(...r.vector))));rows.push({kind:r.kind,href:r.href,title:r.title,similarity});}}
  return {searched:rows.length,shards:seen.size,complete:seen.size===SHARDS,rows:rows.sort((a,b)=>b.similarity-a.similarity|| (identity(a)<identity(b)?-1:1)).slice(0,limit)};
 }
-module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank};
+function catalog(index,source,parts){
+ if(!digestOK(source)||!Array.isArray(parts)||parts.length>SHARDS)throw Error("Invalid catalogue input");
+ const expected=Array.from({length:SHARDS},(_,i)=>targets(index,i).length),seen=new Set(),entries=[];
+ for(const p of parts){
+  if(!p||!p.data||!p.receipt)throw Error("Missing shard receipt");
+  const d=p.data,r=p.receipt,i=d.shard;
+  if(seen.has(i))throw Error("Duplicate shard");seen.add(i);validate(d,index,source,i);
+  const name="research-title-shard-"+String(i).padStart(2,"0")+".json";
+  if(r.schema!==1||r.source_sha256!==source||r.shard!==i||r.rows!==d.rows.length||r.file!==name||!digestOK(r.sha256)||!Number.isSafeInteger(r.bytes)||r.bytes<1||!r.model||Object.keys(r.model).length!==Object.keys(MODEL).length||Object.keys(MODEL).some(k=>r.model[k]!==MODEL[k]))throw Error("Invalid receipt");
+  entries.push({shard:i,file:name,rows:r.rows,sha256:r.sha256,bytes:r.bytes});
+ }
+ entries.sort((a,b)=>a.shard-b.shard);
+ const missing=Array.from({length:SHARDS},(_,i)=>i).filter(i=>!seen.has(i)),total=expected.reduce((a,b)=>a+b,0),indexed=entries.reduce((a,b)=>a+b.rows,0);
+ return {schema:1,scope:"research-title-only",model:{...MODEL},source_sha256:source,shards:SHARDS,complete:missing.length===0,total,indexed,entries,missing};
+}
+module.exports={MODEL,SHARDS,MAX,identity,bucket,eligible,targets,vectorOK,build,validate,rank,catalog};
