@@ -56,6 +56,11 @@ def build(out,previous,stamp,refresh):
       agent("quality","attention" if memory["backlog"] or m["recent_rejected"] else "ok",{"freshness":m["freshness"],"backlog":len(memory["backlog"]),"recent_rejected":m["recent_rejected"]},["freshness.html","source-pipeline.html"],[{k:r.get(k) for k in ("id","title","state","next_check")} for r in memory["backlog"][:10]]),
       agent("research","ok" if news or papers else "waiting",{"news":m["changes"]["news"],"papers":m["changes"]["papers"],"baseline_available":baseline},["index.html","papers.html"],report_items),
       agent("forecast","attention" if any(r["action"]=="review_model" for r in flags) else "ok" if assessed else "waiting",{"frozen":len(forecast["rows"]),"scored":sum(r["first_actual"] is not None for r in forecast["rows"]),"adequate_sample_groups":len(assessed)},["forecast.html","economic-ai-forecast-memory.json"],flags[:30])]
+    eurostat=read(out,"economic-eurostat-trade.json")
+    agents[1]["metrics"]["eurostat"]=[dict(code=k,title=r["title"],status=r["status"],checked=r["checked"],success=r["success"],count=len(r["rows"]),latest=r["rows"][-1] if r["rows"] else None) for k,r in eurostat["series"].items()]
+    agents[1]["metrics"]["eurostat_note"]=eurostat["note"]
+    agents[1]["links"].append("economic-eurostat-trade.json")
+    if any(r["status"]=="error" for r in eurostat["series"].values()):agents[1]["state"]="attention"
     tournament=read(out,"economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")

@@ -52,7 +52,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json"];
+  const keys=["site-search.json","data-registry.json","archive.json","literature.json","economic-search-index.json","economic-ai-diagnostics.json","economic-ai-planning.json","economic-eurostat-trade.json"];
   const files=await Promise.allSettled(keys.map(k=>Provenance.get(manifest,k,base)));
   const get=i=>files[i].status==="fulfilled"?files[i].value.data:null;
   const found=[];const tools=get(0);
@@ -92,6 +92,9 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+p.authors+" · "+r.date+" · Аннотация (форматирование нормализовано): "+a.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+a.license+"; Crossref, проверка "+a.checked});
    }
   }catch{}}
+  if(get(7)?.schema===1&&get(7).series){const d=get(7);const ranked=C.rank(Object.entries(d.series).map(([code,r])=>({...r,code,description:"Eurostat Евростат ЕС Россия торговля экспорт импорт товары"})),q.value,2);
+   for(const [i,r] of ranked.entries()){const last=r.rows?.at(-1);if(!last||!Number.isFinite(last.value)||!C.external(d.source))continue;found.push({id:"eurostat"+(i+1),kind:"Зеркальная статистика Eurostat",title:r.title,description:last.period+" · "+last.value+" "+d.unit+" · флаг "+(last.flag||"нет"),period:last.period,value:last.value,unit:d.unit,href:d.source,limit:d.note+" Проверка "+(r.success||"не подтверждена")+(r.status==="error"?" Последняя загрузка не удалась.":"")})}
+  }
   return {found,context:localContext,failed:files.filter(x=>x.status==="rejected").length,fingerprint:manifest.data_fingerprint};
  }
  function render(r){
