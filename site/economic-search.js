@@ -193,12 +193,32 @@ const EconomicSearch=(function core(){
  for(const d of eligible){const key=cacheIdentity(d.title);if(seen.has(key))continue;seen.add(key);out.push(d);if(out.length===limit)break;}
  return out;
  }
- return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets,touchCache};
+ function coverage(index,audit=null){
+  const kinds=["tool","series","news","paper","discovered","external","web"];
+  if(index?.schema!==1||!Array.isArray(index.docs))throw Error("Invalid search coverage");
+  const counts=Object.fromEntries(kinds.map(k=>[k,0]));let abstracts=0,dated=0;
+  for(const d of index.docs){
+   if(!Object.hasOwn(counts,d.kind))throw Error("Unknown document kind");
+   counts[d.kind]++;
+   if(d.kind==="paper"&&d.abstract_license==="https://creativecommons.org/licenses/by/4.0/")abstracts++;
+   if(["paper","external","web"].includes(d.kind)&&/^\d{4}/.test(d.date||""))dated++;
+  }
+  const research=counts.paper+counts.external+counts.web;
+  const consistent=!!audit&&audit.schema===1&&kinds.every(k=>audit.counts?.[k]?.total===counts[k])&&audit.abstracts?.indexed===abstracts;
+  const sources=consistent&&Array.isArray(audit.sources)?audit.sources.filter(r=>["wdi","arxiv","feds"].includes(r.id)&&["waiting","ok","error","blocked"].includes(r.status)).map(r=>({id:r.id,status:r.status,checked:typeof r.checked==="string"?r.checked:null,success:typeof r.success==="string"?r.success:null})):null;
+  const changes=consistent&&audit.baseline_available===true&&kinds.every(k=>["added","removed"].every(m=>Number.isSafeInteger(audit.counts[k][m])&&audit.counts[k][m]>=0)&&audit.counts[k].added<=counts[k])?Object.fromEntries(kinds.map(k=>[k,{added:audit.counts[k].added,removed:audit.counts[k].removed}])):null;
+  return {counts,total:index.docs.length,research,abstracts,dated,undated:research-dated,metadataOnly:research-abstracts,sources,changes,consistent};
+ }
+ function coverageQuestion(q){
+  const s=String(q||"").toLowerCase().replaceAll("ё","е").trim();
+  return /(?:охват|покрытие|размер|состояние|статистика|сколько|объем)/u.test(s)&&/(?:поисковик|поискового индекс|научного архив|научных публикаци|научных статей|аннотаци)/u.test(s);
+ }
+ return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets,touchCache,coverage,coverageQuestion};
 })();
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("es-"+id),form=$("form");if(!form)return;
- const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector"),semantic=$("semantic"),semanticStatus=$("semantic-status"),clearSemantic=$("semantic-clear"),localSemantic=$("local-semantic"),localResults=$("local-results"),buildSemantic=$("semantic-build"),stopSemantic=$("semantic-stop"),buildStatus=$("semantic-build-status"),buildLimit=$("semantic-build-limit"),buildFiltered=$("semantic-build-filtered");
+ const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector"),semantic=$("semantic"),semanticStatus=$("semantic-status"),clearSemantic=$("semantic-clear"),localSemantic=$("local-semantic"),localResults=$("local-results"),buildSemantic=$("semantic-build"),stopSemantic=$("semantic-stop"),buildStatus=$("semantic-build-status"),buildLimit=$("semantic-build-limit"),buildFiltered=$("semantic-build-filtered"),coverageHost=$("coverage"),coverageRefresh=$("coverage-refresh");
  const labels={tool:"Инструмент",series:"Статистика",news:"Новости и документы",paper:"Научные статьи",discovered:"Новые показатели WDI",external:"Внешние препринты arXiv",web:"Внешние исследования FEDS"};
  let index=null,rows=[],limit=20,fingerprint="",seq=0,manifest=null,papersPromise=null,lastQuery="",encoderPromise=null,semanticBusy=false,baselineRows=[],lastOptions=null,buildStop=false,buildActive=false,indexPromise=null;
  const add=(p,t,v)=>{const e=document.createElement(t);e.textContent=v;p.append(e);return e};
@@ -273,6 +293,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{if(token===seq)semanticStatus.textContent="Локальный индекс или модель недоступны; обычная выдача сохранена.";}
   finally{semanticBusy=false;controls()}
  };
+ async function showCoverage(){
+  coverageRefresh.disabled=true;coverageHost.textContent="Проверка охвата индекса…";
+  try{
+   await ensureIndex();let audit=null;
+   try{audit=(await Provenance.get(manifest,"economic-search-audit.json",root)).data}catch{}
+   const c=EconomicSearch.coverage(index,audit);
+   coverageHost.replaceChildren();
+   add(coverageHost,"p","Всего записей: "+c.total+" · научных материалов: "+c.research+" · с лицензированными аннотациями: "+c.abstracts+" · только метаданные: "+c.metadataOnly+" · без даты: "+c.undated+".");
+   const ul=add(coverageHost,"ul","");
+   for(const [k,n] of Object.entries(c.counts)){const ch=c.changes?.[k];add(ul,"li",labels[k]+": "+n+(ch?" · добавлено "+ch.added+", удалено "+ch.removed:""));}
+   if(c.sources)for(const r of c.sources)add(coverageHost,"p",r.id+" · "+({ok:"успешно",error:"ошибка",blocked:"заблокировано",waiting:"ожидает"}[r.status])+" · последняя проверка "+(r.checked||"нет данных")+" · успех "+(r.success||"нет данных"));
+   else add(coverageHost,"p","Согласованный отчёт об обновлении источников недоступен.");
+   add(coverageHost,"small","SHA-256 "+fingerprint.slice(0,12)+". Охват архива, а не всего интернета; число записей не доказывает полноту или истинность данных. Без проверенной базы сравнения прирост не показывается.");
+  }catch{coverageHost.textContent="Охват не подтверждён: индекс недоступен или не прошёл контроль."}
+  finally{coverageRefresh.disabled=false;}
+ }
+ coverageRefresh.onclick=showCoverage;
  async function ensureIndex(){
   if(index)return;
   if(!indexPromise)indexPromise=(async()=>{const m=await Provenance.validateManifest(await load("data-manifest.json"));const d=(await Provenance.get(m,"economic-search-index.json",root)).data;if(d.schema!==1||!Array.isArray(d.docs)||!d.postings)throw Error("Invalid index");index=d;manifest=m;fingerprint=m.data_fingerprint;})().finally(()=>{indexPromise=null});

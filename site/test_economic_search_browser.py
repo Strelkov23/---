@@ -53,6 +53,11 @@ with tempfile.TemporaryDirectory() as tmp:
                 }}"""))
             url=f"http://127.0.0.1:{server.server_port}/economic-search.html"
             page.goto(url)
+            page.locator("summary").filter(has_text="Паспорт охвата поисковика").click()
+            page.locator("#es-coverage-refresh").click()
+            expect(page.locator("#es-coverage")).to_contain_text("Всего записей: 3")
+            expect(page.locator("#es-coverage")).to_contain_text("научных материалов: 2")
+            expect(page.locator("#es-coverage")).to_contain_text("отчёт об обновлении источников недоступен")
             page.locator("#es-semantic-build-filtered").check()
             page.locator("#es-kind").select_option("paper")
             page.locator("#es-from").fill("2026")

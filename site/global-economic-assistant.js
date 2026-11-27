@@ -491,6 +491,14 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }
   const cutoff=new Date().toISOString().slice(0,7);
   for(const [i,kind] of [[2,"news"],[3,"papers"]]){const data=get(i),rows=kind==="news"?data:data?.articles;if(!Array.isArray(rows))continue;for(const r of EconomicAIRetrieval.collect(rows,kind,q.value,cutoff,2)){if(C.external(r.url))found.push({id:r.id,kind:kind==="news"?"Публикация":"Научная статья",title:r.title,description:r.published+" · "+r.source,href:r.url,limit:r.limit})}}
+  if(get(4)){try{
+   await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");
+   if(EconomicSearch.coverageQuestion(q.value)){
+    let audit=null;try{audit=(await Provenance.get(manifest,"economic-search-audit.json",base)).data}catch{}
+    const c=EconomicSearch.coverage(get(4),audit);
+    found.unshift({id:"search-coverage",kind:"Паспорт охвата",title:"Охват собственного экономического поисковика",description:"Всего "+c.total+" записей; научных материалов "+c.research+"; лицензированные аннотации "+c.abstracts+"; только метаданные "+c.metadataOnly+"; без даты "+c.undated+". "+Object.entries(c.counts).map(([k,n])=>k+": "+n).join("; "),href:"economic-search.html",limit:"Не весь интернет; числа отражают записи проверенного снимка, а не качество доказательств. "+(c.consistent?"Отчёт охвата согласован.":"Отчёт обновления источников не подтверждён.")});
+   }
+  }catch{}}
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");const seen=new Set(found.map(r=>r.href));for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"discovered",expand:true}).slice(0,3).entries()){if(!seen.has(r.href)&&C.external(r.href))found.push({id:"index"+(i+1),kind:"Новый показатель WDI",title:r.title,description:r.description,href:r.href,limit:"Метаданные нового ряда; числовые наблюдения не переданы."})}}catch{}}
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"external",expand:true}).slice(0,3).entries()){if(C.external(r.href))found.push({id:"external"+(i+1),kind:"Внешний препринт",title:r.title,description:r.date+" · "+r.description,href:r.href,limit:"Только метаданные; рецензирование и содержание не проверены."})}}catch{}}
   if(get(4)){try{await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");for(const [i,r] of EconomicSearch.search(get(4),q.value,{kind:"web",expand:true}).slice(0,3).entries()){if(C.external(r.href))found.push({id:"web"+(i+1),kind:"Внешнее рабочее исследование",title:r.title,description:r.description,href:r.href,limit:"Заголовок и ссылка; содержание и дата публикации не проверены."})}}catch{}}
