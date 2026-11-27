@@ -75,6 +75,10 @@ def build(out,previous,stamp,refresh):
     agents[1]["metrics"]["corporate_discovery"]={"note":corporate_discovery["note"],"sources":list(corporate_discovery["sources"].values()),"count":len(corporate_discovery["rows"]),"recent":sorted(corporate_discovery["rows"].values(),key=lambda r:(r["first_seen"],r["url"]),reverse=True)[:15]}
     agents[1]["links"].append("economic-corporate-discovery.json")
     if any(r["status"] in ("error","blocked") for r in corporate_discovery["sources"].values()):agents[1]["state"]="attention"
+    pdf=read(out,"economic-corporate-pdf.json")
+    agents[2]["metrics"]["corporate_pdf"]=pdf
+    agents[2]["links"].append("economic-corporate-pdf.json")
+    if pdf["status"] in ("error","blocked") or any(r["status"]!="match" for r in pdf["comparison"]):agents[2]["state"]="attention"
     comp=read(out,"economic-ai-comparability.json")
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")

@@ -40,7 +40,7 @@ def fingerprints(raw,charset):
     text=" ".join("".join(p.parts).split())
     if len(text)<100:raise ValueError("Insufficient visible text")
     return sha(raw),sha(text.encode("utf-8")),len(text)
-def fetch_html(url):
+def check_robots(url):
     u=urlsplit(url);host=u.hostname;robots="https://"+host+"/robots.txt"
     try:
         p=download(robots,hosts=(host,),path_check=lambda p:p=="/robots.txt",max_bytes=200_000,timeout=10)
@@ -50,6 +50,9 @@ def fetch_html(url):
         if rp.crawl_delay("EconomicsMonitor") or rp.request_rate("EconomicsMonitor"):raise Blocked("robots.txt rate policy requires separate scheduler")
     except HTTPError as e:
         if e.code!=404:raise
+def fetch_html(url):
+    check_robots(url)
+    u=urlsplit(url);host=u.hostname
     p=download(url,hosts=(host,),path_check=lambda path:path==u.path,max_bytes=2_000_000,timeout=20)
     if p.final_url!=url or p.media_type not in ("text/html","application/xhtml+xml"):raise ValueError("Unexpected final URL or type")
     return p
