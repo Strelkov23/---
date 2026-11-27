@@ -287,3 +287,17 @@ A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,upper:b.upper+1e6},T)
 A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,rows:b.rows.slice(1)},T));
 A.throws(()=>core.investmentComparisonEvidence(c,m,a,{...b,maxViolation:-1},T));
 console.log("20 investment comparison assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),G=require("./global-plan.js"),T=require("./iv-trajectory.js");
+const c=core.laborPlanCommand("трудовой план: инвестиции=1000; импорт=500; горизонт=2; труд=0; трудоёмкость=100; трудоёмкость 9=200; производительность=-2");
+A.equal(c.kind,"labor-plan");A.equal(c.labor.cap,0);A.equal(c.labor.intensity[8],200);A.equal(c.labor.intensity[0],100);A.equal(c.labor.productivity,-2);A.equal(c.p.labor,null);
+A.equal(core.laborPlanCommand("труд"),null);
+for(const q of ["трудовой план: инвестиции=1; импорт=2; труд=0","трудовой план: инвестиции=1; импорт=2; труд=0; трудоёмкость=0","трудовой план: инвестиции=1; импорт=2; труд=-1; трудоёмкость=1","трудовой план: инвестиции=1; импорт=2; труд=0; трудоёмкость=1; трудоёмкость 20=1","трудовой план: инвестиции=1; импорт=2; труд=0; трудоёмкость=1; трудоёмкость 9=1; трудоёмкость 09=2","трудовой план: инвестиции=1; импорт=2; труд=0; трудоёмкость=1; производительность=21","трудовой план: инвестиции=1; импорт=2; труд=0; трудоёмкость=1; горизонт=11"])A.equal(core.laborPlanCommand(q).kind,"invalid");
+const n=19,m={names:Array.from({length:n},(_,i)=>"Группа "+i),output:Array(n).fill(10000),demand:Array(n).fill(10000),imports:Array(n).fill(100),effects:Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?10000:0))};
+const a=G.solve(m,c.p,c.objective),b=G.solve(m,{...c.p,labor:c.labor},c.objective);
+A.ok(a.score>0);A.equal(b.score,0);A.ok(b.rows.every(r=>r.labor===0));
+const o=core.laborPlanEvidence(c,m,a,b,T);
+A.equal(o.length,4);A.ok(o[0].description.includes("человеко-лет"));A.ok(o[1].limit.includes("не измерены"));
+A.throws(()=>core.laborPlanEvidence(c,m,a,{...b,rows:b.rows.map(r=>({...r,labor:1}))},T));
+A.throws(()=>core.laborPlanEvidence(c,m,a,{...b,upper:b.upper+1e6},T));
+console.log("22 labor-constrained planning assistant checks passed");}

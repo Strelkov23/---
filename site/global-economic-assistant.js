@@ -444,6 +444,40 @@ const GlobalEconomicAssistant=(function core(){
  for(const row of result.rows)found.push({id:"invest-period"+row.year,kind:"Сравнение периодов",title:"Условный период "+row.year,description:"Дополнительный спрос A "+f(row.demandA)+" / B "+f(row.demandB)+" млрд руб. · покрытие A "+f(row.a*100)+"% / B "+f(row.b*100)+"% · разница "+f(row.deltaPP)+" п.п. · инвестиции A "+f(row.investmentA)+" / B "+f(row.investmentB)+" млрд руб. · ограничения A: "+(row.bindingA.join("; ")||"нет")+"; B: "+(row.bindingB.join("; ")||"нет"),href:"scenario.html#global-plan",limit:note});
  return found;
  }
+ function laborPlanCommand(q){
+ const match=String(q??"").trim().match(/^трудовой план\s*:\s*(.*)$/iu);
+ if(!match)return null;
+ const invalid={kind:"invalid"},rest=[],values={},overrides={};
+ for(const part of match[1].split(";").map(x=>x.trim())){
+  const m=part.match(/^(труд|трудо[её]мкость|производительность)(?:\s+(\d{1,2}))?\s*=\s*(-?\d{1,10}(?:[.,]\d)?)$/iu);
+  if(!m){rest.push(part);continue;}
+  const k=m[1].toLowerCase().replace("трудоемкость","трудоёмкость"),v=Number(m[3].replace(",","."));
+  const [lo,hi]=k==="труд"?[0,1e9]:k==="трудоёмкость"?[0,1e6]:[-10,20];
+  if(v<lo||v>hi)return invalid;
+  if(m[2]){const n=Number(m[2]);if(k!=="трудоёмкость"||n<1||n>19||Object.hasOwn(overrides,n))return invalid;overrides[n]=v;}
+  else{if(Object.hasOwn(values,k))return invalid;values[k]=v;}
+ }
+ if(!Object.hasOwn(values,"труд")||!Object.hasOwn(values,"трудоёмкость"))return invalid;
+ const base=horizonCommand("многолетний план: "+rest.join("; "));
+ if(!base||base.kind!=="horizon"||base.p.years>10)return invalid;
+ const intensity=Array.from({length:19},(_,i)=>overrides[i+1]??values["трудоёмкость"]);
+ if(!intensity.some(v=>v>0))return invalid;
+ return {...base,kind:"labor-plan",labor:{cap:values["труд"],productivity:values["производительность"]??0,intensity}};
+ }
+ function laborPlanEvidence(cmd,m,a,b,T){
+ if(cmd?.kind!=="labor-plan"||!cmd.labor||cmd.p.labor!==null||cmd.labor.intensity?.length!==19||![cmd.labor.cap,cmd.labor.productivity,...cmd.labor.intensity].every(Number.isFinite))throw Error("Invalid labor plan");
+ const l=cmd.labor;
+ if(l.cap<0||l.cap>1e9||l.productivity< -10||l.productivity>20||l.intensity.some(v=>v<0||v>1e6)||!l.intensity.some(v=>v>0))throw Error("Invalid labor assumptions");
+ horizonEvidence(cmd,m,a);horizonEvidence({...cmd,p:{...cmd.p,labor:l}},m,b);
+ for(const r of [a,b])if(r.tolerance<0||r.dualityGap<0||r.maxViolation<0||r.rows.some((x,i)=>x.year!==i+1||x.actualDemand<0||x.investment<0||x.imports<0))throw Error("Invalid result");
+ if(a.rows.some(x=>x.labor!==null)||b.rows.some(x=>!Number.isFinite(x.labor)||x.labor<0||x.labor>l.cap+1e-7*Math.max(1,l.cap))||b.score>a.score+a.tolerance+b.tolerance)throw Error("Labor feasibility failed");
+ const x=T.compare(a,b),f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="МРБ 2021, фиксированная технология, цены базы. Коэффициенты дополнительных человеко-лет на млрд руб. валового выпуска и рост производительности заданы пользователем, не измерены. Трудовой лимит относится к дополнительному выпуску, не всей занятости. A без трудового лимита; B с лимитом; остальные параметры одинаковы. Условный расчёт, не прогноз ВВП.";
+ const href="scenario.html#global-plan";
+ const out=[{id:"labor-plan-params",kind:"Условные допущения",title:"Трудовые параметры",description:"Лимит "+f(l.cap)+" дополнительных человеко-лет за период · рост производительности "+f(l.productivity)+"% · трудоёмкость по группам: "+l.intensity.map((v,i)=>(i+1)+": "+f(v)).join("; "),href,limit:note+" При переходе в полный инструмент параметры труда задаются вручную."},{id:"labor-plan-total",kind:"Сравнение проверенных оптимумов",title:"Влияние трудового ограничения",description:"Цель A "+f(a.score)+" · B "+f(b.score)+" · разница B − A "+f(x.deltaScore)+" млрд руб. · изменение покрытия цели последнего периода "+f(x.terminalDelta)+" п.п. · двойственные границы A "+f(a.upper)+" / B "+f(b.upper)+" · разрывы "+a.dualityGap.toExponential(2)+" / "+b.dualityGap.toExponential(2),href,limit:note}];
+ for(const row of x.rows)out.push({id:"labor-plan-period"+row.year,kind:"Условный период",title:"Период "+row.year,description:"Спрос A "+f(row.demandA)+" / B "+f(row.demandB)+" млрд руб. · покрытие A "+f(row.a*100)+"% / B "+f(row.b*100)+"% · труд B "+f(row.laborB)+" из "+f(l.cap)+" человеко-лет · ограничения B: "+(row.bindingB.join("; ")||"нет"),href,limit:note});
+ return out;
+ }
  function robustnessCommand(q,parse){
  const m=String(q??"").trim().match(/^устойчивость\s*:\s*(.*)$/iu);
  if(!m)return null;
@@ -516,7 +550,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -748,9 +782,10 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
  async function findInvestmentComparison(cmd,parameters){
+  const labor=cmd.kind==="labor-plan";
   await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
-  const context={page,heading,description:"Сравнение двух инвестиционных календарей",parameters,parameter_note:"Лимиты и рост являются условными допущениями."};
+  const context={page,heading,description:labor?"Сравнение планов с трудовым ограничением и без него":"Сравнение двух инвестиционных календарей",parameters,parameter_note:"Лимиты, коэффициенты и рост являются условными допущениями."};
   let found=[],failed=0;
   const note=description=>[{id:"invest-status",kind:"Статус расчёта",title:"Сравнение инвестиций",description,href:"scenario.html#global-plan"}];
   if(cmd.kind==="invalid")found=note("Пример: сравнить инвестиции: инвестиции A=1000; инвестиции B=1500; импорт=500; горизонт=5; рост=3. Оба лимита и импорт обязательны; горизонт 1–10.");
@@ -766,12 +801,16 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     try{worker.postMessage({m,p,objective:cmd.objective})}catch(e){finish(e)}
    });
    status.textContent="Проверка варианта A…";const a=await run(cmd.p);
-   status.textContent="Проверка варианта B…";const b=await run({...cmd.p,investment:cmd.budgetB});
-   found=C.investmentComparisonEvidence(cmd,m,a,b,IVTrajectory,!!base);
+   status.textContent="Проверка варианта B…";const b=await run(labor?{...cmd.p,labor:cmd.labor}:{...cmd.p,investment:cmd.budgetB});
+   found=labor?C.laborPlanEvidence(cmd,m,a,b,IVTrajectory):C.investmentComparisonEvidence(cmd,m,a,b,IVTrajectory,!!base);
   }catch{failed=1;found=note("Оба оптимума не подтверждены. Частичное сравнение не публикуется.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
  async function find(parameters){
+  const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){
+   if(laborPlan.kind==="invalid"){await loadScript("provenance.js",()=>typeof Provenance!=="undefined");const manifest=await Provenance.validateManifest(await load("data-manifest.json"));return {found:[{id:"labor-plan-status",kind:"Статус расчёта",title:"Трудовой план",description:"Пример: трудовой план: инвестиции=1000; импорт=500; горизонт=3; труд=100000; трудоёмкость=100; трудоёмкость 9=150; производительность=2. Лимит 0–1 млрд человеко-лет, коэффициенты 0–1 млн человеко-лет на млрд руб., производительность −10…20%, горизонт до 10. Условные параметры.",href:"scenario.html#global-plan"}],context:{page,heading,description:"Трудовые ограничения",parameters},failed:0,fingerprint:manifest.data_fingerprint};}
+   return findInvestmentComparison(laborPlan,parameters);
+  }
   const investments=C.investmentComparisonCommand(q.value);if(investments)return findInvestmentComparison(investments,parameters);
   const energy=C.energyCommand(q.value);if(energy)return findEnergy(energy,parameters);
   const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
