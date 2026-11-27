@@ -191,6 +191,15 @@ jobs:
           node test-electricity-balance.js
           node test-energy-output.js
           rm -rf public
+          # Optional CPU inference; a failed installation must not stop statistical publication.
+          if timeout 180 npm install --prefix "$RUNNER_TEMP/vector-runtime" --no-audit --no-fund @xenova/transformers@2.17.2; then
+            export ECONOMIC_VECTOR_RUNTIME="$RUNNER_TEMP/vector-runtime"
+          else
+            unset ECONOMIC_VECTOR_RUNTIME
+            echo "Optional vector runtime unavailable"
+          fi
+          python3 -m unittest test_economic_vector_public.py
+          node test-economic-vector.js
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
           node test-economic-search-index.js public/economic-search-index.json
           python3 -c "import json,economic_search as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
@@ -325,6 +334,8 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           mkdir -p history/published
+          # Never keep vector parts that are absent from this new snapshot.
+          rm -f history/published/research-title-catalog.json history/published/research-title-shard-*.json
           cp monitor/public/*.json history/published/
           cp monitor/public/federal-budget.csv history/published/
           if [ -f monitor/public/regional-boundaries.geojson ]; then cp monitor/public/regional-boundaries.geojson history/published/; fi

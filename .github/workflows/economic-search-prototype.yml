@@ -1,7 +1,7 @@
 name: Economic search prototype checks
 on:
   push:
-    branches: [economic-ai-prototype-v01, economic-ai-release-v053, main]
+    branches: [economic-ai-prototype-v01, economic-ai-release-v053, main, economic-ai-release-v071]
     paths: ['site/economic-search*', 'site/global-economic-assistant.js', 'site/test-global-economic-assistant.js', 'site/test-economic-search.js', 'site/test_economic_search_browser.py', '.github/workflows/economic-search-prototype.yml']
   pull_request:
     branches: [main]

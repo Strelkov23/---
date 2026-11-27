@@ -1,0 +1,60 @@
+name: Economic server vector prototype
+on:
+  push:
+    branches: [economic-ai-prototype-v01, economic-ai-release-v071]
+    paths: ['site/economic-vector-*.js', 'site/test-economic-vector.js', 'site/economic_vector_public.py', 'site/test_economic_vector_public.py', '.github/workflows/economic-vector-prototype.yml']
+  workflow_dispatch:
+    inputs:
+      shard:
+        description: 'Research title shard 0–63, or all'
+        type: string
+        default: 'all'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --check site/economic-vector-build.js
+          node --check site/economic-vector-pack.js
+          node site/test-economic-vector.js
+          python3 -m unittest discover -s site -p test_economic_vector_public.py
+  encode:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned inference runtime
+        run: npm install --prefix "$RUNNER_TEMP/vector-runtime" --no-audit --no-fund @xenova/transformers@2.17.2
+      - name: Restore last successful vector artifact (optional)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow economic-vector-prototype.yml --branch economic-ai-prototype-v01 --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty') || id=""
+          if [ -n "$id" ]; then
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --name economic-research-title-vectors --dir "$RUNNER_TEMP/vector-previous" || rm -rf "$RUNNER_TEMP/vector-previous"
+          fi
+      - name: Build verified vector catalogue from one public snapshot
+        env:
+          SHARD: ${{ inputs.shard || 'all' }}
+        run: |
+          git fetch origin main --depth=1
+          git archive FETCH_HEAD history/published/data-manifest.json history/published/economic-search-index.json | tar -x -C "$RUNNER_TEMP"
+          node site/economic-vector-build.js "$RUNNER_TEMP/history/published" "$RUNNER_TEMP/vector-catalog" "$SHARD" "$RUNNER_TEMP/vector-runtime" "$RUNNER_TEMP/vector-previous"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: economic-research-title-vectors
+          path: ${{ runner.temp }}/vector-catalog/
+          if-no-files-found: error
+          retention-days: 7

@@ -20,4 +20,47 @@ class AbstractTests(unittest.TestCase):
         self.assertIsNone(extract(dict(ITEM,abstract="x"*4001),ACCESS,STAMP))
     def test_no_license(self):
         self.assertIsNone(extract(ITEM,{},STAMP))
+class AbstractBackfillTests(unittest.TestCase):
+    def setUp(self):
+        import sqlite3,literature
+        self.lit=literature
+        self.db=sqlite3.connect(":memory:")
+        self.db.execute("create table literature(doi text primary key,journal text,published text,title text,authors text,topics text)")
+        self.db.execute("create table literature_meta(doi text primary key,payload text,checked text)")
+        self.issn=min(literature.JOURNALS)
+        self.doi="10.1234/abstract"
+        self.db.execute("insert into literature values(?,?,?,?,?,?)",(self.doi,literature.JOURNALS[self.issn],"2026-01-01","Test article","Example","Economics"))
+        self.item=dict(ITEM,DOI=self.doi,title=["Test article"],license=[{"URL":LICENSE,"content-version":"vor","start":{"date-parts":[[2025,1,1]]}}])
+    def tearDown(self):
+        self.db.close()
+    def fetch(self,item):
+        def run(issn,filters,offset):
+            self.assertEqual(issn,self.issn)
+            self.assertIn("has-abstract:true",filters)
+            self.assertIn("has-license:true",filters)
+            self.assertEqual(offset,0)
+            return {"total-results":1,"items":[item]}
+        return run
+    def test_targeted_backfill(self):
+        import json
+        self.assertEqual(self.lit.abstract_backfill(self.db,STAMP,self.fetch(self.item)),1)
+        p=json.loads(self.db.execute("select payload from literature_meta").fetchone()[0])
+        self.assertEqual(p["licensed_abstract"]["text"],"Economic growth model.")
+        self.assertEqual(self.db.execute("select year,offset from literature_abstract_progress").fetchone(),(2025,0))
+    def test_unlicensed(self):
+        self.assertEqual(self.lit.abstract_backfill(self.db,STAMP,self.fetch(dict(self.item,license=[]))),0)
+        self.assertIsNone(self.db.execute("select payload from literature_meta").fetchone())
+    def test_wrong_title(self):
+        self.assertEqual(self.lit.abstract_backfill(self.db,STAMP,self.fetch(dict(self.item,title=["Wrong"]))),0)
+    def test_missing_doi(self):
+        self.assertEqual(self.lit.abstract_backfill(self.db,STAMP,self.fetch(dict(self.item,DOI="10.1234/unknown"))),0)
+    def test_failed_page(self):
+        with self.assertRaises(ValueError):
+            self.lit.abstract_backfill(self.db,STAMP,lambda *a:{"total-results":1,"items":[]})
+        self.assertIsNone(self.db.execute("select * from literature_abstract_progress").fetchone())
+    def test_rate_limit(self):
+        def fail(*a):raise self.lit.CrossrefRateLimited("60")
+        with self.assertRaises(self.lit.CrossrefRateLimited):
+            self.lit.abstract_backfill(self.db,STAMP,fail)
+        self.assertIsNone(self.db.execute("select * from literature_abstract_progress").fetchone())
 if __name__=="__main__":unittest.main()

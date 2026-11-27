@@ -96,3 +96,19 @@ const two={...idx,docs:[doc,b],postings:{"инвестиц":[[0,5],[1,1]]},abstr
 assert.deepEqual(core.researchEvidence(two,[{...paper,authors:""},pb],"инвестиции","2026-01",1).map(r=>r.code),[b.code]);
 assert.equal(core.researchEvidence(idx,[paper],"инвестиции","2026-01",6).length,0);
 console.log("12 verified research evidence checks passed");}
+
+{const A=require("node:assert/strict"),S=require("./economic-search.js");
+const lic="https://creativecommons.org/licenses/by/4.0/",stamp="2026-11-27";
+const p={doi:"10.1234/abc",title:"Test",authors:"A",licensed_abstract:{text:"One two three",license:lic},access:{licenses:[{version:"vor",start:"2025-01-01",url:lic}]}};
+const d={kind:"paper",code:p.doi,title:p.title,href:"https://doi.org/"+p.doi,abstract_license:lic};
+A.deepEqual(S.abstractChunks("One two"),["One two"]);
+const long=("economic model ".repeat(260)).trim(),chunks=S.abstractChunks(long);
+A.ok(chunks.every(x=>x.length<=400));A.equal(chunks.join(" "),long);A.throws(()=>S.abstractChunks("x".repeat(4001)));
+A.equal(S.abstractCandidates([d],[p],stamp).length,1);A.equal(S.abstractCandidates([d],[p,p],stamp).length,0);
+A.equal(S.abstractCandidates([d],[{...p,access:{licenses:[]}}],stamp).length,0);
+A.equal(S.abstractCandidates([d],[{...p,title:"Wrong"}],stamp).length,0);
+A.equal(S.abstractCandidates([d,d],[p],stamp).length,1);
+const v=i=>Array.from({length:384},(_,j)=>Number(j===i));
+const ranked=S.abstractRank(v(0),[{doc:{title:"B"},vectors:[v(1)]},{doc:{title:"A"},vectors:[v(0),v(1)]}]);
+A.equal(ranked[0].title,"A");A.equal(ranked[0].abstractSimilarity,.5);A.equal(ranked[0].bestChunk,1);A.equal(ranked[0].chunkCount,2);A.throws(()=>S.abstractRank(v(0),[{doc:d,vectors:[]}]));
+console.log("14 abstract semantic comparison checks passed");}
