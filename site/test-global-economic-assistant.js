@@ -352,3 +352,17 @@ A.throws(()=>core.forecastAuditEvidence(c,d,{...m,rows:[{...p,issued:"2026-01-01
 A.throws(()=>core.forecastAuditEvidence(c,d,{...m,rows:[{...p,first_seen:"2025-12-01"}]},t,v));
 A.equal(core.forecastAuditEvidence(c,d,{...m,rows:[{...p,unit:"руб."}]},t,v)[2].description.includes("фактов 0"),true);
 console.log("14 forecast audit assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js");
+const c=core.agentCommand("координация агентов: приоритеты");
+A.deepEqual(c,{kind:"agent-coordination",mode:"priorities"});A.equal(core.agentCommand("агенты"),null);A.equal(core.agentCommand("координация агентов: запуск").kind,"invalid");
+const agent=(id,state,metrics,items=[])=>({id,state,metrics,items,links:["forecast.html"]});
+const d={schema:1,built:"2026-11-27",mode:"scheduled_refresh",agents:[agent("coverage","attention",{series_with_values:10}),agent("discovery","ok",{candidates:10,available:3}),agent("quality","attention",{backlog:5,recent_rejected:2}),agent("research","ok",{}),agent("forecast","waiting",{frozen:7,scored:0,adequate_sample_groups:0}),agent("search","ok",{abstracts:{indexed:0,catalogue:10}}),agent("diagnostics","attention",{counts:{signal:1}}),agent("planning","attention",{counts:{investigate:1,refresh_first:0,data_required:0,history_required:0,monitor:1}},[{priority:"investigate",title:"Труд",action:"Проверить",limit:"Не причина",href:"scenario.html#reproduction-plan"}])]};
+const a=core.agentEvidence(c,d);A.equal(a[0].id,"agents-overview");A.equal(a[1].id,"agent-quality");A.ok(a.some(r=>r.id==="agent-route1"));A.ok(a.some(r=>r.id==="agent-forecast-wait"));A.ok(a.some(r=>r.id==="agent-abstracts"));A.ok(a.every(r=>r.limit.includes("не автономное выполнение")));
+A.equal(core.agentEvidence({...c,mode:"all"},d).length,a.length+8);
+A.equal(core.agentEvidence(c,{...d,agents:d.agents.slice(1)}).length,0);
+A.equal(core.agentEvidence(c,{...d,agents:[...d.agents.slice(1),d.agents[1]]}).length,0);
+const edit=(id,metrics)=>({...d,agents:d.agents.map(x=>x.id===id?{...x,metrics:{...x.metrics,...metrics}}:x)});
+A.equal(core.agentEvidence(c,edit("quality",{backlog:-1})).length,0);A.equal(core.agentEvidence(c,edit("forecast",{scored:8})).length,0);A.equal(core.agentEvidence(c,edit("search",{abstracts:{indexed:11,catalogue:10}})).length,0);
+A.ok(!core.agentEvidence(c,{...d,agents:d.agents.map(x=>x.id==="planning"?{...x,items:[{...x.items[0],href:"javascript:alert(1)"}]}:x)}).some(r=>r.id==="agent-route1"));
+console.log("16 agent coordination checks passed");}

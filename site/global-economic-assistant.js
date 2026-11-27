@@ -284,6 +284,43 @@ const GlobalEconomicAssistant=(function core(){
  out.push({id:"forecast-prospective",kind:"Перспективный журнал",title:"Реальная проверка после публикации",description:"Зафиксировано "+rows.length+" · фактов "+scored.length+" · ожидают "+(rows.length-scored.length)+" · MAE "+f(mae("point"))+" · базовая MAE "+f(mae("naive"))+" · турнир: "+trows.filter(x=>x.actual!==null).length+" из "+trows.length+" оценено · испытаний кандидатов "+trials.length,href,limit:"Первый факт в архиве, не пересмотренная редакция; прогнозы записаны до начала периода. "+(scored.length<10?"Недостаточно завершённых наблюдений для вывода о превосходстве метода.":"Описательная диагностика; не гарантия будущей точности.")});
  return out;
  }
+ function agentCommand(q){
+ const s=String(q||"").trim();if(!/^координация агентов\s*:/iu.test(s))return null;
+ const m=s.match(/^координация агентов\s*:\s*(все|приоритеты)$/iu);
+ return m?{kind:"agent-coordination",mode:m[1].toLowerCase()==="все"?"all":"priorities"}:{kind:"invalid"};
+ }
+ function agentEvidence(cmd,d){
+ const ids=["coverage","discovery","quality","research","forecast","search","diagnostics","planning"];
+ if(cmd?.kind!=="agent-coordination"||!["all","priorities"].includes(cmd.mode)||d?.schema!==1||!["scheduled_refresh","offline_build"].includes(d.mode)||!Number.isFinite(Date.parse(d.built||""))||!Array.isArray(d.agents)||d.agents.length!==ids.length||new Set(d.agents.map(a=>a.id)).size!==ids.length||d.agents.some(a=>!ids.includes(a.id)||!["ok","waiting","attention"].includes(a.state)||!a.metrics||!Array.isArray(a.items)))return [];
+ const map=Object.fromEntries(d.agents.map(a=>[a.id,a])),n=x=>Number.isSafeInteger(x)&&x>=0;
+ const q=map.quality.metrics,c=map.coverage.metrics,f=map.forecast.metrics,s=map.search.metrics,p=map.planning.metrics,g=map.diagnostics.metrics,w=map.discovery.metrics;
+ const vals=[q.backlog,q.recent_rejected,c.series_with_values,f.frozen,f.scored,f.adequate_sample_groups,s.abstracts?.indexed,s.abstracts?.catalogue,p.counts?.investigate,p.counts?.refresh_first,p.counts?.data_required,p.counts?.history_required,p.counts?.monitor,g.counts?.signal,w.candidates,w.available];
+ if(!vals.every(n)||f.scored>f.frozen||s.abstracts.indexed>s.abstracts.catalogue||w.available>w.candidates)return [];
+ const note="Отчёт "+d.built+" · "+(d.mode==="scheduled_refresh"?"сборка с обновлением":"офлайн-сборка")+". Агенты — детерминированные программные модули. Очередь действий, не автономное выполнение или управленческое решение. Статусы не гарантируют истинность данных.";
+ const out=[{id:"agents-overview",kind:"Координация модулей",title:"Состояние восьми агентов",description:"Требуют внимания "+d.agents.filter(a=>a.state==="attention").length+" · ожидают "+d.agents.filter(a=>a.state==="waiting").length+" · сформировали отчёт "+d.agents.filter(a=>a.state==="ok").length+" · рядов с данными "+c.series_with_values,href:"economic-ai-agents.json",limit:note}];
+ const tasks=[];
+ const add=(id,priority,title,description,href)=>tasks.push({id:"agent-"+id,priority,kind:priority===1?"1 · Проверка данных":priority===2?"2 · Исследование":"3 · Накопление данных",title,description,href,limit:note});
+ if(q.backlog||q.recent_rejected||map.quality.state==="attention")add("quality",1,"Контроль качества источников","В очереди "+q.backlog+" · отклонённых событий "+q.recent_rejected+". Проверить первичные источники; не использовать отсутствующие наблюдения как нулевые.","freshness.html");
+ if(map.discovery.state==="attention")add("discovery",1,"Проверить сбор новых данных","Статус требует внимания; доступно "+w.available+" из "+w.candidates+" кандидатов.","economic-ai-discovery.json");
+ if(map.search.state==="attention")add("search-source",1,"Проверить источники поисковика","Ошибки или ограничения источников требуют проверки до использования результатов.","economic-search-audit.json");
+ if(p.counts.refresh_first+p.counts.data_required+p.counts.history_required)add("planning-data",1,"Подготовить данные для сценариев","Сначала обновить "+p.counts.refresh_first+" · нужны данные "+p.counts.data_required+" · мало истории "+p.counts.history_required+".","planning-centre.html");
+ if(g.counts.signal||p.counts.investigate){
+  const routes=map.planning.items.filter(x=>x.priority==="investigate"&&typeof x.title==="string"&&typeof x.action==="string"&&typeof x.limit==="string"&&/^[a-z0-9-]+\.html(?:#[a-z0-9-]+)?$/.test(x.href));
+  add("diagnostics",2,"Исследовать диагностические сигналы","Сигналов "+g.counts.signal+" · маршрутов "+p.counts.investigate+". Проверить сопоставимость и причинные гипотезы; не менять коэффициенты автоматически.","diagnostics.html");
+  for(const [i,r] of routes.slice(0,5).entries())add("route"+(i+1),2,r.title,r.action+" Ограничение: "+r.limit,r.href);
+ }
+ if(map.forecast.state==="attention")add("forecast-review",2,"Проверить прогнозные методы","Оценённых "+f.scored+" · групп с выборкой от 10: "+f.adequate_sample_groups+". Не переключать метод по малой выборке.","forecast.html");
+ if(s.abstracts.indexed<s.abstracts.catalogue)add("abstracts",3,"Расширить доступное содержание поиска","Индексированных лицензированных аннотаций "+s.abstracts.indexed+" из "+s.abstracts.catalogue+" статей каталога. Не считать остальные статьи прочитанными; проверять лицензии.","economic-search.html");
+ if(f.scored<f.frozen||!f.adequate_sample_groups)add("forecast-wait",3,"Дождаться фактов для оценки прогнозов","Зафиксировано "+f.frozen+" · оценено "+f.scored+" · ожидают "+(f.frozen-f.scored)+". Новые факты проверяются при обновлении архива.","forecast.html");
+ if(w.available<w.candidates)add("coverage",3,"Расширить статистическое покрытие","Доступно "+w.available+" из "+w.candidates+" кандидатов. Проверить происхождение, единицы и периоды.","economic-ai-discovery.json");
+ tasks.sort((a,b)=>a.priority-b.priority);
+ out.push(...tasks.map(({priority,...r})=>r));
+ if(cmd.mode==="all"){
+ const labels={coverage:"Статистическое покрытие",discovery:"Поиск новых показателей",quality:"Контроль источников",research:"Научные публикации",forecast:"Прогнозирование",search:"Поисковик",diagnostics:"Макродиагностика",planning:"Подготовка сценариев"};
+ for(const id of ids){const a=map[id],href=a.links?.find(x=>typeof x==="string"&&/^[a-z0-9-]+\.(?:html|json)$/.test(x))||"economic-ai-agents.json";out.push({id:"agent-state-"+id,kind:"Статус модуля",title:labels[id],description:({ok:"Отчёт сформирован",attention:"Требует внимания",waiting:"Ожидает данных"})[a.state],href,limit:note});}
+ }
+ return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -639,7 +676,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -942,7 +979,19 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Журнал или историческая проверка недоступны; вывод о точности не сделан.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findAgents(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Координация восьми аналитических модулей",parameters,parameter_note:"Очередь рекомендаций, не выполнение действий."};
+  let found=[],failed=0;
+  const note=description=>[{id:"agents-status",kind:"Статус",title:"Координация агентов",description,href:"economic-ai-agents.json"}];
+  if(cmd.kind==="invalid")found=note("Пример: координация агентов: приоритеты. Для статусов всех восьми модулей: координация агентов: все.");
+  else try{const d=(await Provenance.get(manifest,"economic-ai-agents.json",base)).data;found=C.agentEvidence(cmd,d);if(!found.length)found=note("Отчёт не прошёл проверку структуры и счётчиков.");}
+  catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const agents=C.agentCommand(q.value);if(agents)return findAgents(agents,parameters);
   const forecastAudit=C.forecastAuditCommand(q.value);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
   const technology=C.technologyCommand(q.value);if(technology)return findTechnology(technology,parameters);
   const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
