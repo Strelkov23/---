@@ -22,7 +22,7 @@ def record(kind,title,href,description="",source="",date="",code=""):
     if not isinstance(title,str) or not title.strip() or not safe(href):return None
     return dict(kind=kind,title=title[:350],href=href,description=text(description,700),source=text(source,180),date=text(date,10),code=text(code,120))
 def compile_index(rows,stamp):
-    docs=[];postings=defaultdict(list);seen=set()
+    docs=[];postings=defaultdict(list);abstract_postings=defaultdict(list);seen=set()
     for r in rows:
         if not r:continue
         key=(r["kind"],r["href"])
@@ -31,13 +31,17 @@ def compile_index(rows,stamp):
         weights=Counter()
         for field,weight in (("title",5),("description",1),("source",1),("code",3)):
             for w in set(tokens(r[field])):weights[w]+=weight
-        for w in set(tokens(r.get("abstract_text",""))):weights[w]+=1
+        if r.get("abstract_text"):
+            if r["kind"]!="paper" or r.get("abstract_license")!=economic_abstracts.LICENSE:raise ValueError("Unlicensed abstract")
+            # Full permitted text (bounded by the abstract importer); no metadata tokens.
+            terms=set(SUFFIX.sub("",w) if len(w)>=5 else w for w in re.findall(r"[a-zа-я0-9]+",r["abstract_text"].lower().replace("ё","е")) if len(w)>=2 and w not in STOP)
+            for w in sorted(terms):abstract_postings[w].append([i,1]);weights[w]+=1
         for w,weight in sorted(weights.items()):postings[w].append([i,weight])
     norms=[0.0]*len(docs)
     for posting in postings.values():
         idf=math.log(1+(len(docs)-len(posting)+0.5)/(len(posting)+0.5))
         for i,w in posting:norms[i]+=(w*idf)**2
-    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
+    return dict(schema=1,built=stamp,note=NOTE,docs=docs,postings=dict(postings),abstract_postings=dict(abstract_postings),norms=[round(math.sqrt(v),8) for v in norms],counts={k:sum(r["kind"]==k for r in docs) for k in KINDS})
 def read(out,name):return json.loads((out/name).read_text(encoding="utf-8"))
 def build(out,stamp):
     rows=[]
@@ -51,7 +55,7 @@ def build(out,stamp):
         doi=r.get("doi") or ""
         if re.fullmatch(r"10\.\d{4,9}/\S+",doi):
             doc=record("paper",r.get("title"),"https://doi.org/"+quote(doi,safe="/:().-_;")," · ".join(str(x) for x in (r.get("authors"),r.get("topics")) if x),r.get("journal"),r.get("published"),doi)
-            if doc and economic_abstracts.eligible(r,stamp):
+            if doc and len(doi)<=120 and economic_abstracts.eligible(r,stamp):
                 doc.update(abstract_text=r["licensed_abstract"]["text"],abstract_license=economic_abstracts.LICENSE)
             rows.append(doc)
     for code,r in read(out,"economic-ai-discovery.json")["rows"].items():
@@ -75,6 +79,14 @@ def validate(d):
         last=-1
         for i,w in posting:
             if type(i) is not int or not last<i<len(docs) or type(w) is not int or not 1<=w<=11:raise ValueError("Invalid posting")
+            last=i
+    a=d["abstract_postings"]
+    if not isinstance(a,dict):raise ValueError("Invalid content index")
+    for word,posting in a.items():
+        if word not in d["postings"] or not posting:raise ValueError("Invalid content term")
+        last=-1;general=dict(d["postings"][word])
+        for i,w in posting:
+            if type(i) is not int or not last<i<len(docs) or type(w) is not int or w!=1 or i not in general or docs[i]["kind"]!="paper" or docs[i].get("abstract_license")!=economic_abstracts.LICENSE:raise ValueError("Invalid content posting")
             last=i
     return {"documents":len(docs),"terms":len(d["postings"])}
 def publish(out,stamp):

@@ -503,7 +503,9 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   if(get(4)&&Array.isArray(get(3)?.articles)){try{
    await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");
    const byDoi=new Map(get(3).articles.map(r=>[r.doi,r]));
-   const ranked=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true}).filter(r=>r.abstract_license==="https://creativecommons.org/licenses/by/4.0/").slice(0,2);
+   const content=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,contentOnly:true});
+   const metadata=EconomicSearch.search(get(4),q.value,{kind:"paper",expand:true,abstractOnly:true});
+   const ranked=[...new Map([...content,...metadata.filter(r=>!content.some(c=>c.href===r.href))].slice(0,2).map(r=>[r.href,r])).values()];
    for(const [i,r] of ranked.entries()){const p=byDoi.get(r.code),a=p?.licensed_abstract;if(!a||a.license!==r.abstract_license||typeof a.text!=="string"||!p.authors||!C.external(r.href))continue;
     found.push({id:"abstract"+(i+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+p.authors+" · "+r.date+" · Аннотация (форматирование нормализовано): "+a.text,href:r.href,limit:"Утверждения авторов; полный текст и выводы не проверены. Лицензия по метаданным издателя: "+a.license+"; Crossref, проверка "+a.checked});
    }
