@@ -39,24 +39,32 @@ const EconomicAIScenario=(function scenarioCore(){
  function path(year,params){
   return "scenario.html?repro-base="+year+fields.map(([k])=>"&repro-"+k+"="+encodeURIComponent(params[k])).join("")+"#reproduction-plan";
  }
- return {fields,parse,selectBase,summary,path};
+ function compare(base,a,b,calculate,summarize){
+ if(a.year!==null&&a.year!==base.year||b.year!==null&&b.year!==base.year)throw Error("Для сравнения требуется одинаковый базовый год.");
+ if(a.params.years!==b.params.years)throw Error("Для сравнения требуется одинаковый горизонт.");
+ const left=summarize(calculate(base,a.params)),right=summarize(calculate(base,b.params));
+ const delta=Object.fromEntries(["gdp","investment","gap","laborGap"].map(k=>[k,right[k]-left[k]]));
+ if(Object.values(delta).some(v=>!Number.isFinite(v)))throw Error("Некорректная разность");
+ return {left,right,delta};
+}
+ return {fields,parse,selectBase,summary,path,compare};
 })();
 if(typeof module!=="undefined")module.exports=EconomicAIScenario;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("easc-"+id),command=$("command"),preview=$("preview"),apply=$("apply"),out=$("result"),status=$("status");if(!command)return;
- let pending=null,seq=0;const C=EconomicAIScenario;
+ let pending=null,seq=0;const C=EconomicAIScenario,second=$("second"),applySecond=$("apply-second"),exportButton=$("export");let pendingSecond=null,report=null;
  const add=(tag,v)=>{const e=document.createElement(tag);e.textContent=v;out.append(e);return e};
  function script(name,ready){if(ready())return Promise.resolve();return new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=name;s.onload=()=>ready()?resolve():reject(Error("Модуль недоступен"));s.onerror=()=>reject(Error("Модуль недоступен"));document.head.append(s)})}
- command.oninput=()=>{seq++;pending=null;apply.disabled=true;out.replaceChildren();status.textContent="Параметры изменены; выполните предварительный расчёт."};
- preview.onclick=async()=>{const id=++seq;preview.disabled=true;pending=null;apply.disabled=true;out.replaceChildren();status.textContent="Проверка базы и расчёт…";
+ command.oninput=second.oninput=()=>{seq++;pending=null;pendingSecond=null;report=null;apply.disabled=applySecond.disabled=exportButton.disabled=true;out.replaceChildren();status.textContent="Параметры изменены; выполните предварительный расчёт."};
+ preview.onclick=async()=>{const id=++seq;preview.disabled=true;pending=null;pendingSecond=null;report=null;apply.disabled=applySecond.disabled=exportButton.disabled=true;out.replaceChildren();status.textContent="Проверка базы и расчёт…";
  try{
-  const parsed=C.parse(command.value);
+  const parsed=C.parse(command.value),alternative=second.value.trim()?C.parse(second.value):null;
   await script("provenance.js",()=>typeof Provenance!=="undefined");
   await script("reproduction-plan.js",()=>typeof ReproductionPlan!=="undefined");
   const m=await Provenance.validateManifest(await load("data-manifest.json"));
   const data=(await Provenance.get(m,"compare.json",root)).data;
-  const closed=Number(m.built.slice(0,4))-1,base=C.selectBase(ReproductionPlan.baselines(data),parsed.year,closed);
-  const rows=ReproductionPlan.calculate(base,parsed.params),s=C.summary(rows);
+  const closed=Number(m.built.slice(0,4))-1,base=C.selectBase(ReproductionPlan.baselines(data),parsed.year??alternative?.year??null,closed);
+  const rows=ReproductionPlan.calculate(base,parsed.params),s=C.summary(rows),comparison=alternative?C.compare(base,parsed,alternative,ReproductionPlan.calculate,C.summary):null;
   if(id!==seq)return;
   add("p","База: "+base.year+" · SHA-256 "+m.data_fingerprint.slice(0,12));
   for(const [k,label] of C.fields)add("p",label+": "+parsed.params[k]+(parsed.provided.includes(label)?" (введено)":" (допущение по умолчанию)"));
@@ -64,8 +72,19 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   add("p","Последний год: "+s.year+"; целевой ВВП: "+f(s.gdp/1e9)+" млрд долл. 2015 г.");
   add("p","Сумма необходимых инвестиций: "+f(s.investment/1e9)+" млрд долл.; сумма инвестиционных разрывов: "+f(s.gap/1e9)+" млрд долл.");
   add("p","Разрыв занятости последнего года: "+f(s.laborGap/1e6)+" млн чел.");
+  if(comparison){
+   add("h4","Сценарий Б и разница Б − А");
+   for(const [k,label] of C.fields)add("p",label+": "+alternative.params[k]+(alternative.provided.includes(label)?" (введено)":" (допущение по умолчанию)"));
+   const table=add("table",""),head=table.createTHead().insertRow();for(const name of ["Показатель","А","Б","Б − А"]){const th=document.createElement("th");th.textContent=name;head.append(th)}
+   const body=table.createTBody();for(const [k,label,scale] of [["gdp","ВВП, млрд долл.",1e9],["investment","Инвестиции, млрд долл.",1e9],["gap","Разрыв инвестиций, млрд долл.",1e9],["laborGap","Разрыв труда, млн чел.",1e6]]){const tr=body.insertRow();for(const v of [label,f(comparison.left[k]/scale),f(comparison.right[k]/scale),f(comparison.delta[k]/scale)])tr.insertCell().textContent=v}
+   const altUrl=new URL(C.path(base.year,alternative.params),location.href);if(typeof pinned!=="undefined"&&pinned)altUrl.searchParams.set("snapshot",pinned);pendingSecond=altUrl.href;applySecond.disabled=false;
+  }
+  report={schema:1,note:"Условные сценарии, не прогноз и не доказательство выполнимости. Денежные величины в долл. 2015 г., занятость в людях.",fingerprint:m.data_fingerprint,base,scenarioA:{params:parsed.params,rows,summary:s},scenarioB:alternative?{params:alternative.params,rows:ReproductionPlan.calculate(base,alternative.params),summary:comparison.right}:null,delta:comparison?.delta??null};
+  exportButton.disabled=false;
   add("small","Условная траектория, не прогноз и не доказательство выполнимости. Все параметры показаны до перехода. На текущем архиве повторный расчёт может измениться при обновлении данных.");
   const u=new URL(C.path(base.year,parsed.params),location.href);if(typeof pinned!=="undefined"&&pinned)u.searchParams.set("snapshot",pinned);pending=u.href;apply.disabled=false;status.textContent="Предварительный расчёт готов. Подтвердите переход.";
  }catch(e){if(id===seq)status.textContent=e.message||"Расчёт недоступен."}finally{preview.disabled=false}};
  apply.onclick=()=>{if(pending)location.assign(pending)};
+ applySecond.onclick=()=>{if(pendingSecond)location.assign(pendingSecond)};
+ exportButton.onclick=()=>{if(!report)return;const u=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=u;a.download="economic-scenario-comparison.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 });
