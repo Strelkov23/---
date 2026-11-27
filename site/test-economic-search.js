@@ -62,3 +62,11 @@ console.log("14 local neural index checks passed");}
 
 {const a={kind:"paper",href:"a",title:"A",date:"2025"},b={kind:"external",href:"b",title:"B",date:"2026"},c={kind:"web",href:"c",title:"A",date:"2024"};
 assert.deepEqual(core.archiveTargets([a,b,c]).map(d=>d.href),["b","a"]);assert.deepEqual(core.archiveTargets([a,b,c],1).map(d=>d.href),["b"]);assert.deepEqual(core.archiveTargets([{...a,kind:"tool"},{...b,title:""},{...c,href:"x".repeat(2049)}]),[]);assert.throws(()=>core.archiveTargets([],257));assert.equal(core.archiveTargets(Array.from({length:300},(_,i)=>({...a,href:String(i),title:String(i)}))).length,256);assert.deepEqual(core.archiveTargets([a,b,c]),core.archiveTargets([c,b,a]));console.log("6 archive target checks passed");}
+
+{const v=Array.from({length:384},(_,i)=>i===0?1:0),rec=(i,used)=>({key:i.toString(16).padStart(64,"0"),used,vector:v}),a=rec(1,100),b=rec(2,100),c=rec(3,0);
+assert.deepEqual(core.touchCache([a,b],[c,a],1,2).map(r=>r.key),[a.key,c.key]);
+assert.equal(core.touchCache([a],[b],1)[0].used,101);
+assert.equal(core.touchCache([a],[b,c],1)[0].used,102);
+assert.equal(core.touchCache([rec(4,Number.MAX_SAFE_INTEGER)],[b],0)[0].key,b.key);
+assert.equal(core.touchCache([a],[b],100,1).length,1);
+assert.throws(()=>core.touchCache([],[],-1));console.log("6 atomic cache clock checks passed");}

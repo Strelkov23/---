@@ -157,6 +157,17 @@ const EconomicSearch=(function core(){
  }
  return [...map.values()].sort((a,b)=>b.used-a.used||a.key.localeCompare(b.key)).slice(0,limit);
 }
+ // Serialize cache touches against the latest transaction contents, even if the
+ // system clock moves backwards or several records are written in one millisecond.
+ function touchCache(old,updates,now=Date.now(),limit=256){
+  if(!Number.isSafeInteger(now)||now<0||!Array.isArray(updates))throw Error("Invalid cache clock");
+  let prior=mergeCache(old,[],limit);
+  let clock=Math.max(now,prior[0]?.used||0);
+  if(clock>Number.MAX_SAFE_INTEGER-updates.length){
+   prior=prior.map((r,i)=>({...r,used:prior.length-i}));clock=prior.length;
+  }
+  return mergeCache(prior,updates.map(r=>({...r,used:++clock})),limit);
+ }
  function localEligible(d,options={}){
  if(!d||!["paper","external","web"].includes(d.kind)||typeof d.href!=="string"||!d.href||typeof d.title!=="string"||!d.title.trim()||options.kind&&d.kind!==options.kind)return false;
  if(options.abstractOnly&&d.abstract_license!=="https://creativecommons.org/licenses/by/4.0/")return false;
@@ -182,7 +193,7 @@ const EconomicSearch=(function core(){
  for(const d of eligible){const key=cacheIdentity(d.title);if(seen.has(key))continue;seen.add(key);out.push(d);if(out.length===limit)break;}
  return out;
  }
- return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets};
+ return {words,search,plan,dictionary,related,contentVector,semanticCandidates,semanticRerank,cacheIdentity,validCachedVector,mergeCache,localEligible,localRank,archiveTargets,touchCache};
 })();
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -213,10 +224,10 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   })}finally{db.close()}
  }
  const readCache=()=>cacheOperation("readonly",(store,set)=>{const req=store.get("entries");req.onsuccess=()=>set(EconomicSearch.mergeCache(req.result,[]));});
- const writeCache=updates=>cacheOperation("readwrite",(store,set)=>{const req=store.get("entries");req.onsuccess=()=>{const entries=EconomicSearch.mergeCache(req.result,updates);store.put(entries,"entries");set(entries.length)};});
+ const writeCache=updates=>cacheOperation("readwrite",(store,set)=>{const req=store.get("entries");req.onsuccess=()=>{const entries=EconomicSearch.touchCache(req.result,updates);store.put(entries,"entries");set(entries.length)};});
  const clearCache=()=>cacheOperation("readwrite",(store,set)=>{store.delete("entries");set(true);});
  async function titleKey(title){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(EconomicSearch.cacheIdentity(title)));return Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");}
- clearSemantic.onclick=async()=>{if(semanticBusy)return;clearSemantic.disabled=true;try{await clearCache();localResults.replaceChildren();semanticStatus.textContent="Локальный кеш векторов очищен. Файлы модели в кеше браузера не удалены."}catch{semanticStatus.textContent="Не удалось очистить кеш; используйте настройки хранения данных браузера."}finally{clearSemantic.disabled=semanticBusy}};
+ clearSemantic.onclick=async()=>{if(semanticBusy)return;semanticBusy=true;controls();try{await clearCache();localResults.replaceChildren();buildStatus.textContent="";semanticStatus.textContent="Локальный кеш векторов очищен. Файлы модели в кеше браузера не удалены."}catch{semanticStatus.textContent="Не удалось очистить кеш; используйте настройки хранения данных браузера."}finally{semanticBusy=false;controls()}};
  function controls(){
   semantic.disabled=semanticBusy||!lastQuery||!EconomicSearch.semanticCandidates(baselineRows).length;
   localSemantic.disabled=semanticBusy||!lastQuery||!lastOptions||lastOptions.all||lastOptions.contentOnly||lastOptions.vector||!!lastOptions.kind&&!["paper","external","web"].includes(lastOptions.kind);
@@ -247,7 +258,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     matched.push({doc,vector:r.vector});
    }
    if(token!==seq)return;
-   if(!matched.length){semanticStatus.textContent="Нет актуальных сохранённых исследований для этих фильтров. Сначала выполните нейросетевое ранжирование обычной выдачи.";return}
+   if(!matched.length){semanticStatus.textContent="Нет актуальных сохранённых исследований для этих фильтров. Пополните локальный индекс из архива или выполните нейросетевое ранжирование обычной выдачи.";return}
    const encoder=await getEncoder(),v=await encodeText(encoder,query);
    if(token!==seq)return;
    const ranked=EconomicSearch.localRank(v,matched);
@@ -357,6 +368,13 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  }catch{if(token===seq)semanticStatus.textContent="Модель или вычисление недоступны. Обычная выдача сохранена.";}
  finally{semanticBusy=false;controls();}
 };
+ // Editing a query/filter invalidates both neural actions and in-flight search results.
+ // The independently running archive builder is unaffected.
+ form.addEventListener("input",()=>{
+  ++seq;lastQuery="";lastOptions=null;baselineRows=[];rows=[];host.replaceChildren();
+  localResults.replaceChildren();more.hidden=true;expansion.textContent="";semanticStatus.textContent="";
+  status.textContent="Параметры изменены. Нажмите «Найти» для обновления выдачи.";controls();
+ });
  form.onsubmit=e=>{e.preventDefault();run()};more.onclick=()=>{limit+=20;draw()};
  $("ask").onclick=()=>{const field=document.getElementById("gea-question"),toggle=document.getElementById("gea-toggle");if(field&&toggle){field.value=q.value.slice(0,600);field.dispatchEvent(new Event("input"));if(document.getElementById("gea-panel").hidden)toggle.click()}};
  const saved=new URLSearchParams(location.search);q.value=(saved.get("q")||"").slice(0,600);
