@@ -220,6 +220,27 @@ const GlobalEconomicAssistant=(function core(){
  out.push({id:"prod-calibration-gate",kind:"Методологический контроль",title:"Калибровка трудоёмкости МРБ",description:"Автоматическая подстановка этих рядов в 19 групп МРБ заблокирована: ВДС не валовой выпуск, доллары 2015 не рубли 2021, занятые не годовые FTE, три сектора не продуктовые группы. Требуются распределённые FTE по продуктам 2021 и документированные источники. Доступен шаблон калибровки.",href:"labor.html#labor-calibration",limit:"Диагностика пригодности данного набора, не утверждение об отсутствии иных источников."});
  return out;
  }
+ function technologyCommand(q){
+ const s=String(q||"").trim();if(!/^технология\s*:/iu.test(s))return null;
+ const m=s.match(/^технология\s*:\s*(все|[1-9]|1[0-9])\s*;\s*материалы\s*=\s*(-?\d{1,2}(?:[.,]\d)?)\s*;\s*импорт\s*=\s*(-?\d{1,2}(?:[.,]\d)?)\s*;\s*спрос\s*=\s*(\d{1,2}(?:[.,]\d)?)$/iu);
+ if(!m)return {kind:"invalid"};
+ const [material,imported,demand]=m.slice(2).map(v=>Number(v.replace(",",".")));
+ if(material< -20||material>80||imported< -20||imported>80||demand<0||demand>20)return {kind:"invalid"};
+ return {kind:"technology",group:m[1].toLowerCase()==="все"?-1:Number(m[1])-1,material,imported,demand};
+ }
+ function technologyEvidence(cmd,m,T,V){
+ if(cmd?.kind!=="technology"||m?.year!==2021||m.compatible!==true||m.names?.length!==19||!external(m.source)||!Number.isInteger(cmd.group)||cmd.group< -1||cmd.group>=19||![cmd.material,cmd.imported,cmd.demand].every(Number.isFinite))return [];
+ const p=V.params(19,cmd.group,cmd.material,cmd.imported,cmd.demand),r=V.compare(m,p),a=r.base,b=r.changed;
+ const valid=x=>[x.totalOutput,x.totalDomestic,x.totalImports,x.demand,x.residual].every(v=>Number.isFinite(v)&&v>=0)&&x.residual<=1e-7*Math.max(1,...x.output)&&x.totalLabor===null;
+ if(!valid(a)||!valid(b)||Math.abs(a.demand-b.demand)>1e-7*Math.max(1,a.demand)||r.rows.length!==19||r.rows.some(x=>![x.base,x.changed,x.delta,x.importBase,x.importChanged,x.costIndex].every(Number.isFinite)))throw Error("Technology balance unverified");
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const note="МРБ 2021, фиксированная стоимостная оценка. Пользователь меняет коэффициенты отечественных и импортных промежуточных затрат, а не физическую технологию по измеренным нормам. Одинаковый дополнительный конечный спрос в обоих вариантах. Труд, капитальные затраты внедрения, мощности и эффект на рыночные цены не рассчитаны. Не прогноз ВВП.";
+ const href="scenario.html#technology";
+ const out=[{id:"tech-params",kind:"Условные допущения",title:"Изменение технологии",description:"Группа: "+(cmd.group<0?"все 19":m.names[cmd.group])+" · экономия отечественных затрат "+f(cmd.material)+"% · импортных "+f(cmd.imported)+"% · дополнительный спрос "+f(cmd.demand)+"% базового · общий спрос "+f(a.demand)+" млрд руб.",href:m.source,limit:note},
+ {id:"tech-result",kind:"Проверенный условный расчёт",title:"Ресурсный эффект технологии",description:"Валовой выпуск "+f(a.totalOutput)+" → "+f(b.totalOutput)+" · изменение "+f(r.delta.output)+" · отечественные промежуточные затраты "+f(a.totalDomestic)+" → "+f(b.totalDomestic)+" · изменение "+f(r.delta.domestic)+" · промежуточный импорт "+f(a.totalImports)+" → "+f(b.totalImports)+" · изменение "+f(r.delta.imports)+" млрд руб. · индекс затрат корзины "+f(a.basket)+" → "+f(b.basket)+" · невязки "+a.residual.toExponential(2)+" / "+b.residual.toExponential(2),href,limit:note+" Меньший валовой выпуск при том же спросе может означать экономию промежуточных ресурсов."}];
+ for(const [i,x] of r.rows.entries())out.push({id:"tech-sector"+(i+1),kind:"Продуктовая группа",title:x.name,description:"Выпуск "+f(x.base)+" → "+f(x.changed)+" · изменение "+f(x.delta)+" · импорт "+f(x.importBase)+" → "+f(x.importChanged)+" млрд руб. · условный индекс затрат "+f(x.costIndex),href,limit:note});
+ return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -575,7 +596,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -846,7 +867,26 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Архив производительности или расчёт недоступны.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findTechnology(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Сценарное изменение технологии МРБ",parameters,parameter_note:"Коэффициенты являются условными допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"tech-status",kind:"Статус расчёта",title:"Технология производства",description,href:"scenario.html#technology"}];
+  if(cmd.kind==="invalid")found=note("Пример: технология: 9; материалы=10; импорт=5; спрос=3. Группа 1–19 или все; экономия −20…80%; прирост спроса 0–20%.");
+  else try{
+   await loadScript("labor-calibration.js",()=>typeof LaborCalibration!=="undefined");
+   await Promise.all([loadScript("price-model.js",()=>typeof PriceModel!=="undefined"),loadScript("resource-plan.js",()=>typeof ResourcePlan!=="undefined")]);
+   await loadScript("technology.js",()=>typeof Technology!=="undefined");
+   await loadScript("iv-tech.js",()=>typeof IVTech!=="undefined");
+   const m=(await Provenance.get(manifest,"price-data.json",base)).data;
+   found=C.technologyEvidence(cmd,m,Technology,IVTech);
+   if(!found.length)found=note("Не подтверждена исходная матрица или параметры.");
+  }catch{failed=1;found=note("Технологический сценарий не подтверждён: проверьте параметры и матрицу.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const technology=C.technologyCommand(q.value);if(technology)return findTechnology(technology,parameters);
   const productivity=C.productivityCommand(q.value);if(productivity)return findProductivity(productivity,parameters);
   const laborPlan=C.laborPlanCommand(q.value);if(laborPlan){
    if(laborPlan.kind==="invalid"){await loadScript("provenance.js",()=>typeof Provenance!=="undefined");const manifest=await Provenance.validateManifest(await load("data-manifest.json"));return {found:[{id:"labor-plan-status",kind:"Статус расчёта",title:"Трудовой план",description:"Пример: трудовой план: инвестиции=1000; импорт=500; горизонт=3; труд=100000; трудоёмкость=100; трудоёмкость 9=150; производительность=2. Лимит 0–1 млрд человеко-лет, коэффициенты 0–1 млн человеко-лет на млрд руб., производительность −10…20%, горизонт до 10. Условные параметры.",href:"scenario.html#global-plan"}],context:{page,heading,description:"Трудовые ограничения",parameters},failed:0,fingerprint:manifest.data_fingerprint};}

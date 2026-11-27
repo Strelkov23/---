@@ -320,3 +320,16 @@ A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,prod
 A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,employment_checked:null}:r)},L,"2026-11").length,0);
 A.equal(core.productivityEvidence(c,{...d,broad:rows.map((r,i)=>i===0?{...r,productivity_checked:"2027-01-01"}:r)},L,"2026-11").length,0);
 console.log("16 productivity decomposition assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),T=require("./technology.js"),V=require("./iv-tech.js");
+const c=core.technologyCommand("технология: 9; материалы=10; импорт=5; спрос=3");
+A.deepEqual(c,{kind:"technology",group:8,material:10,imported:5,demand:3});
+A.equal(core.technologyCommand("технология: все; материалы=-20; импорт=80; спрос=0").group,-1);
+A.equal(core.technologyCommand("технология"),null);
+for(const q of ["технология: 20; материалы=10; импорт=5; спрос=3","технология: 9; материалы=81; импорт=5; спрос=3","технология: 9; материалы=-21; импорт=5; спрос=3","технология: 9; материалы=10; импорт=5; спрос=21"])A.equal(core.technologyCommand(q).kind,"invalid");
+const n=19,m={year:2021,source:"https://example.org",names:Array.from({length:n},(_,i)=>"Группа "+i),A:Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?.2:0)),imported:Array(n).fill(.1),residual:Array(n).fill(.7),demand:Array(n).fill(10000),output:Array(n).fill(20000),compatible:true};
+const e=core.technologyEvidence(c,m,T,V);A.equal(e.length,21);A.equal(e[1].id,"tech-result");A.ok(e[1].limit.includes("не рассчитаны"));A.ok(e[0].description.includes("Группа 8"));
+const p=V.params(n,8,10,5,3),r=V.compare(m,p);A.ok(r.delta.output<0);A.ok(r.delta.imports<0);A.equal(r.base.demand,r.changed.demand);
+A.equal(core.technologyEvidence(c,{...m,year:2022},T,V).length,0);A.equal(core.technologyEvidence(c,{...m,compatible:false},T,V).length,0);A.equal(core.technologyEvidence(c,{...m,source:"javascript:alert(1)"},T,V).length,0);
+A.throws(()=>core.technologyEvidence(c,m,T,{...V,compare:()=>({...r,changed:{...r.changed,residual:100}})}));
+console.log("18 technology assistant checks passed");}
