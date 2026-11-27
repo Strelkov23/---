@@ -60,6 +60,9 @@ def build(out,previous,stamp,refresh):
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament_results"]=tournament["summary"]
+    trials=read(out,"economic-ai-forecast-trials.json")["trials"]
+    agents[4]["metrics"]["trials"]=[dict(code=r["code"],unit=r["unit"],horizon=r["horizon"],candidate=r["candidate"],selected=r["selected"],**r["result"]) for r in trials]
+    agents[4]["links"].append("economic-ai-forecast-trials.json")
     search=read(out,"economic-search-audit.json")
     agents.append(agent("search","attention" if any(r["status"] in ("error","blocked") for r in search["sources"]) else "waiting" if any(r["status"]=="waiting" for r in search["sources"]) else "ok",{"counts":search["counts"],"terms":search["terms"],"index_bytes":search["index_bytes"],"baseline_available":search["baseline_available"],"abstracts":search["abstracts"]},["economic-search.html","economic-search-audit.json"],search["sources"]))
     diag=read(out,"economic-ai-diagnostics.json")
