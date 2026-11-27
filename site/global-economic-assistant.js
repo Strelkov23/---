@@ -47,7 +47,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function link(p,r){if(!r.href)return;const a=add(p,"a",r.title);a.href=C.internal(r.href)?localHref(r.href):r.href;a.rel="noopener noreferrer";if(C.external(r.href))a.target="_blank"}
  function reset(){results.replaceChildren();answer.textContent="";last=null;exportButton.disabled=true}
  clear.onclick=()=>{q.value="";try{sessionStorage.removeItem(storageKey)}catch{}reset();status.textContent="Вопрос и результаты очищены."};
- full.href=localHref("analyst-cockpit.html#economic-ai");full.onclick=save;
+ full.href=localHref("analyst-cockpit.html#economic-ai");full.onclick=()=>{save();if(page==="analyst-cockpit.html"&&location.hash==="#economic-ai")document.dispatchEvent(new Event("economic-ai-draft-transfer"));};
  async function find(parameters){
   await modules();
   const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));

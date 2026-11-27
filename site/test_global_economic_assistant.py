@@ -24,7 +24,11 @@ def main():
             page.locator("#gea-preview-context").click()
             assert "Целевой реальный рост ВВП" in page.locator("#gea-parameters").inner_text()
             page.goto("http://localhost:8765/analyst-cockpit.html#economic-ai",wait_until="domcontentloaded")
-            assert page.locator("#eai-question").input_value()=="сравнение регионов"
+            page.wait_for_function("document.querySelector('#eai-question').value === 'сравнение регионов'")
+            page.locator("#gea-toggle").click()
+            page.locator("#gea-question").fill("динамика ВВП")
+            page.locator("#gea-full").click()
+            page.wait_for_function("document.querySelector('#eai-question').value === 'динамика ВВП'")
             page.close()
         browser.close()
 if __name__=="__main__":main()

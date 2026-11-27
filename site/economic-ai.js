@@ -26,7 +26,10 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function setBusy(v){busy=v;run.disabled=v||!engine;init.disabled=v||!!engine;month.disabled=v;question.disabled=v;evidenceButton.disabled=v;seriesQuery.disabled=v;seriesSelect.disabled=v;dq.disabled=v;ds.disabled=v;docsToggle.disabled=v;stop.disabled=!v||!engine}
  function clear(){answer.textContent="";sources.replaceChildren();docsHost.replaceChildren()}
  month.value=new Date().toISOString().slice(0,7);
- try{if(location.hash==="#economic-ai"){const draft=JSON.parse(sessionStorage.getItem("economic-ai-draft-v1")||"null");if(typeof draft?.question==="string"&&draft.question.trim())question.value=draft.question.slice(0,600)}}catch{}
+ function restoreAssistantDraft(){try{if(location.hash==="#economic-ai"){const draft=JSON.parse(sessionStorage.getItem("economic-ai-draft-v1")||"null");if(typeof draft?.question==="string"&&draft.question.trim())question.value=draft.question.slice(0,600)}}catch{}}
+ restoreAssistantDraft();
+ window.addEventListener("hashchange",restoreAssistantDraft);
+ document.addEventListener("economic-ai-draft-transfer",restoreAssistantDraft);
  async function manifestNow(){return Provenance.validateManifest(await load("data-manifest.json"))}
  async function loadRegistry(){const m=await manifestNow();const d=(await Provenance.get(m,"data-registry.json",root)).data;if(!Array.isArray(d.rows))throw Error("Некорректный каталог");return d.rows}
  function renderSearch(){const saved=seriesSelect.value;seriesSelect.replaceChildren(new Option("Не добавлять ряд",""));for(const r of EconomicAISeries.search(registry,seriesQuery.value))seriesSelect.add(new Option(r.title+" · "+r.unit+" · "+r.group,r.id));if(Array.from(seriesSelect.options).some(o=>o.value===saved))seriesSelect.value=saved;seriesStatus.textContent="Показано "+(seriesSelect.options.length-1)+" рядов (до 25). Поиск по названию или коду."}
