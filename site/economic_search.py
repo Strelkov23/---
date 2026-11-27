@@ -3,7 +3,7 @@ import json,re
 from collections import Counter,defaultdict
 from urllib.parse import quote,urlsplit
 FILE="economic-search-index.json"
-KINDS=("tool","series","news","paper","discovered","external")
+KINDS=("tool","series","news","paper","discovered","external","web")
 NOTE="Поиск по заголовкам и метаданным опубликованного архива, не по всему интернету."
 STOP=set("как что где найти мне можно нужно помоги покажи объясни это чем какой какие для при или по на в и с к у о об из за от до а".split())
 SUFFIX=re.compile(r"(иями|ями|ами|ого|его|ему|ому|ыми|ими|иях|иям|ией|ия|ии|ий|ию|ие|ях|ах|ам|ом|ов|ем|ая|ые|ый|ой|ую|а|ы|у|и|е|я|ю)$")
@@ -49,6 +49,8 @@ def build(out,stamp):
             rows.append(record("discovered",r["title"],r["url"],r["definition"],"World Bank WDI",max(r["values"]),code))
     for key,r in read(out,"economic-external-research.json")["rows"].items():
         rows.append(record("external",r["title"],r["url"],"Препринт; статус рецензирования не подтверждён. "+" · ".join(r["authors"]+r["categories"]),"arXiv",r["published"],key))
+    for href,r in read(out,"economic-web-crawl.json")["rows"].items():
+        rows.append(record("web",r["title"],href,"Рабочее исследование FEDS; найдено "+r["first_seen"][:10]+". Дата публикации не извлечена.","Federal Reserve FEDS"))
     return compile_index(rows,stamp)
 def validate(d):
     if d["schema"]!=1 or d["note"]!=NOTE or not isinstance(d["postings"],dict) or not isinstance(d["docs"],list):raise ValueError("Invalid index")
