@@ -53,6 +53,16 @@ with tempfile.TemporaryDirectory() as tmp:
                 }}"""))
             url=f"http://127.0.0.1:{server.server_port}/economic-search.html"
             page.goto(url)
+            page.locator("#es-semantic-build-filtered").check()
+            page.locator("#es-kind").select_option("paper")
+            page.locator("#es-from").fill("2026")
+            page.locator("#es-semantic-build").click()
+            expect(page.locator("#es-semantic-build-status")).to_contain_text("подтверждены",timeout=20000)
+            expect(page.locator("#es-semantic-build-status")).to_contain_text("1 из 1")
+            assert page.evaluate("globalThis.fixtureEncodes")==1
+            page.locator("#es-semantic-build-filtered").uncheck()
+            page.locator("#es-kind").select_option("")
+            page.locator("#es-from").fill("")
             page.locator("#es-semantic-build").click()
             expect(page.locator("#es-semantic-build-status")).to_contain_text("2 из 2",timeout=20000)
             expect(page.locator("#es-semantic-build-status")).to_contain_text("подтверждены")

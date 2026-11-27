@@ -186,10 +186,10 @@ const EconomicSearch=(function core(){
  }
  return rows.sort((a,b)=>b.semanticSimilarity-a.semanticSimilarity||a.href.localeCompare(b.href)).slice(0,limit);
 }
- function archiveTargets(docs,limit=256){
+ function archiveTargets(docs,limit=256,options={}){
  if(!Array.isArray(docs)||!Number.isInteger(limit)||limit<1||limit>256)throw Error("Invalid archive targets");
  const seen=new Set(),out=[];
- const eligible=docs.filter(d=>localEligible(d)&&d.href.length<=2048).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||a.href.localeCompare(b.href)||a.kind.localeCompare(b.kind));
+ const eligible=docs.filter(d=>localEligible(d,options)&&d.href.length<=2048).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||a.href.localeCompare(b.href)||a.kind.localeCompare(b.kind));
  for(const d of eligible){const key=cacheIdentity(d.title);if(seen.has(key))continue;seen.add(key);out.push(d);if(out.length===limit)break;}
  return out;
  }
@@ -198,7 +198,7 @@ const EconomicSearch=(function core(){
 if(typeof module!=="undefined")module.exports=EconomicSearch;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("es-"+id),form=$("form");if(!form)return;
- const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector"),semantic=$("semantic"),semanticStatus=$("semantic-status"),clearSemantic=$("semantic-clear"),localSemantic=$("local-semantic"),localResults=$("local-results"),buildSemantic=$("semantic-build"),stopSemantic=$("semantic-stop"),buildStatus=$("semantic-build-status");
+ const q=$("query"),status=$("status"),host=$("results"),more=$("more"),kind=$("kind"),from=$("from"),to=$("to"),all=$("all"),expand=$("expand"),expansion=$("expansion"),abstractOnly=$("abstract-only"),contentOnly=$("content-only"),vector=$("vector"),semantic=$("semantic"),semanticStatus=$("semantic-status"),clearSemantic=$("semantic-clear"),localSemantic=$("local-semantic"),localResults=$("local-results"),buildSemantic=$("semantic-build"),stopSemantic=$("semantic-stop"),buildStatus=$("semantic-build-status"),buildLimit=$("semantic-build-limit"),buildFiltered=$("semantic-build-filtered");
  const labels={tool:"Инструмент",series:"Статистика",news:"Новости и документы",paper:"Научные статьи",discovered:"Новые показатели WDI",external:"Внешние препринты arXiv",web:"Внешние исследования FEDS"};
  let index=null,rows=[],limit=20,fingerprint="",seq=0,manifest=null,papersPromise=null,lastQuery="",encoderPromise=null,semanticBusy=false,baselineRows=[],lastOptions=null,buildStop=false,buildActive=false,indexPromise=null;
  const add=(p,t,v)=>{const e=document.createElement(t);e.textContent=v;p.append(e);return e};
@@ -231,7 +231,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function controls(){
   semantic.disabled=semanticBusy||!lastQuery||!EconomicSearch.semanticCandidates(baselineRows).length;
   localSemantic.disabled=semanticBusy||!lastQuery||!lastOptions||lastOptions.all||lastOptions.contentOnly||lastOptions.vector||!!lastOptions.kind&&!["paper","external","web"].includes(lastOptions.kind);
-  clearSemantic.disabled=semanticBusy;buildSemantic.disabled=semanticBusy;stopSemantic.disabled=!buildActive||buildStop;
+  clearSemantic.disabled=semanticBusy;buildSemantic.disabled=semanticBusy;buildLimit.disabled=semanticBusy;buildFiltered.disabled=semanticBusy;stopSemantic.disabled=!buildActive||buildStop;
  }
  async function getEncoder(){
   if(!encoderPromise)encoderPromise=(async()=>{
@@ -266,7 +266,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    add(localResults,"p","Проверено "+matched.length+" сохранённых исследований из текущего архива; показано "+ranked.length+". Поиск по названиям, без требования совпадения слов. Это не полный архив, не оценка достоверности и не доказательство релевантности.");
    for(const r of ranked){
     const line=add(localResults,"p",""),a=add(line,"a",r.title);
-    try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();a.href=u.href;a.rel="noopener noreferrer"}catch{a.removeAttribute("href")}
+    try{const u=new URL(r.href,location.href);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error();if(u.origin===location.origin&&typeof pinned!=="undefined"&&pinned&&typeof dynamicPages!=="undefined"&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);a.href=u.href;a.rel="noopener noreferrer"}catch{a.removeAttribute("href")}
     add(line,"small"," · "+labels[r.kind]+" · "+(r.date||"без даты")+" · косинус "+r.semanticSimilarity.toFixed(3));
    }
    semanticStatus.textContent="Локальный поиск завершён. Обычная выдача не изменена.";
@@ -282,12 +282,17 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  buildSemantic.onclick=async()=>{
   if(semanticBusy)return;
   semanticBusy=true;buildActive=true;buildStop=false;controls();
+  const options=buildFiltered.checked?{kind:kind.value,from:Number(from.value),to:Number(to.value),abstractOnly:abstractOnly.checked}:{};
+  const batchLimit=Number(buildLimit.value);
   let completed=0,targets=[],updates=[];
   const flush=async()=>{if(updates.length){await writeCache(updates);updates=[];}};
   try{
    buildStatus.textContent="Проверка архива и сохранённых векторов…";
    await ensureIndex();
-   targets=EconomicSearch.archiveTargets(index.docs);
+   if(options.from&&options.to&&options.from>options.to){buildStatus.textContent="Начальный год больше конечного.";return}
+   targets=EconomicSearch.archiveTargets(index.docs,batchLimit,options);
+   if(!targets.length){buildStatus.textContent="Нет подходящих научных названий. Измените тип, годы или наличие аннотации.";return}
+   localResults.replaceChildren();
    const cached=await readCache(),known=new Map(cached.map(r=>[r.key,r]));
    let encoder=null;
    for(const doc of targets){
@@ -311,7 +316,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    const current=await readCache(),saved=new Map(current.map(r=>[r.key,r]));
    let verified=0;
    for(const doc of targets){const r=saved.get(await titleKey(doc.title));if(r?.href===doc.href&&r.kind===doc.kind)verified++;}
-   buildStatus.textContent=(buildStop?"Остановлено. ":"Завершено. ")+verified+" из "+targets.length+" выбранных названий подтверждены в кеше. Общий научный архив не индексирован полностью.";
+   buildStatus.textContent=(buildStop?"Остановлено. ":"Завершено. ")+verified+" из "+targets.length+" выбранных названий подтверждены в кеше. Всего в кеше "+current.length+" из 256 возможных векторов; общий научный архив не индексирован полностью.";
   }catch{try{await flush()}catch{}buildStatus.textContent="Индексация прервана: модель, архив или хранилище недоступны. Ранее сохранённые пакеты не удалены; повторите запуск для продолжения.";}
   finally{buildActive=false;semanticBusy=false;controls();}
  };

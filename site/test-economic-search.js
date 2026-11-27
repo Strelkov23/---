@@ -70,3 +70,6 @@ assert.equal(core.touchCache([a],[b,c],1)[0].used,102);
 assert.equal(core.touchCache([rec(4,Number.MAX_SAFE_INTEGER)],[b],0)[0].key,b.key);
 assert.equal(core.touchCache([a],[b],100,1).length,1);
 assert.throws(()=>core.touchCache([],[],-1));console.log("6 atomic cache clock checks passed");}
+
+{const a={kind:"paper",href:"a",title:"A",date:"2025",abstract_license:"https://creativecommons.org/licenses/by/4.0/"},b={kind:"external",href:"b",title:"B",date:"2026"},c={kind:"web",href:"c",title:"C",date:"2024"};
+assert.deepEqual(core.archiveTargets([a,b,c],256,{from:2025}).map(d=>d.href),["b","a"]);assert.deepEqual(core.archiveTargets([a,b,c],256,{to:2024}).map(d=>d.href),["c"]);assert.deepEqual(core.archiveTargets([a,b,c],32,{abstractOnly:true}).map(d=>d.href),["a"]);assert.deepEqual(core.archiveTargets([a,b,c],32,{kind:"external"}).map(d=>d.href),["b"]);assert.deepEqual(core.archiveTargets([a,b,c],32,{kind:"series"}),[]);console.log("5 archive batch filter checks passed");}
