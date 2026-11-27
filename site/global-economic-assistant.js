@@ -155,7 +155,45 @@ const GlobalEconomicAssistant=(function core(){
  found.push({id:"balance-source",kind:"Первоисточник",title:"Таблицы затрат — выпуска Росстата за 2021 год",description:"Базовая таблица для модели; не текущая статистика.",href:source,limit:base});
  return found;
 }
- return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence}
+ function allocationCommand(q){
+ const s=String(q??"").trim(),match=s.match(/^оптимизация\s*:\s*(.*)$/iu);
+ if(!match)return null;
+ const invalid={kind:"invalid"},parts=match[1].split(";").map(x=>x.trim());
+ if(parts.length>64||parts.some(x=>!x))return invalid;
+ const scalar={бюджет:null,импорт:null,штраф:2,предел:10,спрос:20},seen=new Set(),vectors={вес:{},предел:{},спрос:{}};
+ const ranges={бюджет:100000,импорт:100000,штраф:10,предел:100,спрос:20,вес:10};
+ for(const part of parts){
+  const m=part.match(/^(бюджет|импорт|штраф|предел|спрос|вес)(?:\s+(\d{1,2}))?\s*=\s*(\d{1,6}(?:[.,]\d)?)$/iu);
+  if(!m)return invalid;
+  const name=m[1].toLowerCase(),group=m[2]?+m[2]:null,value=Number(m[3].replace(",","."));
+  if(value>ranges[name])return invalid;
+  if(group!==null){
+   if(!Object.hasOwn(vectors,name)||group<1||group>19||Object.hasOwn(vectors[name],group))return invalid;
+   vectors[name][group]=value;
+  }else{
+   if(!Object.hasOwn(scalar,name)||seen.has(name))return invalid;
+   scalar[name]=value;seen.add(name);
+  }
+ }
+ if(scalar.бюджет===null||scalar.импорт===null)return invalid;
+ return {kind:"allocation",budget:scalar.бюджет,importLimit:scalar.импорт,penalty:scalar.штраф,defaultCap:scalar.предел,defaultDemand:scalar.спрос,priority:Array.from({length:19},(_,i)=>vectors.вес[i+1]??1),cap:Array.from({length:19},(_,i)=>vectors.предел[i+1]??scalar.предел),maxDemand:Array.from({length:19},(_,i)=>vectors.спрос[i+1]??scalar.спрос)};
+}
+ function allocationEvidence(cmd,m,R,pinned=false){
+ if(cmd.kind!=="allocation")throw Error("Invalid allocation");
+ const p={budget:cmd.budget,importLimit:cmd.importLimit,penalty:cmd.penalty,priority:cmd.priority,cap:cmd.cap,maxDemand:cmd.maxDemand},r=R.model(m,p);
+ if(r.results.length!==3||r.results.some(x=>![x.direct,x.imports,x.gross,x.priority,x.objective,x.dualObjective,x.gap].every(Number.isFinite)))throw Error("Invalid allocation results");
+ const f=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:3}):"нет расчёта";
+ const href="scenario.html?"+[["opt-budget",p.budget],["opt-import",p.importLimit],["opt-penalty",p.penalty],["opt-cap",cmd.defaultCap],["opt-max",cmd.defaultDemand],["opt-priority",p.priority.join(",")],["opt-caps",p.cap.join(",")],["opt-maxima",p.maxDemand.join(",")]].map(([k,v])=>k+"="+encodeURIComponent(v)).join("&")+"#resource-plan";
+ const note="Линейная оптимизация дополнительных объёмов конечного спроса на базе баланса 2021 года, в ценах базы. Бюджет — условный лимит конечного спроса, не бюджет государства. Импорт — промежуточные импортные затраты модели. Веса и мощности условные, технология фиксирована. Максимум по заданному критерию не означает максимум ВВП, благосостояния или реального выпуска."+(pinned?" Интерактивная страница открывает текущую редакцию сайта.":"");
+ const found=[{id:"allocation-params",kind:"Условные параметры",title:"Ограничения задачи распределения",description:"Лимит спроса "+f(p.budget)+" · лимит импорта "+f(p.importLimit)+" млрд руб. · штраф импорта "+f(p.penalty)+" · "+m.names.map((name,i)=>(i+1)+". "+name+": вес "+f(p.priority[i])+", спрос ≤ "+f(p.maxDemand[i])+"%, выпуск ≤ "+f(p.cap[i])+"%").join("; "),href,limit:note}];
+ for(const [i,a] of r.results.entries()){
+  const assigned=a.x.map((v,j)=>({v,j})).filter(x=>x.v>1e-8).sort((x,y)=>y.v-x.v||x.j-y.j);
+  const binding=a.capacitySlack.map((v,j)=>({v,j})).filter(x=>Math.abs(x.v)<=1e-6*Math.max(1,m.output[x.j]*p.cap[x.j]/100000)).map(x=>m.names[x.j]);
+  found.push({id:"allocation"+(i+1),kind:"Оптимизированная альтернатива",title:a.name,description:"Конечный спрос "+f(a.direct)+" · валовой выпуск "+f(a.gross)+" · импортные затраты "+f(a.imports)+" · остаток лимита спроса "+f(Math.max(0,a.usedBudget))+" млрд руб. · взвешенный спрос "+f(a.priority)+" усл. ед. · невязка прямой/двойственной цели "+a.gap.toExponential(2)+" · распределение (млрд руб.): "+(assigned.map(x=>m.names[x.j]+" "+f(x.v)).join("; ")||"нулевое")+" · активные ограничения выпуска: "+(binding.join("; ")||"нет"),href,limit:note+" Численная проверка оптимальности относится только к данной линейной задаче."});
+ }
+ return found;
+}
+ return {words,rank,internal,external,prompt,audit,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -275,7 +313,22 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Матрица или расчёт недоступны; проверьте целостность архива.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findAllocation(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Условная линейная оптимизация распределения конечного спроса",parameters,parameter_note:"Лимиты и веса являются допущениями."};
+  let found=[],failed=0;
+  const note=description=>[{id:"allocation-status",kind:"Статус расчёта",title:"Оптимизация ресурсов",description,href:"scenario.html#resource-plan"}];
+  if(cmd.kind==="invalid")found=note("Пример: оптимизация: бюджет=1000; импорт=150; вес 9=5; предел 9=5. Бюджет и импорт обязательны, в млрд руб. (0–100000). Группы 1–19; вес и штраф 0–10, предел выпуска 0–100%, спрос 0–20%. Один десятичный знак. По умолчанию вес 1, штраф 2, предел 10%, спрос 20%.");
+  else try{
+   await loadScript("resource-plan.js",()=>typeof ResourcePlan!=="undefined");
+   const m=(await Provenance.get(manifest,"sectors.json",base)).data;
+   found=C.allocationEvidence(cmd,m,ResourcePlan,!!base);
+  }catch{failed=1;found=note("Не удалось получить проверенное допустимое и оптимальное решение. Проверьте параметры и доступность матрицы.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const allocation=C.allocationCommand(q.value);if(allocation)return findAllocation(allocation,parameters);
   const balance=C.balanceCommand(q.value);if(balance)return findBalance(balance,parameters);
   const industry=C.industryCommand(q.value);if(industry)return findIndustry(industry,parameters);
   const cmd=C.companyCommand(q.value);if(cmd)return findCompany(cmd,parameters);

@@ -89,3 +89,17 @@ const expected=CS.calculate(mm,sv,cv);
 A.ok(total.description.includes((expected.alpha*100).toLocaleString("ru-RU",{maximumFractionDigits:3})+"%"));
 A.throws(()=>core.balanceEvidence({kind:"multi",shocks:{20:5},limits:{},cap:10},mm,BM,CS));
 console.log("19 multi-sector scenario checks passed");
+
+const RP=require("./resource-plan.js");
+const ac=core.allocationCommand("оптимизация: бюджет=1000; импорт=150; вес 9=5; предел 9=5; спрос 2=0");
+A.equal(ac.kind,"allocation");A.equal(ac.priority[8],5);A.equal(ac.cap[8],5);A.equal(ac.maxDemand[1],0);A.equal(ac.cap[0],10);A.equal(ac.priority[0],1);
+A.equal(core.allocationCommand("оптимизация: бюджет=0; импорт=0").budget,0);
+A.equal(core.allocationCommand("ВВП"),null);
+for(const q of ["оптимизация: бюджет=1","оптимизация: бюджет=1; импорт=-1","оптимизация: бюджет=1; импорт=1; вес 20=3","оптимизация: бюджет=1; импорт=1; вес 1=2; вес 01=3","оптимизация: бюджет=1; импорт=1; спрос=21","оптимизация: бюджет=1; импорт=1; предел=101","оптимизация: бюджет=1; импорт=1; бюджет=2","оптимизация: бюджет=1; импорт=1; вес=1","оптимизация: бюджет=1; импорт=1; штраф=1,25"])A.equal(core.allocationCommand(q).kind,"invalid");
+const alloc=core.allocationEvidence(ac,mm,RP);
+A.equal(alloc.length,4);A.ok(alloc[1].description.includes("невязка прямой/двойственной цели"));A.ok(alloc[1].limit.includes("не означает максимум ВВП"));
+const au=new URL(alloc[0].href,"https://example.org/");
+A.equal(au.searchParams.get("opt-budget"),"1000");A.equal(au.searchParams.get("opt-caps").split(",")[8],"5");
+const zeroAlloc=core.allocationEvidence(core.allocationCommand("оптимизация: бюджет=0; импорт=0"),mm,RP);
+A.ok(zeroAlloc[1].description.includes("распределение (млрд руб.): нулевое"));
+console.log("23 resource allocation assistant checks passed");
