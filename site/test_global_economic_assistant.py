@@ -17,6 +17,12 @@ def main():
                 assert page.locator("#gea-results").inner_text().find("Найдено:")>=0
                 page.locator("#gea-close").click()
                 assert not page.locator("#gea-panel").is_visible()
+            page.goto("http://localhost:8765/scenario.html",wait_until="domcontentloaded")
+            page.locator("#gea-toggle").click()
+            page.locator("#gea-panel details summary").click()
+            page.locator("#gea-include-context").check()
+            page.locator("#gea-preview-context").click()
+            assert "Целевой реальный рост ВВП" in page.locator("#gea-parameters").inner_text()
             page.goto("http://localhost:8765/analyst-cockpit.html#economic-ai",wait_until="domcontentloaded")
             assert page.locator("#eai-question").input_value()=="сравнение регионов"
             page.close()

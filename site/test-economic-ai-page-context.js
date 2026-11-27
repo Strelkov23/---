@@ -1,0 +1,6 @@
+const assert=require('node:assert/strict');const core=require('./economic-ai-page-context.js');(function checks(c,assert){
+ const num=(value,extra={})=>({tagName:"INPUT",type:"number",value,...extra});
+ const sel=(value,textContent)=>({tagName:"SELECT",value,selectedOptions:[{textContent}]});
+ const map={left:sel("A","ВВП"),begin:num("2020"),finish:num("2025"),password:{tagName:"INPUT",type:"password",value:"secret"}};
+ const r=c.capture("compare.html",id=>map[id]);assert(r.length===3);assert(r[0].value==="ВВП");assert(r.every(x=>x.id!=="password"));assert(c.capture("unknown.html",id=>map[id]).length===0);assert(c.capture("compare.html",id=>id==="begin"?num("NaN"):null).length===0);assert(c.capture("compare.html",id=>id==="begin"?num("2020",{disabled:true}):null).length===0);assert(c.capture("scenario.html",id=>id==="repro-growth"?num("3"):null)[0].kind==="scenario_assumption");assert(c.capture("scenario.html",id=>id==="dyn-laborEnabled"?{tagName:"INPUT",type:"checkbox",checked:true}:null)[0].value==="Да");assert(c.note("Вопрос",{heading:"Раздел",parameters:r},[],"abc","Текст").includes("Черновик ИИ"));assert(!c.note("Вопрос",{heading:"Раздел"},[],"abc","").includes("Черновик ИИ"));
+})(core,assert.ok);console.log('10 context checks passed');
