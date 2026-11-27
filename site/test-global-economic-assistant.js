@@ -251,3 +251,25 @@ A.equal(core.compositeEvidence(c,bad,IV,P,"2026-11")[0].id,"composite-blocked");
 A.equal(core.compositeEvidence({...c,weights:[0,0,0,0,0]},d,IV,P,"2026-11")[0].id,"composite-blocked");
 A.ok(a.filter(r=>r.kind==="Корпоративное наблюдение").every(r=>r.href.startsWith("https://")));
 console.log("19 composite physical index assistant checks passed");}
+
+{const A=require("node:assert/strict"),core=require("./global-economic-assistant.js"),S=require("./iv-energy-structure.js"),E=require("./iv-ember.js");
+const c=core.energyCommand("структура энергетики: 2025; база=2024; порог=5");
+A.deepEqual(c,{kind:"energy-structure",year:2025,base:2024,threshold:5});
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024").threshold,5);
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024; порог=1,5").threshold,1.5);
+A.equal(core.energyCommand("энергетика"),null);
+A.equal(core.energyCommand("структура энергетики: 2025; база=2024; порог=101").kind,"invalid");
+const vals=Object.fromEntries(S.types.map(k=>[k,10]));
+const d={schema:"iv-ember-v1",origin:"external_compilation",unit:"TWh",source:"https://example.org/data",documentation:"https://example.org/method",success:"2026-01-01",sha256:"a".repeat(64),rows:[{year:2024,values:{...vals,total:90}},{year:2025,values:{...vals,total:90}}]};
+const a=core.energyEvidence(c,d,S,E,"2026-11");
+A.equal(a.length,13);A.ok(a[2].description.includes("общий структурный сдвиг 0"));A.ok(a[2].description.includes("9 из 9"));
+const missing={...d,rows:d.rows.map(r=>({...r,values:{...r.values,other_renewables:null}}))};
+const b=core.energyEvidence(c,missing,S,E,"2026-11");
+A.ok(b[2].description.includes("HHI нет расчёта"));A.ok(b[2].description.includes("общий структурный сдвиг нет расчёта"));A.ok(b[2].description.includes("8 из 9"));A.ok(!b.some(r=>r.id==="energy-other_renewables"));
+A.equal(core.energyEvidence(c,d,S,E,"2025-12").length,0);
+A.equal(core.energyEvidence(c,{...d,rows:[d.rows[0]]},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,rows:[...d.rows,d.rows[0]]},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,sha256:null},S,E,"2026-11").length,0);
+A.equal(core.energyEvidence(c,{...d,unit:"GWh"},S,E,"2026-11").length,0);
+A.ok(a.at(-1).description.includes("Не переносить"));
+console.log("18 energy structure assistant checks passed");}

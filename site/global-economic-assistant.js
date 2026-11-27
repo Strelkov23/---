@@ -170,6 +170,31 @@ const GlobalEconomicAssistant=(function core(){
   out.unshift({id:"composite-result",kind:"Расчёт индекса",title:"Составной индекс физического выпуска",description:cmd.year+" к "+cmd.base+" · индекс (база=100): "+fmt(x.index)+" · изменение "+fmt(x.index-100)+"% · покрытие "+fmt(x.coverage*100)+"% заданных весов · диапазон компонентов "+fmt(x.min)+" — "+fmt(x.max)+(s?.trials.length?" · при исключении по одному компоненту: "+fmt(s.min)+" — "+fmt(s.max):" · для проверки чувствительности нужен второй компонент"),href:"independent-statistics.html#physical-index-weights",limit:note+" Диапазон чувствительности к составу не доверительный интервал."});
   return out;
  }
+ function energyCommand(q){
+  const s=String(q||"").trim();if(!/^структура энергетики\s*:/iu.test(s))return null;
+  const m=s.match(/^структура энергетики\s*:\s*(\d{4})\s*;\s*база\s*=\s*(\d{4})(?:\s*;\s*порог\s*=\s*(\d{1,3}(?:[.,]\d{1,2})?))?$/iu);
+  if(!m)return {kind:"invalid"};
+  const year=Number(m[1]),base=Number(m[2]),threshold=m[3]?Number(m[3].replace(",",".")):5;
+  if(Math.min(year,base)<1992||Math.max(year,base)>2100||threshold>100)return {kind:"invalid"};
+  return {kind:"energy-structure",year,base,threshold};
+ }
+ function energyEvidence(cmd,d,S,E,cutoff){
+  if(cmd?.kind!=="energy-structure"||!Number.isInteger(cmd.year)||!Number.isInteger(cmd.base)||!Number.isFinite(cmd.threshold)||cmd.threshold<0||cmd.threshold>100||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)||Math.max(cmd.year,cmd.base)>=Number(cutoff.slice(0,4)))return [];
+  if(d?.schema!=="iv-ember-v1"||d.origin!=="external_compilation"||d.unit!=="TWh"||!external(d.source)||!external(d.documentation)||!Number.isFinite(Date.parse(d.success||""))||d.success.slice(0,7)>cutoff||! /^[a-f0-9]{64}$/.test(d.sha256||"")||!Array.isArray(d.rows))return [];
+  const seen=new Set();for(const r of d.rows){if(!Number.isInteger(r.year)||seen.has(r.year)||!r.values||typeof r.values!=="object"||Object.values(r.values).some(v=>v!==null&&(!Number.isFinite(v)||v<0)))return [];seen.add(r.year);}
+  if(!seen.has(cmd.year)||!seen.has(cmd.base))return [];
+  const x=S.compare(d.rows,cmd.year,cmd.base,cmd.threshold),fmt=v=>Number.isFinite(v)?Number(v.toFixed(4)).toLocaleString("ru-RU"):"нет расчёта";
+  const note="Ember: внешняя компиляция, может включать официальную российскую статистику. Не независимый аудит. Территория — Россия, единица ТВт·ч; годовая выработка, не установленная мощность и не потребление. Последний успешный импорт "+d.success+(d.error?" (последняя загрузка не удалась)":"")+".";
+  const out=[];
+  for(const [i,y] of [cmd.year,cmd.base].entries()){
+   const p=i?x.b:x.a;
+   out.push({id:"energy-year"+(i+1),kind:"Внешняя компиляция Ember",title:"Выработка и полнота структуры",description:y+" · общая выработка "+fmt(p.total)+" ТВт·ч · известные компоненты "+fmt(p.coverage)+"% · остаток "+fmt(p.residual)+" ТВт·ч · пропуски: "+(p.missing.map(k=>E.labels[k]||k).join(", ")||"нет")+" · баланс "+(p.consistent?"в пределах допуска":"не подтверждён"),href:d.source,limit:note});
+  }
+  out.push({id:"energy-shift",kind:"Структурная диагностика",title:"Изменение структуры электроэнергетики",description:cmd.year+" к "+cmd.base+" · изменение общей выработки "+fmt(x.totalChange)+"% · доля ископаемого топлива "+fmt(x.a.fossil)+"% · доля ВИЭ "+fmt(x.a.renewables)+"% · HHI "+fmt(x.a.hhi)+" · общий структурный сдвиг "+fmt(x.shift)+" п.п. · сопоставимых категорий "+x.common+" из "+S.types.length+" · выше или равно порогу "+cmd.threshold+" п.п.: "+x.flagged,href:"independent-statistics.html#energy-structure",limit:note+" HHI и полный сдвиг требуют полной структуры; пропуски не нули. Порог описательный, не статистическая значимость. Изменение выработки не равно изменению доступных мощностей."});
+  for(const r of x.items)if(r.delta!==null)out.push({id:"energy-"+r.key,kind:"Доля источника генерации",title:E.labels[r.key]||r.key,description:cmd.base+": "+fmt(r.previous)+"% · "+cmd.year+": "+fmt(r.current)+"% · изменение "+fmt(r.delta)+" п.п."+(r.flag?" · достигнут порог":""),href:d.source,limit:note});
+  out.push({id:"energy-planning",kind:"Маршрут планирования",title:"Проверка энергетических ограничений",description:"Сопоставить физические показатели с балансом электроэнергии и отдельно проверить мощности, коэффициенты использования, потребление и отраслевые ограничения. Не переносить доли генерации автоматически в межотраслевую матрицу.",href:"scenario.html#resource-plan",limit:"Маршрут исследования, не рассчитанный план. Нужны данные о мощностях и технологических коэффициентах."});
+  return out;
+ }
  function companyCommand(q){
  const s=String(q??"").trim();
  const compare=s.match(/^сравнить\s+(?:предприятия|компании)\s*:\s*(.*)$/iu);
@@ -461,7 +486,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,seriesEvidence,tradeEvidence,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -677,7 +702,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{failed=1;found=note("Архив физических показателей или расчёт недоступны.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
+ async function findEnergy(cmd,parameters){
+  await loadScript("provenance.js",()=>typeof Provenance!=="undefined");
+  const base=typeof root!=="undefined"?root:"",manifest=await Provenance.validateManifest(await load("data-manifest.json"));
+  const context={page,heading,description:"Структурный анализ выработки электроэнергии по Ember",parameters,parameter_note:"Периоды и порог задаёт пользователь. Пропущенные категории не восстанавливаются."};
+  let found=[],failed=0;
+  const note=description=>[{id:"energy-status",kind:"Статус расчёта",title:"Структура электроэнергетики",description,href:"independent-statistics.html#energy-structure"}];
+  if(cmd.kind==="invalid")found=note("Пример: структура энергетики: 2025; база=2024; порог=5. Порог 0–100 п.п., по умолчанию 5.");
+  else try{
+   await Promise.all([loadScript("iv-energy-structure.js",()=>typeof IVEnergyStructure!=="undefined"),loadScript("iv-ember.js",()=>typeof IVEmber!=="undefined")]);
+   const d=(await Provenance.get(manifest,"independent-ember.json",base)).data;
+   found=C.energyEvidence(cmd,d,IVEnergyStructure,IVEmber,new Date().toISOString().slice(0,7));
+   if(!found.length)found=note("Нет подтверждённых наблюдений обоих закрытых лет.");
+  }catch{failed=1;found=note("Проверенный архив Ember или расчёт недоступны.");}
+  return {found,context,failed,fingerprint:manifest.data_fingerprint};
+ }
  async function find(parameters){
+  const energy=C.energyCommand(q.value);if(energy)return findEnergy(energy,parameters);
   const composite=C.compositeCommand(q.value);if(composite)return findComposite(composite,parameters);
   const labour=C.labourCommand(q.value);if(labour)return findIndependent(labour,parameters,"labour");
   const output=C.outputCommand(q.value);if(output)return findIndependent(output,parameters,"physical");
