@@ -2,3 +2,16 @@ const assert=require('node:assert/strict');const core=require('./global-economic
  const r=[{title:"Инвестиции в промышленности",href:"industrial.html"},{title:"Банки",description:"Кредиты",href:"banks.html"},{title:"Сравнение регионов",questions:["где сравнить регионы"],href:"historical.html"}];
  assert(c.rank(r,"помоги найти инвестиции")[0].href==="industrial.html");assert(c.rank(r,"где сравнить регионы")[0].href==="historical.html");assert(c.rank(r,"что как").length===0);assert(c.internal("historical.html#hist-rank"));assert(!c.internal("../index.html"));assert(!c.internal("https://example.org/a"));assert(!c.external("https://a@b.org"));assert(!c.external("javascript:alert(1)"));assert(c.audit("[tool1] [fake]",[{id:"tool1"}]).join(",")==="fake");assert(c.prompt("x",{},[]).length===2)
 })(core,assert.ok);console.log('10 global assistant checks passed');
+
+const A=require("node:assert/strict");
+A.deepEqual(core.companyCommand("ИНН: 7707083893"),{kind:"inn",value:"7707083893"});
+A.deepEqual(core.companyCommand("7707083893"),{kind:"inn",value:"7707083893"});
+A.deepEqual(core.companyCommand("компания: ПАО Сбербанк"),{kind:"name",value:"ПАО Сбербанк"});
+A.equal(core.companyCommand("найти инвестиции"),null);
+A.equal(core.companyCommand("ИНН: 123").kind,"invalid");
+A.equal(core.money("9007199254740993"),"90071992547409,93 руб.");
+A.equal(core.money("-1"),"−0,01 руб.");
+A.equal(core.money(null),"нет данных");
+const e=core.companyEvidence({inn:"7707083893",income_name:"Тест",income_cents:"100",expense_cents:null,workers:0},{year:2025,fingerprint:"abc"});
+A.equal(e.href,"company-atlas.html?inn=7707083893");A.ok(e.description.includes("численность 0"));
+console.log("10 company assistant checks passed");
