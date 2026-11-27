@@ -2,7 +2,7 @@ name: Economic server vector prototype
 on:
   push:
     branches: [economic-ai-prototype-v01]
-    paths: ['site/economic-vector-*.js', 'site/test-economic-vector.js', '.github/workflows/economic-vector-prototype.yml']
+    paths: ['site/economic-vector-*.js', 'site/test-economic-vector.js', 'site/economic_vector_public.py', 'site/test_economic_vector_public.py', '.github/workflows/economic-vector-prototype.yml']
   workflow_dispatch:
     inputs:
       shard:
@@ -25,6 +25,7 @@ jobs:
           node --check site/economic-vector-build.js
           node --check site/economic-vector-pack.js
           node site/test-economic-vector.js
+          python3 -m unittest discover -s site -p test_economic_vector_public.py
   encode:
     needs: checks
     runs-on: ubuntu-24.04
