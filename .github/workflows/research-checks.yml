@@ -35,7 +35,12 @@ jobs:
           node test-economic-ai.js
           node test-economic-ai-series.js
           node test-economic-ai-retrieval.js
-          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_agents.py
+          node test-global-economic-assistant.js
+          node test-economic-ai-page-context.js
+          node test-economic-search.js
+          node test-economic-ai-diagnostics.js
+          python3 -m unittest test_economic_search.py test_economic_external_research.py test_economic_web_crawl.py test_economic_search_audit.py
+          python3 -m unittest test_economic_ai_memory.py test_economic_ai_discovery.py test_economic_ai_forecast_memory.py test_economic_ai_agents.py test_economic_ai_planning.py
           node test-provenance.js
           node test-index-builder.js
           node test-composite-index.js
@@ -53,6 +58,8 @@ jobs:
           python3 test_global_reference.py
           rm -rf public
           python3 build.py
+          node test-economic-search-index.js public/economic-search-index.json
+          python3 -c "import json,economic_search as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_agents as a; from pathlib import Path; p=Path('public'); assert a.validate(json.loads((p/a.FILE).read_text())); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_discovery as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_memory as a; from pathlib import Path; p=Path('public'); d=json.loads((p/a.FILE).read_text()); print(a.validate(d)); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
@@ -127,6 +134,7 @@ jobs:
           trap 'kill $!' EXIT
           curl --retry 5 --retry-connrefused --fail --silent http://localhost:8765/ >/dev/null
           CHROME_BIN=$(command -v google-chrome) python3 ../test_iv_browser.py
+          CHROME_BIN=$(command -v google-chrome) python3 ../test_global_economic_assistant.py
       - name: Verify horizon optimizer in desktop and mobile browsers
         working-directory: monitor/public
         run: |
