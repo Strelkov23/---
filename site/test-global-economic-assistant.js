@@ -384,3 +384,21 @@ console.log("16 agent coordination checks passed");}
  A.deepEqual(C.researchDedup([]),[]);
  console.log("8 research evidence deduplication checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"fact1",kind:"Наблюдение",title:"Выпуск",description:"2025 · 1 250,50 млн рублей · снижение −7% · 2 п.п.",period:"2025",value:1250.5,unit:"млн рублей"},{id:"fact2",kind:"Наблюдение",title:"Занятость",description:"0 человек",value:0,unit:"человек",href:"https://example.org/9000"}];
+ A.deepEqual(C.answerEvidenceAudit("В 2025 году выпуск 1250,5 млн, снижение -7%, 2 процентных пункта [fact1].",rows),{unknown:[],missing:[],noCitation:false});
+ A.deepEqual(C.answerEvidenceAudit("Выпуск 1250,5 млрд [fact1], рост 7%, изменение 2% [fake].",rows).missing,["1250.5 млрд","7%","2%"]);
+ A.deepEqual(C.answerEvidenceAudit("Выпуск 1250,5 млрд [fact1] [fake].",rows).unknown,["fake"]);
+ A.equal(C.answerEvidenceAudit("Выпуск 1250,5 млн.",rows).noCitation,true);
+ A.equal(C.answerEvidenceAudit("Сведений нет.",rows).noCitation,false);
+ A.deepEqual(C.answerEvidenceAudit("Занятость 0 [fact2].",rows).missing,[]);
+ A.deepEqual(C.answerEvidenceAudit("Показатель 9000 [fact2].",rows).missing,["9000"]);
+ A.deepEqual(C.answerEvidenceAudit("−0 [fact2]",rows).missing,[]);
+ A.deepEqual(C.answerEvidenceAudit("1250,50 миллиона [fact1]",rows).missing,[]);
+ A.deepEqual(C.answerEvidenceAudit("1 250,50 [fact1]",rows).missing,["1250.5"]);
+ A.equal(C.answerEvidenceAudit("7% [unknown]",rows).noCitation,true);
+ A.ok(C.answerEvidenceWarning(C.answerEvidenceAudit("7% [unknown]",rows)).includes("неизвестные ссылки"));
+ A.ok(C.answerEvidenceWarning(C.answerEvidenceAudit("0 [fact2]",rows)).includes("не проверка фактов"));
+ console.log("13 numerical answer audit checks passed");
+}
