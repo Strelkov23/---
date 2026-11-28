@@ -50,7 +50,7 @@ jobs:
         env:
           EXPECTED_REVISION: ${{ inputs.revision }}
           PUBLIC_BASE: https://strelkov23.github.io/---/
-          MINIMUM_SOURCE_REVISION: 2d991b0401d993a252467c2d88b6638eb8103365
+          MINIMUM_SOURCE_REVISION: 5d081a81a48bedc5524f408b9dcd9980dfd72842
         run: |
           set -eu -o pipefail
           if [ -z "$EXPECTED_REVISION" ]; then
@@ -58,7 +58,7 @@ jobs:
             [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]]
             echo "Observed public source: $EXPECTED_REVISION"
             git fetch origin main
-            git merge-base --is-ancestor "$MINIMUM_SOURCE_REVISION" "$EXPECTED_REVISION" || { echo "Public source does not include startup fix"; exit 1; }
+            git merge-base --is-ancestor "$MINIMUM_SOURCE_REVISION" "$EXPECTED_REVISION" || { echo "Public source does not include usability, knowledge and persistent history update"; exit 1; }
           fi
           python3 site/probe_ai_public_release.py --base "$PUBLIC_BASE" --revision "$EXPECTED_REVISION" | tee public-ai-release-report.json
       - name: Check real WebLLM module and model catalogue without loading weights
