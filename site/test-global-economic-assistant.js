@@ -2380,3 +2380,25 @@ console.log("16 agent coordination checks passed");}
  }
  dialoguePlanningChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+ // v2.26: adaptive budgets and explicit incomplete responses.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function answerPerformanceChecks(){
+   A.deepEqual(C.chatGenerationProfile("Ответь только числом"),{maxTokens:320,budget:9500});
+   A.deepEqual(C.chatGenerationProfile("Объясни подробно, с примерами"),{maxTokens:1200,budget:7000});
+   A.deepEqual(C.chatGenerationProfile("Что это?"),{maxTokens:750,budget:8500});
+   A.equal(C.chatGenerationProfile("Подробно, но кратко").maxTokens,320);
+   const p=C.generalChatPrompt("Объясни",[]);A.ok(p.messages[0].content.includes("Различай факты, оценки и допущения"));
+   const lengthStop=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"Начало"}}]};yield {choices:[{delta:{},finish_reason:"length"}]};})());
+   A.deepEqual(lengthStop,{state:"complete",text:"Начало",truncated:true});
+   const normal=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"Ответ"},finish_reason:"stop"}]};})());
+   A.deepEqual(normal,{state:"complete",text:"Ответ",truncated:false});
+   const incomplete=await C.runGeneralChat("Вопрос",[],async()=>lengthStop);A.equal(incomplete.state,"notice");A.equal(incomplete.truncated,true);A.equal(incomplete.answer,"Начало");
+   const complete=await C.runGeneralChat("Вопрос",[],async()=>normal);A.equal(complete.state,"complete");A.equal(complete.answer,"Ответ");
+   const oversized=await C.runGeneralChat("Вопрос",[],async()=>"x".repeat(6001));A.equal(oversized.truncated,true);A.equal(oversized.answer.length,6000);
+   let active=true;const stopped=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"stop"},finish_reason:"length"}]};})(),()=>active,()=>{active=false;});A.equal(stopped.state,"cancelled");
+   const hidden={mode:"general",state:"notice",question:"Неполный вопрос",answer:"Неполный ответ"};A.equal(C.generalChatPrompt("Следующий", [hidden]).used,0);
+   console.log("v2.26 adaptive answer performance checks passed");
+  }
+  answerPerformanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
