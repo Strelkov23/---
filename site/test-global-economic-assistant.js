@@ -1439,3 +1439,57 @@ console.log("16 agent coordination checks passed");}
   A.ok(!JSON.stringify(C.dialogueFollowup("А за 2023 год?",[a],true)).includes("99999"));
   console.log("v1.36–1.38 contextual dialogue checks passed");
  }
+
+
+ // v1.39–1.41: explicit ephemeral multimodal context and source-class isolation.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const table={id:"local-mean",kind:"Локальный расчёт",title:"Среднее",description:"100 тонн",limit:"Не проверено",value:100,unit:"тонн",period:""};
+  const doc={id:"doc-0",kind:"Фрагмент пользовательского документа",title:"Документ",description:"Текст документа",limit:"Фрагмент"};
+  const ocr={...doc,id:"doc-30",kind:"Распознанный текст изображения",description:"Распознанный текст"};
+  const chart={...table,id:"chart-last",kind:"Оценка по изображению",title:"Оценка",description:"120 тонн",value:120};
+  const basket={table:[table],document:[doc,ocr],chart:[chart]};
+  A.deepEqual(C.localResearchBasket(basket),basket);
+  A.throws(()=>C.localResearchBasket({other:[doc]}));
+  A.throws(()=>C.localResearchBasket({table:[doc]}));
+  A.throws(()=>C.localResearchBasket({document:[doc,doc]}));
+  A.throws(()=>C.localResearchBasket({table:[{...table,value:Infinity}]}));
+  A.throws(()=>C.localResearchBasket({document:[{...doc,description:"x".repeat(1001)}]}));
+  A.equal(C.localResearchBasket({document:[{...doc,href:"https://bad.example"}]}).document[0].href,undefined);
+  const local=C.multimodalEvidence(null,[],basket);
+  A.equal(local.fingerprint,null);A.equal(local.rows.length,4);
+  A.deepEqual(local.rows.map(r=>r.category),["local_table","local_document","local_ocr","local_chart"]);
+  const archive={fingerprint:"a".repeat(64),failed:0,found:[{id:"obs",kind:"Наблюдение",title:"Выпуск",description:"100 тонн",value:100,unit:"тонн",period:"2025"}]};
+  const online=[{id:"wiki-ru-1",title:"Справка",description:"Справка"}];
+  const combined=C.multimodalEvidence(archive,online,basket);
+  A.equal(combined.rows.length,6);A.equal(combined.fingerprint,archive.fingerprint);
+  A.equal(new Set(combined.rows.map(r=>r.id)).size,6);
+  const context=C.multimodalContext("Сравнение",combined,[]);
+  A.equal(context.rows.length,6);A.equal(context.omitted,0);
+  A.equal(C.multimodalContext("Сравнение",combined,[],1).rows.length,0);
+  const limit={type:"limitation",text:"Нужна сверка.",refs:[]};
+  const raw=JSON.stringify([{type:"local_table",text:"100 тонн",refs:["loc-1"]},{type:"local_ocr",text:"Распознанный текст",refs:["loc-3"]},limit]);
+  async function multimodalChecks(){
+   const result=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async messages=>{A.ok(messages[0].content.includes("не официальная статистика"));return raw;});
+   A.equal(result.state,"accepted");A.equal(result.evidence.fingerprint,null);
+   A.equal(result.partial,false);
+   const falseObs=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async()=>JSON.stringify([{type:"observation",text:"100 тонн",refs:["loc-1"]},limit]));
+   A.equal(falseObs.state,"rejected");A.equal(falseObs.checked.reason,"source_class");
+   const falseOcr=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async()=>JSON.stringify([{type:"local_document",text:"Текст",refs:["loc-3"]},limit]));
+   A.equal(falseOcr.checked.reason,"source_class");
+   const wrongNumber=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async()=>JSON.stringify([{type:"local_table",text:"120 тонн",refs:["loc-1"]},limit]));
+   A.equal(wrongNumber.checked.reason,"numeric_evidence");
+   const joint=await C.runMultimodalResearch("Сравнение",basket,online,[],async()=>archive,async()=>JSON.stringify([{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"local_chart",text:"120 тонн",refs:["loc-6"]},limit]));
+   A.equal(joint.state,"accepted");A.equal(joint.evidence.fingerprint,archive.fingerprint);
+   const noData=await C.runMultimodalResearch("Сравнение",{},[],[],null,async()=>{throw Error("must not call")});
+   A.equal(noData.state,"no_evidence");
+   const failed=await C.runMultimodalResearch("Сравнение",basket,[],[],async()=>{throw Error("offline")},async()=>raw);
+   A.equal(failed.state,"archive_unavailable");
+   const cancelled=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async()=>raw,()=>false);
+   A.equal(cancelled.state,"cancelled");
+   const broken=await C.runMultimodalResearch("Сравнение",basket,[],[],null,async()=>{throw Error("offline")});
+   A.equal(broken.state,"model_unavailable");
+   A.equal(C.validateHybridFindings(raw,local.rows).ok,false);
+   console.log("v1.39–1.41 multimodal research checks passed");
+  }
+  multimodalChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
