@@ -932,3 +932,28 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.hypothesisJournal(Array(31).fill(j[0])));
  console.log("18 hypothesis journal checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),next="b".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const question="Производительность и энергетика России в 2025 году относительно 2020 года";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"Данные",value:10,unit:"руб."};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,question,"h-1",at),r=j[0];
+ A.deepEqual(r.runs,[]);
+ const questions=["Покажи производительность труда в 2025 году относительно 2020 года","Покажи структуру энергетики России в 2025 году относительно 2020 года"];
+ const plan=C.hypothesisPlan(JSON.stringify(questions),r);A.equal(plan.kind,"research");
+ A.equal(C.hypothesisPlan(JSON.stringify([questions[0],questions[1].replace("2025","2026")]),r),null);
+ A.ok(C.hypothesisPlanPrompt(r)[0].content.includes("не доказана"));
+ const result={fingerprint:next,failed:1,found:[{...source,id:"s1-fact"},{id:"s2-status",kind:"Статус проверки",title:"Нет данных"}],results:plan.steps.map((s,i)=>({step:i+1,command:s.command,count:1,failed:i}))};
+ const receipt=C.hypothesisReceipt(r,plan,result,at);A.equal(receipt.same_snapshot,false);A.equal(receipt.eligible,1);A.equal(receipt.cards.length,1);A.equal(receipt.steps[1].observations,0);
+ A.equal(C.hypothesisReceipt(r,plan,{...result,fingerprint:fp},at).same_snapshot,true);
+ const saved=C.appendHypothesisRun(j,"h-1",plan,result,at);
+ A.equal(saved[0].runs.length,1);A.equal(saved[0].events.length,0);A.equal(j[0].runs.length,0);
+ A.throws(()=>C.hypothesisReceipt(r,plan,{...result,failed:0},at));
+ A.throws(()=>C.hypothesisReceipt(r,plan,{...result,fingerprint:"bad"},at));
+ A.throws(()=>C.hypothesisReceipt(r,{...plan,steps:plan.steps.slice().reverse()},result,at));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:[{...receipt,same_snapshot:true}]}]));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:[{...receipt,eligible:2}]}]));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:Array(6).fill(receipt)}]));
+ A.equal(C.hypothesisJournal(JSON.parse(JSON.stringify(saved)))[0].runs[0].fingerprint,next);
+ console.log("19 hypothesis research receipt checks passed");
+}
