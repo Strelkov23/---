@@ -214,12 +214,98 @@ def validate_preflight_history(data):
             raise ValueError('Invalid history counts')
     return True
 
+# Matched-sample sensitivity to statistical revisions, not retrospective tuning.
+def forecast_revision_audit(rows):
+    groups={}
+    for r in rows:
+        key=(r['code'],r['source'],r['unit'],r['horizon'])
+        groups.setdefault(key,[]).append(r)
+    result=[]
+    for (code,source,unit,horizon),xs in sorted(groups.items()):
+        first=[r for r in xs if finite(r.get('first_actual'))]
+        paired=[r for r in first if finite(r.get('latest_actual'))]
+        if len({r['target'] for r in paired})!=len(paired):
+            # Repeated targets must not masquerade as independent observations.
+            result.append(dict(code=code,source=source,unit=unit,horizon=horizon,
+                               frozen=len(xs),first_scored=len(first),paired=len(paired),status='duplicate_targets',
+                               first_mae=None,latest_mae=None,first_naive_mae=None,latest_naive_mae=None,
+                               revised=None,revision_mae=None,advantage_changed=None))
+            continue
+        def mae(actual,forecast):
+            return sum(abs(r[forecast]-r[actual]) for r in paired)/len(paired) if paired else None
+        a,b=mae('first_actual','point'),mae('latest_actual','point')
+        c,d=mae('first_actual','naive'),mae('latest_actual','naive')
+        result.append(dict(code=code,source=source,unit=unit,horizon=horizon,
+                           frozen=len(xs),first_scored=len(first),paired=len(paired),
+                           status='waiting' if not paired else 'small_sample' if len(paired)<10 else 'diagnostic',
+                           first_mae=a,latest_mae=b,first_naive_mae=c,latest_naive_mae=d,
+                           revised=sum(r['first_actual']!=r['latest_actual'] for r in paired),
+                           revision_mae=mae('first_actual','latest_actual'),
+                           advantage_changed=(a<c)!=(b<d) if paired else None))
+    return dict(schema=1,method='matched_first_latest',rows=result,
+                note='MAE на одной выборке целевых периодов. Пересмотр факта не означает ошибку источника; преимущество перед наивным прогнозом не является статистически доказанным. При выборке менее 10 вывод предварительный. Методы прогнозирования не меняются.')
+
+# Compare individual diagnostic records on an identical method and period.
+SIGNAL_STATES=('signal','ordinary','missing','short','constant','unavailable')
+SIGNAL_TRANSITIONS=('initial','new_signal','persistent','cleared','lost_observation','ordinary','unavailable','method_changed','period_changed')
+def signal_identity(row):
+    return tuple(json.dumps(row.get(k),ensure_ascii=False,sort_keys=True) for k in ('unit','formula','codes','sources','note'))
+
+def signal_memory(current, prior=None):
+    old_rows=next((a['items'] for a in prior['agents'] if a['id']=='diagnostics'),[]) if prior else []
+    old={r['id']:r for r in old_rows}
+    rows=[]
+    for r in current:
+        p=old.get(r['id'])
+        now=r['status'];before=p['status'] if p else None
+        comparable=bool(p and signal_identity(p)==signal_identity(r) and p.get('year')==r.get('year') and type(r.get('year')) is int and finite(r.get('value')) and finite(p.get('value')))
+        if p is None:transition='initial'
+        elif signal_identity(p)!=signal_identity(r):transition='method_changed'
+        elif before=='signal' and (not finite(r.get('value')) or now not in ('ordinary','signal')):transition='lost_observation'
+        elif p.get('year')!=r.get('year'):transition='period_changed'
+        elif not comparable or now not in ('ordinary','signal') or before not in ('ordinary','signal'):transition='unavailable'
+        elif before=='signal' and now=='signal':transition='persistent'
+        elif before=='ordinary' and now=='signal':transition='new_signal'
+        elif before=='signal' and now=='ordinary':transition='cleared'
+        else:transition='ordinary'
+        rows.append(dict(id=r['id'],title=r['title'],unit=r['unit'],year=r.get('year'),status=now,
+                         value=r.get('value'),previous_status=before,previous_year=p.get('year') if p else None,
+                         previous_value=p.get('value') if p else None,transition=transition,
+                         revision_delta=r['value']-p['value'] if comparable else None))
+    return dict(schema=1,previous_built=prior['built'] if prior else None,rows=rows,
+                removed_ids=sorted(old.keys()-{r['id'] for r in current}),
+                counts={k:sum(r['transition']==k for r in rows) for k in SIGNAL_TRANSITIONS},
+                note='Сравнение двух снимков диагностики. Изменение значения одного периода может отражать пересмотр данных, а не новый экономический рост. Снятие сигнала не доказывает устранение проблемы. При изменении методики или периода значения не вычитаются.')
+
+def validate_signal_memory(data):
+    m=data['signal_memory'];diag=next(a for a in data['agents'] if a['id']=='diagnostics')['items']
+    if m['schema']!=1 or [r['id'] for r in m['rows']]!=[r['id'] for r in diag] or len({r['id'] for r in m['rows']})!=len(diag):
+        raise ValueError('Invalid diagnostic memory registry')
+    if m['previous_built'] is not None and (datetime.fromisoformat(m['previous_built']).tzinfo is None or datetime.fromisoformat(m['previous_built'])>datetime.fromisoformat(data['built'])):
+        raise ValueError('Invalid diagnostic memory time')
+    for row,r in zip(m['rows'],diag):
+        if any(row[k]!=r.get(k) for k in ('title','unit','year','status','value')) or row['status'] not in SIGNAL_STATES or row['previous_status'] not in (*SIGNAL_STATES,None) or row['transition'] not in SIGNAL_TRANSITIONS:
+            raise ValueError('Invalid diagnostic memory row')
+        delta=row['revision_delta']
+        if delta is not None and (not finite(delta) or not finite(row['value']) or not finite(row['previous_value']) or row['year']!=row['previous_year'] or delta!=row['value']-row['previous_value'] or row['transition'] in ('method_changed','period_changed','initial')):
+            raise ValueError('Invalid diagnostic delta')
+    if m['counts']!={k:sum(r['transition']==k for r in m['rows']) for k in SIGNAL_TRANSITIONS}:
+        raise ValueError('Invalid diagnostic counts')
+    if len(set(m['removed_ids']))!=len(m['removed_ids']) or set(m['removed_ids'])&{r['id'] for r in diag}:
+        raise ValueError('Invalid removed diagnostic IDs')
+    if m['previous_built'] is None and (m['removed_ids'] or any(r['transition']!='initial' or r['previous_status'] is not None or r['revision_delta'] is not None for r in m['rows'])):
+        raise ValueError('Diagnostic history without baseline')
+    return True
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
     discovery=read(out,"economic-ai-discovery.json");dr=discovery["rows"]
     ready=[r for r in dr.values() if r["values"] and r["status"] in ("ok","error")]
     forecast=read(out,"economic-ai-forecast-memory.json")
+    from economic_ai_forecast_memory import validate as validate_forecast
+    validate_forecast(forecast)
+    revision_audit=forecast_revision_audit(forecast["rows"])
     fs=forecast["summary"]
     assessed=[r for r in fs if r["n"]>=10]
     # Diagnostics only: no tuning against the future evaluation set.
@@ -269,6 +355,7 @@ def build(out,previous,stamp,refresh):
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")
     if comp["counts"]["unknown"]:agents[2]["state"]="attention"
+    agents[4]["metrics"]["revision_audit"]=revision_audit
     tournament=read(out,"economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")
@@ -290,6 +377,7 @@ def build(out,previous,stamp,refresh):
     data['research_queue']=research_queue(agents,data['continuity'])
     data['preflight']=preflight(out,data['research_queue'],stamp)
     data['preflight_history']=preflight_history(data,prior)
+    data['signal_memory']=signal_memory(diag['rows'],prior)
     validate(data)
     return data
 def validate(d):
@@ -304,6 +392,7 @@ def validate(d):
     if 'preflight_history' in d:
         if 'preflight' not in d:raise ValueError('History without current check')
         validate_preflight_history(d)
+    if 'signal_memory' in d:validate_signal_memory(d)
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
