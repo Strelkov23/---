@@ -65,4 +65,33 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(by['quality']['consecutive'],1)
         self.assertEqual(make(planning='attention')['tasks'][0]['state'],'ready_for_review')
         self.assertEqual(make(coverage='waiting',diagnostics='attention')['tasks'][1]['blockers'],['coverage'])
+    def test_preflight(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from copy import deepcopy
+        stamp='2026-11-28T03:00:00+00:00'
+        agents=[dict(id=r[0],state='attention' if r[0] in ('quality','diagnostics','search') else 'ok') for r in TASK_RULES]
+        q=research_queue(agents,continuity(agents,stamp))
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'freshness.json').write_text('{"rows":[]}',encoding='utf-8')
+            (root/'source-pipeline.json').write_text('broken',encoding='utf-8')
+            (root/'economic-search-audit.json').write_text('{"counts":{}}',encoding='utf-8')
+            (root/'economic-search-index.json').write_text('{"rows":[]}',encoding='utf-8')
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['status'],'inputs_unavailable')
+            self.assertEqual(by['review-quality']['files'][1]['status'],'unreadable')
+            self.assertEqual(by['review-search']['status'],'inputs_readable')
+            self.assertEqual(by['review-diagnostics']['status'],'deferred')
+            self.assertEqual(by['review-diagnostics']['files'],[])
+            self.assertEqual(by['review-search']['files'][0]['sha256'],provenance.file_info(root/'economic-search-audit.json')['sha256'])
+            self.assertTrue(validate_preflight(dict(built=stamp,research_queue=q,preflight=p)))
+            bad=deepcopy(p);bad['counts']['deferred']=9
+            with self.assertRaises(ValueError):validate_preflight(dict(built=stamp,research_queue=q,preflight=bad))
+            (root/'source-pipeline.json').unlink()
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['files'][1]['status'],'missing')
+            (root/'source-pipeline.json').write_text('[]',encoding='utf-8')
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['files'][1]['status'],'empty_or_invalid')
 if __name__=="__main__":unittest.main()
