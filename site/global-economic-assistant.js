@@ -115,13 +115,14 @@ const GlobalEconomicAssistant=(function core(){
  function benchmarkScore(c,answer){
   const text=String(answer??"").trim(),rows=c.rows;
   const report=answerEvidenceAudit(text,rows),citations=citationEvidenceAudit(text,rows),units=unitEvidenceAudit(text,rows);
+  const citedUnits=citationUnitAudit(text,rows);
   const knownRefs=new Set([...text.matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi)].map(m=>m[1]));
   const tokens=c.units?explicitUnitTokens(text):quantityTokens(text),missingRequired=c.required.filter(x=>!tokens.has(x)),missingRefs=c.refs.filter(x=>!knownRefs.has(x));
   const missingPeriods=(c.periods||[]).filter(x=>!quantityTokens(text).has(x));
   const abstentionOK=!c.abstain||(!quantityTokens(text).size&&/(?:нет\s+(?:достаточных\s+)?данных|данных\s+нет|нет\s+(?:числовых\s+)?наблюдений|(?:значение|показатель)\s+неизвестн|не\s+(?:указано|представлено|приведено|доступно)|недостаточно\s+данных)/iu.test(text));
   const causalOK=!c.causal||/(?:не\s+доказыва|не\s+доказан|не\s+установлен|не\s+(?:позволяет|позволяют)\s+(?:доказать|установить|сделать вывод)|нельзя\s+(?:доказать|установить|утверждать)|недостаточно\s+данных)/iu.test(text);
-  const flags={unknown:report.unknown,unsupported:report.missing,unlinked:citations.unlinked,mismatched:citations.mismatched,units,missingRequired,missingRefs,missingPeriods,abstentionOK,causalOK,noCitation:report.noCitation,empty:!text};
-  return {pass:!!text&&!report.noCitation&&abstentionOK&&causalOK&&[report.unknown,report.missing,citations.unlinked,citations.mismatched,units,missingRequired,missingRefs,missingPeriods].every(x=>!x.length),flags};
+  const flags={unknown:report.unknown,unsupported:report.missing,unlinked:citations.unlinked,mismatched:citations.mismatched,units,citedUnits,missingRequired,missingRefs,missingPeriods,abstentionOK,causalOK,noCitation:report.noCitation,empty:!text};
+  return {pass:!!text&&!report.noCitation&&abstentionOK&&causalOK&&[report.unknown,report.missing,citations.unlinked,citations.mismatched,units,citedUnits,missingRequired,missingRefs,missingPeriods].every(x=>!x.length),flags};
  }
  async function runModelBenchmark(generate,active=()=>true,progress=()=>{},clock=()=>Date.now()){
   const cases=benchmarkCases(),results=[];
@@ -180,6 +181,18 @@ const GlobalEconomicAssistant=(function core(){
    if(number)out.add(number+" "+({"₽":"руб.","€":"EUR","$":"долл."}[m[1]]));
   }
   return out;
+ }
+ function citationUnitAudit(answer,rows){
+  const byId=new Map(rows.map(r=>[r.id,r]));
+  const passages=String(answer??"").split(/\r?\n+|(?<=[.!?…])\s+(?=[А-ЯЁA-Z0-9«])/u).map(x=>x.trim()).filter(Boolean),issues=[];
+  for(const [i,passage] of passages.entries()){
+   const claims=explicitUnitTokens(passage);
+   if(!claims.size)continue;
+   const refs=[...new Set([...passage.matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi)].map(m=>m[1]).filter(x=>byId.has(x)))];
+   const missing=unitEvidenceAudit(passage,refs.map(id=>byId.get(id)));
+   if(missing.length)issues.push({part:i+1,units:missing,refs});
+  }
+  return issues;
  }
  function unitEvidenceAudit(answer,rows){
   const known=new Set();
@@ -979,7 +992,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,benchmarkCases,benchmarkScore,runModelBenchmark,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,benchmarkCases,benchmarkScore,runModelBenchmark,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,citationUnitAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
