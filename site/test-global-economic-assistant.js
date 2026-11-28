@@ -2153,3 +2153,69 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.chatLayoutCss().includes("overflow-wrap:anywhere"));
  console.log("v1.99–2.01 chat scroll checks passed");
 }
+
+
+// v2.08–2.10: bounded user-configured SearXNG gateway; no external calls.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function gatewayChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",query="экономика России",endpoint="https://search.mydomain.org/search";
+  const plan=C.webGatewayPlan(query,endpoint,2);
+  A.equal(plan.pages,2);A.equal(plan.requests.length,2);
+  A.ok(plan.requests[0].includes("q="+encodeURIComponent(query)));A.ok(plan.requests[1].endsWith("pageno=2"));
+  A.equal(C.webGatewayPlan(query,"https://SEARCH.MYDOMAIN.ORG/instance/search/",1).endpoint,"https://search.mydomain.org/instance/search");
+  for(const url of ["http://search.mydomain.org/search","https://user:pass@search.mydomain.org/search","https://127.0.0.1/search","https://localhost/search","https://foo.internal/search","https://search.mydomain.org/search?key=secret","https://search.mydomain.org/search#x","https://search.mydomain.org/../search","https://search.mydomain.org:8080/search","https://search.mydomain.org/search/extra"])A.throws(()=>C.webGatewayPlan(query,url));
+  A.throws(()=>C.webGatewayPlan("",endpoint));A.throws(()=>C.webGatewayPlan("x".repeat(241),endpoint));
+  A.throws(()=>C.webGatewayPlan(query,endpoint,3));A.throws(()=>C.webGatewayPlan(query,endpoint,0));
+  A.equal(C.gatewayResultLink("javascript:alert(1)"),null);A.equal(C.gatewayResultLink("https://a.org@b.org/a"),null);
+  A.equal(C.gatewayResultLink("https://a.org/a#part").href,"https://a.org/a");
+  A.equal(C.gatewayResultLink("https://a.org/a b"),null);
+  const items=[
+   {url:"https://alpha.org/a",title:"Экономика России",content:"<b>Обзор</b> экономики"},
+   {url:"https://alpha.org/a#section",title:"Дубликат"},
+   {url:"https://alpha.org/b",title:"Экономика России"},
+   {url:"https://alpha.org/c",title:"Экономика России"},
+   {url:"https://alpha.org/d",title:"Экономика России"},
+   {url:"https://beta.org/a",title:"Экономика России"},
+   {url:"https://gamma.org/a",title:"История",content:"Текст"},
+   {url:"javascript:alert(1)",title:"bad"},
+   {url:"https://private.local/a",title:"bad"},
+   {url:"https://delta.org/a",title:"<script></script>"},
+   {url:"https://beta.org/a",title:"duplicate"}
+  ];
+  const payload={results:items,unresponsive_engines:[["engine A","timeout"],["engine B","error"]]};
+  const parsed=C.webGatewayCards(payload,stamp);
+  A.equal(parsed.rows.length,6);A.equal(parsed.rows[0].description,"Обзор экономики");
+  A.deepEqual(parsed.failures,["engine A","engine B"]);
+  A.throws(()=>C.webGatewayCards({results:Array(251).fill(items[0])},stamp));A.throws(()=>C.webGatewayCards({},stamp));
+  const ranked=C.rankGatewayCards(parsed.rows,query);
+  A.equal(ranked.length,5);A.equal(ranked.filter(x=>x.host==="alpha.org").length,3);A.equal(ranked[0].href,"https://alpha.org/a");
+  A.equal(new Set(ranked.map(x=>x.id)).size,ranked.length);A.equal(C.rankGatewayCards(parsed.rows,query,1).length,1);
+  const requests=[];
+  const fetcher=async(url,options)=>{requests.push({url,options});return {ok:true,text:async()=>JSON.stringify(payload)};};
+  const r=await C.runWebGatewaySearch(plan,{fetcher,stamp});
+  A.equal(r.state,"search");A.equal(r.sources.length,5);A.ok(r.note.includes("сбои движков"));A.ok(r.note.includes("полные страницы не получены")||r.note.includes("Полные страницы не получены")||r.note.includes("полные страницы не получены"));
+  A.equal(requests.length,2);A.ok(requests.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"&&x.options.referrerPolicy==="no-referrer"));
+  A.ok(r.sources.every(x=>x.limit.includes("не проверены")));A.equal(C.chatTranscript([{...r,question:query}])[0].sources.length,5);
+  const partial=await C.runWebGatewaySearch(plan,{stamp,fetcher:async url=>url.endsWith("pageno=2")?{ok:false,status:403}:fetcher(url,{})});
+  A.equal(partial.state,"search");A.ok(partial.note.includes("JSON выключен"));
+  const off=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:false,status:429})});
+  A.equal(off.state,"notice");A.ok(off.note.includes("лимит запросов"));
+  const bad=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:true,text:async()=>"invalid"})});
+  A.equal(bad.state,"notice");A.ok(bad.note.includes("CORS"));
+  const oversized=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:true,text:async()=>"x".repeat(1048577)})});
+  A.equal(oversized.state,"notice");
+  const count=requests.length;
+  await A.rejects(()=>C.runWebGatewaySearch({...plan,requests:["https://other.org/search?q=secret"]},{fetcher,stamp}));A.equal(requests.length,count);
+  const stopped=await C.runWebGatewaySearch(plan,{fetcher,stamp,active:()=>false});
+  A.equal(stopped.state,"cancelled");A.equal(requests.length,count);
+  let live=true;
+  const late=await C.runWebGatewaySearch(plan,{stamp,active:()=>live,fetcher:async()=>{live=false;return {ok:true,text:async()=>JSON.stringify(payload)};}});
+  A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  A.equal(C.chatActionPlan(query,[],[],false,"web-gateway").kind,"gateway");
+  A.equal(C.chatActionPlan(query,[],[],false,"web-gateway").requiresApproval,true);
+  A.equal(C.chatActionPlan("x".repeat(241),[],[],false,"web-gateway").kind,"clarify");
+  A.equal(C.chatActionPlan(query).kind,"general");
+  console.log("v2.08–2.10 gateway checks passed");
+ }
+ gatewayChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
