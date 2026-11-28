@@ -1523,7 +1523,7 @@ function implicitEconomicPlan(q){
  const parts=input.split(/\s+(?:а\s+также|а\s+затем|затем|и)\s+/iu);
  if(parts.length<2||parts.length>3)return null;
  const steps=parts.map(expandedNaturalRoute);
- if(steps.some(x=>!x)||new Set(steps.map(x=>x.command)).size!==steps.length)return null;
+ if(steps.some(x=>!x||x.tool==="company"&&companyCommand(x.command)?.kind==="compare")||new Set(steps.map(x=>x.command)).size!==steps.length)return null;
  return {kind:"research",steps,questions:parts};
 }
 function economicIntent(q){
@@ -1554,7 +1554,7 @@ function economicIntent(q){
   const pieces=text.replace(/^исследование\s*:\s*/iu,"").split(/\r?\n|\|/u).map(x=>x.trim()).filter(Boolean);
   if(pieces.length<2||pieces.length>3)return {kind:"invalid"};
   const steps=pieces.map(expandedNaturalRoute);
-  if(steps.some(x=>!x)||new Set(steps.map(x=>x.command)).size!==steps.length)return {kind:"invalid"};
+  if(steps.some(x=>!x||x.tool==="company"&&companyCommand(x.command)?.kind==="compare")||new Set(steps.map(x=>x.command)).size!==steps.length)return {kind:"invalid"};
   return {kind:"research",steps};
  }
  async function runResearchPlan(plan,run,active=()=>true){
