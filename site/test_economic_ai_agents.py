@@ -46,4 +46,81 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(prior_agent_report(root,stamp),(None,'missing'))
             (root/FILE).write_text('{}',encoding='utf-8')
             self.assertEqual(prior_agent_report(root,stamp),(None,'unverified'))
+    def test_research_queue(self):
+        stamp='2026-11-28T03:00:00+00:00'
+        ids=[r[0] for r in TASK_RULES]
+        def make(**states):
+            agents=[dict(id=k,state=states.get(k,'ok')) for k in ids]
+            return research_queue(agents,continuity(agents,stamp))
+        self.assertEqual(make()['tasks'],[])
+        q=make(quality='attention',planning='attention',forecast='waiting',research='waiting')
+        self.assertEqual(q['counts'],dict(ready_for_review=1,blocked=2,needs_data=1))
+        by={r['owner']:r for r in q['tasks']}
+        self.assertEqual(by['quality']['state'],'ready_for_review')
+        self.assertEqual(by['planning']['blockers'],['quality'])
+        self.assertEqual(by['forecast']['state'],'blocked')
+        self.assertEqual(by['research']['state'],'needs_data')
+        self.assertEqual(q['tasks'][0]['owner'],'quality')
+        self.assertEqual(q['mode'],'recommendations_only')
+        self.assertEqual(by['quality']['consecutive'],1)
+        self.assertEqual(make(planning='attention')['tasks'][0]['state'],'ready_for_review')
+        self.assertEqual(make(coverage='waiting',diagnostics='attention')['tasks'][1]['blockers'],['coverage'])
+    def test_preflight(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from copy import deepcopy
+        stamp='2026-11-28T03:00:00+00:00'
+        agents=[dict(id=r[0],state='attention' if r[0] in ('quality','diagnostics','search') else 'ok') for r in TASK_RULES]
+        q=research_queue(agents,continuity(agents,stamp))
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'freshness.json').write_text('{"rows":[]}',encoding='utf-8')
+            (root/'source-pipeline.json').write_text('broken',encoding='utf-8')
+            (root/'economic-search-audit.json').write_text('{"counts":{}}',encoding='utf-8')
+            (root/'economic-search-index.json').write_text('{"rows":[]}',encoding='utf-8')
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['status'],'inputs_unavailable')
+            self.assertEqual(by['review-quality']['files'][1]['status'],'unreadable')
+            self.assertEqual(by['review-search']['status'],'inputs_readable')
+            self.assertEqual(by['review-diagnostics']['status'],'deferred')
+            self.assertEqual(by['review-diagnostics']['files'],[])
+            self.assertEqual(by['review-search']['files'][0]['sha256'],provenance.file_info(root/'economic-search-audit.json')['sha256'])
+            self.assertTrue(validate_preflight(dict(built=stamp,research_queue=q,preflight=p)))
+            bad=deepcopy(p);bad['counts']['deferred']=9
+            with self.assertRaises(ValueError):validate_preflight(dict(built=stamp,research_queue=q,preflight=bad))
+            (root/'source-pipeline.json').unlink()
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['files'][1]['status'],'missing')
+            (root/'source-pipeline.json').write_text('[]',encoding='utf-8')
+            p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
+            self.assertEqual(by['review-quality']['files'][1]['status'],'empty_or_invalid')
+    def test_preflight_history(self):
+        from datetime import timedelta
+        from copy import deepcopy
+        stamp=datetime.fromisoformat('2026-10-01T03:00:00+00:00')
+        prior=None
+        for i in range(35):
+            checked=(stamp+timedelta(days=i)).isoformat()
+            row=dict(id='review-quality',status='deferred',files=[])
+            current=dict(built=checked,mode='scheduled_refresh',preflight=dict(rows=[row],counts=dict(inputs_readable=0,inputs_unavailable=0,deferred=1)))
+            current['preflight_history']=preflight_history(current,prior)
+            prior=current
+        h=current['preflight_history']
+        self.assertEqual(len(h['snapshots']),30)
+        self.assertEqual(h['snapshots'][0]['checked'],current['built'])
+        self.assertEqual(h['snapshots'][-1]['checked'],(stamp+timedelta(days=5)).isoformat())
+        self.assertTrue(validate_preflight_history(current))
+        self.assertEqual(preflight_history(current,current),h)
+        self.assertEqual(len(preflight_history(current,None)['snapshots']),1)
+        old=deepcopy(current);old.pop('preflight_history')
+        old['built']=stamp.isoformat()
+        self.assertEqual(len(preflight_history(current,old)['snapshots']),2)
+        for field in ('time','counts','id','files'):
+            bad=deepcopy(current)
+            row=bad['preflight_history']['snapshots'][1]
+            if field=='time':row['checked']=current['built']
+            elif field=='counts':row['counts']['deferred']=2
+            elif field=='id':row['rows'][0]['id']='review-other'
+            else:row['rows'][0]['files']=[dict(name='freshness.json',status='missing')]
+            with self.assertRaises(ValueError):validate_preflight_history(bad)
 if __name__=="__main__":unittest.main()

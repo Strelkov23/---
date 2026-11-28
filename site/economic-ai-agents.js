@@ -9,6 +9,32 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",as
  $("status").textContent="Автоматический обзор · "+d.built+" · "+(d.mode==="scheduled_refresh"?"сборка с обновлением":"офлайн-сборка");
  const continuity=d.continuity;const continuityRows=new Map((continuity?.rows||[]).map(r=>[r.id,r]));
  if(continuity)add($("cards"),"p",continuity.baseline==="verified"?"Сопоставление с предыдущим проверенным отчётом.":"История состояний начинается заново: предыдущий отчёт "+(continuity.baseline==="missing"?"отсутствует.":"не прошёл проверку."));
+ const history=d.preflight_history;
+ if(history?.schema===1&&Array.isArray(history.snapshots)){
+  const section=add($("cards"),"details","");section.className="ac-panel";add(section,"summary","История автоматических проверок · "+history.snapshots.length+" снимков");
+  add(section,"p","Журнал читаемости входных файлов, а не доказательство корректности статистики или завершения исследования. Хеши отражают байты на момент проверки.");
+  for(const snapshot of history.snapshots){
+   const item=add(section,"details","");const c=snapshot.counts;
+   add(item,"summary",snapshot.checked+" · читаются "+c.inputs_readable+" · недоступны "+c.inputs_unavailable+" · отложены "+c.deferred);
+   add(item,"p",snapshot.mode==="scheduled_refresh"?"Сборка с обновлением":"Офлайн-сборка");
+   for(const r of snapshot.rows){const box=add(item,"div","");add(box,"strong",r.id+" · "+r.status);for(const f of r.files)add(box,"p",f.name+" · "+f.status+(f.sha256?" · SHA-256 "+f.sha256:""));}
+  }
+ }
+ const queue=d.research_queue;
+ if(queue?.schema===1&&queue.mode==="recommendations_only"&&Array.isArray(queue.tasks)){
+  const section=add($("cards"),"article","");section.className="ac-panel";add(section,"h3","Очередь исследовательских задач");
+  add(section,"p","Рекомендации по состоянию модулей, не автоматический запуск действий. Зависимости обозначают предварительные проверки, а не доказанные причины.");
+  const states={ready_for_review:"Готова к рассмотрению",blocked:"Сначала проверить зависимые модули",needs_data:"Ожидает данных"};
+  if(!queue.tasks.length)add(section,"p","По текущим статусам задач нет; это не подтверждает полноту или истинность данных.");
+  const preflight=new Map((d.preflight?.rows||[]).map(r=>[r.id,r]));
+  for(const task of queue.tasks){
+   const item=add(section,"details","");add(item,"summary","Приоритет "+task.priority+" · "+task.title);add(item,"p",states[task.state]||"Неизвестный статус");
+   const check=preflight.get(task.id);if(check){add(item,"p","Автоматическая проверка файлов: "+({inputs_readable:"входы читаются",inputs_unavailable:"есть недоступные входы",deferred:"отложена"}[check.status]||"неизвестно")+". Читаемость не подтверждает полноту или истинность данных.");for(const f of check.files||[])add(item,"small",f.name+" · "+f.status+(f.sha256?" · SHA-256 "+f.sha256:""));}
+   if(task.blockers?.length)add(item,"p","Предварительные проверки: "+task.blockers.map(k=>labels[k]||k).join(", "));
+   add(item,"p","Состояние модуля сохраняется "+task.consecutive+" снимков, с "+task.since+".");
+   if(/^[a-z0-9-]+\.(?:html|json)$/.test(task.href)){const link=add(item,"a","Открыть материалы");link.href=task.href}
+  }
+ }
  for(const a of d.agents){const panel=add($("cards"),"article","");panel.className="ac-panel";add(panel,"h3",labels[a.id]||a.id);add(panel,"p",states[a.state]||a.state);const x=a.metrics;const run=continuityRows.get(a.id);if(run)add(panel,"p","Состояние: "+(run.transition==="initial"?"первичная запись":run.transition==="changed"?"изменилось":"не изменилось")+" · последовательных снимков "+run.consecutive+" · с "+run.since+" (не календарные дни; не история отдельных проблем).");
  if(a.id==="coverage"){add(panel,"p","Рядов с данными: "+x.series_with_values+" · групп: "+Object.keys(x.groups).length);add(panel,"p","Новые ряды: "+x.catalogue_changes.added+" · отсутствуют в новом снимке: "+x.catalogue_changes.missing)}
  if(a.id==="coverage"&&x.physical){const c=x.physical;add(panel,"h4","Физическая экономика");add(panel,"p",c.note);add(panel,"p","Сверка документов: "+c.counts.document_rechecked+" · импорт Ember: "+c.counts.machine_import+" · ожидают: "+c.counts.pending);for(const r of c.rows){const box=add(panel,"details","");add(box,"summary",r.title+" · "+(r.year??"нет проверенного года")+" · "+(r.value===null?"нет данных":r.value+" "+r.unit));add(box,"p",r.scope+" · "+r.limit);if(r.yoy!==null)add(box,"p","К предыдущему году: "+r.yoy.toFixed(2)+"%");if(r.newer_unverified)add(box,"p","Более новый год требует сверки: "+r.latest_available_year);if(r.source&&/^https:\/\//.test(r.source)){const a=add(box,"a","Источник");a.href=r.source;a.rel="noopener noreferrer";}add(box,"small","Проверка: "+(r.checked||"нет"));}}
