@@ -31,6 +31,10 @@ jobs:
           python site/stage_pdf_runtime.py "$RUNNER_TEMP/pdf-runtime/node_modules/pdfjs-dist" "$RUNNER_TEMP/pdf-runtime/staged"
           echo "ECONOMIC_PDF_RUNTIME=$RUNNER_TEMP/pdf-runtime/staged" >> "$GITHUB_ENV"
       - run: |
+          npm install --prefix "$RUNNER_TEMP/ocr-runtime" --ignore-scripts --omit=optional --no-audit --no-fund tesseract.js@6.0.1 tesseract.js-core@6.0.0 @tesseract.js-data/eng@1.0.0 @tesseract.js-data/rus@1.0.0
+          python site/stage_ocr_runtime.py "$RUNNER_TEMP/ocr-runtime/node_modules" "$RUNNER_TEMP/ocr-runtime/staged"
+          echo "ECONOMIC_OCR_RUNTIME=$RUNNER_TEMP/ocr-runtime/staged" >> "$GITHUB_ENV"
+      - run: |
           python -m pip install playwright==1.51.0
           python -m playwright install --with-deps chromium
           python site/test_economic_search_browser.py

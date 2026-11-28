@@ -21,6 +21,7 @@ def sha(data):
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     shutil.copytree(Path(os.environ["ECONOMIC_PDF_RUNTIME"]), root / "pdf-runtime")
+    shutil.copytree(Path(os.environ["ECONOMIC_OCR_RUNTIME"]), root / "ocr-runtime")
     for name in ("economic-search.html", "economic-search.js", "provenance.js", "global-economic-assistant.js"):
         shutil.copy(HERE / name, root / name)
     # The production shell provides load/root/pinned; reproduce that contract here.
@@ -177,6 +178,17 @@ with tempfile.TemporaryDirectory() as tmp:
             assert result["parsed"]["text"]=="Production 125\n\nEmployment 50", result
             assert result["parsed"]["emptyPages"]==0 and len(result["parsed"]["pages"])==2, result
             assert len(result["hits"])==1 and result["hits"][0]["page"]==2, result
+            # Actual local OCR over a synthetic raster, no external image or document.
+            page.add_script_tag(url=f"http://127.0.0.1:{server.server_port}/ocr-runtime/tesseract.min.js")
+            result = page.evaluate("""async ()=>{
+                const canvas=document.createElement("canvas");canvas.width=1000;canvas.height=240;
+                const ctx=canvas.getContext("2d");ctx.fillStyle="white";ctx.fillRect(0,0,1000,240);
+                ctx.fillStyle="black";ctx.font="64px Arial";ctx.fillText("Production 125",35,140);
+                const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+                return GlobalEconomicAssistant.recognizeLocalImage(await blob.arrayBuffer(),"eng",Tesseract,new URL("ocr-runtime/",location.href).href);
+            }""")
+            assert "125" in result["text"] and "production" in result["text"].lower(), result
+            assert 0 <= result["confidence"] <= 100, result
             assert not errors, errors
             browser.close()
     finally:

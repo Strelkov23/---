@@ -754,3 +754,15 @@ console.log("16 agent coordination checks passed");}
  A.deepEqual(C.localPdfSearch(text,[{page:1,start:0,end:100}],"выпуск"),[]);
  console.log("8 local PDF page mapping checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const png=(w,h)=>{const a=new Uint8Array(24);a.set([137,80,78,71,13,10,26,10]);const v=new DataView(a.buffer);v.setUint32(8,13);v.setUint32(12,0x49484452);v.setUint32(16,w);v.setUint32(20,h);return a};
+ A.deepEqual(C.localImageHeader(png(100,200)),{type:"image/png",width:100,height:200});
+ A.throws(()=>C.localImageHeader(png(6000,6000)));A.throws(()=>C.localImageHeader(png(0,100)));A.throws(()=>C.localImageHeader(png(6001,1)));
+ A.throws(()=>C.localImageHeader(new Uint8Array(24)));
+ const jpeg=new Uint8Array(24);jpeg.set([255,216,255,192,0,8,8,0,100,0,200,1]);A.deepEqual(C.localImageHeader(jpeg),{type:"image/jpeg",width:200,height:100});
+ jpeg[5]=40;A.throws(()=>C.localImageHeader(jpeg));
+ A.deepEqual(C.localOcrResult({text:"  Выпуск 125\r\n",confidence:82},"rus"),{text:"Выпуск 125",confidence:82,language:"rus"});
+ A.throws(()=>C.localOcrResult({text:"x",confidence:101},"rus"));A.throws(()=>C.localOcrResult({text:"x",confidence:NaN},"eng"));A.throws(()=>C.localOcrResult({text:"x",confidence:50},"unknown"));
+ console.log("11 OCR input/result contract checks passed");
+}
