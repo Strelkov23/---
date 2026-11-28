@@ -203,6 +203,52 @@ const GlobalEconomicAssistant=(function core(){
   }
   return parsed&&parsed.kind!=="invalid"?{tool,command}:null;
  }
+ // A bounded research plan with explicitly supplied, validated steps.
+ function researchPlan(q){
+  const text=String(q??"").trim();
+  if(!/^исследование\s*:/iu.test(text))return null;
+  if(text.length>600)return {kind:"invalid"};
+  const pieces=text.replace(/^исследование\s*:\s*/iu,"").split(/\r?\n|\|/u).map(x=>x.trim()).filter(Boolean);
+  if(pieces.length<2||pieces.length>3)return {kind:"invalid"};
+  const steps=pieces.map(naturalRoute);
+  if(steps.some(x=>!x)||new Set(steps.map(x=>x.command)).size!==steps.length)return {kind:"invalid"};
+  return {kind:"research",steps};
+ }
+ async function runResearchPlan(plan,run,active=()=>true){
+  if(plan?.kind!=="research"||!Array.isArray(plan.steps)||plan.steps.length<2||plan.steps.length>3||typeof run!=="function")throw Error("Invalid research plan");
+  const results=[],found=[];let fingerprint=null,failed=0;
+  for(const [i,step] of plan.steps.entries()){
+   if(!active())throw Error("Research cancelled");
+   const result=await run(step);
+   if(!active())throw Error("Research cancelled");
+   if(!result||!Array.isArray(result.found)||typeof result.fingerprint!=="string"||!result.fingerprint||!Number.isInteger(result.failed)||result.failed<0||result.table)throw Error("Invalid step result");
+   if(fingerprint!==null&&fingerprint!==result.fingerprint)throw Error("Archive snapshot changed");
+   fingerprint=result.fingerprint;failed+=result.failed;
+   const prefix="s"+(i+1)+"-",ids=new Set();
+   for(const row of result.found){
+    if(typeof row.id!=="string"||!/^[a-z][a-z0-9_-]{0,35}$/i.test(row.id)||ids.has(row.id))throw Error("Invalid step evidence identity");
+    ids.add(row.id);
+    found.push({...row,id:prefix+row.id});
+   }
+   results.push({step:i+1,command:step.command,count:result.found.length,failed:result.failed,context:result.context||{}});
+  }
+  return {found,failed,fingerprint,results};
+ }
+ // Model proposes only existing read-only tools, subject to user approval.
+ function planningPrompt(question){
+  return [{role:"system",content:"Составь план экономического исследования. Верни только JSON-массив из 2 или 3 разных строк без Markdown. Разрешены только шаблоны: Покажи производительность труда в YYYY году относительно YYYY года; Покажи структуру энергетики России в YYYY году относительно YYYY года; Сравни торговлю России с США за первые N месяцев YYYY года; Покажи рынок труда России за YYYY-MM относительно YYYY года; Проверь точность прогноза CODE на горизонте N лет; Покажи приоритетные задачи агентов; Покажи состояние всех агентов; Рассчитай межотраслевой баланс для группы N. Используй только явно заданные пользователем числа, годы и коды. Если нельзя составить такой план, верни []."},{role:"user",content:JSON.stringify({question})}];
+ }
+ function modelResearchPlan(raw,question){
+  if(typeof raw!=="string"||raw.length>1800||typeof question!=="string"||question.length>600)return null;
+  let items;try{items=JSON.parse(raw.trim())}catch{return null}
+  if(!Array.isArray(items)||items.length<2||items.length>3||items.some(x=>typeof x!=="string"||x.length>180||/[\r\n|]/u.test(x)))return null;
+  const plan=researchPlan("Исследование: "+items.join(" | "));
+  if(plan?.kind!=="research")return null;
+  const literals=x=>String(x).toLowerCase().match(/(?:[a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+)|\d+(?:-\d{2})?/g)||[];
+  const supplied=new Set(literals(question));
+  if(items.some(x=>literals(x).some(n=>!supplied.has(n))))return null;
+  return {...plan,questions:items.slice()};
+ }
  function priceCommand(q){
   const s=String(q||"").trim();
   if(!/^покупательная способность\s*:/iu.test(s))return null;
@@ -832,19 +878,19 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("gea-"+id),toggle=$("toggle"),panel=$("panel");if(!toggle||!panel)return;
  const C=GlobalEconomicAssistant,q=$("question"),status=$("status"),results=$("results"),answer=$("answer"),search=$("search"),ask=$("ask"),model=$("model"),clear=$("clear"),stop=$("stop"),full=$("full"),ctx=$("context");
- let busy=false,engine=null,epoch=0,last=null;const include=$("include-context"),preview=$("preview-context"),previewHost=$("parameters"),exportButton=$("export");const scripts=new Map(),storageKey="economic-ai-draft-v1";
+ let busy=false,engine=null,epoch=0,last=null;let proposed=null,approved=null;const planButton=$("plan-model"),planAccept=$("plan-accept"),planPreview=$("plan-preview");const include=$("include-context"),preview=$("preview-context"),previewHost=$("parameters"),exportButton=$("export");const scripts=new Map(),storageKey="economic-ai-draft-v1";
  const page=location.pathname.split("/").at(-1)||"index.html";
  const heading=(document.querySelector("main h1")?.textContent||document.title).trim().slice(0,250);
  ctx.textContent="Текущий раздел: "+heading+(typeof pinned!=="undefined"&&pinned?" · закреплённый снимок":"");
  function save(){try{sessionStorage.setItem(storageKey,JSON.stringify({question:q.value.slice(0,600),page}))}catch{}}
  try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||"null");if(typeof saved?.question==="string")q.value=saved.question.slice(0,600)}catch{}
- q.addEventListener("input",()=>{save();last=null;exportButton.disabled=true});
+ q.addEventListener("input",()=>{save();last=null;exportButton.disabled=true;proposed=null;approved=null;if(planPreview)planPreview.textContent="";if(planAccept)planAccept.disabled=true;});
  function currentParameters(){return include.checked?EconomicAIPageContext.capture(page,id=>document.getElementById(id)):[]}
  function renderParameters(){previewHost.replaceChildren();const rows=currentParameters();previewHost.textContent=rows.length?rows.map(r=>r.label+": "+r.value).join(" · "):include.checked?"Для раздела нет доступных разрешённых параметров.":"Параметры не включены."}
  include.onchange=()=>{renderParameters();last=null;exportButton.disabled=true};preview.onclick=renderParameters;
@@ -852,7 +898,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const close=()=>{panel.hidden=true;toggle.setAttribute("aria-expanded","false");toggle.focus()};
  toggle.onclick=()=>panel.hidden?open():close();$("close").onclick=close;
  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!panel.hidden&&panel.contains(document.activeElement)){e.preventDefault();close()}});
- function lock(v){busy=v;search.disabled=v;ask.disabled=v||!engine;model.disabled=v||!!engine;q.disabled=v;clear.disabled=v;stop.disabled=!v||!engine;include.disabled=v;preview.disabled=v;exportButton.disabled=v||!last}
+ function lock(v){busy=v;if(planButton)planButton.disabled=v||!engine;if(planAccept)planAccept.disabled=v||!proposed;search.disabled=v;ask.disabled=v||!engine;model.disabled=v||!!engine;q.disabled=v;clear.disabled=v;stop.disabled=!v||!engine;include.disabled=v;preview.disabled=v;exportButton.disabled=v||!last}
  function loadScript(name,ready){
   if(ready())return Promise.resolve();
   if(!scripts.has(name)){const p=new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=name;s.onload=()=>ready()?resolve():reject(Error("Module unavailable"));s.onerror=()=>reject(Error("Script unavailable"));document.head.append(s)});scripts.set(name,p);p.catch(()=>scripts.delete(name))}
@@ -866,7 +912,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  function localHref(path){const u=new URL(path,location.href);if(typeof pinned!=="undefined"&&pinned&&typeof dynamicPages!=="undefined"&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);return u.href}
  function link(p,r){if(!r.href)return;const a=add(p,"a",r.title);a.href=C.internal(r.href)?localHref(r.href):r.href;a.rel="noopener noreferrer";if(C.external(r.href))a.target="_blank"}
  function reset(){results.replaceChildren();answer.textContent="";last=null;exportButton.disabled=true}
- clear.onclick=()=>{q.value="";try{sessionStorage.removeItem(storageKey)}catch{}reset();status.textContent="Вопрос и результаты очищены."};
+ clear.onclick=()=>{proposed=null;approved=null;if(planPreview)planPreview.textContent="";if(planAccept)planAccept.disabled=true;q.value="";try{sessionStorage.removeItem(storageKey)}catch{}reset();status.textContent="Вопрос и результаты очищены."};
  const searchFull=$("search-full");searchFull.href=localHref("economic-search.html");searchFull.onclick=()=>{searchFull.href=localHref("economic-search.html?q="+encodeURIComponent(q.value));save()};
  full.href=localHref("analyst-cockpit.html#economic-ai");full.onclick=()=>{save();if(page==="analyst-cockpit.html"&&location.hash==="#economic-ai")document.dispatchEvent(new Event("economic-ai-draft-transfer"));};
  async function findCompany(cmd,parameters){
@@ -1146,8 +1192,8 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
- async function find(parameters){
-  const command=C.naturalRoute(q.value)?.command||q.value;
+ async function find(parameters,query=q.value){
+  const command=C.naturalRoute(query)?.command||query;
   const agents=C.agentCommand(command);if(agents)return findAgents(agents,parameters);
   const forecastAudit=C.forecastAuditCommand(command);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
   const technology=C.technologyCommand(command);if(technology)return findTechnology(technology,parameters);
@@ -1238,7 +1284,14 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  }
  async function execute(generate){
   if(busy||!q.value.trim())return;save();const id=++epoch;lock(true);reset();status.textContent="Поиск по архиву сайта…";
-  try{const parameters=currentParameters();renderParameters();const r=await find(parameters);if(id!==epoch)return;const route=C.naturalRoute(q.value);if(route){r.context={...r.context,automatic_route:route.command,route_note:"Выбрано по явным параметрам запроса; не самостоятельное решение модели."};r.found.unshift({id:"auto-route",kind:"Выбранный инструмент",title:"Автоматический маршрут запроса",description:route.command,limit:"Параметры взяты из вопроса. Результат расчёта приведён отдельно, если доступен."});}render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
+  try{const parameters=currentParameters();renderParameters();const plan=approved?.question===q.value?approved.plan:C.researchPlan(q.value);let r;
+   if(plan?.kind==="invalid"){status.textContent="Исследование: укажите 2–3 разных поддерживаемых вопроса через | или новую строку. Неполные параметры не подставляются.";return}
+   if(plan){
+    const combined=await C.runResearchPlan(plan,async step=>{status.textContent="Выполняется: "+step.command;return find(parameters,step.command)},()=>id===epoch);
+    r={found:combined.found,failed:combined.failed,fingerprint:combined.fingerprint,context:{page,heading,parameters,research_steps:combined.results,plan_origin:approved?.question===q.value?"Предложен локальной моделью, подтверждён пользователем":"Явные задачи пользователя",description:"Составное исследование по одному снимку. Независимые расчёты; причинная связь не установлена."}};
+    r.found.unshift({id:"research-plan",kind:"План исследования",title:"Выполнены запросы к "+combined.results.length+" инструментам",description:combined.results.map(x=>x.step+". "+x.command+" · карточек "+x.count+(x.failed?" · недоступных архивов "+x.failed:"")).join(" | "),limit:"Карточки состояния не являются успешными расчётами. Параметры запроса не фактические наблюдения."});
+   }else r=await find(parameters);
+   if(id!==epoch)return;const route=C.naturalRoute(q.value);if(route){r.context={...r.context,automatic_route:route.command,route_note:"Выбрано по явным параметрам запроса; не самостоятельное решение модели."};r.found.unshift({id:"auto-route",kind:"Выбранный инструмент",title:"Автоматический маршрут запроса",description:route.command,limit:"Параметры взяты из вопроса. Результат расчёта приведён отдельно, если доступен."});}render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
    if(!generate){status.textContent="Поиск завершён, нейросеть не использована.";return}
    if(!r.found.length){status.textContent="Нет данных для объяснения.";return}
    status.textContent="Локальная генерация…";
@@ -1250,6 +1303,25 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   }catch{if(id===epoch)status.textContent="Поиск или генерация недоступны. Проверьте соединение и целостность архива."}finally{lock(false)}
  }
  exportButton.onclick=()=>{if(!last||busy)return;const text=EconomicAIPageContext.note(last.question,last.context,last.rows,last.fingerprint,last.answer);const u=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=u;a.download="economic-research-note.txt";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+ if(planButton)planButton.onclick=async()=>{
+  if(busy||!engine||!q.value.trim())return;
+  proposed=null;approved=null;const question=q.value,token=++epoch;lock(true);
+  planPreview.textContent="";status.textContent="Локальная модель составляет план…";
+  try{
+   const reply=await engine.chat.completions.create({messages:C.planningPrompt(question),temperature:0,max_tokens:240});
+   if(token!==epoch)return;
+   const plan=C.modelResearchPlan(reply.choices?.[0]?.message?.content,question);
+   if(!plan){planPreview.textContent="Нет допустимого плана. Уточните периоды, коды и параметры или воспользуйтесь обычным поиском.";status.textContent="План не принят; расчёты не запускались.";return}
+   proposed={question,plan};planPreview.textContent=plan.questions.map((x,i)=>(i+1)+". "+x).join("\n");
+   status.textContent="Проверьте соответствие задач вашему вопросу. Расчёты ещё не запускались.";
+  }catch{if(token===epoch)status.textContent="Не удалось составить план. Расчёты не запускались."}
+  finally{lock(false)}
+ };
+ if(planAccept)planAccept.onclick=()=>{
+  if(busy||!proposed||proposed.question!==q.value)return;
+  approved=proposed;proposed=null;planAccept.disabled=true;
+  planPreview.textContent+="\nПлан подтверждён. Нажмите «Найти на сайте» или «Объяснить с ИИ».";
+ };
  $("form").onsubmit=e=>{e.preventDefault();execute(false)};ask.onclick=()=>execute(true);
  model.onclick=async()=>{if(busy||engine)return;if(!navigator.gpu){status.textContent="WebGPU недоступен. Поиск и инструкции работают без нейросети.";return}lock(true);status.textContent="Загрузка локальной Qwen…";try{const lib=await import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.86/+esm");const id="Qwen2.5-1.5B-Instruct-q4f16_1-MLC";if(!lib.prebuiltAppConfig?.model_list?.some(r=>r.model_id===id))throw Error("Model unavailable");engine=await lib.CreateMLCEngine(id,{initProgressCallback:r=>{status.textContent=String(r.text||"Загрузка…")}});status.textContent="Локальная модель готова. Теперь можно объяснить результаты."}catch{engine=null;status.textContent="Не удалось загрузить модель. Поиск доступен без неё."}finally{lock(false)}};
  stop.onclick=()=>{epoch++;if(engine)engine.interruptGenerate();status.textContent="Запрошена остановка."};
