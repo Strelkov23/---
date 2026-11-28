@@ -819,6 +819,46 @@ const GlobalEconomicAssistant=(function core(){
  function formatResearchFindings(findings){
   return findings.map(f=>FINDING_LABELS[f.type]+": "+f.text+(f.refs.length?" "+f.refs.map(id=>"["+id+"]").join(" "):"")).join("\n\n");
  }
+ // Explicitly saved research hypotheses, separate from observations and chat history.
+ const HYPOTHESIS_STATES=Object.freeze(["proposed","investigating","user_support","user_challenge","inconclusive"]);
+ function journalStamp(x){return typeof x==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x}
+ function hypothesisJournal(raw){
+  if(!Array.isArray(raw)||raw.length>30)throw Error("Invalid hypothesis journal");
+  const ids=new Set();
+  return raw.map(r=>{
+   if(!r||typeof r.id!=="string"||!/^h-[a-z0-9-]{1,60}$/.test(r.id)||ids.has(r.id)||!journalStamp(r.created)||typeof r.fingerprint!=="string"||!/^[a-f0-9]{64}$/.test(r.fingerprint)||typeof r.question!=="string"||!r.question.trim()||r.question.length>600||typeof r.text!=="string"||!r.text.trim()||r.text.length>400||!Array.isArray(r.sources)||r.sources.length<1||r.sources.length>3||!Array.isArray(r.events)||r.events.length>10)throw Error("Invalid hypothesis entry");
+   ids.add(r.id);const refs=new Set();
+   const sources=r.sources.map(x=>{
+    if(!x||typeof x.id!=="string"||!/^[a-z][a-z0-9_-]{0,40}$/i.test(x.id)||refs.has(x.id)||!["observation","calculation","abstract"].includes(x.class)||typeof x.title!=="string"||x.title.length>350||typeof x.description!=="string"||x.description.length>1000||typeof x.limit!=="string"||x.limit.length>500||!(x.href===null||external(x.href)||internal(x.href)))throw Error("Invalid hypothesis source");
+    refs.add(x.id);return {id:x.id,class:x.class,title:x.title,description:x.description,limit:x.limit,href:x.href};
+   });
+   let stamp=r.created;
+   const events=r.events.map(e=>{
+    if(!e||!HYPOTHESIS_STATES.slice(1).includes(e.state)||!journalStamp(e.at)||e.at<stamp||typeof e.note!=="string"||!e.note.trim()||e.note.length>600)throw Error("Invalid hypothesis review");
+    stamp=e.at;return {state:e.state,at:e.at,note:e.note};
+   });
+   return {id:r.id,created:r.created,fingerprint:r.fingerprint,question:r.question,text:r.text,sources,events};
+  });
+ }
+ function addHypothesis(journal,entry,rows,fingerprint,question,id,stamp){
+  const existing=hypothesisJournal(journal);
+  if(existing.length>=30)throw Error("Journal full");
+  if(entry?.type!=="hypothesis"||!Array.isArray(entry.refs))throw Error("Not a hypothesis");
+  const check=validateResearchFindings(JSON.stringify([entry,{type:"limitation",text:"Гипотеза не доказана.",refs:[]}]),rows);
+  if(!check.ok)throw Error("Invalid hypothesis evidence");
+  const sources=entry.refs.map(ref=>{
+   const r=rows.find(x=>x.id===ref);
+   return {id:ref,class:researchCardClass(r),title:String(r.title||"").slice(0,350),description:String(r.description||"").slice(0,1000),limit:String(r.limit||"").slice(0,500),href:external(r.href)||internal(r.href)?r.href:null};
+  });
+  if(existing.some(r=>r.fingerprint===fingerprint&&r.text===entry.text.trim()&&r.sources.map(x=>x.id).join("|")===sources.map(x=>x.id).join("|")))throw Error("Duplicate hypothesis");
+  return hypothesisJournal([...existing,{id,created:stamp,fingerprint,question:question.trim(),text:entry.text.trim(),sources,events:[]}]);
+ }
+ function reviewHypothesis(journal,id,state,note,stamp){
+  const rows=hypothesisJournal(journal),r=rows.find(x=>x.id===id);
+  if(!r||r.events.length>=10||typeof note!=="string")throw Error("Invalid hypothesis update");
+  r.events.push({state,at:stamp,note:note.trim()});
+  return hypothesisJournal(rows);
+ }
  function seriesEvidence(x,id){
   if(!x||!Number.isFinite(x.value)||typeof x.unit!=="string"||typeof x.period!=="string")return null;
   let description=x.period+" · "+x.value+" "+x.unit;
@@ -1624,7 +1664,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,hypothesisJournal,addHypothesis,reviewHypothesis,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -2050,6 +2090,56 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const structuredLabel=add($("form"),"label"," Научное заключение: разделить наблюдения, гипотезы и ограничения ");
  const structuredMode=add(structuredLabel,"input","");structuredMode.type="checkbox";structuredMode.setAttribute("aria-label","Структурированное научное заключение");
 
+ const journalKey="economic-ai-hypothesis-journal-v1";
+ const journalPanel=add(panel,"details","");add(journalPanel,"summary","Научная память: журнал гипотез");
+ add(journalPanel,"p","Гипотезы сохраняются только по отдельной кнопке в хранилище этого браузера, до 30 записей. Сохраняются вопрос, гипотеза, снимок архива и сокращённые карточки источников. Не сохраняйте конфиденциальные вопросы: другие скрипты сайта могут иметь доступ к хранилищу. Журнал не отправляется модели автоматически и не синхронизируется между устройствами. Отметки проверки — оценка пользователя, не доказательство.");
+ const journalStatus=add(journalPanel,"p","");journalStatus.setAttribute("aria-live","polite");
+ const journalEntries=add(journalPanel,"div","");
+ const journalExport=add(journalPanel,"button","Скачать журнал JSON");journalExport.type="button";
+ const journalClear=add(journalPanel,"button","Удалить весь журнал");journalClear.type="button";
+ const journalReload=add(journalPanel,"button","Обновить журнал");journalReload.type="button";
+ const journalLabels={proposed:"Предложена, не проверена",investigating:"Проверяется пользователем",user_support:"Пользователь отметил поддержку",user_challenge:"Пользователь отметил возражения",inconclusive:"Недостаточно данных"};
+ function readJournal(){const raw=localStorage.getItem(journalKey);return C.hypothesisJournal(raw===null?[]:JSON.parse(raw));}
+ function saveJournal(rows){localStorage.setItem(journalKey,JSON.stringify(C.hypothesisJournal(rows)));renderJournal();}
+ function renderJournal(){
+  journalEntries.replaceChildren();let rows;
+  try{rows=readJournal();}catch{journalStatus.textContent="Журнал недоступен или повреждён. Данные не перезаписываются автоматически.";return}
+  journalStatus.textContent="Гипотез: "+rows.length+" из 30. Все статусы требуют независимой проверки.";
+  for(const r of rows.slice().reverse()){
+   const article=add(journalEntries,"article","");
+   add(article,"strong",r.text);add(article,"p",journalLabels[r.events.at(-1)?.state||"proposed"]+" · "+r.created);
+   add(article,"small","Снимок SHA-256: "+r.fingerprint);
+   add(article,"p","Вопрос: "+r.question);
+   const detail=add(article,"details","");add(detail,"summary","Сохранённые карточки (сокращённые) и история");
+   for(const x of r.sources){add(detail,"p","["+x.id+"] "+x.title);add(detail,"p",x.description);add(detail,"small",x.limit);if(x.href)add(detail,"p",x.href);}
+   for(const e of r.events)add(detail,"p",e.at+" · "+journalLabels[e.state]+" · "+e.note);
+   const state=add(article,"select","");state.setAttribute("aria-label","Новая пользовательская отметка");
+   for(const k of ["investigating","user_support","user_challenge","inconclusive"]){const opt=add(state,"option",journalLabels[k]);opt.value=k}
+   const note=add(article,"textarea","");note.maxLength=600;note.rows=2;note.placeholder="Основание отметки, ссылка или метод проверки";note.setAttribute("aria-label","Основание отметки");
+   const update=add(article,"button","Сохранить отметку");update.type="button";update.disabled=r.events.length>=10;
+   update.onclick=()=>{try{saveJournal(C.reviewHypothesis(readJournal(),r.id,state.value,note.value,new Date().toISOString()));}catch{journalStatus.textContent="Не удалось сохранить отметку. Нужен непустой комментарий; лимит 10 отметок."}};
+   const remove=add(article,"button","Удалить гипотезу");remove.type="button";
+   remove.onclick=()=>{try{saveJournal(readJournal().filter(x=>x.id!==r.id));}catch{journalStatus.textContent="Удаление не выполнено."}};
+  }
+ }
+ journalReload.onclick=renderJournal;
+ journalClear.onclick=()=>{if(!confirm("Удалить все сохранённые гипотезы из этого браузера?"))return;try{localStorage.removeItem(journalKey);renderJournal()}catch{journalStatus.textContent="Удаление не выполнено."}};
+ journalExport.onclick=()=>{try{const url=URL.createObjectURL(new Blob([JSON.stringify({schema:1,kind:"user_hypothesis_journal",rows:readJournal()},null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="economic-hypotheses.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch{journalStatus.textContent="Экспорт недоступен."}};
+ window.addEventListener("storage",e=>{if(e.key===journalKey)renderJournal()});
+ renderJournal();
+ function offerHypotheses(findings,input,question,fingerprint){
+  for(const finding of findings.filter(f=>f.type==="hypothesis")){
+   const host=add(results,"article","");add(host,"p","Сохранить непроверенную гипотезу: "+finding.text);
+   const button=add(host,"button","Добавить в локальный журнал гипотез");button.type="button";
+   button.onclick=()=>{if(busy)return;try{
+    const id="h-"+crypto.randomUUID();
+    saveJournal(C.addHypothesis(readJournal(),finding,input.rows,fingerprint,question,id,new Date().toISOString()));
+    button.disabled=true;button.textContent="Сохранено в журнал";
+   }catch{journalStatus.textContent="Гипотеза не сохранена: дубликат, лимит журнала, неверный снимок или недоступное хранилище.";journalPanel.open=true}};
+  }
+ }
+
+
 
  function localHref(path){const u=new URL(path,location.href);if(typeof pinned!=="undefined"&&pinned&&typeof dynamicPages!=="undefined"&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);return u.href}
  function link(p,r){if(!r.href)return;const a=add(p,"a",r.title);a.href=C.internal(r.href)?localHref(r.href):r.href;a.rel="noopener noreferrer";if(C.external(r.href))a.target="_blank"}
@@ -2464,6 +2554,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     if(!checked.ok){status.textContent="Структурированное заключение отклонено: "+checked.reason+". Исходные карточки сохранены. Попробуйте обычное объяснение.";return}
     const limit="Структура, типы источников, числа и единицы прошли буквальную проверку. Смысловая достоверность и причинность не установлены.";
     answer.textContent=C.formatResearchFindings(checked.findings);
+    offerHypotheses(checked.findings,input,q.value,r.fingerprint);
     last.answer=answer.textContent+"\n\n"+inputNote+" "+limit;
     status.textContent=inputNote+" "+limit;remember({question:q.value,answer:last.answer,page,fingerprint:r.fingerprint});return;
    }
