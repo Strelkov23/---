@@ -2554,3 +2554,30 @@ console.log("16 agent coordination checks passed");}
   A.ok(context.used<=6);A.ok(context.used>0);
   console.log("Persistent chat history regression checks passed");
  }
+
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function generationRecoveryChecks(){
+   const messages=[{role:"user",content:"Привет"}],calls=[],updates=[];
+   let resets=0;
+   const engine={async resetChat(){resets++;},chat:{completions:{async create(p){calls.push(p);if(p.stream)throw Error("stream rejected");return {choices:[{message:{content:"Привет! Чем помочь?"},finish_reason:"stop"}]};}}}};
+   const recovered=await C.generateLocalChat(engine,messages,{modelId:"local-model",maxTokens:420,onText:x=>updates.push(x)});
+   A.equal(recovered.text,"Привет! Чем помочь?");A.equal(recovered.fallback,true);A.equal(resets,1);A.equal(calls.length,2);
+   A.equal(calls[0].model,"local-model");A.equal(calls[1].stream,false);A.equal(calls[1].max_tokens,256);A.deepEqual(calls[1].messages,messages);
+   A.deepEqual(updates,["Привет! Чем помочь?"]);
+   const emptyFirst={chat:{completions:{async create(p){if(p.stream)return(async function*(){yield {choices:[{delta:{},finish_reason:"stop"}]};})();return {choices:[{message:{content:"Ответ"},finish_reason:"length"}]};}}}};
+   const length=await C.generateLocalChat(emptyFirst,messages);A.equal(length.truncated,true);A.equal(length.fallback,true);
+   let failedCalls=0;const gpu={chat:{completions:{async create(){failedCalls++;throw Error("GPU device lost");}}}};
+   const failed=await C.generateLocalChat(gpu,messages);A.equal(failed.errorCode,"device");A.equal(failedCalls,1);A.equal(failed.text,"");
+   const result=await C.runGeneralChat("Привет",[],async m=>C.generateLocalChat(gpu,m));A.equal(result.state,"error");A.equal(result.errorCode,"device");
+   A.ok(C.localGenerationMessage("device").includes("перезапустите"));
+   let interruptedCalls=0;const partialEngine={chat:{completions:{async create(){interruptedCalls++;return(async function*(){yield {choices:[{delta:{content:"Начало"}}]};throw Error("GPU device lost");})();}}}};
+   const partial=await C.generateLocalChat(partialEngine,messages);A.equal(partial.text,"Начало");A.equal(partial.truncated,true);A.equal(partial.errorCode,"device");A.equal(interruptedCalls,1);
+   const p=await C.runGeneralChat("Привет",[],async()=>partial);A.equal(p.state,"notice");A.equal(p.errorCode,"device");A.equal(p.answer,"Начало");
+   let active=true;const cancelled=await C.generateLocalChat({chat:{completions:{async create(){active=false;throw Error("cancel");}}}},messages,{active:()=>active});A.equal(cancelled.state,"cancelled");
+   A.equal(C.localGenerationError(Error("Context window exceeded")),"context");A.equal(C.localGenerationError(Error("model not loaded")),"model");
+   const final=await C.generateLocalChat({chat:{completions:{async create(){throw Error("private prompt and unexpected failure");}}}},messages);
+   A.equal(final.errorCode,"generation");A.ok(!JSON.stringify(final).includes("private prompt"));
+   console.log("Real generation recovery regression checks passed");
+  }
+  generationRecoveryChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }

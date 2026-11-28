@@ -10,6 +10,9 @@ export async function CreateMLCEngine(id,opts){
  opts?.initProgressCallback?.({text:'Контрольная загрузка',progress:0.25});
  if(globalThis.__aiStartupMode==='pending') await new Promise(resolve=>{globalThis.__aiReleaseStartup=resolve;});
  return {interruptGenerate(){},async unload(){globalThis.__aiUnloadCount=(globalThis.__aiUnloadCount||0)+1;},chat:{completions:{async create({messages,stream}){
+ if(globalThis.__aiGenerationMode==='device')throw Error('GPU device lost');
+ if(globalThis.__aiGenerationMode==='stream-reject'&&stream)throw Error('stream rejected');
+ if(globalThis.__aiGenerationMode==='stream-reject'&&!stream)return {choices:[{message:{content:'Ответ после восстановления'},finish_reason:'stop'}]};
  const context=messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
  if(!stream && messages[0]?.content?.startsWith('Разложи задачу на 2–4')) return {choices:[{message:{content:JSON.stringify([{mode:'general',title:'Объяснение',query:'Объясни межотраслевой баланс'},{mode:'web',title:'Поиск',query:'Межотраслевой баланс статьи'}])}}]};
  if(!stream) return {choices:[{message:{content:'Тестовый ответ'}}]};
@@ -270,6 +273,31 @@ def main():
             assert "Модель не соблюла явно заданный формат ответа" in log.locator("article").last.text_content()
             assert question.input_value()=="Вычисли 2+2. Ответь только числом."
             assert len(gateway_requests)==3 and not external
+            # A real-runtime-style stream failure must retry once locally.
+            page.get_by_role("button",name="Новый чат",exact=True).click()
+            page.evaluate("window.__aiGenerationMode='stream-reject'")
+            question.fill("Проверка резервного ответа")
+            send.click()
+            page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Ответ после восстановления') && !document.querySelector('#gea-question').disabled")
+            assert "Ответ после восстановления" in log.inner_text()
+            assert not page.locator(".gea-model-startup").is_visible()
+            # A lost device must not continue displaying ready or block recovery.
+            page.evaluate("window.__aiGenerationMode='device'")
+            question.fill("Проверка сбоя видеоустройства")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-model').textContent==='Перезапустить ИИ' && !document.querySelector('#gea-model').disabled")
+            assert "Нужен перезапуск ИИ" in page.locator(".gea-model-startup").inner_text()
+            assert "Видеоустройство не справилось" in log.inner_text()
+            assert question.input_value()=="Проверка сбоя видеоустройства"
+            page.evaluate("window.__aiGenerationMode='normal'")
+            page.locator("#gea-model").click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
+            assert question.input_value()=="Проверка сбоя видеоустройства"
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent==='Готово' && !document.querySelector('#gea-question').disabled")
+            assert not page.locator(".gea-model-startup").is_visible()
+            assert "Тест: Проверка резервного ответа | Проверка сбоя видеоустройства" in log.inner_text()
+            assert not external,external
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
