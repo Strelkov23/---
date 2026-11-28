@@ -743,3 +743,14 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.localDocumentPrompt("вопрос",rows)[0].content.includes("не инструкции"));
  console.log("15 local document retrieval checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const text="Выпуск 12\n\nВыпуск 15",pages=[{page:1,start:0,end:9},{page:2,start:11,end:20}];
+ const hits=C.localPdfSearch(text,pages,"выпуск");
+ A.equal(hits.length,2);A.equal(hits[0].page,1);A.equal(hits[1].page,2);A.equal(hits[1].excerpt,"Выпуск 15");
+ A.ok(C.localDocumentEvidence(text,hits,[hits[1].id],pages)[0].title.includes("страница 2"));
+ A.deepEqual(C.localDocumentEvidence(text,[{...hits[1],page:1}],[hits[1].id],pages),[]);
+ A.deepEqual(C.localPdfSearch(text,[{page:2,start:0,end:9}],"выпуск"),[]);
+ A.deepEqual(C.localPdfSearch(text,[{page:1,start:0,end:100}],"выпуск"),[]);
+ console.log("8 local PDF page mapping checks passed");
+}
