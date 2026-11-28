@@ -86,6 +86,36 @@ def prior_agent_report(previous, stamp):
     except (OSError,ValueError,TypeError,KeyError,AttributeError):
         return None,'unverified'
 
+# Fixed, read-only coordination policy. A dependency is a prerequisite for
+# interpreting a downstream report, not a command to modify the source.
+TASK_RULES = (
+    ('quality', 1, 'Проверить качество и свежесть источников', 'freshness.html', ()),
+    ('discovery', 1, 'Проверить доступность новых показателей', 'economic-ai-discovery.json', ()),
+    ('search', 1, 'Проверить покрытие и источники поиска', 'economic-search-audit.json', ()),
+    ('coverage', 1, 'Проверить статистическое покрытие', 'data-registry.html', ('quality',)),
+    ('diagnostics', 2, 'Исследовать макроэкономические сигналы', 'diagnostics.html', ('quality','coverage')),
+    ('forecast', 2, 'Проверить качество прогнозов', 'forecast.html', ('quality',)),
+    ('planning', 2, 'Проверить предпосылки экономических сценариев', 'planning-centre.html', ('quality','coverage','diagnostics')),
+    ('research', 3, 'Проверить доступность научных материалов', 'papers.html', ('search',)),
+)
+def research_queue(agents, continuity_report):
+    states = {a['id']:a['state'] for a in agents}
+    runs = {r['id']:r for r in continuity_report['rows']}
+    tasks = []
+    for owner,priority,title,href,dependencies in TASK_RULES:
+        if states[owner]=='ok':
+            continue
+        run = runs[owner]
+        blockers = [d for d in dependencies if states[d]!='ok']
+        # A waiting agent needs data, not a premature analytical conclusion.
+        status = 'blocked' if blockers else 'needs_data' if states[owner]=='waiting' else 'ready_for_review'
+        tasks.append(dict(id='review-'+owner,owner=owner,priority=priority,title=title,href=href,
+                          state=status,source_state=states[owner],blockers=blockers,
+                          consecutive=run['consecutive'],since=run['since']))
+    tasks.sort(key=lambda t:(t['priority'], t['state']=='blocked', -t['consecutive'], t['id']))
+    return dict(schema=1, mode='recommendations_only', tasks=tasks,
+                counts={k:sum(t['state']==k for t in tasks) for k in ('ready_for_review','blocked','needs_data')})
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
@@ -159,6 +189,7 @@ def build(out,previous,stamp,refresh):
     data=dict(schema=1,built=stamp,mode="scheduled_refresh" if refresh else "offline_build",note=NOTE,agents=agents)
     prior,baseline=prior_agent_report(previous,stamp)
     data['continuity']=continuity(agents,stamp,prior,baseline)
+    data['research_queue']=research_queue(agents,data['continuity'])
     validate(data)
     return data
 def validate(d):
@@ -167,6 +198,8 @@ def validate(d):
     for a in d["agents"]:
         if a["state"] not in ("ok","attention","waiting") or not isinstance(a["metrics"],dict) or not isinstance(a["items"],list):raise ValueError("Agent result")
     if 'continuity' in d:validate_continuity(d)
+    if 'research_queue' in d:
+        if 'continuity' not in d or d['research_queue']!=research_queue(d['agents'],d['continuity']):raise ValueError('Invalid research queue')
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
