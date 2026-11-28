@@ -883,3 +883,32 @@ console.log("16 agent coordination checks passed");}
  }
  checks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб."},{id:"sim",kind:"Условный расчёт",title:"Сценарий",description:"150 млн руб.",value:150,unit:"млн руб."},{id:"meta",kind:"paper",title:"Статья",description:"Метаданные"},{id:"abstract",kind:"Лицензированная аннотация",title:"Аннотация",description:"Авторы исследуют выпуск"}];
+ const limit={type:"limitation",text:"Причинная связь не установлена.",refs:[]},fact={type:"observation",text:"Выпуск 125 млн руб.",refs:["fact"]},validate=(...items)=>C.validateResearchFindings(JSON.stringify(items),rows);
+ A.equal(validate(fact,limit).ok,true);
+ A.equal(validate(limit).ok,true);
+ A.equal(validate(fact).reason,"missing_limitation");
+ A.equal(validate({...fact,refs:["sim"]},limit).reason,"source_class");
+ A.equal(validate({...fact,refs:["unknown"]},limit).reason,"source_class");
+ A.equal(validate({...fact,refs:[]},limit).reason,"missing_source");
+ A.equal(validate({...fact,text:"Выпуск 999 млн руб."},limit).reason,"numeric_evidence");
+ A.equal(validate({...fact,text:"Выпуск 125 тонн."},limit).reason,"numeric_evidence");
+ A.equal(validate({...fact,text:"Выпуск [sim]"},limit).reason,"shape");
+ A.equal(validate({...fact,other:1},limit).reason,"shape");
+ A.equal(validate(fact,fact,limit).reason,"duplicate_finding");
+ A.equal(validate({type:"literature",text:"Авторы доказали рост",refs:["meta"]},limit).reason,"source_class");
+ A.equal(validate({type:"literature",text:"Авторы исследуют выпуск",refs:["abstract"]},limit).ok,true);
+ A.equal(validate({type:"scenario",text:"Условный результат 150 млн руб.",refs:["sim"]},limit).ok,true);
+ A.equal(validate({type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},limit).ok,true);
+ A.equal(validate({...limit,text:"Недостаёт 999 записей."}).reason,"numeric_evidence");
+ A.equal(C.validateResearchFindings("not json",rows).reason,"json");
+ A.ok(C.formatResearchFindings(validate({type:"hypothesis",text:"Возможна связь.",refs:["fact"]},limit).findings).includes("Гипотеза (не доказана)"));
+ const input=C.structuredResearchInput("вопрос",{},rows,1);
+ A.equal(input.blocked,false);A.ok(input.bytes<=input.budget);
+ A.equal(JSON.parse(input.messages[1].content).results[0].evidence_class,"observation");
+ A.equal(input.context.research_scope.transmitted,input.rows.length);
+ A.equal(C.structuredResearchInput("вопрос",{},rows,0,100).blocked,true);
+ console.log("23 structured research checks passed");
+}

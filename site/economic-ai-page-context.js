@@ -27,6 +27,7 @@ const EconomicAIPageContext=(function pageContext(){
   lines.push("","Результаты поиска (включая не переданные модели):");
   for(const r of rows)lines.push("["+r.id+"] "+r.kind+" — "+r.title,r.description||"",r.limit||"",r.href||"","");
   if(context.answer_review)lines.push("","Протокол повторной буквальной сверки:",JSON.stringify(context.answer_review,null,2));
+  if(context.structured_findings)lines.push("","Структурированное заключение (буквальная проверка, не смысловая):",JSON.stringify(context.structured_findings,null,2));
   if(answer)lines.push("Черновик ИИ (не подтверждённая аналитика):",answer);
   return lines.join("\n");
  }

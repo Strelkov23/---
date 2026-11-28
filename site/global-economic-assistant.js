@@ -773,6 +773,52 @@ const GlobalEconomicAssistant=(function core(){
   if(!checked.passed)return {...result,state:"repair_rejected",repair:checked};
   return {...result,answer:revised,final:checked,state:"repair_accepted"};
  }
+ const FINDING_CLASSES=Object.freeze({
+  observation:["observation"],calculation:["calculation"],scenario:["scenario"],literature:["abstract"],
+  hypothesis:["observation","calculation","abstract"],limitation:["observation","calculation","scenario","abstract","metadata","status","other"]
+ });
+ const FINDING_LABELS=Object.freeze({observation:"Наблюдение",calculation:"Расчёт",scenario:"Условный сценарий",literature:"Утверждение авторов аннотации",hypothesis:"Гипотеза (не доказана)",limitation:"Ограничение"});
+ function structuredResearchPrompt(question,context,rows){
+  const messages=prompt(question,context,rows);
+  return [{role:"system",content:messages[0].content+" Вместо обычного ответа верни только JSON-массив из 1–5 объектов с ровно тремя ключами type, text, refs. type: observation, calculation, scenario, literature, hypothesis, limitation. text — одно короткое утверждение без ID, ссылок, Markdown или переноса строки. refs — массив ID переданных карточек, максимум 3. observation только по observation, calculation только по calculation, scenario только по scenario, literature только по abstract, hypothesis только по observation/calculation/abstract и всегда условная, limitation может иметь пустой refs. Хотя бы один объект limitation обязателен. Классы карточек переданы явно. Не выдавай гипотезу за результат, метаданные за содержание статьи. Если нет достаточных данных, верни только limitation."},{role:"user",content:JSON.stringify({question,context,results:rows.map(r=>({...r,evidence_class:researchCardClass(r)}))})}];
+ }
+ function structuredResearchInput(question,context,rows,failed=0,budget=9500){
+  if(!Number.isInteger(budget)||budget<1||budget>20000)throw Error("Invalid structured budget");
+  const initial=prepareEvidence(question,context,rows,budget),selected=initial.rows.slice();
+  let ctx,scope,messages,bytes;
+  do{
+   scope=researchScope(rows,selected,failed,context.research_steps||[]);
+   ctx={...context,research_scope:scope};
+   messages=structuredResearchPrompt(question,ctx,selected);bytes=utf8Size(JSON.stringify(messages));
+   if(bytes<=budget||!selected.length)break;
+   selected.pop();
+  }while(true);
+  return {context:ctx,scope,messages,rows:selected,omitted:rows.length-selected.length,bytes,budget,blocked:bytes>budget||!selected.length};
+ }
+ function validateResearchFindings(raw,rows){
+  const reject=reason=>({ok:false,reason,findings:[]});
+  if(typeof raw!=="string"||raw.length>6000||!Array.isArray(rows))return reject("shape");
+  let list;try{list=JSON.parse(raw.trim())}catch{return reject("json")}
+  if(!Array.isArray(list)||list.length<1||list.length>5)return reject("shape");
+  const byId=new Map(rows.map(r=>[r.id,r]));if(byId.size!==rows.length)return reject("duplicate_source");
+  const findings=[],seen=new Set();
+  for(const item of list){
+   if(!item||typeof item!=="object"||Object.keys(item).sort().join(",")!=="refs,text,type"||!Object.hasOwn(FINDING_CLASSES,item.type)||typeof item.text!=="string"||!item.text.trim()||item.text.length>400||/[\r\n\[\]<>]|https?:\/\//i.test(item.text)||!Array.isArray(item.refs)||item.refs.length>3||new Set(item.refs).size!==item.refs.length)return reject("shape");
+   if(item.type!=="limitation"&&!item.refs.length)return reject("missing_source");
+   const cited=item.refs.map(id=>byId.get(id));
+   if(cited.some(r=>!r||!FINDING_CLASSES[item.type].includes(researchCardClass(r))))return reject("source_class");
+   const text=item.text.trim(),identity=item.type+"|"+text;if(seen.has(identity))return reject("duplicate_finding");seen.add(identity);
+   // No unsupported numeric values or explicit units even inside hypotheses/limitations.
+   const statement=text+(item.refs.length?" "+item.refs.map(id=>"["+id+"]").join(" "):"");
+   if(!researchAnswerCheck(statement,cited).passed)return reject("numeric_evidence");
+   findings.push({type:item.type,text,refs:item.refs.slice()});
+  }
+  if(!findings.some(x=>x.type==="limitation"))return reject("missing_limitation");
+  return {ok:true,reason:null,findings};
+ }
+ function formatResearchFindings(findings){
+  return findings.map(f=>FINDING_LABELS[f.type]+": "+f.text+(f.refs.length?" "+f.refs.map(id=>"["+id+"]").join(" "):"")).join("\n\n");
+ }
  function seriesEvidence(x,id){
   if(!x||!Number.isFinite(x.value)||typeof x.unit!=="string"||typeof x.period!=="string")return null;
   let description=x.period+" · "+x.value+" "+x.unit;
@@ -1578,7 +1624,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -2001,6 +2047,8 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   download.onclick=()=>{if(!points.length)return;const url=URL.createObjectURL(new Blob([C.chartPointsCsv(points)],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="chart-estimates.csv";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)};
  }
  mountChartDigitizer();
+ const structuredLabel=add($("form"),"label"," Научное заключение: разделить наблюдения, гипотезы и ограничения ");
+ const structuredMode=add(structuredLabel,"input","");structuredMode.type="checkbox";structuredMode.setAttribute("aria-label","Структурированное научное заключение");
 
 
  function localHref(path){const u=new URL(path,location.href);if(typeof pinned!=="undefined"&&pinned&&typeof dynamicPages!=="undefined"&&dynamicPages.has(u.pathname.split("/").at(-1)))u.searchParams.set("snapshot",pinned);return u.href}
@@ -2402,11 +2450,23 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    if(!r.found.length){status.textContent="Нет данных для объяснения.";return}
    status.textContent="Локальная генерация · "+(loadedProfile?.label||"Qwen")+"…";
    r.context={...r.context,local_model:loadedProfile?.id||"неизвестно"};last.context=r.context;
-   const input=C.prepareResearchInput(q.value,r.context,r.found,r.failed||0);
+   const structured=structuredMode.checked;
+   const input=structured?C.structuredResearchInput(q.value,r.context,r.found,r.failed||0):C.prepareResearchInput(q.value,r.context,r.found,r.failed||0);
    last.context={...input.context,model_input:{included:input.rows.map(x=>x.id),omitted:input.omitted,bytes:input.bytes,budget:input.budget}};
    if(input.blocked){status.textContent="Контекст не помещается в безопасный бюджет или нет подходящих карточек. Сузьте вопрос; результаты поиска сохранены.";return}
    const inputNote="Модели передано "+input.rows.length+" из "+r.found.length+" карточек; "+input.omitted+" не передано. Оценка размера "+input.bytes+" байт, не точное число токенов.";
    status.textContent=inputNote+" Локальная генерация…";
+   if(structured){
+    const reply=await engine.chat.completions.create({messages:input.messages,temperature:0,max_tokens:420});
+    if(id!==epoch)return;
+    const checked=C.validateResearchFindings(reply.choices?.[0]?.message?.content||"",input.rows);
+    last.context={...last.context,structured_findings:{accepted:checked.ok,reason:checked.reason,findings:checked.findings}};
+    if(!checked.ok){status.textContent="Структурированное заключение отклонено: "+checked.reason+". Исходные карточки сохранены. Попробуйте обычное объяснение.";return}
+    const limit="Структура, типы источников, числа и единицы прошли буквальную проверку. Смысловая достоверность и причинность не установлены.";
+    answer.textContent=C.formatResearchFindings(checked.findings);
+    last.answer=answer.textContent+"\n\n"+inputNote+" "+limit;
+    status.textContent=inputNote+" "+limit;remember({question:q.value,answer:last.answer,page,fingerprint:r.fingerprint});return;
+   }
    const reply=await engine.chat.completions.create({messages:C.prompt(q.value,input.context,input.rows),temperature:0.1,max_tokens:300});
    if(id!==epoch)return;
    const draft=reply.choices?.[0]?.message?.content||"";
