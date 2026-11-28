@@ -3,6 +3,9 @@ on:
   push:
     branches: [economic-ai-v207-live-acceptance]
     paths: ['site/probe_ai_public_release.py', 'site/test_probe_ai_public_release.py', '.github/workflows/ai-live-probe.yml']
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/ai-live-probe.yml']
   workflow_dispatch:
     inputs:
       revision:
@@ -11,6 +14,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -24,7 +28,7 @@ jobs:
         working-directory: site
   public-observation:
     needs: probe
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'economic-ai-v230-public-observation'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     # This observation is independent of the production deployment. A stale
@@ -36,13 +40,52 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Observe production workflow status
+        if: github.head_ref == 'economic-ai-v230-public-observation'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow publish.yml --branch main --limit 5 --json databaseId,status,conclusion,headSha,createdAt,updatedAt,url
       - name: Verify the exact deployed assistant release
         env:
           EXPECTED_REVISION: ${{ inputs.revision }}
           PUBLIC_BASE: https://strelkov23.github.io/---/
+          MINIMUM_SOURCE_REVISION: 5d081a81a48bedc5524f408b9dcd9980dfd72842
         run: |
-          set -o pipefail
+          set -eu -o pipefail
+          if [ -z "$EXPECTED_REVISION" ]; then
+            EXPECTED_REVISION=$(curl --fail --silent --show-error --retry 2 --max-time 25 -H 'Cache-Control: no-cache' "${PUBLIC_BASE}source-version.txt?probe=${GITHUB_RUN_ID}")
+            [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]]
+            echo "Observed public source: $EXPECTED_REVISION"
+            git fetch origin main
+            git merge-base --is-ancestor "$MINIMUM_SOURCE_REVISION" "$EXPECTED_REVISION" || { echo "Public source does not include usability, knowledge and persistent history update"; exit 1; }
+          fi
           python3 site/probe_ai_public_release.py --base "$PUBLIC_BASE" --revision "$EXPECTED_REVISION" | tee public-ai-release-report.json
+      - name: Check real WebLLM module and model catalogue without loading weights
+        if: always() && github.head_ref == 'economic-ai-v230-public-observation'
+        run: |
+          python3 -m pip install playwright==1.51.0
+          CHROME_BIN=$(command -v google-chrome) python3 - <<'PY'
+          import os, json
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser=p.chromium.launch(executable_path=os.environ.get("CHROME_BIN") or None,headless=True,args=["--no-sandbox","--disable-gpu"])
+              page=browser.new_page()
+              page.goto("https://strelkov23.github.io/---/",wait_until="domcontentloaded",timeout=60000)
+              result=page.evaluate("""async () => {
+                const module = await Promise.race([
+                  import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.86/+esm"),
+                  new Promise((_,reject)=>setTimeout(()=>reject(Error("CDN import timed out")),45000))
+                ]);
+                const ids=(module.prebuiltAppConfig?.model_list||[]).map(x=>x.model_id);
+                const expected=["Qwen2.5-1.5B-Instruct-q4f16_1-MLC","Qwen2.5-3B-Instruct-q4f16_1-MLC","Qwen2.5-7B-Instruct-q4f16_1-MLC"];
+                return {runtime:typeof module.CreateMLCEngine==="function",models:expected.map(id=>({id,available:ids.includes(id)}))};
+              }""")
+              print(json.dumps(result,ensure_ascii=False))
+              assert result["runtime"] and all(x["available"] for x in result["models"]), result
+              browser.close()
+          PY
+
       - name: Save independent live observation
         if: always()
         uses: actions/upload-artifact@v4
