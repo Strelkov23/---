@@ -635,3 +635,21 @@ console.log("16 agent coordination checks passed");}
  A.ok(Math.abs(r.mean-5/3)<1e-12);
  console.log("19 local table checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q=C.parseLocalTable("year;value\n2025;120\n2022;100\n2023;110\n2027;0\n2028;5\n2029;-2\n2030;4\n2030;6\n2031;8\n2032;\n2033;bad\nwrong;3",";");
+ const r=C.localAnnualSeries(q,0,1,".");
+ const get=y=>r.rows.find(x=>x.year===y);
+ A.equal(r.invalidYears,1);A.equal(r.totalInputRows,12);
+ A.deepEqual(r.counts,{ok:7,missing:1,invalid:1,gap:2,duplicate:1});
+ A.equal(get(2023).delta,10);A.equal(get(2023).relativePercent,10);
+ A.equal(get(2024).state,"gap");A.equal(get(2025).delta,null);
+ A.equal(get(2027).delta,null);A.equal(get(2028).delta,5);A.equal(get(2028).relativePercent,null);
+ A.equal(get(2029).delta,-7);A.equal(get(2029).relativePercent,null);
+ A.equal(get(2030).state,"duplicate");A.equal(get(2030).value,null);A.equal(get(2031).delta,null);
+ A.equal(get(2032).state,"missing");A.equal(get(2033).state,"invalid");
+ A.equal(C.localAnnualSeries(C.parseLocalTable("y;v\n2024;2,5\n2025;5,0",";"),0,1,",").rows[1].relativePercent,100);
+ A.deepEqual(C.localAnnualSeries(C.parseLocalTable("y;v\n1899;5\n2101;2",";"),0,1,".").rows,[]);
+ A.throws(()=>C.localAnnualSeries(q,1,1,"."));
+ console.log("20 annual table checks passed");
+}
