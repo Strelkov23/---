@@ -790,3 +790,42 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.chartPointsCsv([]));A.throws(()=>C.chartPointsCsv([{x:NaN}]));
  console.log("12 chart digitization checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const width=101,height=101,data=new Uint8ClampedArray(width*height*4);
+ const raster={width,height,data},c=C.chartCalibration({x:0,y:100},{x:100,y:0},2020,0,2030,100);
+ function pixel(x,y,r=37,g=99,b=235,a=255){data.set([r,g,b,a],4*(y*width+x))}
+ for(let x=0;x<=100;x++){pixel(x,49);pixel(x,50);pixel(x,51)}
+ pixel(25,10);for(let y=30;y<=44;y++)pixel(75,y);
+ for(let y=49;y<=51;y++)pixel(50,y,0,0,0,0);
+ const result=C.chartTrace(raster,c,"#2563eb",0,5);
+ A.equal(result.sampled,5);A.equal(result.points.length,2);
+ A.equal(result.points[0].y,50);A.equal(result.points[1].x,2030);
+ A.deepEqual(result.skipped,[{pixelX:25,reason:"ambiguous"},{pixelX:50,reason:"missing"},{pixelX:75,reason:"ambiguous"}]);
+ A.equal(C.chartTrace(raster,c,"#ffffff",0,5).points.length,0);
+ A.equal(C.chartTrace(raster,c,"#2563eb",0,200).sampled,101);
+ A.throws(()=>C.chartTrace(raster,c,"bad",0,5));
+ A.throws(()=>C.chartTrace(raster,c,"#2563eb",101,5));
+ A.throws(()=>C.chartTrace(raster,c,"#2563eb",0,201));
+ A.throws(()=>C.chartTrace({...raster,data:new Uint8ClampedArray(4)},c,"#2563eb",0,5));
+ A.throws(()=>C.chartTrace(raster,{...c,b:{x:101,y:0}},"#2563eb",0,5));
+ console.log("12 chart color tracing checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const p=(x,y)=>({x,y,onePixelX:1,onePixelY:2});
+ const r=C.chartResearchSummary([p(2025,120),p(2020,100),p(2022,500),p(2022,501)]);
+ A.equal(r.unique,2);A.equal(r.duplicateX,2);A.equal(r.delta,20);A.equal(r.relativePercent,20);A.equal(r.max,120);A.equal(r.first.x,2020);
+ A.equal(C.chartResearchSummary([p(1,10),p(2,11)]).relativePercent,null);
+ A.equal(C.chartResearchSummary([p(1,10),p(2,11)]).belowPixelScale,true);
+ A.equal(C.chartResearchSummary([p(1,0),p(2,10)]).relativePercent,null);
+ A.equal(C.chartResearchSummary([p(1,10),p(1,20)]).unique,0);
+ A.throws(()=>C.chartResearchSummary([p(1,NaN)]));
+ A.throws(()=>C.chartResearchSummary([p(1,10)],{sampled:2,skipped:[]}));
+ A.deepEqual(C.chartResearchSummary([p(1,10)],{sampled:2,skipped:[{reason:"ambiguous"}]}).coverage,{sampled:2,missing:0,ambiguous:1});
+ A.deepEqual(C.chartResearchEvidence(r,"руб.",false),[]);
+ A.ok(C.chartResearchEvidence(r,"руб.",true).every(x=>x.kind==="Оценка по изображению"));
+ A.ok(!C.chartResearchEvidence(r,"%",true).some(x=>x.id==="chart-relative"));
+ A.ok(C.chartResearchPrompt([])[0].content.includes("X может не быть временем"));
+ console.log("17 chart research summary checks passed");
+}
