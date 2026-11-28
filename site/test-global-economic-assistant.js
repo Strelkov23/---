@@ -530,3 +530,23 @@ console.log("16 agent coordination checks passed");}
  A.deepEqual(C.dialogueQuery("",[entry(1)],true),{query:"",context:null});
  console.log("16 dialogue history checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fast=C.modelProfile("fast"),balanced=C.modelProfile("balanced"),research=C.modelProfile("research");
+ A.equal(fast.id,"Qwen2.5-1.5B-Instruct-q4f16_1-MLC");
+ A.equal(balanced.id,"Qwen2.5-3B-Instruct-q4f16_1-MLC");
+ A.equal(research.id,"Qwen2.5-7B-Instruct-q4f16_1-MLC");
+ A.equal(research.vramMB,5106.67);
+ A.ok(fast.vramMB<balanced.vramMB&&balanced.vramMB<research.vramMB);
+ A.equal(C.modelProfile("unknown"),null);
+ A.equal(C.modelProfile("__proto__"),null);
+ A.equal(C.modelProfile("research",[]),null);
+ A.equal(C.modelProfile("research",[{model_id:fast.id}]),null);
+ A.deepEqual(C.modelProfile("research",[{model_id:research.id}]),research);
+ A.equal(C.modelProfile("research",null),null);
+ research.id="bad";A.equal(C.modelProfile("research").id,"Qwen2.5-7B-Instruct-q4f16_1-MLC");
+ A.ok(C.modelHint("research").includes("5107"));
+ A.ok(C.modelHint("research").includes("не гарантия"));
+ A.ok(C.modelHint("unknown").includes("Неизвестный"));
+ console.log("15 local model profile checks passed");
+}
