@@ -1676,3 +1676,24 @@ console.log("16 agent coordination checks passed");}
   A.equal(C.researchChatTurn(publicResult,true).private,true);
   console.log("v1.54–1.56 chat research checks passed");
  }
+
+
+ // v1.57–1.59: streaming response and responsive chat controls.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function streamChecks(){
+   const chunk=content=>({choices:[{delta:{content}}]});
+   async function* sample(){yield chunk("При");yield {choices:[]};yield chunk("вет");yield chunk(null);}
+   const updates=[];const r=await C.consumeChatStream(sample(),()=>true,x=>updates.push(x));
+   A.equal(r.state,"complete");A.equal(r.text,"Привет");A.equal(r.truncated,false);A.deepEqual(updates,["При","Привет"]);
+   const truncated=await C.consumeChatStream(sample(),()=>true,()=>{},4);
+   A.equal(truncated.text,"Прив");A.equal(truncated.truncated,true);
+   let active=true;const cancelled=await C.consumeChatStream(sample(),()=>active,()=>{active=false;});
+   A.equal(cancelled.state,"cancelled");A.equal(cancelled.text,"");
+   const empty=await C.consumeChatStream((async function*(){yield {choices:[]};})());A.equal(empty.text,"");
+   await A.rejects(()=>C.consumeChatStream({}));await A.rejects(()=>C.consumeChatStream(sample(),()=>true,()=>{},0));
+   await A.rejects(()=>C.consumeChatStream((async function*(){throw Error("stream");})()));
+   A.ok(C.chatLayoutCss().includes("@media(max-width:600px)"));A.ok(C.chatLayoutCss().includes("overflow-wrap:anywhere"));
+   console.log("v1.57–1.59 streaming checks passed");
+  }
+  streamChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
