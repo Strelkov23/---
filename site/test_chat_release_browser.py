@@ -9,6 +9,7 @@ MODEL = """export const prebuiltAppConfig={model_list:[{model_id:'Qwen2.5-1.5B-I
 export async function CreateMLCEngine(){
  return {interruptGenerate(){},async unload(){},chat:{completions:{async create({messages,stream}){
  const context=messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
+ if(!stream && messages[0]?.content?.startsWith('Разложи задачу на 2–4')) return {choices:[{message:{content:JSON.stringify([{mode:'general',title:'Объяснение',query:'Объясни межотраслевой баланс'},{mode:'web',title:'Поиск',query:'Межотраслевой баланс статьи'}])}}]};
  if(!stream) return {choices:[{message:{content:'Тестовый ответ'}}]};
  return (async function*(){yield {choices:[{delta:{content:'Тест: '}}]};yield {choices:[{delta:{content:context}}]};})();
  }}}};
@@ -175,6 +176,30 @@ def main():
             assert "Многоступенчатый поиск завершён" in log.inner_text(), (page.locator("#gea-status").inner_text(), log.inner_text(), gateway_requests, errors)
             assert len(gateway_requests)==3,gateway_requests
             assert "1, 2" in log.text_content()
+            # Memory is explicit and scoped to one thread. Task drafts never execute automatically.
+            page.get_by_text("Память и контекст этого диалога",exact=True).click()
+            memory=page.get_by_role("textbox",name="Заметки диалога")
+            memory.fill("Память контрольного диалога")
+            page.get_by_role("checkbox",name="Подбирать релевантные ранние сообщения").check()
+            page.get_by_role("button",name="Сохранить настройки памяти",exact=True).click()
+            question.fill("Объясни межотраслевой баланс")
+            page.get_by_role("button",name="Проверить контекст следующего вопроса",exact=True).click()
+            assert "заметки: включены" in page.locator("#gea-panel").inner_text()
+            active_thread=chats.input_value()
+            page.get_by_role("button",name="Новый чат",exact=True).click()
+            assert memory.input_value()==""
+            chats.select_option(active_thread)
+            assert memory.input_value()=="Память контрольного диалога"
+            question.fill("Подготовить исследование")
+            page.get_by_role("button",name="Составить план задачи",exact=True).click()
+            page.get_by_role("button",name="Подготовить шаг 2",exact=True).wait_for(state="visible")
+            before=log.locator("article").count()
+            page.get_by_role("button",name="Подготовить шаг 2",exact=True).click()
+            assert question.input_value()=="Межотраслевой баланс статьи"
+            assert log.locator("article").count()==before
+            assert len(gateway_requests)==3 and not external
+            page.get_by_role("button",name="Очистить заметки диалога",exact=True).click()
+            assert memory.input_value()==""
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
