@@ -1609,3 +1609,34 @@ console.log("16 agent coordination checks passed");}
   }
   chatChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.51–1.53: isolated threads, workspace validation and automatic local mode.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const t=(question,answer,mode="general",state="complete")=>({question,answer,mode,state});
+  const h={question:"Покажи межотраслевой баланс группы 9",answer:"",page:"index.html",fingerprint:"a".repeat(64),route:"мрб: 9"};
+  let w=C.newChatWorkspace("chat-a");
+  A.equal(w.active,"chat-a");A.equal(w.threads.length,1);
+  w=C.updateChatThread(w,"chat-a",[t("Первый вопрос","Первый ответ")],[h]);
+  A.equal(w.threads[0].title,"Первый вопрос");A.equal(w.threads[0].archiveHistory[0].route,"мрб: 9");
+  w=C.addChatThread(w,"chat-b");A.equal(w.active,"chat-b");
+  A.equal(w.threads[1].turns.length,0);A.equal(w.threads[1].archiveHistory.length,0);
+  w=C.updateChatThread(w,"chat-b",[t("Второй вопрос","Другой ответ")],[]);
+  A.equal(w.threads[0].turns[0].answer,"Первый ответ");A.equal(w.threads[1].turns[0].answer,"Другой ответ");
+  const selected=C.selectChatThread(w,"chat-a");A.equal(selected.active,"chat-a");
+  A.equal(C.generalChatPrompt("Продолжи",selected.threads[0].turns).messages.some(m=>m.content==="Другой ответ"),false);
+  A.deepEqual(C.chatWorkspace(JSON.parse(JSON.stringify(w))),w);
+  A.throws(()=>C.addChatThread(w,"chat-a"));A.throws(()=>C.selectChatThread(w,"chat-unknown"));
+  A.throws(()=>C.updateChatThread(w,"chat-unknown",[],[]));A.throws(()=>C.chatWorkspace({...w,schema:2}));
+  let removed=C.removeChatThread(w,"chat-b","chat-c");A.equal(removed.active,"chat-a");A.equal(removed.threads.length,1);
+  removed=C.removeChatThread(removed,"chat-a","chat-c");A.equal(removed.active,"chat-c");A.equal(removed.threads[0].turns.length,0);
+  let many=C.newChatWorkspace("chat-0");for(let i=1;i<12;i++)many=C.addChatThread(many,"chat-"+i);A.equal(many.threads.length,12);A.throws(()=>C.addChatThread(many,"chat-12"));
+  A.equal(C.chatModeRoute("Что такое история?",[],false),"general");
+  A.equal(C.chatModeRoute("Покажи межотраслевой баланс группы 9",[],false),"archive");
+  A.equal(C.chatModeRoute("мрб: 9",[],false),"archive");
+  A.equal(C.chatModeRoute("Покажи рынок труда",[],false),"archive");
+  A.equal(C.chatModeRoute("А для группы 10?",[h],true),"archive");
+  A.equal(C.chatModeRoute("А для группы 10?",[h],false),"general");
+  A.equal(C.chatModeRoute("Привет!",[h],true),"general");
+  console.log("v1.51–1.53 chat workspace checks passed");
+ }
