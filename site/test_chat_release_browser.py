@@ -102,7 +102,7 @@ def main():
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога | Уточнение') && !document.querySelector('#gea-question').disabled")
             assert log.locator("article").count()==2
             original=chats.input_value()
-            page.get_by_role("checkbox",name="Сохранять диалоги в этой вкладке").check()
+            page.get_by_role("checkbox",name="Сохранять историю чатов").check()
             page.get_by_role("button",name="Новый чат",exact=True).click()
             assert log.locator("article").count()==0
             question.fill("Независимый вопрос")
@@ -111,7 +111,7 @@ def main():
             assert "Проверка первого диалога" not in log.inner_text()
             chats.select_option(original)
             assert log.locator("article").count()==2
-            page.get_by_text("Дополнительные инструменты",exact=True).click()
+            page.locator("#gea-panel").get_by_text("Дополнительные инструменты",exact=True).click()
             page.get_by_role("button",name="Повторить последний вопрос",exact=True).click()
             assert question.input_value()=="Уточнение"
             # Explicit web search preview; no external request before confirmation.
@@ -131,6 +131,21 @@ def main():
             page.reload(wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
             assert page.get_by_role("log",name="Сообщения диалога").locator("article").count()==2
+            # A new browser context restored from persistent storage has no sessionStorage.
+            restored=browser.new_context(viewport={"width":width,"height":844},storage_state=page.context.storage_state())
+            restored_page=restored.new_page()
+            restored_page.goto("http://localhost:8765/historical.html",wait_until="domcontentloaded")
+            restored_page.locator("#gea-toggle").click()
+            assert restored_page.get_by_role("checkbox",name="Сохранять историю чатов").is_checked()
+            assert restored_page.get_by_role("log",name="Сообщения диалога").locator("article").count()==2
+            assert restored_page.get_by_role("combobox",name="Выберите диалог").input_value()==original
+            assert "Проверка первого диалога" in restored_page.get_by_role("log",name="Сообщения диалога").inner_text()
+            restored_page.get_by_role("checkbox",name="Сохранять историю чатов").uncheck()
+            restored_page.reload(wait_until="domcontentloaded")
+            restored_page.locator("#gea-toggle").click()
+            assert not restored_page.get_by_role("checkbox",name="Сохранять историю чатов").is_checked()
+            assert restored_page.get_by_role("log",name="Сообщения диалога").locator("article").count()==0
+            restored.close()
             # Automatic routing must preview the approved query and never send before consent.
             question = page.locator("#gea-question")
             question.fill("Найди в интернете историю науки")
@@ -226,7 +241,7 @@ def main():
             chats.select_option(active_thread)
             assert memory.input_value()=="Память контрольного диалога"
             question.fill("Подготовить исследование")
-            page.get_by_text("Дополнительные инструменты",exact=True).click()
+            page.locator("#gea-panel").get_by_text("Дополнительные инструменты",exact=True).click()
             page.get_by_role("button",name="Составить план задачи",exact=True).click()
             page.get_by_role("button",name="Подготовить шаг 2",exact=True).wait_for(state="visible")
             before=log.locator("article").count()
