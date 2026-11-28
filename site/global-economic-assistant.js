@@ -76,7 +76,7 @@ function dialogueSnapshotNote(previous,current){
 }
  function chatTranscript(raw){
  if(!Array.isArray(raw))return [];
- return raw.filter(x=>x&&["archive","general","research"].includes(x.mode)&&typeof x.question==="string"&&x.question.trim()&&typeof x.answer==="string"&&["complete","notice","cancelled","error","search"].includes(x.state)).slice(-20).map(x=>({mode:x.mode,question:x.question.slice(0,600),answer:x.answer.slice(0,6000),state:x.state,...(x.private===true?{private:true}:{}),note:typeof x.note==="string"?x.note.slice(0,2500):"",sources:Array.isArray(x.sources)?x.sources.slice(0,12).filter(r=>r&&typeof r.id==="string"&&typeof r.title==="string"&&typeof r.description==="string").map(r=>({id:r.id.slice(0,60),title:r.title.slice(0,400),description:r.description.slice(0,1000),limit:typeof r.limit==="string"?r.limit.slice(0,1000):"",href:typeof r.href==="string"&&(internal(r.href)||external(r.href))?r.href:null})):[]}));
+ return raw.filter(x=>x&&["archive","general","research"].includes(x.mode)&&typeof x.question==="string"&&x.question.trim()&&typeof x.answer==="string"&&["complete","notice","cancelled","error","search"].includes(x.state)).slice(-20).map(x=>({mode:x.mode,question:x.question.slice(0,600),answer:x.answer.slice(0,6000),state:x.state,...(x.private===true?{private:true}:{}),note:typeof x.note==="string"?x.note.slice(0,2500):"",sources:Array.isArray(x.sources)?x.sources.slice(0,x.mode==="research"?24:12).filter(r=>r&&typeof r.id==="string"&&typeof r.title==="string"&&typeof r.description==="string").map(r=>({id:r.id.slice(0,60),title:r.title.slice(0,400),description:r.description.slice(0,1000),limit:typeof r.limit==="string"?r.limit.slice(0,1000):"",href:typeof r.href==="string"&&(internal(r.href)||external(r.href))?r.href:null})):[]}));
 }
 function chatWorkspace(raw){
  if(!raw||raw.schema!==1||!Array.isArray(raw.threads)||raw.threads.length<1||raw.threads.length>12)throw Error("Invalid chat workspace");
@@ -103,7 +103,7 @@ function researchChatTurn(result,privateTurn=false){
  const stageNames={archive:"Архив",online:"Внешний поиск",local:"Локальные материалы"};
  const stageStatus={ok:"получено",partial:"частично",empty:"нет материалов",unavailable:"недоступно"};
  const stages=Array.isArray(result.stages)?result.stages.map(x=>(stageNames[x.stage]||"Канал")+": "+(stageStatus[x.status]||"неизвестно")+" ("+x.count+")").join(" · "):"";
- return {mode:"research",private:privateTurn===true||sources.some(x=>x.origin==="local"),state:accepted?"complete":result.state==="cancelled"?"cancelled":"notice",answer:accepted?findings.map(f=>(labels[f.type]||"Заключение")+": "+f.text+(f.refs.length?" "+f.refs.map(x=>"["+x+"]").join(" "):"")).join("\n\n"):result.state==="cancelled"?"Исследование отменено.":"Заключение не принято: "+result.state+(result.checked?.reason?" / "+result.checked.reason:"")+".",note:[stages,result.partial?"Неполное покрытие.":"",result.context?"Передано карточек: "+sources.length+"; не передано: "+result.context.omitted+".":"",sources.length>12?"В чате показано не более 12 карточек; полный набор в исследовательском блоке.":"","Буквальная проверка не доказывает истинность и причинность."].filter(Boolean).join(" "),sources:sorted.slice(0,12)};
+ return {mode:"research",private:privateTurn===true||sources.some(x=>x.origin==="local"),state:accepted?"complete":result.state==="cancelled"?"cancelled":"notice",answer:accepted?findings.map(f=>(labels[f.type]||"Заключение")+": "+f.text+(f.refs.length?" "+f.refs.map(x=>"["+x+"]").join(" "):"")).join("\n\n"):result.state==="cancelled"?"Исследование отменено.":"Заключение не принято: "+result.state+(result.checked?.reason?" / "+result.checked.reason:"")+".",note:[stages,result.partial?"Неполное покрытие.":"",result.context?"Передано карточек: "+sources.length+"; не передано: "+result.context.omitted+".":"",sources.length>24?"В чате показано не более 24 карточек; полный набор в исследовательском блоке.":"","Буквальная проверка не доказывает истинность и причинность."].filter(Boolean).join(" "),sources:sorted.slice(0,24)};
 }
 function newChatWorkspace(id){
  return chatWorkspace({schema:1,active:id,threads:[{id,title:"Новый чат",turns:[],archiveHistory:[]}]});
@@ -2605,7 +2605,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   await Promise.all([loadScript("economic-ai-retrieval.js",()=>typeof EconomicAIRetrieval!=="undefined"),loadScript("economic-ai-series.js",()=>typeof EconomicAISeries!=="undefined"),loadScript("data-registry.js",()=>typeof DataRegistry!=="undefined")]);
  }
  const add=(p,t,v)=>{const n=document.createElement(t);n.textContent=v;p.append(n);return n};
- let chatTurns=[],chatPending=null,chatRevision=0,chatMode=null,chatSend=null,chatNew=null,chatLog=null,chatSelect=null,chatDelete=null,chatPersist=null,chatNotice=null,chatTools=null,openChatTools=()=>{},resetChatTools=()=>{},attachmentActions={},attachmentButtons=[],workspace=null,savedWorkspaceRaw=null;
+ let chatTurns=[],chatPending=null,chatRevision=0,chatMode=null,chatSend=null,chatNew=null,chatLog=null,chatSelect=null,chatDelete=null,chatPersist=null,chatNotice=null,chatTools=null,openChatTools=()=>{},resetChatTools=()=>{},attachmentActions={},attachmentResets=[],attachmentButtons=[],stopChatResearch=()=>{},workspace=null,savedWorkspaceRaw=null;
  const workspaceKey="economic-ai-chat-workspace-v1";
  const freshChatId=()=>"chat-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
  function syncWorkspace(){if(!workspace)return;try{workspace=C.updateChatThread(workspace,workspace.active,chatTurns,historyOpt?.checked?history:[]);if(chatPersist?.checked){const actual=sessionStorage.getItem(workspaceKey);if(actual!==savedWorkspaceRaw)throw Error("Storage changed");const raw=JSON.stringify(C.persistedChatWorkspace(workspace));if(C.utf8Size(raw)>1000000)throw Error("Storage budget exceeded");sessionStorage.setItem(workspaceKey,raw);savedWorkspaceRaw=raw;}chatNotice.textContent=chatPersist?.checked?"Переписка сохранена в этой вкладке; исследования локальных файлов исключены из сохранения.":"Переписка только в памяти страницы.";}catch{chatNotice.textContent="Не удалось обновить сохранение: лимит или недоступное хранилище. Текущий диалог остаётся на экране.";}}
@@ -2733,7 +2733,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   };
   const resetTable=()=>{revision++;table=null;invalidateComparison();col.replaceChildren();yearCol.replaceChildren();col.disabled=true;yearCol.disabled=true;calculate.disabled=true;annual.disabled=true;output.replaceChildren();};
   file.onchange=resetTable;delim.onchange=resetTable;sheetNumber.onchange=resetTable;decimal.onchange=invalidateComparison;col.onchange=invalidateComparison;yearCol.onchange=invalidateComparison;
-  remove.onclick=()=>{resetTable();file.value="";output.textContent="Данные таблицы очищены из рабочего представления."};
+  remove.onclick=()=>{resetTable();file.value="";output.textContent="Данные таблицы очищены из рабочего представления."};attachmentResets.push(()=>remove.onclick());
   load.onclick=async()=>{
    resetTable();const selected=file.files?.[0],ticket=revision;
    const xlsx=!!selected&&/\.xlsx$/i.test(selected.name);
@@ -2845,7 +2845,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   };
   let rev=0;
   const reset=()=>{rev++;pdfPages=null;ocrResult=null;output.value="";status.textContent="";query.value="";question.value="";clearMatches();};
-  file.onchange=reset;ocrLanguage.onchange=reset;scanPdf.onchange=reset;clear.onclick=()=>{reset();file.value="";status.textContent="Текст очищен."};
+  file.onchange=reset;ocrLanguage.onchange=reset;scanPdf.onchange=reset;clear.onclick=()=>{reset();file.value="";status.textContent="Текст очищен."};attachmentResets.push(()=>clear.onclick());
   read.onclick=async()=>{
    reset();const token=rev,selected=file.files?.[0],docx=!!selected&&/\.docx$/i.test(selected.name),pdf=!!selected&&/\.pdf$/i.test(selected.name),image=!!selected&&/\.(png|jpe?g)$/i.test(selected.name),language=ocrLanguage.value,scanEnabled=scanPdf.checked;
    if(!selected||!/\.(docx|txt|pdf|png|jpe?g)$/i.test(selected.name)||selected.size>(pdf||image?8388608:docx?4194304:262144)){status.textContent="Выберите поддерживаемый документ допустимого размера.";return}
@@ -2961,7 +2961,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   };
   const resetScale=()=>{clearTrace();anchors=[];calibration=null;points=[];display();redraw();label.textContent=image?"Выберите нижнюю левую точку графика.":""};
   const clearImage=()=>{revision++;if(image)image.close();image=null;canvas.width=1;canvas.height=1;canvas.style.display="none";resetScale();};
-  file.onchange=clearImage;remove.onclick=()=>{clearImage();file.value="";};reset.onclick=resetScale;
+  file.onchange=clearImage;remove.onclick=()=>{clearImage();file.value="";};attachmentResets.push(()=>remove.onclick());reset.onclick=resetScale;
   for(const id of ["x1","y1","x2","y2"])fields[id].oninput=()=>{clearTrace();calibration=null;points=[];display();redraw();if(image&&anchors.length===2)label.textContent="Шкала изменена; подтвердите её заново."};
   load.onclick=async()=>{
    clearImage();const token=revision,selected=file.files?.[0];if(!selected||selected.size>8388608){label.textContent="Выберите PNG или JPEG до 8 МиБ.";return}
@@ -3079,8 +3079,8 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   for(const input of [uq,ua,ul,uw,uaq,uwq,uen])input.addEventListener("input",invalidateUnified);
   fromMain.onclick=()=>{if(busy)return;uq.value=q.value;invalidateUnified();};
   uplan.onclick=()=>{if(busy)return;invalidateUnified();try{const p=C.unifiedResearchPlan(uq.value,{archive:ua.checked,archiveQuery:uaq.value,local:ul.checked,web:uw.checked,webQuery:uwq.value,englishQuery:uen.value});approvedUnified=p;upreview.textContent=["Вопрос: "+p.question,p.archiveQuery!==null?"Архив: "+p.archiveQuery:"Архив: не используется",p.local?"Локальные карточки: "+Object.values(localBasket).reduce((n,r)=>n+r.length,0):"Локальные карточки: не используются",p.online?"Внешние запросы: "+p.online.steps.map(x=>x.query+(x.english?" / "+x.english:"")).join(" · ")+"; максимум "+p.online.maxRequests+" обращений.":"Внешняя сеть: не используется"].join("\n");urun.disabled=false;}catch{upreview.textContent="План не принят: выберите каналы, укажите вопрос и полные параметры; для внешнего поиска нужен публичный запрос.";}};
-  ustop.onclick=()=>{if(unifiedAbort){unifiedAbort.abort();epoch++;try{engine?.interruptGenerate();}catch{}uout.textContent="Запрошена отмена."; }};
-  const previousBasketChanged=localBasketChanged;localBasketChanged=()=>{previousBasketChanged();invalidateUnified();};resetChatTools=()=>{localBasket={};localBasketRevision++;localBasketChanged();resetReference();uq.value="";uaq.value="";uwq.value="";uen.value="";mq.value="";ma.value="";useArchive.checked=false;useWeb.checked=false;invalidateUnified();};
+  stopChatResearch=()=>{unifiedAbort?.abort();};ustop.onclick=()=>{if(unifiedAbort){unifiedAbort.abort();epoch++;try{engine?.interruptGenerate();}catch{}uout.textContent="Запрошена отмена."; }};
+  const previousBasketChanged=localBasketChanged;localBasketChanged=()=>{previousBasketChanged();invalidateUnified();};resetChatTools=()=>{for(const clear of attachmentResets)clear();localBasket={};localBasketRevision++;localBasketChanged();resetReference();query.value="";englishQuery.value="";refreshPlan();archiveQuery.value="";uq.value="";uaq.value="";uwq.value="";uen.value="";mq.value="";ma.value="";useArchive.checked=false;useWeb.checked=false;invalidateUnified();};
   urun.onclick=async()=>{
    if(busy||!approvedUnified)return;if(!engine){uout.textContent="Сначала загрузите локальную модель.";return;}
    const p=approvedUnified,chatTurn=startChat("research",approvedUnified.question,approvedUnified.local),token=++epoch,rev=unifiedRevision,ac=new AbortController(),params=currentParameters(),basket=C.localResearchBasket(localBasket),active=()=>token===epoch&&rev===unifiedRevision&&!ac.signal.aborted;unifiedAbort=ac;
@@ -3786,6 +3786,6 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   finally{renderModelInfo();lock(false)}
  };
  renderModelInfo();
- stop.onclick=()=>{epoch++;if(engine)engine.interruptGenerate();status.textContent="Запрошена остановка."};
+ stop.onclick=()=>{epoch++;stopChatResearch();if(engine)engine.interruptGenerate();status.textContent="Запрошена остановка."};
  renderHistory();lock(false);
 });
