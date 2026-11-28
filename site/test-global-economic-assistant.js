@@ -572,3 +572,29 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.prepareEvidence(q,{heading:"Я".repeat(10000)},[a]).blocked);
  console.log("15 context budget checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const cmd=C.agentCommand("координация агентов: досье");
+ A.deepEqual(cmd,{kind:"agent-coordination",mode:"dossiers"});
+ A.deepEqual(C.agentCommand("координация агентов: досье age-dependency"),{...cmd,id:"age-dependency"});
+ A.equal(C.agentCommand("координация агентов: все age-dependency").kind,"invalid");
+ A.deepEqual(C.naturalRoute("Покажи исследовательские досье по экономическим сигналам"),{tool:"agents",command:"координация агентов: досье"});
+ const x={id:"age-dependency",title:"Нагрузка",year:2025,value:27.3,unit:"чел.",formula:"A/B",codes:["A","B"],sources:["https://example.org/a"],score:4,note:"Не причинность.",status:"signal"};
+ const p={id:x.id,year:x.year,status:x.status,inputs:x.codes,title:"Труд",href:"scenario.html#reproduction-plan",action:"Проверить ограничения",priority:"investigate"};
+ const r={...x,limit:x.note,state:"check_inputs",transition:"initial",blockers:["quality"],route:{title:p.title,href:p.href,action:p.action,priority:p.priority}};
+ const d={schema:1,built:"2026-11-28T10:00:00Z",mode:"scheduled_refresh",agents:[{id:"diagnostics",items:[x]},{id:"planning",items:[p]}],signal_dossiers:{schema:1,rows:[r],note:"Не результат оптимизации."}};
+ const a=C.agentEvidence(cmd,d);
+ A.equal(a.length,2);A.equal(a[0].value,27.3);A.equal(a[0].period,"2025");A.equal(a[1].href,p.href);A.ok(a[1].limit.includes("расчёт не выполнен"));
+ A.deepEqual(C.agentEvidence({...cmd,id:"age-dependency"},d),a);
+ A.equal(C.agentEvidence({...cmd,id:"other"},d)[0].id,"dossier-status");
+ A.equal(C.agentEvidence(cmd,{...d,signal_dossiers:undefined})[0].id,"dossier-status");
+ const edit=patch=>({...d,signal_dossiers:{...d.signal_dossiers,rows:[{...r,...patch}]}});
+ A.deepEqual(C.agentEvidence(cmd,edit({value:123})),[]);
+ A.deepEqual(C.agentEvidence(cmd,edit({year:2024})),[]);
+ A.deepEqual(C.agentEvidence(cmd,edit({sources:["javascript:alert(1)"]})),[]);
+ A.deepEqual(C.agentEvidence(cmd,edit({route:{...r.route,href:"javascript:alert(1)"}})),[]);
+ A.deepEqual(C.agentEvidence(cmd,edit({codes:["other"]})),[]);
+ A.deepEqual(C.agentEvidence(cmd,{...d,signal_dossiers:{...d.signal_dossiers,rows:[r,r]}}),[]);
+ A.ok(C.agentEvidence(cmd,edit({route:null})).every(x=>x.id!=="route-age-dependency"));
+ console.log("19 dossier assistant checks passed");
+}
