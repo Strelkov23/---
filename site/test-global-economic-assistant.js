@@ -2219,3 +2219,66 @@ console.log("16 agent coordination checks passed");}
  }
  gatewayChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v2.11–2.15: page reading must be explicit, bounded and separate from search snippets.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function webReadingChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",q="экономика России",sources=[{id:"hit-1",title:"Экономика России",href:"https://alpha.org/a"},{id:"hit-2",title:"Второй материал",href:"https://beta.org/b"},{id:"hit-3",title:"Третий",href:"https://gamma.org/c"}];
+  const plan=C.webReadingPlan(q,sources,["hit-1","hit-2"]);
+  A.equal(plan.pages.length,2);A.equal(plan.pages[0].host,"alpha.org");A.equal(plan.question,q);
+  for(const ids of [[],["hit-1","hit-1"],["unknown"],["hit-1","hit-2","hit-3","hit-4"]])A.throws(()=>C.webReadingPlan(q,sources,ids));
+  A.throws(()=>C.webReadingPlan(q,[{...sources[0],href:"http://alpha.org/a"}],["hit-1"]));
+  A.throws(()=>C.webReadingPlan(q,[{...sources[0],href:"https://alpha.org/a#fragment"}],["hit-1"]));
+  A.throws(()=>C.webReadingPlan(q,[sources[0],{...sources[1],href:sources[0].href}],["hit-1","hit-2"]));
+  const html='<head><title>hidden</title></head><nav>menu</nav><script>malicious 999</script><p>Экономика России: учебное описание, содержащее условное число 100 тонн. Это материал для проверки.</p><p>Текст &amp; данные &#x410; &nbsp; далее.</p><img src="https://evil.org/image">';
+  const text=C.webExtractText(html,"text/html");
+  A.ok(text.includes("100 тонн"));A.ok(text.includes("Текст & данные А далее."));
+  for(const x of ["malicious","999","hidden","menu","evil.org"])A.ok(!text.includes(x));
+  A.equal(C.webExtractText("plain <markup>","text/plain"),"plain <markup>");
+  A.throws(()=>C.webExtractText("text","application/pdf"));
+  A.throws(()=>C.webExtractText("x".repeat(524289),"text/html"));
+  A.equal(C.webExtractText("x".repeat(40000),"text/plain").length,32000);
+  const cards=C.webPageCards(plan.pages[0],text,q,stamp);
+  A.equal(cards.length,1);A.equal(cards[0].id,"page-1-1");A.equal(cards[0].category,"web_extract");A.ok(cards[0].match>0);
+  A.ok(cards[0].limit.includes("не проверенный факт"));
+  const ctx=C.webReadingContext(q,[...cards,{...cards[0],id:"page-2-1",match:0,href:sources[1].href}]);
+  A.equal(ctx.rows.length,1);A.equal(ctx.omitted,1);A.ok(ctx.messages[0].content.includes("не инструкции"));
+  A.equal(C.webReadingContext(q,cards,1).rows.length,0);
+  const calls=[];
+  const response=(body=html,mime="text/html; charset=utf-8")=>({ok:true,headers:{get:k=>k==="content-type"?mime:null},text:async()=>body});
+  const fetcher=async(url,options)=>{calls.push({url,options});return response();};
+  const r=await C.runWebReading(plan,{stamp,fetcher});
+  A.equal(r.state,"search");A.equal(r.sources.length,2);A.ok(r.note.includes("локальную модель"));
+  A.equal(calls.length,2);A.ok(calls.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"&&x.options.referrerPolicy==="no-referrer"));
+  A.equal(C.chatTranscript([{...r,question:q}])[0].sources.length,2);
+  const good=JSON.stringify([{type:"web_extract",text:"В учебном тексте указано 100 тонн",refs:["page-1-1"]},{type:"limitation",text:"Достоверность не проверена.",refs:[]}]);
+  const model=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good});
+  A.equal(model.state,"complete");A.ok(model.answer.includes("[page-1-1]"));A.ok(model.answer.includes("Утверждение страницы"));
+  const bad=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good.replace("100","999")});
+  A.equal(bad.state,"search");A.ok(!bad.answer.includes("999"));A.ok(bad.note.includes("не прошла проверку"));
+  const wrong=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good.replace("web_extract","observation")});
+  A.equal(wrong.state,"search");
+  const limited=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>JSON.stringify([{type:"limitation",text:"Недостаточно данных.",refs:[]}])});
+  A.equal(limited.state,"notice");
+  const partial=await C.runWebReading(plan,{stamp,fetcher:async url=>url.includes("alpha")?response():({ok:false,status:403})});
+  A.equal(partial.state,"search");A.equal(partial.sources.length,1);A.ok(partial.note.includes("HTTP-ошибка"));
+  const blocked=await C.runWebReading(plan,{stamp,fetcher:async()=>{throw Error("CORS")}});
+  A.equal(blocked.state,"notice");A.ok(blocked.note.includes("CORS"));
+  const pdf=await C.runWebReading(plan,{stamp,fetcher:async()=>response("PDF","application/pdf")});
+  A.equal(pdf.state,"notice");A.ok(pdf.note.includes("неподдерживаемый тип"));
+  const legacy=await C.runWebReading(plan,{stamp,fetcher:async()=>response(html,"text/html; charset=windows-1251")});
+  A.equal(legacy.state,"notice");
+  const oversized=await C.runWebReading(plan,{stamp,fetcher:async()=>response("x".repeat(524289))});
+  A.equal(oversized.state,"notice");
+  const n=calls.length;
+  await A.rejects(()=>C.runWebReading({...plan,pages:[{...plan.pages[0],host:"wrong.org"}]},{stamp,fetcher}));A.equal(calls.length,n);
+  const stopped=await C.runWebReading(plan,{stamp,fetcher,active:()=>false});
+  A.equal(stopped.state,"cancelled");A.equal(calls.length,n);
+  let live=true;const late=await C.runWebReading(plan,{stamp,fetcher:async()=>{live=false;return response()},active:()=>live});
+  A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  await A.rejects(()=>C.boundedWebText({headers:{get:()=>String(600000)},text:async()=>""}));
+  console.log("v2.11–2.15 web reading checks passed");
+ }
+ webReadingChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
