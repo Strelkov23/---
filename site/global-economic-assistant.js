@@ -526,7 +526,7 @@ function chatPerformanceNote(m){
   return p?p.label+" · ориентир WebLLM: "+Math.ceil(p.vramMB)+" МБ видеопамяти; контекст 4096 токенов. Это не гарантия совместимости и не размер загрузки.":"Неизвестный профиль модели.";
  }
  // Stage-aware local startup: timeout or cancellation never installs a late engine.
- async function runLocalModelStartup(key,{secure=true,gpu,loadRuntime,signal,onProgress=()=>{},onPending=()=>{},timeoutMs=180000,stageMs=45000,timers={set:setTimeout,clear:clearTimeout}}={}){
+ async function runLocalModelStartup(key,{secure=true,gpu,loadRuntime,signal,onProgress=()=>{},onPending=()=>{},timeoutMs=180000,stageMs=45000,timers={set:(fn,ms)=>setTimeout(fn,ms),clear:id=>clearTimeout(id)}}={}){
   const profile=modelProfile(key);let stage="device",timer=null,deadline=null,expired=false,cancelled=false,finished=false,lastProgress=null,stopWait=null;
   const report=(phase,message,progress=null)=>{if(!finished&&!expired&&!cancelled)onProgress({phase,message,progress});};
   const failure=(code)=>({state:"error",code,stage,profile});
@@ -4648,7 +4648,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    if(r.state==="ready"){engine=r.engine;loadedProfile=r.profile;showStartup("ИИ готов",C.modelStartupMessage(r),1,"Общий чат работает локально. Интернет-поиск требует отдельного подтверждения.");}
    else{engine=null;loadedProfile=null;showStartup(r.state==="cancelled"?"Загрузка остановлена":"ИИ не запущен",C.modelStartupMessage(r),null,modelStartupPending?"Предыдущая фоновая операция ещё завершается; для немедленного повтора перезагрузите страницу.":"Можно повторить загрузку или пользоваться поиском без модели.");}
    status.textContent=C.modelStartupMessage(r);
-  }catch{engine=null;loadedProfile=null;status.textContent="Ошибка запуска ИИ. Поиск доступен без модели.";showStartup("ИИ не запущен",status.textContent,null,"Повторите попытку или перезагрузите страницу.");}
+  }catch(error){engine=null;loadedProfile=null;const kind=typeof error?.name==="string"&&/^[A-Za-z]{1,40}$/.test(error.name)?error.name:"UnknownError";status.textContent="Ошибка запуска ИИ ("+kind+"). Поиск доступен без модели.";showStartup("ИИ не запущен",status.textContent,null,"Повторите попытку или перезагрузите страницу.");}
   finally{modelStartupAbort=null;renderModelInfo();lock(false);syncStartupButton();}
  };
  if(modelUnload)modelUnload.onclick=async()=>{
