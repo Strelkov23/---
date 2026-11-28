@@ -20,6 +20,14 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",as
    for(const r of snapshot.rows){const box=add(item,"div","");add(box,"strong",r.id+" · "+r.status);for(const f of r.files)add(box,"p",f.name+" · "+f.status+(f.sha256?" · SHA-256 "+f.sha256:""));}
   }
  }
+ const memory=d.signal_memory;
+ if(memory?.schema===1&&Array.isArray(memory.rows)){
+  const section=add($("cards"),"details","");section.className="ac-panel";add(section,"summary","Динамика макроэкономических сигналов");add(section,"p",memory.note);
+  add(section,"p",memory.previous_built?"Предыдущий проверенный отчёт: "+memory.previous_built:"Первичный снимок — изменения не установлены.");
+  const names={initial:"Первичная запись",new_signal:"Новый сигнал",persistent:"Сохраняющийся сигнал",cleared:"Сигнал снят",lost_observation:"Наблюдение недоступно",ordinary:"Обычное состояние",unavailable:"Сравнение недоступно",method_changed:"Методика изменилась",period_changed:"Период изменился"};
+  for(const r of memory.rows){const box=add(section,"details","");add(box,"summary",r.title+" · "+names[r.transition]);add(box,"p",(r.year??"нет периода")+" · "+(r.value===null?"нет наблюдения":r.value+" "+r.unit));if(r.revision_delta!==null)add(box,"p","Изменение значения того же периода: "+r.revision_delta.toPrecision(5)+" "+r.unit);}
+  if(memory.removed_ids.length)add(section,"p","Исключённые диагностические записи (не снятые сигналы): "+memory.removed_ids.join(", "));
+ }
  const queue=d.research_queue;
  if(queue?.schema===1&&queue.mode==="recommendations_only"&&Array.isArray(queue.tasks)){
   const section=add($("cards"),"article","");section.className="ac-panel";add(section,"h3","Очередь исследовательских задач");
