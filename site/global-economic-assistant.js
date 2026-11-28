@@ -259,6 +259,8 @@ const GlobalEconomicAssistant=(function core(){
    command="точность прогноза: "+m[1]+"; горизонт="+m[2];tool="forecast";parsed=forecastAuditCommand(command);
   }else if(/^(?:покажи|перечисли) приоритетные задачи (?:экономических |аналитических )?агентов$/u.test(text)){
    command="координация агентов: приоритеты";tool="agents";parsed=agentCommand(command);
+  }else if(/^(?:покажи|перечисли) (?:исследовательские )?досье (?:по )?(?:макроэкономическим |экономическим )?сигналам$/u.test(text)){
+   command="координация агентов: досье";tool="agents";parsed=agentCommand(command);
   }else if(/^(?:покажи|перечисли) состояние всех (?:экономических |аналитических )?агентов$/u.test(text)){
    command="координация агентов: все";tool="agents";parsed=agentCommand(command);
   }else if((m=text.match(/^(?:покажи|рассчитай) межотраслевой баланс(?: для)? группы (\d{1,2})$/u))){
@@ -551,10 +553,42 @@ const GlobalEconomicAssistant=(function core(){
  }
  function agentCommand(q){
  const s=String(q||"").trim();if(!/^координация агентов\s*:/iu.test(s))return null;
- const m=s.match(/^координация агентов\s*:\s*(все|приоритеты)$/iu);
- return m?{kind:"agent-coordination",mode:m[1].toLowerCase()==="все"?"all":"priorities"}:{kind:"invalid"};
+ const m=s.match(/^координация агентов\s*:\s*(все|приоритеты|досье)(?:\s+([a-z][a-z0-9-]{0,24}))?$/iu);
+ if(!m||m[2]&&m[1].toLowerCase()!=="досье")return {kind:"invalid"};
+ const mode=({все:"all",приоритеты:"priorities",досье:"dossiers"})[m[1].toLowerCase()];
+ return m[2]?{kind:"agent-coordination",mode,id:m[2].toLowerCase()}:{kind:"agent-coordination",mode};
+ }
+ // Verified archive only; exact joins to the diagnostic record and planning route.
+ function dossierEvidence(cmd,d){
+  if(cmd?.kind!=="agent-coordination"||cmd.mode!=="dossiers"||d?.schema!==1||!Number.isFinite(Date.parse(d.built||""))||!["scheduled_refresh","offline_build"].includes(d.mode)||!Array.isArray(d.agents))return [];
+  const status=(description)=>[{id:"dossier-status",kind:"Статус проверки",title:"Исследовательские досье",description,href:"economic-ai-agents.json",limit:"Статус наличия материалов, не экономическое наблюдение."}];
+  const pack=d.signal_dossiers;
+  if(pack===undefined)return status("Этот снимок ещё не содержит досье.");
+  if(pack?.schema!==1||!Array.isArray(pack.rows)||pack.rows.length>50||typeof pack.note!=="string")return [];
+  const diag=d.agents.find(a=>a.id==="diagnostics")?.items,plans=d.agents.find(a=>a.id==="planning")?.items;
+  if(!Array.isArray(diag)||!Array.isArray(plans))return [];
+  const unique=rows=>rows.every(r=>typeof r?.id==="string")&&new Set(rows.map(r=>r.id)).size===rows.length;
+  if(!unique(diag)||!unique(plans)||!unique(pack.rows))return [];
+  const stateNames={ready_for_review:"Готово к рассмотрению",check_inputs:"Сначала сверить данные",refresh_first:"Сначала обновить данные",needs_data:"Нужны данные или история",unmatched_route:"Маршрут не подтверждён",review_transition:"Проверить изменение сигнала"};
+  const transitions={initial:"Первичная запись",new_signal:"Новый сигнал",persistent:"Сохраняющийся сигнал",cleared:"Сигнал снят",lost_observation:"Наблюдение недоступно",ordinary:"Обычное состояние",unavailable:"Сравнение недоступно",method_changed:"Методика изменилась",period_changed:"Период изменился"};
+  const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b),out=[];
+  for(const r of pack.rows){
+   const x=diag.find(v=>v.id===r.id),p=plans.find(v=>v.id===r.id);
+   if(!x||!/^[a-z][a-z0-9-]{0,24}$/.test(r.id)||!Object.hasOwn(stateNames,r.state)||!Object.hasOwn(transitions,r.transition)||!Array.isArray(r.codes)||!Array.isArray(r.sources)||!Array.isArray(r.blockers)||r.blockers.some(k=>!["quality","coverage"].includes(k))||r.sources.some(u=>typeof u!=="string"||!/^https?:\/\/[^/\s@]+(?:\/|$)/i.test(u)||!x.sources?.includes(u)))return [];
+   if(["title","year","value","unit","formula","codes","score"].some(k=>!equal(r[k],x[k]))||r.limit!==x.note||!(r.value===null||Number.isFinite(r.value))||!(r.year===null||Number.isInteger(r.year)))return [];
+   if(x.status!=="signal"&&!["cleared","lost_observation"].includes(r.transition))return [];
+   if(r.route!==null){
+    if(!p||p.status!==x.status||p.year!==r.year||!equal(p.inputs,r.codes)||["title","href","action","priority"].some(k=>r.route[k]!==p[k])||!(/^[a-z0-9-]+\.html(?:#[a-z0-9-]+)?$/.test(r.route.href)))return [];
+   }
+   if(cmd.id&&cmd.id!==r.id)continue;
+   const limit=r.limit+" "+pack.note+" Отчёт: "+d.built+".";
+   out.push({id:"dossier-"+r.id,kind:"Диагностическое наблюдение",title:r.title,description:(r.year??"нет периода")+" · "+(r.value===null?"нет данных":r.value+" "+r.unit)+" · "+transitions[r.transition]+" · "+stateNames[r.state]+" · формула: "+r.formula,period:r.year===null?"":String(r.year),value:r.value,unit:r.unit,href:"economic-ai-agents.json",limit});
+   if(r.route)out.push({id:"route-"+r.id,kind:"Рекомендация, не расчёт",title:r.route.title,description:r.route.action+" · "+stateNames[r.state]+(r.blockers.length?" · предварительно проверить "+r.blockers.join(", "):""),href:r.route.href,limit:"Исследовательский маршрут; расчёт не выполнен. "+limit});
+  }
+  return out.length?out:status(cmd.id?"Досье с указанным идентификатором отсутствует в текущем снимке.":"В текущем снимке нет досье. Это не означает отсутствия экономических проблем.");
  }
  function agentEvidence(cmd,d){
+ if(cmd?.mode==="dossiers")return dossierEvidence(cmd,d);
  const ids=["coverage","discovery","quality","research","forecast","search","diagnostics","planning"];
  if(cmd?.kind!=="agent-coordination"||!["all","priorities"].includes(cmd.mode)||d?.schema!==1||!["scheduled_refresh","offline_build"].includes(d.mode)||!Number.isFinite(Date.parse(d.built||""))||!Array.isArray(d.agents)||d.agents.length!==ids.length||new Set(d.agents.map(a=>a.id)).size!==ids.length||d.agents.some(a=>!ids.includes(a.id)||!["ok","waiting","attention"].includes(a.state)||!a.metrics||!Array.isArray(a.items)))return [];
  const map=Object.fromEntries(d.agents.map(a=>[a.id,a])),n=x=>Number.isSafeInteger(x)&&x>=0;
@@ -941,7 +975,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -1266,7 +1300,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   const context={page,heading,description:"Координация восьми аналитических модулей",parameters,parameter_note:"Очередь рекомендаций, не выполнение действий."};
   let found=[],failed=0;
   const note=description=>[{id:"agents-status",kind:"Статус",title:"Координация агентов",description,href:"economic-ai-agents.json"}];
-  if(cmd.kind==="invalid")found=note("Пример: координация агентов: приоритеты. Для статусов всех восьми модулей: координация агентов: все.");
+  if(cmd.kind==="invalid")found=note("Пример: координация агентов: приоритеты. Для статусов всех восьми модулей: координация агентов: все. Для исследовательских досье: координация агентов: досье.");
   else try{const d=(await Provenance.get(manifest,"economic-ai-agents.json",base)).data;found=C.agentEvidence(cmd,d);if(!found.length)found=note("Отчёт не прошёл проверку структуры и счётчиков.");}
   catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
