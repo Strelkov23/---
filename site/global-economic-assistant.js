@@ -1445,6 +1445,63 @@ async function runMultimodalResearch(question,basket,onlineRows,coverage,archive
  const checked=validateHybridFindings(raw,context.rows,["local_table","local_document","local_ocr","local_chart"]);
  return {state:checked.ok?"accepted":"rejected",evidence,context,checked,partial:context.omitted>0||evidence.failed>0||coverage.some(c=>c.status!=="ok")};
 }
+ function unifiedResearchPlan(question,options={}){
+ if(typeof question!=="string"||!question.trim()||question.length>600||!options||typeof options!=="object")throw Error("Invalid research question");
+ const q=question.trim(),intent=economicIntent(q);
+ const archive=options.archive===true,local=options.local===true,web=options.web===true;
+ if(!archive&&!local&&!web)throw Error("Choose research channels");
+ let archiveQuery=null,online=null;
+ if(archive){
+  const supplied=options.archiveQuery;
+  if(supplied!=null&&typeof supplied!=="string")throw Error("Invalid archive query");
+  archiveQuery=(supplied||"").trim()||q;
+  if(archiveQuery.length>600||economicIntent(archiveQuery).kind==="clarify")throw Error("Incomplete archive parameters");
+ }
+ if(web){
+  // Never derive network queries from document contents or the model output.
+  if(typeof options.webQuery!=="string"||typeof (options.englishQuery??"")!=="string")throw Error("Explicit public query required");
+  const w=options.webQuery.trim(),en=(options.englishQuery||"").trim();
+  const steps=automaticOnlinePlan(w,en);
+  online={query:w,english:en,steps,maxRequests:steps.length*(en?4:3)};
+ }
+ return {question:q,archiveQuery,online,local,intent:intent.kind};
+}
+async function runUnifiedResearch(plan,basket,runtime){
+ if(!plan||typeof plan!=="object"||!runtime||typeof runtime.generate!=="function")throw Error("Invalid unified runtime");
+ // Rebuild and validate the approved plan, including every externally transmitted query.
+ const canonical=unifiedResearchPlan(plan.question,{archive:plan.archiveQuery!==null,archiveQuery:plan.archiveQuery,local:plan.local===true,web:plan.online!==null,webQuery:plan.online?.query,englishQuery:plan.online?.english});
+ if(JSON.stringify(plan)!==JSON.stringify(canonical))throw Error("Plan changed");
+ const active=runtime.active||(()=>true),progress=runtime.progress||(()=>{}),stages=[];
+ const local=canonical.local?localResearchBasket(basket):{};
+ let archive=null,onlineRows=[],coverage=[];
+ const cancelled=()=>({state:"cancelled",stages});
+ if(!active()||runtime.signal?.aborted)return cancelled();
+ if(canonical.archiveQuery!==null){
+  if(typeof runtime.archiveSearch!=="function")throw Error("Archive runtime missing");
+  progress("archive");
+  try{
+   const a=await runtime.archiveSearch(canonical.archiveQuery);
+   hybridEvidence(a,[]);
+   if(a.table)throw Error("Unsupported archive table");
+   archive=a;stages.push({stage:"archive",status:a.failed?"partial":a.found.length?"ok":"empty",count:a.found.length});
+  }catch{stages.push({stage:"archive",status:"unavailable",count:0});}
+ }
+ if(!active()||runtime.signal?.aborted)return cancelled();
+ if(canonical.online){
+  if(typeof runtime.fetcher!=="function"||!journalStamp(runtime.stamp))throw Error("Online runtime missing");
+  progress("online");
+  try{
+   const result=await runAutomaticOnlineResearch(canonical.online.query,canonical.online.english,runtime.fetcher,runtime.signal,runtime.stamp,active);
+   onlineRows=result.rows;coverage=result.coverage;
+   stages.push({stage:"online",status:result.cancelled||coverage.some(c=>c.status!=="ok")?"partial":onlineRows.length?"ok":"empty",count:onlineRows.length});
+  }catch{stages.push({stage:"online",status:"unavailable",count:0});}
+ }
+ if(!active()||runtime.signal?.aborted)return cancelled();
+ if(canonical.local){const count=Object.values(local).reduce((n,r)=>n+r.length,0);stages.push({stage:"local",status:count?"ok":"empty",count});}
+ progress("synthesis");
+ const r=await runMultimodalResearch(canonical.question,local,onlineRows,coverage,archive?async()=>archive:null,runtime.generate,()=>active()&&!runtime.signal?.aborted,runtime.budget??9500);
+ return {...r,stages,partial:!!r.partial||stages.some(s=>s.status!=="ok"),coverage};
+}
  function hybridEvidence(archive,onlineRows){
  if(!archive||!Array.isArray(archive.found)||typeof archive.fingerprint!=="string"||!/^[a-f0-9]{64}$/i.test(archive.fingerprint)||!Number.isInteger(archive.failed)||archive.failed<0||!Array.isArray(onlineRows)||onlineRows.length>40)throw Error("Invalid hybrid evidence");
  const types={observation:"observation",calculation:"calculation",scenario:"scenario",abstract:"abstract",metadata:"bibliography"};
@@ -2374,7 +2431,7 @@ function economicIntent(q){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,dialogueToolRoute,dialogueFollowup,dialogueSnapshotNote,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,hypothesisJournal,addHypothesis,reviewHypothesis,hypothesisPlanPrompt,hypothesisPlan,hypothesisReceipt,appendHypothesisRun,compareHypothesisRuns,hypothesisArgumentInput,validateHypothesisArguments,wikiSearchUrl,wikiReferenceCards,fetchWikiReferences,wikiReferencePlan,fetchWikiComparison,wikiBudgetSelection,wikiExplanationPrompt,crossrefSearchUrl,crossrefReferenceCards,fetchCrossrefReferences,literatureExplanationPrompt,federatedReferencePlan,federatedReferenceRank,fetchFederatedReferences,federatedExplanationPrompt,epmcSearchUrl,epmcReferenceCards,fetchEpmcReferences,referenceProvider,referenceMetadata,referenceMetadataDifferences,onlineSourceAudit,mergeResearchReferences,fetchExtendedResearch,extendedResearchPrompt,automaticOnlinePlan,consolidateOnlineRuns,runAutomaticOnlineResearch,onlineDraftAudit,repairOnlineDraft,onlineMemoryUrl,onlineMemoryCard,onlineResearchLibrary,addOnlineResearch,findOnlineResearch,onlineResearchComparison,onlineAgentRole,onlineAgentPlan,onlineAgentPrompt,onlineTeamSynthesis,runOnlineAgentTeam,localResearchBasket,multimodalEvidence,multimodalPrompt,multimodalContext,runMultimodalResearch,hybridEvidence,hybridResearchPrompt,hybridResearchContext,validateHybridFindings,runHybridResearch,onlineReferenceContext,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,expandedNaturalRoute,implicitEconomicPlan,economicIntent,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,dialogueToolRoute,dialogueFollowup,dialogueSnapshotNote,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,hypothesisJournal,addHypothesis,reviewHypothesis,hypothesisPlanPrompt,hypothesisPlan,hypothesisReceipt,appendHypothesisRun,compareHypothesisRuns,hypothesisArgumentInput,validateHypothesisArguments,wikiSearchUrl,wikiReferenceCards,fetchWikiReferences,wikiReferencePlan,fetchWikiComparison,wikiBudgetSelection,wikiExplanationPrompt,crossrefSearchUrl,crossrefReferenceCards,fetchCrossrefReferences,literatureExplanationPrompt,federatedReferencePlan,federatedReferenceRank,fetchFederatedReferences,federatedExplanationPrompt,epmcSearchUrl,epmcReferenceCards,fetchEpmcReferences,referenceProvider,referenceMetadata,referenceMetadataDifferences,onlineSourceAudit,mergeResearchReferences,fetchExtendedResearch,extendedResearchPrompt,automaticOnlinePlan,consolidateOnlineRuns,runAutomaticOnlineResearch,onlineDraftAudit,repairOnlineDraft,onlineMemoryUrl,onlineMemoryCard,onlineResearchLibrary,addOnlineResearch,findOnlineResearch,onlineResearchComparison,onlineAgentRole,onlineAgentPlan,onlineAgentPrompt,onlineTeamSynthesis,runOnlineAgentTeam,localResearchBasket,multimodalEvidence,multimodalPrompt,multimodalContext,runMultimodalResearch,unifiedResearchPlan,runUnifiedResearch,hybridEvidence,hybridResearchPrompt,hybridResearchContext,validateHybridFindings,runHybridResearch,onlineReferenceContext,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,expandedNaturalRoute,implicitEconomicPlan,economicIntent,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -2862,6 +2919,35 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   const multi=add(box,"details","");add(multi,"summary","Общее исследование файлов и экономических данных");add(multi,"p","Добавьте подготовленные карточки из блоков таблицы, документа или графика. Только в памяти страницы; не сохраняются и не отправляются внешним сервисам. Изменение исходного файла или выбора удаляет соответствующие карточки.");const basketView=add(multi,"div","");const mq=add(multi,"textarea","");mq.rows=3;mq.maxLength=600;mq.placeholder="Общий вопрос по материалам";mq.setAttribute("aria-label","Вопрос общего исследования");const useArchiveLabel=add(multi,"label"," Использовать экономический архив ");const useArchive=add(useArchiveLabel,"input","");useArchive.type="checkbox";const ma=add(multi,"input","");ma.type="search";ma.maxLength=600;ma.placeholder="Запрос к архиву или расчётному инструменту";ma.setAttribute("aria-label","Запрос к архиву для общего исследования");const useWebLabel=add(multi,"label"," Использовать текущую внешнюю подборку ");const useWeb=add(useWebLabel,"input","");useWeb.type="checkbox";const multiRun=add(multi,"button","Выполнить общее исследование");multiRun.type="button";const multiClear=add(multi,"button","Очистить корзину карточек");multiClear.type="button";const multiOutput=add(multi,"div","");multiOutput.setAttribute("aria-live","polite");let multiRevision=0;
   function refreshBasket(){multiRevision++;multiOutput.replaceChildren();basketView.replaceChildren();for(const [key,cards] of Object.entries(localBasket)){if(!cards.length)continue;const d=add(basketView,"details","");add(d,"summary",({table:"Таблица",document:"Документ / OCR",chart:"График"})[key]+" · "+cards.length+" карточек");for(const r of cards){add(d,"p",r.title+" · "+r.description);add(d,"small",r.limit);}}if(!Object.values(localBasket).some(x=>x.length))add(basketView,"p","Корзина пуста.");}
   localBasketChanged=refreshBasket;refreshBasket();multiClear.onclick=()=>{localBasket={};localBasketRevision++;refreshBasket();};for(const input of [mq,ma,useArchive,useWeb])input.addEventListener("input",()=>{multiRevision++;multiOutput.replaceChildren();});
+  const unified=add(box,"details","");add(unified,"summary","Единый план исследования — с предварительным подтверждением");add(unified,"p","Вопрос и локальные файлы не отправляются внешним сервисам автоматически. Для внешнего поиска отдельно введите публичный запрос. План показывает каналы и возможные дополнительные запросы; запуск только по отдельной кнопке.");
+  const uq=add(unified,"textarea","");uq.rows=3;uq.maxLength=600;uq.placeholder="Общий исследовательский вопрос";uq.setAttribute("aria-label","Общий вопрос");
+  const fromMain=add(unified,"button","Взять вопрос из основного чата");fromMain.type="button";
+  const choice=(title,checked)=>{const label=add(unified,"label",title+" ");const c=add(label,"input","");c.type="checkbox";c.checked=checked;return c;};
+  const ua=choice("Архив и экономические инструменты",true),ul=choice("Добавленные локальные карточки",false),uw=choice("Внешние источники",false);
+  const uaq=add(unified,"input","");uaq.maxLength=600;uaq.placeholder="Запрос к архиву (необязательно)";uaq.setAttribute("aria-label","Запрос к архиву");
+  const uwq=add(unified,"input","");uwq.maxLength=240;uwq.placeholder="Публичный запрос (обязательно для внешнего поиска)";uwq.setAttribute("aria-label","Публичный запрос");
+  const uen=add(unified,"input","");uen.maxLength=240;uen.placeholder="Английский публичный запрос (необязательно)";uen.setAttribute("aria-label","Публичный запрос на английском");
+  const uplan=add(unified,"button","Подготовить план");uplan.type="button";const urun=add(unified,"button","Подтвердить и выполнить");urun.type="button";urun.disabled=true;const ustop=add(unified,"button","Отменить исследование");ustop.type="button";ustop.disabled=true;const upreview=add(unified,"pre","");upreview.style.whiteSpace="pre-wrap";const uout=add(unified,"div","");uout.setAttribute("aria-live","polite");let approvedUnified=null,unifiedRevision=0,unifiedAbort=null;
+  function invalidateUnified(){unifiedRevision++;approvedUnified=null;unifiedAbort?.abort();urun.disabled=true;upreview.textContent="";uout.replaceChildren();}
+  for(const input of [uq,ua,ul,uw,uaq,uwq,uen])input.addEventListener("input",invalidateUnified);
+  fromMain.onclick=()=>{if(busy)return;uq.value=q.value;invalidateUnified();};
+  uplan.onclick=()=>{if(busy)return;invalidateUnified();try{const p=C.unifiedResearchPlan(uq.value,{archive:ua.checked,archiveQuery:uaq.value,local:ul.checked,web:uw.checked,webQuery:uwq.value,englishQuery:uen.value});approvedUnified=p;upreview.textContent=["Вопрос: "+p.question,p.archiveQuery!==null?"Архив: "+p.archiveQuery:"Архив: не используется",p.local?"Локальные карточки: "+Object.values(localBasket).reduce((n,r)=>n+r.length,0):"Локальные карточки: не используются",p.online?"Внешние запросы: "+p.online.steps.map(x=>x.query+(x.english?" / "+x.english:"")).join(" · ")+"; максимум "+p.online.maxRequests+" обращений.":"Внешняя сеть: не используется"].join("\n");urun.disabled=false;}catch{upreview.textContent="План не принят: выберите каналы, укажите вопрос и полные параметры; для внешнего поиска нужен публичный запрос.";}};
+  ustop.onclick=()=>{if(unifiedAbort){unifiedAbort.abort();epoch++;try{engine?.interruptGenerate();}catch{}uout.textContent="Запрошена отмена."; }};
+  const previousBasketChanged=localBasketChanged;localBasketChanged=()=>{previousBasketChanged();invalidateUnified();};
+  urun.onclick=async()=>{
+   if(busy||!approvedUnified)return;if(!engine){uout.textContent="Сначала загрузите локальную модель.";return;}
+   const p=approvedUnified,token=++epoch,rev=unifiedRevision,ac=new AbortController(),params=currentParameters(),basket=C.localResearchBasket(localBasket),active=()=>token===epoch&&rev===unifiedRevision&&!ac.signal.aborted;unifiedAbort=ac;
+   lock(true);urun.disabled=true;ustop.disabled=false;uout.textContent="Выполнение плана…";
+   const timer=setTimeout(()=>{if(unifiedAbort===ac){ac.abort();try{engine?.interruptGenerate();}catch{}uout.textContent="Истёк лимит исследования."; }},90000);
+   try{
+    const r=await C.runUnifiedResearch(p,basket,{archiveSearch:async text=>{const plan=C.researchPlan(text)||C.implicitEconomicPlan(text);return plan?C.runResearchPlan(plan,step=>find(params,step.command),active):find(params,text);},fetcher:fetch,stamp:new Date().toISOString(),signal:ac.signal,active,progress:stage=>{if(active())uout.textContent=({archive:"Архив и расчёты…",online:"Внешний поиск…",synthesis:"Локальный синтез…"})[stage];},generate:async messages=>{const reply=await engine.chat.completions.create({messages,temperature:0,max_tokens:620});return reply.choices?.[0]?.message?.content||"";}});
+    if(!active())return;uout.replaceChildren();const labels={local_table:"Пользовательская таблица",local_document:"Текст документа",local_ocr:"OCR",local_chart:"Оценка графика",observation:"Архивное наблюдение",calculation:"Расчёт",scenario:"Сценарий",reference:"Справка",abstract:"Утверждения авторов",bibliography:"Библиография",limitation:"Ограничение"};
+    for(const stage of r.stages)add(uout,"p",stage.stage+" · "+stage.status+" · "+stage.count+" карточек");
+    if(r.state==="accepted")for(const f of r.checked.findings)add(uout,"p",labels[f.type]+": "+f.text+" "+f.refs.map(x=>"["+x+"]").join(" "));else add(uout,"p","Заключение не принято: "+r.state+(r.checked?.reason?" / "+r.checked.reason:""));
+    if(r.context){add(uout,"p","Передано карточек: "+r.context.rows.length+" · не передано: "+r.context.omitted+(r.partial?" · неполное покрытие":""));const detail=add(uout,"details","");add(detail,"summary","Карточки заключения");for(const x of r.context.rows){add(detail,"p","["+x.id+"] "+x.title+" · "+x.description);add(detail,"small",x.limit||"");}}
+    add(uout,"small","Результат буквальной проверки не подтверждает истинность или причинность.");
+   }catch{if(active())uout.textContent="Исследование недоступно."}finally{clearTimeout(timer);if(unifiedAbort===ac)unifiedAbort=null;lock(false);ustop.disabled=true;urun.disabled=!approvedUnified;}
+  };
   multiRun.onclick=async()=>{
    if(busy)return;if(!engine){multiOutput.textContent="Сначала загрузите локальную модель.";return}const question=mq.value.trim();if(!question){multiOutput.textContent="Введите общий вопрос.";return}const aq=ma.value.trim();if(useArchive.checked&&!aq){multiOutput.textContent="Введите запрос к архиву.";return}if(useWeb.checked&&!rows.length){multiOutput.textContent="Сначала получите внешнюю подборку.";return}
    const version=multiRevision,sourceVersion=revision,localVersion=localBasketRevision,token=++epoch,includeWeb=useWeb.checked,active=()=>token===epoch&&version===multiRevision&&localVersion===localBasketRevision&&(!includeWeb||sourceVersion===revision),params=currentParameters(),basket=C.localResearchBasket(localBasket),webRows=includeWeb?rows.slice():[],webCoverage=includeWeb?coverage.slice():[];
