@@ -2453,3 +2453,37 @@ console.log("16 agent coordination checks passed");}
   }
   explicitFormatChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+ // v2.30: device startup and controlled failure; no GPU or network required.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function startupChecks(){
+   const gpu={requestAdapter:async()=>({})},id=C.modelProfile("fast").id;
+   const goodEngine={chat:{completions:{create(){}}},async unload(){}};
+   const runtime={prebuiltAppConfig:{model_list:[{model_id:id}]},async CreateMLCEngine(id,opts){opts.initProgressCallback({text:"Loading",progress:.25});return goodEngine;}};
+   const makeTimers=()=>{let next=0;const items=new Map();return {set(fn,ms){items.set(++next,{fn,ms});return next;},clear(n){items.delete(n);},fire(ms){const entry=[...items].find(([,x])=>x.ms===ms);A.ok(entry);items.delete(entry[0]);entry[1].fn();},items};};
+   const cfg=(extra={})=>({gpu,loadRuntime:async()=>runtime,timers:makeTimers(),...extra});
+   const progress=[],pending=[];
+   const ready=await C.runLocalModelStartup("fast",cfg({onProgress:x=>progress.push(x),onPending:x=>pending.push(x)}));
+   A.equal(ready.state,"ready");A.equal(ready.engine,goodEngine);A.deepEqual(progress.map(x=>x.phase),["device","runtime","weights","weights"]);A.equal(progress.at(-1).progress,.25);A.deepEqual(pending,[true,false]);
+   A.ok(C.modelStartupMessage(ready).includes("Модель загружена"));
+   for(const [extra,code] of [[{secure:false},"insecure"],[{gpu:null},"webgpu"],[{gpu:{requestAdapter:async()=>null}},"adapter_missing"],[{gpu:{requestAdapter:async()=>{throw Error("GPU");}}},"adapter_error"],[{loadRuntime:async()=>{throw Error("secret");}},"runtime"],[{loadRuntime:async()=>({CreateMLCEngine(){},prebuiltAppConfig:{model_list:[]}})},"catalog"],[{loadRuntime:async()=>({...runtime,async CreateMLCEngine(){throw Error("GPU");}})},"engine"]]){
+    const r=await C.runLocalModelStartup("fast",cfg(extra));A.equal(r.state,"error");A.equal(r.code,code);A.ok(!C.modelStartupMessage(r).includes("secret"));A.ok(C.modelStartupMessage(r).includes("поиск"));
+   }
+   const timers=makeTimers();const timeout= C.runLocalModelStartup("fast",cfg({timers,gpu:{requestAdapter:()=>new Promise(()=>{})},stageMs:12}));
+   timers.fire(12);const t=await timeout;A.equal(t.code,"timeout");A.equal(t.stage,"device");A.equal(timers.items.size,0);
+   let release,startedResolve,unloaded=0;const started=new Promise(resolve=>startedResolve=resolve),controller=new AbortController(),events=[];
+   const lateRuntime={...runtime,async CreateMLCEngine(){startedResolve();return new Promise(resolve=>release=resolve);}};
+   const work=C.runLocalModelStartup("fast",cfg({signal:controller.signal,loadRuntime:async()=>lateRuntime,onPending:x=>events.push(x)}));
+   await started;controller.abort();const cancelled=await work;
+   A.equal(cancelled.state,"cancelled");A.deepEqual(events,[true]);
+   release({...goodEngine,async unload(){unloaded++;}});for(let i=0;i<8;i++)await Promise.resolve();
+   A.equal(unloaded,1);A.deepEqual(events,[true,false]);A.equal(cancelled.engine,undefined);
+   const before=new AbortController();before.abort();let calls=0;
+   const early=await C.runLocalModelStartup("fast",cfg({signal:before.signal,loadRuntime:async()=>{calls++;return runtime;}}));A.equal(early.state,"cancelled");A.equal(calls,0);
+   const stalledTimers=makeTimers();let stalledStart,stalledRelease;const stalledReady=new Promise(r=>stalledStart=r);
+   const stalled=C.runLocalModelStartup("fast",cfg({timers:stalledTimers,timeoutMs:100,loadRuntime:async()=>({...runtime,async CreateMLCEngine(){stalledStart();return new Promise(r=>stalledRelease=r);}})}));
+   await stalledReady;stalledTimers.fire(100);const stalledResult=await stalled;A.equal(stalledResult.code,"timeout");A.equal(stalledResult.stage,"weights");A.equal(stalledTimers.items.size,0);stalledRelease({...goodEngine,async unload(){unloaded++;}});for(let i=0;i<8;i++)await Promise.resolve();A.equal(unloaded,2);
+   console.log("v2.30 startup regression checks passed");
+  }
+  startupChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
