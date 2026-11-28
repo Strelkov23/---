@@ -1728,3 +1728,37 @@ console.log("16 agent coordination checks passed");}
   }
   coverageChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+// v1.69–1.71: bounded research repair; unchanged evidence and private omitted rows.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function recoveryChecks(){
+  const ar={fingerprint:"a".repeat(64),failed:0,found:[{id:"obs",kind:"Наблюдение",title:"Выпуск",description:"100 тонн",value:100,unit:"тонн",period:"2025"}]};
+  const online=[{id:"wiki-ru-1",title:"Справка",description:"Справка"}];
+  const limit={type:"limitation",text:"Нужна сверка.",refs:[]},fact={type:"observation",text:"100 тонн",refs:["arc-1"]},reference={type:"reference",text:"Справка",refs:["web-2"]};
+  const valid=JSON.stringify([fact,reference,limit]),bad=JSON.stringify([{...fact,text:"999 тонн"},reference,limit]);
+  const run=(generate,active=()=>true,budget=9500,archive=ar)=>C.runHybridResearch("Выпуск","мрб: 9",online,[],async()=>archive,generate,active,()=>{},budget);
+  let prompts=[];
+  let r=await run(async m=>{prompts.push(m);return prompts.length===1?"INVALID MODEL CONTENT":valid});
+  A.equal(r.state,"accepted");A.equal(r.repair.recovered,true);A.equal(r.repair.reason,"json");A.equal(prompts.length,2);A.deepEqual(prompts[0][1],prompts[1][1]);A.ok(!JSON.stringify(prompts[1]).includes("INVALID MODEL CONTENT"));A.equal(r.partial,false);
+  A.ok(C.researchChatTurn(r).note.includes("повторно проверены"));
+  prompts=[];r=await run(async m=>{prompts.push(m);return bad});
+  A.equal(r.state,"rejected");A.equal(r.checked.reason,"numeric_evidence");A.equal(r.repair.recovered,false);A.equal(prompts.length,2);
+  let n=0;r=await run(async()=>{n++;return valid});A.equal(n,1);A.equal(r.repair.attempted,false);
+  n=0;r=await run(async()=>{if(++n===1)return "broken";throw Error("offline")});A.equal(r.state,"rejected");A.equal(r.repair.failed,true);A.equal(n,2);
+  let active=true;n=0;r=await run(async()=>{if(++n===1)return "broken";active=false;return valid},()=>active);A.equal(r.state,"cancelled");A.equal(n,2);
+  active=true;n=0;r=await run(async()=>{n++;active=false;return "broken"},()=>active);A.equal(r.state,"cancelled");A.equal(n,1);
+  const rows=C.hybridEvidence(ar,online).rows,context={rows,messages:[{role:"system",content:"x"},{role:"user",content:"y"}]};
+  n=0;const blocked=await C.checkedResearchGeneration(context,async()=>{n++;return "broken"},()=>true,[],80);
+  A.equal(blocked.repair.budgetLimited,true);A.equal(n,1);A.ok(C.researchRepairNote(blocked.repair).includes("лимит"));
+  r=await run(async()=>valid,()=>true,9500,{...ar,found:[...ar.found,{id:"excluded",kind:"Неизвестный вид",title:"Не включено",description:"Не включено"}]});A.equal(r.state,"accepted");A.equal(r.evidence.excluded,1);A.equal(r.partial,true);
+  const basket={document:[{id:"doc-0",kind:"Фрагмент пользовательского документа",title:"Документ",description:"PRIVATE_LOCAL_TEXT",limit:"Не проверено"}]};
+  const localValid=JSON.stringify([{type:"local_document",text:"PRIVATE_LOCAL_TEXT",refs:["loc-1"]},limit]);
+  n=0;r=await C.runMultimodalResearch("Вопрос",basket,[],[],null,async()=>++n===1?"broken":localValid);A.equal(r.state,"accepted");A.equal(r.repair.recovered,true);A.equal(n,2);
+  A.equal(C.researchChatTurn({state:"no_evidence",context:{rows:[],omitted:1},evidence:{rows:[{origin:"local"}]}}).private,true);
+  A.equal((await C.runMultimodalResearch("Вопрос",{},[],[],null,async()=>{throw Error("must not call")})).partial,true);
+  A.equal((await run(async()=>{throw Error("offline")})).partial,true);
+  console.log("v1.69–1.71 research recovery checks passed");
+ }
+ recoveryChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
