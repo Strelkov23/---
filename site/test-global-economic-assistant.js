@@ -1832,3 +1832,47 @@ console.log("16 agent coordination checks passed");}
  }
  contextualToolChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.78–1.80: step provenance, fair context allocation and final citation coverage.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function stepAwareChecks(){
+  const stamp="a".repeat(64),q="Покажи межотраслевой баланс группы 9 и покажи межотраслевой баланс группы 10";
+  const plan=C.implicitEconomicPlan(q);
+  const ar=await C.runResearchPlan(plan,async step=>({fingerprint:stamp,failed:0,found:[{id:"obs",kind:"Наблюдение",title:step.command==="мрб: 9"?"Сталь":"Уголь",description:step.command==="мрб: 9"?"100 тонн":"200 тонн",value:step.command==="мрб: 9"?100:200,unit:"тонн"}]}));
+  const evidence=C.hybridEvidence(ar,[]);
+  A.equal(evidence.steps.length,2);A.deepEqual(evidence.rows.map(r=>r.researchStep),[1,2]);
+  A.deepEqual(C.researchStepManifest(ar).map(r=>r.command),["мрб: 9","мрб: 10"]);
+  A.throws(()=>C.hybridEvidence({...ar,results:ar.results.map((r,i)=>i===0?{...r,count:2}:r)},[]));
+  A.throws(()=>C.hybridEvidence({...ar,failed:1},[]));
+  A.throws(()=>C.hybridEvidence({...ar,results:[ar.results[0],{...ar.results[1],command:ar.results[0].command}]},[]));
+  const forged=C.hybridEvidence({fingerprint:stamp,failed:0,found:[{...ar.found[0],researchStep:99}]},[]);
+  A.equal(forged.rows[0].researchStep,undefined);
+  const fair=C.stepEvidenceGroups({...evidence,rows:[evidence.rows[0],{...evidence.rows[0],id:"extra"},evidence.rows[1]]},["observation"]);
+  A.deepEqual(fair.map(g=>g.map(r=>r.id)),[["arc-1","extra"],["arc-2"]]);
+  const ctx=C.multimodalContext(q,evidence,[]);
+  const payload=JSON.parse(ctx.messages[1].content);
+  A.equal(payload.researchSteps.length,2);A.deepEqual(payload.rows.map(r=>r.researchStep),[1,2]);
+  const limit={type:"limitation",text:"Нужна сверка.",refs:[]};
+  const first={type:"observation",text:"100 тонн",refs:["arc-1"]},second={type:"observation",text:"200 тонн",refs:["arc-2"]};
+  const one=await C.runMultimodalResearch(q,{},[],[],async()=>ar,async()=>JSON.stringify([first,limit]));
+  A.equal(one.state,"accepted");A.equal(one.partial,true);A.deepEqual(one.stepCoverage.map(x=>x.status),["cited","uncited"]);
+  A.ok(C.researchChatTurn(one).note.includes("нет ссылок в ответе"));
+  const both=await C.runMultimodalResearch(q,{},[],[],async()=>ar,async()=>JSON.stringify([first,second,limit]));
+  A.equal(both.partial,false);A.deepEqual(both.stepCoverage.map(x=>x.cited),[1,1]);
+  const restricted=C.researchStepCoverage(evidence,{rows:[evidence.rows[0]]},{ok:true,findings:[first,limit]});
+  A.equal(restricted[1].status,"omitted");
+  const unavailable={...ar,found:[ar.found[0]],results:[ar.results[0],{...ar.results[1],count:0}]};
+  const missing=await C.runMultimodalResearch(q,{},[],[],async()=>unavailable,async()=>JSON.stringify([first,limit]));
+  A.equal(missing.partial,true);A.equal(missing.stepCoverage[1].status,"no_evidence");
+  const broken=await C.runMultimodalResearch(q,{},[],[],async()=>ar,async()=>{throw Error("model offline")});
+  A.equal(broken.state,"model_unavailable");A.deepEqual(broken.stepCoverage.map(x=>x.status),["uncited","uncited"]);
+  const unified=C.unifiedResearchPlan(q,{archive:true});
+  const result=await C.runUnifiedResearch(unified,{}, {archiveSearch:async()=>ar,generate:async()=>JSON.stringify([first,limit])});
+  A.equal(result.partial,true);A.equal(result.stepCoverage[1].status,"uncited");A.equal(result.archiveReceipt,undefined);
+  const withWeb=await C.runHybridResearch(q,q,[{id:"wiki-ru-1",title:"Справка",description:"Текст"}],[],async()=>ar,async()=>JSON.stringify([first,second,{type:"reference",text:"Текст",refs:["web-3"]},limit]));
+  A.equal(withWeb.partial,false);A.equal(withWeb.stepCoverage.length,2);
+  console.log("v1.78–1.80 step-aware research checks passed");
+ }
+ stepAwareChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
