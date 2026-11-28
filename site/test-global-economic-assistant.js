@@ -1537,3 +1537,45 @@ console.log("16 agent coordination checks passed");}
   }
   unifiedChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.45–1.47: dataset metadata discovery, cross-catalog provenance and memory.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const item={type:"dois",id:"10.1234/data",attributes:{doi:"10.1234/data",titles:[{title:"Economic data"}],creators:[{name:"A"}],publisher:{name:"Repository"},publicationYear:2024,types:{resourceTypeGeneral:"Dataset"},url:"https://bad.example/file",descriptions:[{description:"999999 tonnes"}]}};
+  const fixture={data:[item]};
+  const rows=C.dataciteReferenceCards(fixture,stamp),r=rows[0];
+  A.equal(rows.length,1);A.equal(r.source,"datacite");A.equal(r.resourceType,"Dataset");A.equal(r.abstractAvailable,false);A.equal(r.href,"https://doi.org/10.1234/data");
+  A.ok(r.description.includes("Repository"));A.ok(!r.description.includes("999999"));A.ok(r.limit.includes("Сами файлы"));
+  A.equal(C.dataciteReferenceCards({data:[item,item]},stamp).length,1);
+  A.equal(C.dataciteReferenceCards({data:[{...item,id:"10.1234/other"}]},stamp).length,0);
+  A.equal(C.dataciteReferenceCards({data:[{...item,attributes:{...item.attributes,types:{resourceTypeGeneral:"Text"}}}]},stamp).length,0);
+  A.throws(()=>C.dataciteReferenceCards({data:Array(6).fill(item)},stamp));
+  A.throws(()=>C.dataciteReferenceCards(fixture,"invalid"));
+  A.throws(()=>C.dataciteSearchUrl(""));A.throws(()=>C.dataciteSearchUrl("a".repeat(241)));
+  A.ok(C.dataciteSearchUrl('data "x"').includes("resource-type-id=dataset"));A.ok(decodeURIComponent(C.dataciteSearchUrl('data "x"')).endsWith('query="data \\"x\\""'));
+  const cross=C.crossrefReferenceCards({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/data",title:["Other title"],type:"dataset",published:{"date-parts":[[2023]]}}]}},stamp)[0];
+  const merged=C.mergeResearchReferences([cross,r]);
+  A.equal(merged.length,1);A.equal(merged[0].source,"datacite");A.deepEqual(merged[0].providers,["Crossref","DataCite"]);A.equal(merged[0].metadataDifferences.length,2);
+  const entry={id:"study-dataset",mode:"datasets",saved:stamp,question:"data",rows:merged,coverage:[{language:"datacite",query:"data",status:"ok",count:1}]};
+  const lib=C.onlineResearchLibrary([entry]);A.equal(lib[0].rows[0].source,"datacite");A.equal(lib[0].rows[0].resourceType,"Dataset");A.deepEqual(lib[0].rows[0].providers,["Crossref","DataCite"]);A.equal(lib[0].rows[0].metadataDifferences.length,2);
+  A.deepEqual(C.onlineResearchLibrary(JSON.parse(JSON.stringify(lib))),lib);
+  A.ok(C.onlineReferenceContext("data",rows,[],"datasets").messages[0].content.includes("файлы или числа"));
+  async function datasetChecks(){
+   const urls=[];
+   const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+   const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/data",title:["Economic data"],type:"dataset"}]}});
+   const empty=JSON.stringify({hitCount:0,resultList:{result:[]}});
+   const fetcher=async (u,o)=>{urls.push(u);A.equal(o.credentials,"omit");A.equal(o.redirect,"error");return {ok:true,text:async()=>u.includes("datacite")?JSON.stringify(fixture):u.includes("crossref")?papers:u.includes("europepmc")?empty:wiki};};
+   const wide=await C.fetchWideResearch("планирование","planning",fetcher,null,stamp);
+   A.equal(urls.length,5);A.equal(wide.coverage.length,5);A.equal(wide.coverage[4].language,"datacite");
+   A.equal(wide.rows.filter(x=>x.doi==="10.1234/data").length,1);A.equal(wide.rows.find(x=>x.doi==="10.1234/data").source,"datacite");
+   const denied=await C.fetchDatasetDiscovery("data",async()=>({ok:false,status:429}),null,stamp);A.equal(denied.coverage[0].status,"rate_limited");
+   const malformed=await C.fetchDatasetDiscovery("data",async()=>({ok:true,text:async()=>"{invalid"}),null,stamp);A.equal(malformed.coverage[0].status,"unavailable");
+   const partial=await C.fetchWideResearch("планирование","planning",async(u,o)=>u.includes("datacite")?{ok:false,status:503}:fetcher(u,o),null,stamp);
+   A.equal(partial.coverage[4].status,"unavailable");A.ok(partial.rows.length>0);
+   await A.rejects(()=>C.fetchDataciteReferences("data",async()=>({ok:true,text:async()=>"x".repeat(262145)}),null,stamp));
+   console.log("v1.45–1.47 dataset discovery checks passed");
+  }
+  datasetChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
