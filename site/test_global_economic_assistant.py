@@ -12,6 +12,7 @@ def main():
                 assert page.locator("#gea-panel").is_visible()
                 assert page.locator("#gea-context").inner_text().startswith("Текущий раздел:")
                 page.locator("#gea-question").fill("сравнение регионов")
+                page.locator("#gea-panel").get_by_text("Инструменты архива",exact=True).click()
                 page.locator("#gea-search").click()
                 page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Поиск завершён')")
                 assert page.locator("#gea-results").inner_text().find("Найдено:")>=0
@@ -20,6 +21,7 @@ def main():
             page.goto("http://localhost:8765/index.html",wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
             page.locator("#gea-question").fill("сравнить предприятия: 123")
+            page.locator("#gea-panel").get_by_text("Инструменты архива",exact=True).click()
             page.locator("#gea-search").click()
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Поиск завершён')")
             # Offline fixtures may not deploy the full company index.
@@ -36,6 +38,7 @@ def main():
             page.wait_for_function("document.querySelector('#eai-question').value === 'сравнение регионов'")
             page.locator("#gea-toggle").click()
             page.locator("#gea-question").fill("динамика ВВП")
+            page.locator("#gea-panel").get_by_text("Инструменты архива",exact=True).click()
             page.locator("#gea-full").click()
             page.wait_for_function("document.querySelector('#eai-question').value === 'динамика ВВП'")
             page.goto("http://localhost:8765/economic-search.html",wait_until="domcontentloaded")
