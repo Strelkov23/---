@@ -714,3 +714,11 @@ console.log("16 agent coordination checks passed");}
  b[central+46]=98;A.throws(()=>C.xlsxDirectory(b));
  console.log("18 XLSX grid and directory checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ A.equal(C.localDocumentText("\uFEFF a\r\nb\r c\u0000 "),"a\nb\n c");
+ A.equal(C.localDocumentText(" \n "),"");
+ A.throws(()=>C.localDocumentText("x".repeat(262145)));
+ A.throws(()=>C.localDocumentText(null));
+ console.log("4 local document normalization checks passed");
+}
