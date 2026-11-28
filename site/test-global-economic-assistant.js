@@ -1351,7 +1351,7 @@ console.log("16 agent coordination checks passed");}
   async function hybridChecks(){
    const progress=[];let query="";
    const result=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async q=>{query=q;return ar},async m=>{A.ok(m[0].content.includes("не прогноз и не факт"));return raw},()=>true,x=>progress.push(x));
-   A.equal(result.state,"accepted");A.equal(result.partial,false);A.equal(query,"мрб: 9");A.deepEqual(progress,["archive","synthesis"]);
+   A.equal(result.state,"accepted");A.equal(result.partial,true);A.equal(result.evidence.excluded,1);A.ok(C.researchChatTurn(result).note.includes("исключено архивных карточек"));A.equal(query,"мрб: 9");A.deepEqual(progress,["archive","synthesis"]);
    const failed=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async()=>{throw Error("offline")},async()=>raw);
    A.equal(failed.state,"archive_unavailable");
    const partial=await C.runHybridResearch("Выпуск","мрб: 9",ext,[{status:"timeout"}],async()=>({...ar,failed:1}),async()=>raw);
@@ -1761,4 +1761,26 @@ console.log("16 agent coordination checks passed");}
   console.log("v1.69–1.71 research recovery checks passed");
  }
  recoveryChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+
+// v1.72–1.74: explicit public research follow-up, private context isolation and coverage.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const previous={mode:"research",state:"complete",question:"Выпуск стали",answer:"UNVERIFIED_OLD_ANSWER",sources:[{id:"old",title:"OLD_SOURCE",description:"OLD_DATA"}]};
+ const draft=C.researchFollowupDraft(previous,"А за 2025 год?");
+ A.ok(draft.question.includes("Выпуск стали"));A.ok(draft.question.includes("А за 2025 год?"));A.equal(draft.archiveQuery,"А за 2025 год?");A.equal(draft.truncated,false);
+ A.ok(!JSON.stringify(draft).includes("UNVERIFIED_OLD_ANSWER"));A.ok(!JSON.stringify(draft).includes("OLD_SOURCE"));
+ A.throws(()=>C.researchFollowupDraft({...previous,private:true},"Уточни"));
+ A.throws(()=>C.researchFollowupDraft({...previous,state:"cancelled"},"Уточни"));
+ A.throws(()=>C.researchFollowupDraft({...previous,mode:"general"},"Уточни"));
+ A.throws(()=>C.researchFollowupDraft(previous,"  "));
+ A.throws(()=>C.researchFollowupDraft(previous,"x".repeat(590)));
+ const long=C.researchFollowupDraft({...previous,question:"x".repeat(570)+" Последняя тема"},"Что изменилось?");
+ A.equal(long.truncated,true);A.equal(long.question.length,600);A.ok(long.question.includes("Последняя тема"));
+ const plan=C.unifiedResearchPlan(draft.question,{archive:true,archiveQuery:draft.archiveQuery,local:false,web:false});
+ A.equal(plan.archiveQuery,draft.archiveQuery);A.equal(plan.online,null);A.equal(plan.local,false);
+ const general=C.generalChatPrompt("Что дальше?",[{mode:"general",state:"complete",question:"PRIVATE_QUESTION",answer:"PRIVATE_ANSWER",private:true},{mode:"general",state:"complete",question:"Открытый вопрос",answer:"Открытый ответ"}]);
+ A.equal(general.used,1);A.ok(!JSON.stringify(general).includes("PRIVATE_"));
+ A.equal(C.researchExcludedNote({excluded:0}),"");A.ok(C.researchExcludedNote({excluded:2}).includes("охват неполный"));
+ console.log("v1.72–1.74 research dialogue checks passed");
 }
