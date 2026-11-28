@@ -2132,3 +2132,24 @@ console.log("16 agent coordination checks passed");}
  }
  modelAcceptanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.99–2.01: shared transcript scroll policy.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ A.deepEqual(C.chatScrollState(0,100,200),{nearEnd:true,top:0});
+ A.deepEqual(C.chatScrollState(100,500,200),{nearEnd:false,top:100});
+ A.deepEqual(C.chatScrollState(220,500,200),{nearEnd:true,top:220});
+ A.deepEqual(C.chatScrollState(219,500,200),{nearEnd:false,top:219});
+ A.deepEqual(C.chatScrollState(300,500,200),{nearEnd:true,top:300});
+ A.deepEqual(C.chatScrollState(999,500,200),{nearEnd:true,top:300});
+ A.deepEqual(C.chatScrollState(-10,500,200),{nearEnd:false,top:0});
+ A.deepEqual(C.chatScrollState(100,500,200,200),{nearEnd:true,top:100});
+ A.deepEqual(C.chatScrollState(NaN,500,200),{nearEnd:true,top:0});
+ A.deepEqual(C.chatScrollState(0,500,200,-1),{nearEnd:true,top:0});
+ A.deepEqual(C.chatScrollState(0,-5,200),{nearEnd:true,top:0});
+ A.deepEqual(C.chatScrollState(0,500,-1),{nearEnd:true,top:0});
+ A.ok(C.chatLayoutCss().includes("gea-chat-scroll:focus-visible"));
+ A.ok(C.chatLayoutCss().includes("gea-chat-scroll-controls button"));
+ A.ok(C.chatLayoutCss().includes("overflow-wrap:anywhere"));
+ console.log("v1.99–2.01 chat scroll checks passed");
+}
