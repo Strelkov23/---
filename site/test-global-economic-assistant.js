@@ -2282,3 +2282,50 @@ console.log("16 agent coordination checks passed");}
  }
  webReadingChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v2.16–2.20: multi-query investigation and narrow cross-page comparison.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function webInvestigationChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",endpoint="https://search.mydomain.org/search",q="экономика России";
+  const plan=C.webInvestigationPlan(q,endpoint,["Промышленность России","Статистика производства"]);
+  A.equal(plan.maxRequests,3);A.equal(plan.plans.length,3);A.equal(plan.plans[0].pages,1);A.equal(plan.queries[0],q);
+  for(const extra of [[],[q],[" ЭКОНОМИКА   РОССИИ "],["a","b","c"],["x\nz"],["x".repeat(241)]])A.throws(()=>C.webInvestigationPlan(q,endpoint,extra));
+  const two=C.webInvestigationPlan(q,endpoint,["Промышленность"]);A.equal(two.maxRequests,2);
+  const hits=[{url:"https://alpha.org/a",title:"Экономика России",content:"Учебная справка"},{url:"https://beta.org/a",title:"Промышленность России",content:"Учебный материал"}];
+  const payloads=[hits,[hits[0],{url:"https://gamma.org/a",title:"Промышленность России",content:"Данные"}],[{url:"https://delta.org/a",title:"Статистика производства",content:"Таблица"}]];
+  const calls=[],progress=[];
+  const fetcher=async(url,options)=>{const index=calls.length;calls.push({url,options});return {ok:true,text:async()=>JSON.stringify({results:payloads[index%3]})};};
+  const r=await C.runWebInvestigation(plan,{stamp,fetcher,progress:(i,n)=>progress.push([i,n])});
+  A.equal(r.state,"search");A.equal(calls.length,3);A.equal(r.sources.length,4);A.equal(progress.length,3);
+  A.equal(r.sources.find(x=>x.href===hits[0].url).limit.includes("1, 2"),true);
+  A.equal(r.sources.map(x=>x.id).join(","),"hit-1,hit-2,hit-3,hit-4");
+  A.ok(r.note.includes("4 уникальных ссылок"));A.ok(r.note.includes("не подтверждает"));
+  A.ok(calls.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"));
+  const readable=C.webReadingPlan(q,r.sources,["hit-1","hit-2"]);A.equal(readable.pages.length,2);
+  const partial=await C.runWebInvestigation(plan,{stamp,fetcher:async url=>url===plan.plans[0].requests[0]?{ok:true,text:async()=>JSON.stringify({results:hits})}:{ok:false,status:403}});
+  A.equal(partial.state,"search");A.equal(partial.sources.length,2);A.ok(partial.note.includes("нет доступной выдачи"));
+  const off=await C.runWebInvestigation(plan,{stamp,fetcher:async()=>({ok:false,status:503})});A.equal(off.state,"notice");A.equal(off.sources.length,0);
+  const n=calls.length;
+  await A.rejects(()=>C.runWebInvestigation({...plan,maxRequests:99},{stamp,fetcher}));A.equal(calls.length,n);
+  const stopped=await C.runWebInvestigation(plan,{stamp,fetcher,active:()=>false});A.equal(stopped.state,"cancelled");A.equal(calls.length,n);
+  let live=true;const late=await C.runWebInvestigation(plan,{stamp,active:()=>live,fetcher:async()=>{live=false;return {ok:true,text:async()=>JSON.stringify({results:hits})};}});A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  const card=(id,host,description)=>({id,href:"https://"+host+"/a",category:"web_extract",description});
+  const a=card("page-1-1","alpha.org","Объём выпуска предприятия по условной методике составляет 100 тонн.");
+  const b=card("page-2-1","beta.org","Объём выпуска предприятия по условной методике составляет 120 тонн.");
+  const c=card("page-3-1","gamma.org",a.description);
+  const cmp=C.webComparison([a,b,c]);
+  A.equal(cmp.domains,3);A.equal(cmp.matches.length,3);A.equal(cmp.matches.filter(x=>x.kind==="numeric_difference").length,2);A.equal(cmp.matches.filter(x=>x.kind==="same_text").length,1);
+  A.ok(C.webComparisonNote(cmp).includes("возможно копирование"));A.ok(C.webComparisonNote(cmp).includes("разные числа"));
+  A.ok(C.webComparisonNote(cmp).includes("не проверка истинности"));
+  A.equal(C.webComparison([a,{...b,href:a.href}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,description:"Объём выпуска предприятия по другой методике составляет 120 тонн."}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,description:"Объём выпуска предприятия по условной методике составляет 120 рублей."}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,category:"bibliography"}]).matches.length,0);
+  A.ok(C.webComparisonNote(C.webComparison([a])).includes("менее двух"));
+  A.ok(C.webComparisonNote(C.webComparison([a,{...b,description:"Совсем другой текст без совпадений, достаточно длинный для анализа."}])).includes("не доказывает согласие"));
+  A.throws(()=>C.webComparison(Array(10).fill(a)));
+  console.log("v2.16–2.20 web investigation checks passed");
+ }
+ webInvestigationChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
