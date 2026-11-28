@@ -1241,3 +1241,40 @@ console.log("16 agent coordination checks passed");}
   }
   autoChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.24–1.26: explicit local research memory, source fidelity and comparison.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const wiki=C.wikiReferenceCards({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}},"en",stamp)[0];
+  const a=C.crossrefReferenceCards({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Economic planning"],published:{"date-parts":[[2024]]},type:"posted-content"}]}},stamp)[0];
+  const b=C.epmcReferenceCards({hitCount:1,resultList:{result:[{source:"MED",id:"123",title:"Health economics",doi:"10.1234/plan",pubYear:"2025",isOpenAccess:"Y",license:"cc by",abstractText:"Study"}]}},stamp)[0];
+  const rows=[wiki,...C.mergeResearchReferences([a,b])];
+  const entry={id:"study-1",saved:stamp,mode:"research",question:"economic planning",rows,coverage:[{language:"en",query:"planning",status:"ok",count:1},{language:"crossref",query:"planning",status:"ok",count:1},{language:"epmc",query:"planning",status:"ok",count:1}]};
+  const lib=C.addOnlineResearch([],entry);
+  A.equal(lib.length,1);A.equal(lib[0].rows[0].href,wiki.href);A.equal(lib[0].rows[0].history,wiki.history);
+  A.equal(lib[0].rows[1].license,"cc by");A.equal(lib[0].rows[1].preprint,true);
+  A.equal(lib[0].rows[1].metadataDifferences.length,2);
+  A.deepEqual(C.onlineResearchLibrary(JSON.parse(JSON.stringify(lib))),lib);
+  A.equal(C.onlineSourceAudit(lib[0].rows,lib[0].coverage).counts.disputed,1);
+  A.equal(C.findOnlineResearch(lib,"planning").length,1);A.equal(C.findOnlineResearch(lib,"unrelated").length,0);
+  A.equal(C.findOnlineResearch(lib,"").length,1);
+  A.throws(()=>C.addOnlineResearch(lib,entry));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,rows:[wiki,wiki]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,rows:[{...wiki,href:"javascript:alert(1)"}]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,rows:[{...wiki,history:"https://bad.example"}]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,rows:[{...b,license:"unknown"}]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,rows:[{...a,href:"https://doi.org/10.1234/wrong"}]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,coverage:[{language:"epmc",query:"x",status:"timeout",count:1}]}]));
+  A.throws(()=>C.onlineResearchLibrary([{...entry,saved:"2026-11-27T10:00:00.000Z"}]));
+  A.throws(()=>C.onlineResearchLibrary(Array.from({length:21},(_,i)=>({...entry,id:"study-"+i}))));
+  A.equal(C.onlineMemoryUrl("https://europepmc.org/article/MED/.."),false);
+  A.equal(C.onlineMemoryUrl("https://evil.example/https://doi.org/10.1234/plan"),false);
+  const same=C.onlineResearchComparison(entry,entry);
+  A.deepEqual([same.added,same.missing,same.changed],[[],[],[]]);
+  const diff=C.onlineResearchComparison(entry,{...entry,id:"study-2",question:"other",rows:[{...wiki,description:"Revised"},a]});
+  A.equal(diff.sameQuestion,false);A.equal(diff.changed.length,2);A.equal(diff.added.length,0);
+  const subset=C.onlineResearchComparison(entry,{...entry,id:"study-3",rows:[wiki]});
+  A.equal(subset.missing.length,1);A.ok(subset.note.includes("не означают"));
+  console.log("v1.24–1.26 research memory checks passed");
+ }
