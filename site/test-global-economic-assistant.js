@@ -437,3 +437,28 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.productivityCommand(C.naturalRoute("Покажи производительность труда в 2024 году относительно 2020 года").command).year,2024);
  console.log("18 natural-language routing checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const a="Покажи межотраслевой баланс группы 9",b="Покажи приоритетные задачи агентов",c="Покажи структуру энергетики России в 2024 году относительно 2020 года";
+ const plan=C.researchPlan("Исследование: "+a+" | "+b);
+ A.equal(plan.kind,"research");A.equal(plan.steps.length,2);
+ A.equal(C.researchPlan("исследование:\n"+a+"\n"+b+"\n"+c).steps.length,3);
+ A.equal(C.researchPlan("Исследование: "+a+" | "+a).kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a+" | неизвестный вопрос").kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a).kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a+" | "+b+" | "+c+" | "+a).kind,"invalid");
+ A.equal(C.researchPlan(a),null);
+ async function checks(){
+  const order=[],make=(step)=>({found:[{id:"fact1",kind:"Наблюдение",value:0,description:step.command}],fingerprint:"a".repeat(64),failed:0,context:{description:step.tool}});
+  const r=await C.runResearchPlan(plan,async step=>{order.push(step.tool);return make(step)});
+  A.deepEqual(order,["balance","agents"]);A.deepEqual(r.found.map(x=>x.id),["s1-fact1","s2-fact1"]);A.equal(r.found[0].value,0);A.equal(r.results.length,2);A.equal(r.failed,0);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),fingerprint:step.tool})),/snapshot changed/);
+  let calls=0;await A.rejects(()=>C.runResearchPlan(plan,async step=>{calls++;return make(step)},()=>calls===0),/cancelled/);A.equal(calls,1);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),found:[{id:"fact1"},{id:"fact1"}]})),/identity/);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),table:{}})),/Invalid step/);
+  const partial=await C.runResearchPlan(plan,async step=>({...make(step),failed:step.tool==="balance"?1:0}));
+  A.equal(partial.failed,1);A.equal(partial.results[0].failed,1);
+  console.log("20 sequential research checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}

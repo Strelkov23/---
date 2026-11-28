@@ -151,6 +151,37 @@ const GlobalEconomicAssistant=(function core(){
   }
   return parsed&&parsed.kind!=="invalid"?{tool,command}:null;
  }
+ // A bounded research plan with explicitly supplied, validated steps.
+ function researchPlan(q){
+  const text=String(q??"").trim();
+  if(!/^исследование\s*:/iu.test(text))return null;
+  if(text.length>600)return {kind:"invalid"};
+  const pieces=text.replace(/^исследование\s*:\s*/iu,"").split(/\r?\n|\|/u).map(x=>x.trim()).filter(Boolean);
+  if(pieces.length<2||pieces.length>3)return {kind:"invalid"};
+  const steps=pieces.map(naturalRoute);
+  if(steps.some(x=>!x)||new Set(steps.map(x=>x.command)).size!==steps.length)return {kind:"invalid"};
+  return {kind:"research",steps};
+ }
+ async function runResearchPlan(plan,run,active=()=>true){
+  if(plan?.kind!=="research"||!Array.isArray(plan.steps)||plan.steps.length<2||plan.steps.length>3||typeof run!=="function")throw Error("Invalid research plan");
+  const results=[],found=[];let fingerprint=null,failed=0;
+  for(const [i,step] of plan.steps.entries()){
+   if(!active())throw Error("Research cancelled");
+   const result=await run(step);
+   if(!active())throw Error("Research cancelled");
+   if(!result||!Array.isArray(result.found)||typeof result.fingerprint!=="string"||!result.fingerprint||!Number.isInteger(result.failed)||result.failed<0||result.table)throw Error("Invalid step result");
+   if(fingerprint!==null&&fingerprint!==result.fingerprint)throw Error("Archive snapshot changed");
+   fingerprint=result.fingerprint;failed+=result.failed;
+   const prefix="s"+(i+1)+"-",ids=new Set();
+   for(const row of result.found){
+    if(typeof row.id!=="string"||!/^[a-z][a-z0-9_-]{0,35}$/i.test(row.id)||ids.has(row.id))throw Error("Invalid step evidence identity");
+    ids.add(row.id);
+    found.push({...row,id:prefix+row.id});
+   }
+   results.push({step:i+1,command:step.command,count:result.found.length,failed:result.failed,context:result.context||{}});
+  }
+  return {found,failed,fingerprint,results};
+ }
  function priceCommand(q){
   const s=String(q||"").trim();
   if(!/^покупательная способность\s*:/iu.test(s))return null;
@@ -780,7 +811,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -1094,8 +1125,8 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
- async function find(parameters){
-  const command=C.naturalRoute(q.value)?.command||q.value;
+ async function find(parameters,query=q.value){
+  const command=C.naturalRoute(query)?.command||query;
   const agents=C.agentCommand(command);if(agents)return findAgents(agents,parameters);
   const forecastAudit=C.forecastAuditCommand(command);if(forecastAudit)return findForecastAudit(forecastAudit,parameters);
   const technology=C.technologyCommand(command);if(technology)return findTechnology(technology,parameters);
@@ -1186,7 +1217,14 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  }
  async function execute(generate){
   if(busy||!q.value.trim())return;save();const id=++epoch;lock(true);reset();status.textContent="Поиск по архиву сайта…";
-  try{const parameters=currentParameters();renderParameters();const r=await find(parameters);if(id!==epoch)return;const route=C.naturalRoute(q.value);if(route){r.context={...r.context,automatic_route:route.command,route_note:"Выбрано по явным параметрам запроса; не самостоятельное решение модели."};r.found.unshift({id:"auto-route",kind:"Выбранный инструмент",title:"Автоматический маршрут запроса",description:route.command,limit:"Параметры взяты из вопроса. Результат расчёта приведён отдельно, если доступен."});}render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
+  try{const parameters=currentParameters();renderParameters();const plan=C.researchPlan(q.value);let r;
+   if(plan?.kind==="invalid"){status.textContent="Исследование: укажите 2–3 разных поддерживаемых вопроса через | или новую строку. Неполные параметры не подставляются.";return}
+   if(plan){
+    const combined=await C.runResearchPlan(plan,async step=>{status.textContent="Выполняется: "+step.command;return find(parameters,step.command)},()=>id===epoch);
+    r={found:combined.found,failed:combined.failed,fingerprint:combined.fingerprint,context:{page,heading,parameters,research_steps:combined.results,description:"Составное исследование по одному снимку. Независимые расчёты; причинная связь не установлена."}};
+    r.found.unshift({id:"research-plan",kind:"План исследования",title:"Выполнены запросы к "+combined.results.length+" инструментам",description:combined.results.map(x=>x.step+". "+x.command+" · карточек "+x.count+(x.failed?" · недоступных архивов "+x.failed:"")).join(" | "),limit:"Карточки состояния не являются успешными расчётами. Параметры запроса не фактические наблюдения."});
+   }else r=await find(parameters);
+   if(id!==epoch)return;const route=C.naturalRoute(q.value);if(route){r.context={...r.context,automatic_route:route.command,route_note:"Выбрано по явным параметрам запроса; не самостоятельное решение модели."};r.found.unshift({id:"auto-route",kind:"Выбранный инструмент",title:"Автоматический маршрут запроса",description:route.command,limit:"Параметры взяты из вопроса. Результат расчёта приведён отдельно, если доступен."});}render(r);last={question:q.value,context:r.context,rows:r.found,fingerprint:r.fingerprint,answer:""};
    if(!generate){status.textContent="Поиск завершён, нейросеть не использована.";return}
    if(!r.found.length){status.textContent="Нет данных для объяснения.";return}
    status.textContent="Локальная генерация…";
