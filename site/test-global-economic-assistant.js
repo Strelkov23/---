@@ -2099,8 +2099,8 @@ console.log("16 agent coordination checks passed");}
 {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
  async function modelAcceptanceChecks(){
   const cases=C.modelAcceptanceCases(),fact=JSON.stringify([{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"limitation",text:"Учебные данные.",refs:[]}]);
-  const responses={arithmetic:"42",context:"СЕВЕР",grounding:fact,insufficient:JSON.stringify([{type:"limitation",text:"Нет данных.",refs:[]}]),planning:JSON.stringify(["Покажи производительность труда в 2024 году относительно 2019 года","Рассчитай межотраслевой баланс для группы 9"]),injection:fact};
-  A.equal(cases.length,6);A.equal(new Set(cases.map(c=>c.id)).size,6);
+  const responses={arithmetic:"42",context:"СЕВЕР",grounding:fact,insufficient:JSON.stringify([{type:"limitation",text:"Нет данных.",refs:[]}]),planning:JSON.stringify(["Покажи производительность труда в 2024 году относительно 2019 года","Рассчитай межотраслевой баланс для группы 9"]),injection:fact,json_format:'{"status":"ok"}',correction:"ЮГ",unit_grounding:fact};
+  A.equal(cases.length,9);A.equal(new Set(cases.map(c=>c.id)).size,9);
   A.ok(cases.every(c=>c.messages.length>=2&&c.maxTokens<=240));
   A.equal(cases[0].check("41"),"wrong_answer");
   A.equal(cases[1].check("ЮГ"),"wrong_context");
@@ -2110,13 +2110,18 @@ console.log("16 agent coordination checks passed");}
   A.equal(cases[4].check(responses.planning),"pass");
   A.equal(cases[4].check(responses.planning.replace("2019","2018")),"invalid_plan");
   A.equal(cases[5].check(fact.replace("100","999")),"numeric_evidence");
+  A.equal(cases[6].check('{"status":"ok","extra":true}'),"wrong_answer");
+  A.equal(cases[6].check("null"),"wrong_answer");
+  A.equal(cases[6].check("```json\n{}\n```"),"wrong_format");
+  A.equal(cases[7].check("СЕВЕР"),"wrong_context");
+  A.notEqual(cases[8].check(fact.replace("100 тонн","100 кг")),"pass");
   let tick=0;const progress=[];
   const good=await C.runModelAcceptance(async(m,t,id)=>responses[id],()=>true,(i,n,id)=>progress.push([i,n,id]),()=>{tick+=25;return tick;});
-  A.equal(good.state,"passed");A.equal(good.passed,6);A.equal(good.total,6);
-  A.equal(progress.length,6);A.equal(good.results[0].ms,25);A.equal(good.results[0].output,"42");
+  A.equal(good.state,"passed");A.equal(good.passed,9);A.equal(good.total,9);
+  A.equal(progress.length,9);A.equal(good.results[0].ms,25);A.equal(good.results[0].output,"42");
   A.ok(good.scope.includes("не общая оценка"));
   const wrong=await C.runModelAcceptance(async(m,t,id)=>id==="arithmetic"?"43":responses[id]);
-  A.equal(wrong.state,"needs_review");A.equal(wrong.passed,5);
+  A.equal(wrong.state,"needs_review");A.equal(wrong.passed,8);
   let calls=0;
   const off=await C.runModelAcceptance(async()=>{calls++;throw Error("offline")});
   A.equal(off.state,"incomplete");A.equal(off.results[0].state,"model_unavailable");A.equal(calls,1);
@@ -2425,4 +2430,26 @@ console.log("16 agent coordination checks passed");}
    console.log("v2.27 performance diagnostics checks passed");
   }
   performanceDiagnosticsChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+ // v2.28: strict explicit format checking without claiming factual correctness.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function explicitFormatChecks(){
+   const number="Вычисли 2+2. Ответь только числом.",word="Выбери цвет. Ответь только одним словом.",json="Верни только JSON.";
+   for(const v of ["4","−4","4,5","-0.25","1e-3"])A.equal(C.chatFormatAudit(number,v).passed,true);
+   for(const v of ["Ответ: 4","4 руб.","4 и 5","", "NaN"])A.equal(C.chatFormatAudit(number,v).passed,false);
+   A.equal(C.chatFormatAudit(word,"сине-зелёный").passed,true);
+   A.equal(C.chatFormatAudit(word,"синий цвет").passed,false);
+   for(const v of ['{"a":1}',"[1,2]","null","42",'"текст"'])A.equal(C.chatFormatAudit(json,v).passed,true);
+   for(const v of ["{bad}","ответ: {}","", "```json\n{}\n```"])A.equal(C.chatFormatAudit(json,v).passed,false);
+   A.equal(C.explicitChatFormat('Что означает выражение «Ответь только числом»?'),null);
+   A.equal(C.chatFormatAudit("Объясни подробно.","Любой текст").passed,true);
+   A.ok(C.generalChatPrompt(number,[]).messages[0].content.includes("Формат ответа обязателен"));
+   const good=await C.runGeneralChat(number,[],async()=>"4");A.equal(good.state,"complete");
+   const wrong=await C.runGeneralChat(number,[],async()=>"Ответ: 4");A.equal(wrong.state,"notice");A.equal(wrong.formatMismatch,"number");A.equal(wrong.answer,"Ответ: 4");
+   A.equal(C.generalChatPrompt("Следующий вопрос",[{mode:"general",state:wrong.state,question:number,answer:wrong.answer}]).used,0);
+   const truncated=await C.runGeneralChat(json,[],async()=>({text:"{",truncated:true}));A.equal(truncated.truncated,true);A.equal(truncated.formatMismatch,"json");
+   console.log("v2.28 explicit format quality checks passed");
+  }
+  explicitFormatChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
