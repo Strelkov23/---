@@ -776,3 +776,17 @@ console.log("16 agent coordination checks passed");}
  const hits=C.localPdfSearch(text,pages,"выпуск");A.equal(hits[1].page,2);A.equal(hits[1].excerpt,"Выпуск 15");
  console.log("8 scan viewport and page identity checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const c=C.chartCalibration({x:10,y:110},{x:110,y:10},2020,0,2030,100);
+ A.deepEqual(C.chartPoint(c,{x:60,y:60}),{x:2025,y:50,pixelX:60,pixelY:60,onePixelX:0.1,onePixelY:1});
+ A.equal(C.chartPoint(c,{x:10,y:110}).y,0);A.equal(C.chartPoint(c,{x:110,y:10}).x,2030);
+ A.throws(()=>C.chartPoint(c,{x:111,y:50}));A.throws(()=>C.chartPoint(c,{x:50,y:111}));
+ A.throws(()=>C.chartCalibration({x:10,y:110},{x:15,y:10},0,0,1,1));
+ A.throws(()=>C.chartCalibration({x:10,y:110},{x:110,y:10},0,0,0,1));
+ A.throws(()=>C.chartCalibration({x:10,y:110},{x:110,y:10},0,NaN,1,1));
+ const reverse=C.chartCalibration({x:0,y:100},{x:100,y:0},10,100,0,0);A.equal(C.chartPoint(reverse,{x:50,y:50}).y,50);
+ A.equal(C.chartPointsCsv([C.chartPoint(c,{x:60,y:60})]),"x_estimate,y_estimate,pixel_x,pixel_y,x_per_pixel,y_per_pixel\n2025,50,60,60,0.1,1\n");
+ A.throws(()=>C.chartPointsCsv([]));A.throws(()=>C.chartPointsCsv([{x:NaN}]));
+ console.log("12 chart digitization checks passed");
+}
