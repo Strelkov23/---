@@ -74,7 +74,7 @@ def prior_agent_report(previous, stamp):
         return None, 'missing'
     try:
         manifest=read(previous,'data-manifest.json')
-        if provenance.file_info(previous/FILE)!=manifest['files'].get(FILE):
+        if manifest.get('schema')!=provenance.SCHEMA or provenance.fingerprint(manifest['files'])!=manifest.get('data_fingerprint') or provenance.file_info(previous/FILE)!=manifest['files'].get(FILE):
             raise ValueError('Previous report checksum mismatch')
         prior=read(previous,FILE)
         validate(prior)
@@ -169,6 +169,51 @@ def validate_preflight(d):
     if p['counts']!={k:sum(r['status']==k for r in p['rows']) for k in ('inputs_readable','inputs_unavailable','deferred')}:raise ValueError('Invalid preflight counts')
     return True
 
+# Bounded history of actual local checks, not a memory of economic conclusions.
+HISTORY_LIMIT=30
+def preflight_snapshot(data):
+    return dict(checked=data['built'], mode=data['mode'], rows=data['preflight']['rows'],
+                counts=data['preflight']['counts'])
+
+def preflight_history(data, prior):
+    current=preflight_snapshot(data)
+    older=[]
+    if prior and 'preflight' in prior:
+        older=prior.get('preflight_history',{}).get('snapshots',[preflight_snapshot(prior)])
+    now=datetime.fromisoformat(current['checked'])
+    older=[r for r in older if datetime.fromisoformat(r['checked'])<now]
+    return dict(schema=1, limit=HISTORY_LIMIT, snapshots=[current]+older[:HISTORY_LIMIT-1])
+
+def validate_preflight_history(data):
+    h=data['preflight_history']
+    if h['schema']!=1 or h['limit']!=HISTORY_LIMIT or not 1<=len(h['snapshots'])<=HISTORY_LIMIT or h['snapshots'][0]!=preflight_snapshot(data):
+        raise ValueError('Invalid preflight history')
+    previous=None
+    for snap in h['snapshots']:
+        stamp=datetime.fromisoformat(snap['checked'])
+        if stamp.tzinfo is None or previous is not None and stamp>=previous or snap['mode'] not in ('scheduled_refresh','offline_build'):
+            raise ValueError('Invalid history time')
+        previous=stamp
+        ids=set()
+        for row in snap['rows']:
+            owner=row['id'].removeprefix('review-')
+            if owner not in PREFLIGHT_INPUTS or row['id']!='review-'+owner or row['id'] in ids:
+                raise ValueError('Invalid history task')
+            ids.add(row['id'])
+            if row['status']=='deferred':
+                if row['files']:raise ValueError('Deferred history files')
+                continue
+            if [f['name'] for f in row['files']]!=list(PREFLIGHT_INPUTS[owner]):raise ValueError('Invalid history inputs')
+            for f in row['files']:
+                if f['status']=='readable':
+                    if type(f['bytes']) is not int or f['bytes']<1 or not re.fullmatch(r'[a-f0-9]{64}',f['sha256']):raise ValueError('Invalid history checksum')
+                elif f['status'] not in ('missing','empty_or_invalid','unreadable'):raise ValueError('Invalid history file state')
+            if row['status']!=('inputs_readable' if all(f['status']=='readable' for f in row['files']) else 'inputs_unavailable'):
+                raise ValueError('Invalid history status')
+        if snap['counts']!={k:sum(r['status']==k for r in snap['rows']) for k in ('inputs_readable','inputs_unavailable','deferred')}:
+            raise ValueError('Invalid history counts')
+    return True
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
@@ -244,6 +289,7 @@ def build(out,previous,stamp,refresh):
     data['continuity']=continuity(agents,stamp,prior,baseline)
     data['research_queue']=research_queue(agents,data['continuity'])
     data['preflight']=preflight(out,data['research_queue'],stamp)
+    data['preflight_history']=preflight_history(data,prior)
     validate(data)
     return data
 def validate(d):
@@ -255,6 +301,9 @@ def validate(d):
     if 'research_queue' in d:
         if 'continuity' not in d or d['research_queue']!=research_queue(d['agents'],d['continuity']):raise ValueError('Invalid research queue')
     if 'preflight' in d:validate_preflight(d)
+    if 'preflight_history' in d:
+        if 'preflight' not in d:raise ValueError('History without current check')
+        validate_preflight_history(d)
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
