@@ -17,3 +17,31 @@ jobs:
           python-version: '3.12'
       - run: python3 -m unittest -v test_probe_ai_public_release.py
         working-directory: site
+  public-observation:
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    # This observation is independent of the production deployment. A stale
+    # site is reported as a failed probe, not as a failed offline unit test.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the exact deployed assistant release
+        env:
+          EXPECTED_REVISION: 8d57e552af24c368d70c0018d2caf8b44c03bfb6
+          PUBLIC_BASE: https://strelkov23.github.io/---/
+        run: |
+          set -o pipefail
+          python3 site/probe_ai_public_release.py --base "$PUBLIC_BASE" --revision "$EXPECTED_REVISION" | tee public-ai-release-report.json
+      - name: Save independent live observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-ai-release-report
+          path: public-ai-release-report.json
+          if-no-files-found: warn
+          retention-days: 14
