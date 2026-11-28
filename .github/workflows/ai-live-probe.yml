@@ -14,6 +14,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -39,6 +40,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Observe production workflow status
+        if: github.head_ref == 'economic-ai-v230-public-observation'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow publish.yml --branch main --limit 5 --json databaseId,status,conclusion,headSha,createdAt,updatedAt,url
       - name: Verify the exact deployed assistant release
         env:
           EXPECTED_REVISION: ${{ inputs.revision }}
@@ -55,7 +62,7 @@ jobs:
           fi
           python3 site/probe_ai_public_release.py --base "$PUBLIC_BASE" --revision "$EXPECTED_REVISION" | tee public-ai-release-report.json
       - name: Check real WebLLM module and model catalogue without loading weights
-        if: github.head_ref == 'economic-ai-v230-public-observation'
+        if: always() && github.head_ref == 'economic-ai-v230-public-observation'
         run: |
           python3 -m pip install playwright==1.51.0
           CHROME_BIN=$(command -v google-chrome) python3 - <<'PY'
