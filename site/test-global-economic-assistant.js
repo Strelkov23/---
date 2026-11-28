@@ -1914,3 +1914,52 @@ console.log("16 agent coordination checks passed");}
  }
  criticalReviewChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.84–1.86: local alternative review with explicit evidence constraints.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function alternativeReviewChecks(){
+  const q="Объясни изменение выпуска",rows=[
+   {id:"arc-1",category:"observation",origin:"archive",title:"Выпуск",description:"100 тонн",value:100,unit:"тонн",period:"2025"},
+   {id:"arc-2",category:"calculation",origin:"archive",title:"Динамика",description:"Снижение выпуска на 10%"},
+   {id:"arc-3",category:"scenario",origin:"archive",title:"Модель",description:"Будущий выпуск 120 тонн"},
+   {id:"web-4",category:"bibliography",origin:"online",title:"Статья",description:"Только метаданные"}
+  ],result={state:"accepted",context:{rows},checked:{ok:true,findings:[{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"limitation",text:"Недостаточно данных",refs:[]}]}};
+  const input=C.alternativeReviewInput(q,result),payload=JSON.parse(input.messages[1].content);
+  A.equal(input.blocked,false);A.deepEqual(input.cards.map(x=>x.id),["arc-1","arc-2"]);
+  A.equal(payload.preliminary.length,1);A.equal(payload.scope.eligible,2);A.equal(input.omitted,0);
+  A.equal(C.alternativeReviewInput(q,{...result,context:{rows:[...rows,{...rows[0],id:"arc-5"}]}}).cards.length,2);
+  A.throws(()=>C.alternativeReviewInput(q,{...result,state:"rejected"}));
+  A.throws(()=>C.alternativeReviewInput("",result));
+  A.throws(()=>C.alternativeReviewInput(q,result,0));
+  A.equal(C.alternativeReviewInput(q,result,1).blocked,true);
+  const support={type:"support",text:"Зафиксирован выпуск 100 тонн",refs:["arc-1"]},challenge={type:"challenge",text:"Наблюдается снижение выпуска на 10%",refs:["arc-2"]},gap={type:"gap",text:"Не установлены причины",refs:[]};
+  const valid=await C.runAlternativeReview(q,result,async()=>JSON.stringify([support,challenge,gap]));
+  A.equal(valid.state,"accepted");A.equal(valid.summary.support,1);A.equal(valid.summary.challenge,1);A.equal(valid.summary.gap,1);A.equal(valid.summary.partial,false);
+  const only=await C.runAlternativeReview(q,result,async()=>JSON.stringify([gap]));
+  A.equal(only.state,"accepted");A.equal(only.summary.partial,true);
+  const noGap=await C.runAlternativeReview(q,result,async()=>JSON.stringify([support]));
+  A.equal(noGap.state,"rejected");A.equal(noGap.checked.reason,"missing_gap");
+  const scenario=await C.runAlternativeReview(q,result,async()=>JSON.stringify([{...support,refs:["arc-3"]},gap]));
+  A.equal(scenario.checked.reason,"unknown_source");
+  const numeric=await C.runAlternativeReview(q,result,async()=>JSON.stringify([{...support,text:"Выпуск 999 тонн"},gap]));
+  A.equal(numeric.checked.reason,"numeric_evidence");
+  const invalid=await C.runAlternativeReview(q,result,async()=>"bad");
+  A.equal(invalid.state,"rejected");A.equal(invalid.checked.reason,"json");
+  const broken=await C.runAlternativeReview(q,result,async()=>{throw Error("offline")});
+  A.equal(broken.state,"model_unavailable");
+  let calls=0;
+  const blocked=await C.runAlternativeReview(q,result,async()=>{calls++;return ""},()=>true,1);
+  A.equal(blocked.state,"no_evidence");A.equal(calls,0);
+  const cancel=await C.runAlternativeReview(q,result,async()=>{calls++;return ""},()=>false);
+  A.equal(cancel.state,"cancelled");A.equal(calls,0);
+  let active=true;
+  const later=await C.runAlternativeReview(q,result,async()=>{active=false;return JSON.stringify([support,gap])},()=>active);
+  A.equal(later.state,"cancelled");
+  const local={...result,context:{rows:[...rows,{id:"loc-5",category:"local_table",origin:"local",title:"Таблица",description:"5 тонн",value:5,unit:"тонн"}]}};
+  A.ok(C.alternativeReviewInput(q,local).cards.some(x=>x.origin==="local"));
+  A.equal(result.checked.findings.length,2);
+  console.log("v1.84–1.86 alternative review checks passed");
+ }
+ alternativeReviewChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
