@@ -37,5 +37,22 @@ class PublishContractTests(unittest.TestCase):
         for name in ("global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js"):
             self.assertIn('src="'+name+'"',shell)
 
+    def test_exact_ai_public_source_gate(self):
+        root=Path(__file__).resolve().parents[1]
+        source=(root/".github/workflows/publish.yml").read_text(encoding="utf-8")
+        self.assertIn("source_revision: ${{ steps.archive.outputs.source_revision }}",source)
+        self.assertIn('source_revision=$(cat monitor/public/source-version.txt)',source)
+        self.assertIn("EXPECTED_SOURCE_REVISION: ${{ needs.build.outputs.source_revision }}",source)
+        verify=source.split("      - name: Verify public deployment",1)[1]
+        self.assertIn('test "$actual_source" = "$EXPECTED_SOURCE_REVISION"',verify)
+        self.assertIn('assistant_pages={"index.html","historical.html","papers.html","analyst-cockpit.html"}',verify)
+        self.assertIn('assert {"gea-toggle","gea-panel","gea-question","gea-model"}<=parser.ids',verify)
+        self.assertIn('assert {"global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js"}<=parser.scripts',verify)
+        ci=(root/".github/workflows/validate.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request:",ci)
+        self.assertIn("python3 -m unittest -v test_probe_ai_public_release.py",ci)
+        live=(root/".github/workflows/ai-live-probe.yml").read_text(encoding="utf-8")
+        self.assertIn("EXPECTED_REVISION: ${{ inputs.revision }}",live)
+
 if __name__=="__main__":
     unittest.main()
