@@ -957,3 +957,30 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.hypothesisJournal(JSON.parse(JSON.stringify(saved)))[0].runs[0].fingerprint,next);
  console.log("19 hypothesis research receipt checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),next="b".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const question="Производительность и энергетика России в 2025 году относительно 2020 года";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"Данные",value:10,unit:"руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,question,"h-1",at);
+ const questions=["Покажи производительность труда в 2025 году относительно 2020 года","Покажи структуру энергетики России в 2025 году относительно 2020 года"];
+ const plan=C.hypothesisPlan(JSON.stringify(questions),j[0]);
+ const result=(fingerprint,found,p=plan)=>({fingerprint,failed:0,found,results:p.steps.map((s,i)=>({step:i+1,command:s.command,count:found.filter(x=>x.id.startsWith("s"+(i+1)+"-")).length,failed:0}))});
+ const a={...source,id:"s1-a"},b={...source,id:"s2-b",title:"Энергетика"},c={...a,description:"Другой текст"};
+ const append=(journal,res,p=plan)=>C.appendHypothesisRun(journal,"h-1",p,res,at);
+ A.equal(C.compareHypothesisRuns(j[0]).state,"insufficient_runs");
+ const first=append(j,result(fp,[a,b]));const same=append(first,result(fp,[a,b]));
+ const x=C.compareHypothesisRuns(same[0]).comparisons[0];A.equal(x.state,"same_snapshot");A.equal(x.counts.unchanged,2);A.equal(x.previous,1);
+ const changed=append(same,result(next,[c,{...b,title:"Новая карточка"}]));
+ const y=C.compareHypothesisRuns(changed[0]).comparisons[1];A.equal(y.state,"different_snapshot");A.equal(y.counts.changed_excerpt,1);A.equal(y.counts.only_previous_sample,1);A.equal(y.counts.only_current_sample,1);A.equal(y.previous,2);A.equal(y.completeSamples,true);
+ const reverse=C.hypothesisPlan(JSON.stringify(questions.slice().reverse()),j[0]);
+ const diff=append(first,result(next,[a,b],reverse),reverse);
+ A.equal(C.compareHypothesisRuns(diff[0]).comparisons[0].state,"different_plan");
+ const again=append(diff,result(next,[a,b]));A.equal(C.compareHypothesisRuns(again[0]).comparisons[1].previous,1);
+ const amb=append(first,result(next,[a,{...a,id:"s1-a2"},b]));A.equal(C.compareHypothesisRuns(amb[0]).comparisons[0].counts.ambiguous,1);
+ const many=Array.from({length:9},(_,i)=>({...a,id:"s1-a"+i,title:"Ряд "+i}));
+ const partial=append(first,result(next,many));A.equal(C.compareHypothesisRuns(partial[0]).comparisons[0].completeSamples,false);
+ A.equal(changed[0].events.length,0);
+ A.ok(y.limit.includes("не является независимым"));
+ console.log("17 hypothesis run comparison checks passed");
+}
