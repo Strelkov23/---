@@ -163,6 +163,18 @@ def main():
             assert read_requests==["https://science.org/history"],read_requests
             assert "Получены фрагменты выбранных страниц" in log.inner_text()
             assert "hidden test 999" not in log.text_content()
+            # Multi-step search retains consent for every exact query and deduplicates results.
+            question.fill("История науки")
+            page.get_by_role("textbox",name="Дополнительные поисковые запросы").fill("История техники")
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Многоступенчатый веб-поиск",exact=True).click()
+            assert len(gateway_requests)==1,gateway_requests
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Многоступенчатый веб-поиск",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===6 && !document.querySelector('#gea-question').disabled")
+            assert "Многоступенчатый поиск завершён" in log.inner_text(), (page.locator("#gea-status").inner_text(), log.inner_text(), gateway_requests, errors)
+            assert len(gateway_requests)==3,gateway_requests
+            assert "1, 2" in log.text_content()
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
