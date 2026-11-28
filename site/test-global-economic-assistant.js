@@ -1876,3 +1876,41 @@ console.log("16 agent coordination checks passed");}
  }
  stepAwareChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.81–1.83: same-series disagreement detection and non-adjudicating review.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function criticalReviewChecks(){
+  const stamp="a".repeat(64),base={kind:"Наблюдение",title:"Выпуск стали",description:"100 тонн",value:100,registryId:"steel.output",period:"2025",unit:"тонн",href:"https://example.org/steel"};
+  const a={...base,id:"first"},b={...base,id:"second",description:"110 тонн",value:110};
+  const archive={fingerprint:stamp,failed:0,found:[a,b]};
+  const ev=C.hybridEvidence(archive,[]);
+  const groups=C.researchConflictGroups(ev.rows);
+  A.equal(groups.length,1);A.deepEqual(groups[0].ids,["arc-1","arc-2"]);A.deepEqual(groups[0].values,[{id:"arc-1",value:100},{id:"arc-2",value:110}]);
+  for(const changed of [{period:"2024"},{unit:"кг"},{registryId:"coal.output"},{href:"https://example.net/steel"},{value:100},{registryId:""},{href:""},{kind:"Условный расчёт"}]){
+   const rows=C.hybridEvidence({...archive,found:[a,{...b,...changed}]},[]).rows;
+   A.equal(C.researchConflictGroups(rows).length,0);
+  }
+  A.equal(C.researchConflictGroups([{...ev.rows[0],origin:"local"},ev.rows[1]]).length,0);
+  const ctx=C.multimodalContext("Оцени выпуск",ev,[]),payload=JSON.parse(ctx.messages[1].content);
+  A.deepEqual(payload.sameSeriesConflicts,[{ids:["arc-1","arc-2"],period:"2025",unit:"тонн"}]);
+  const fact={type:"observation",text:"100 тонн",refs:["arc-1"]},limit={type:"limitation",text:"Требуется сверка.",refs:[]};
+  const checked={ok:true,findings:[fact,limit]};
+  const review=C.researchConflictReview(ev,ctx,checked);
+  A.equal(review[0].status,"unresolved");A.deepEqual(review[0].cited,["arc-1"]);
+  A.equal(C.researchConflictReview(ev,{rows:[ev.rows[0]]},checked)[0].status,"incomplete_context");
+  A.ok(C.researchConflictNote(review).includes("верное значение не установлены"));
+  A.equal(C.researchConflictNote([]),"");
+  const result=await C.runMultimodalResearch("Оцени выпуск",{},[],[],async()=>archive,async()=>JSON.stringify([fact,limit]));
+  A.equal(result.state,"accepted");A.equal(result.partial,true);A.equal(result.conflictReview.length,1);
+  A.ok(C.researchChatTurn(result).note.includes("Обнаружено расхождений"));
+  const broken=await C.runMultimodalResearch("Оцени выпуск",{},[],[],async()=>archive,async()=>{throw Error("offline")});
+  A.equal(broken.state,"model_unavailable");A.equal(broken.conflictReview.length,1);A.deepEqual(broken.conflictReview[0].cited,[]);
+  const empty=await C.runMultimodalResearch("Оцени выпуск",{},[],[],async()=>archive,async()=>{throw Error("must not call")},()=>true,1);
+  A.equal(empty.state,"no_evidence");A.equal(empty.conflictReview[0].status,"incomplete_context");
+  const hybrid=await C.runHybridResearch("Оцени выпуск","сталь",[{id:"wiki-ru-1",title:"Справка",description:"Текст"}],[],async()=>archive,async()=>JSON.stringify([fact,{type:"reference",text:"Текст",refs:["web-3"]},limit]));
+  A.equal(hybrid.partial,true);A.equal(hybrid.conflictReview.length,1);
+  console.log("v1.81–1.83 critical review checks passed");
+ }
+ criticalReviewChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
