@@ -28,6 +28,17 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",as
   for(const r of memory.rows){const box=add(section,"details","");add(box,"summary",r.title+" · "+names[r.transition]);add(box,"p",(r.year??"нет периода")+" · "+(r.value===null?"нет наблюдения":r.value+" "+r.unit));if(r.revision_delta!==null)add(box,"p","Изменение значения того же периода: "+r.revision_delta.toPrecision(5)+" "+r.unit);}
   if(memory.removed_ids.length)add(section,"p","Исключённые диагностические записи (не снятые сигналы): "+memory.removed_ids.join(", "));
  }
+ const dossiers=d.signal_dossiers;
+ if(dossiers?.schema===1&&Array.isArray(dossiers.rows)){
+  const section=add($("cards"),"article","");section.className="ac-panel";add(section,"h3","Исследовательские досье по сигналам");add(section,"p",dossiers.note);
+  const labels={ready_for_review:"Готово к рассмотрению",check_inputs:"Сначала сверить данные",refresh_first:"Сначала обновить данные",needs_data:"Нужны данные или история",unmatched_route:"Маршрут не подтверждён",review_transition:"Проверить изменение сигнала"};
+  if(!dossiers.rows.length)add(section,"p","Нет досье по текущим сигналам; это не доказывает отсутствие экономических проблем.");
+  for(const r of dossiers.rows){
+   const item=add(section,"details","");add(item,"summary",r.title+" · "+labels[r.state]);add(item,"p",(r.year??"нет периода")+" · "+(r.value===null?"нет данных":r.value+" "+r.unit));add(item,"p","Методика: "+r.formula+" · "+r.limit);add(item,"p","Исходные ряды: "+r.codes.join(", "));
+   for(const href of r.sources){if(/^https?:\/\//.test(href)){const link=add(item,"a","Первичный ряд");link.href=href;link.rel="noopener noreferrer";add(item,"p","");}}
+   if(r.route){add(item,"p",r.route.title+" · "+r.route.action);if(/^[a-z0-9-]+\.html(?:#[a-z0-9-]+)?$/.test(r.route.href)){const link=add(item,"a","Открыть инструмент планирования");link.href=r.route.href;}}
+  }
+ }
  const queue=d.research_queue;
  if(queue?.schema===1&&queue.mode==="recommendations_only"&&Array.isArray(queue.tasks)){
   const section=add($("cards"),"article","");section.className="ac-panel";add(section,"h3","Очередь исследовательских задач");

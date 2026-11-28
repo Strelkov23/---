@@ -174,4 +174,31 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(all(r['transition']=='initial' for r in signal_memory(current)['rows']))
         bad=deepcopy(m);bad['rows'][0]['revision_delta']=99
         with self.assertRaises(ValueError):validate_signal_memory(dict(built=stamp,agents=[dict(id='diagnostics',items=current)],signal_memory=bad))
+    def test_signal_dossiers(self):
+        from copy import deepcopy
+        r=dict(id='a',title='Показатель',status='signal',year=2025,value=2,unit='%',formula='A-B',codes=['A','B'],sources=['https://example.org/a','javascript:bad'],note='Ограничение',score=3)
+        p=dict(id='a',status='signal',year=2025,inputs=['A','B'],title='Маршрут',href='scenario.html',action='Проверить',priority='investigate')
+        agents=[dict(id='diagnostics',items=[r]),dict(id='planning',items=[p]),dict(id='quality',state='ok'),dict(id='coverage',state='ok')]
+        m=signal_memory([r])
+        d=signal_dossiers(agents,m);x=d['rows'][0]
+        self.assertEqual(x['state'],'ready_for_review')
+        self.assertEqual(x['route']['href'],'scenario.html')
+        self.assertEqual(x['sources'],['https://example.org/a'])
+        self.assertEqual(x['limit'],'Ограничение')
+        self.assertEqual(x['value'],2)
+        self.assertEqual(d['counts']['ready_for_review'],1)
+        agents[2]['state']='attention'
+        self.assertEqual(signal_dossiers(agents,m)['rows'][0]['state'],'check_inputs')
+        self.assertEqual(signal_dossiers(agents,m)['rows'][0]['blockers'],['quality'])
+        p['priority']='refresh_first'
+        self.assertEqual(signal_dossiers(agents,m)['rows'][0]['state'],'refresh_first')
+        p['year']=2024
+        self.assertEqual(signal_dossiers(agents,m)['rows'][0]['state'],'unmatched_route')
+        self.assertIsNone(signal_dossiers(agents,m)['rows'][0]['route'])
+        old=deepcopy(r);r['status']='ordinary';p.update(status='ordinary',year=2025,priority='monitor')
+        m=signal_memory([r],dict(built='2026-11-27T03:00:00+00:00',agents=[dict(id='diagnostics',items=[old])]))
+        self.assertEqual(signal_dossiers(agents,m)['rows'][0]['state'],'review_transition')
+        self.assertEqual(signal_dossiers(agents,signal_memory([r]))['rows'],[])
+        agents[1]['items'].append(deepcopy(p))
+        with self.assertRaises(ValueError):signal_dossiers(agents,m)
 if __name__=="__main__":unittest.main()
