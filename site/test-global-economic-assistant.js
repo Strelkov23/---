@@ -1368,3 +1368,34 @@ console.log("16 agent coordination checks passed");}
   }
   hybridChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.33–1.35: conservative natural-language routing and explicit intent previews.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const route=(q,tool,command)=>A.deepEqual(C.expandedNaturalRoute(q),{tool,command});
+  route("Как изменилась производительность труда в России с 2020 по 2024 год?","productivity","производительность труда: 2024; база=2020");
+  route("Покажи структуру энергетики России с 2020 года по 2024 год","energy","структура энергетики: 2024; база=2020");
+  route("Покажи торговлю с США за январь–июнь 2024 года","trade","торговля с сша: 2024; месяцев=6");
+  route("Покажи рынок труда за март 2024 года относительно 2020 года","labour","рынок труда: 2024-03; база=2020");
+  route("Найди предприятие по ИНН 7707083893","company","ИНН: 7707083893");
+  route("Сравни компании по ИНН 7707083893 и 7704211201","company","сравнить предприятия: 7707083893, 7704211201");
+  route("Рассчитай МРБ отраслевой группы № 9","balance","мрб: 9");
+  route("Оцени качество прогноза NY.GDP.MKTP.KD.ZG через 2 года","forecast","точность прогноза: ny.gdp.mktp.kd.zg; горизонт=2");
+  route("Покажи производительность труда в 2024 году относительно 2020 года","productivity","производительность труда: 2024; база=2020");
+  for(const q of ["Покажи производительность труда","Покажи производительность труда с 2024 по 2020 год","Покажи торговлю с США за январь–абракадабра 2024 года","Покажи рынок труда за несуществующий 2024 года относительно 2020 года","Найди предприятие по ИНН 123","Сравни компании по ИНН 7707083893 и 7707083893","Рассчитай МРБ группы 20","Не показывай межотраслевой баланс группы 9","Покажи межотраслевой баланс группы 9 и прогноз ВВП"])A.equal(C.expandedNaturalRoute(q),null);
+  const a="Покажи межотраслевой баланс группы 9",b="проверь точность прогноза NY.GDP.MKTP.KD.ZG на 1 год";
+  A.equal(C.implicitEconomicPlan(a+" и "+b).steps.length,2);
+  A.equal(C.implicitEconomicPlan(a+" и "+a),null);
+  A.equal(C.implicitEconomicPlan(a+" и объясни экономику"),null);
+  A.equal(C.economicIntent(a+" и "+b).kind,"plan");
+  A.equal(C.economicIntent(a).kind,"tool");
+  A.equal(C.economicIntent("Покажи рынок труда").kind,"clarify");
+  A.equal(C.economicIntent("Что такое межотраслевой баланс?").kind,"search");
+  A.equal(C.economicIntent("Не показывай межотраслевой баланс группы 9").kind,"search");
+  A.equal(C.economicIntent("Как развивается экономика России?").kind,"search");
+  A.equal(C.economicIntent("мрб: 9").kind,"search");
+  A.equal(C.economicIntent("").kind,"empty");
+  A.equal(C.researchPlan("Исследование: "+a+" | Покажи рынок труда за март 2024 года относительно 2020 года").steps.length,2);
+  A.equal(C.modelResearchPlan(JSON.stringify([a,"Найди предприятие по ИНН 7707083893"]),a+" 7707083893"),null);
+  console.log("v1.33–1.35 intent routing checks passed");
+ }
