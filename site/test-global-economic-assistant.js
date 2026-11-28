@@ -912,3 +912,23 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.structuredResearchInput("вопрос",{},rows,0,100).blocked,true);
  console.log("23 structured research checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб.",href:"https://example.org/a"}];
+ const h={type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},fp="a".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const add=(j=[])=>C.addHypothesis(j,h,rows,fp,"Вопрос","h-1",at),j=add();
+ A.equal(j.length,1);A.equal(j[0].fingerprint,fp);A.equal(j[0].events.length,0);A.equal(j[0].sources[0].class,"observation");
+ A.throws(()=>add(j));A.throws(()=>C.addHypothesis([],h,rows,"bad","Вопрос","h-1",at));
+ A.throws(()=>C.addHypothesis([],{...h,refs:["bad"]},rows,fp,"Вопрос","h-1",at));
+ A.throws(()=>C.addHypothesis([],{...h,type:"observation"},rows,fp,"Вопрос","h-1",at));
+ const updated=C.reviewHypothesis(j,"h-1","user_challenge","Нужны дополнительные данные.",at);
+ A.equal(updated[0].events[0].state,"user_challenge");A.equal(j[0].events.length,0);
+ A.throws(()=>C.reviewHypothesis(j,"h-1","verified","нет",at));A.throws(()=>C.reviewHypothesis(j,"h-1","investigating"," ",at));
+ A.throws(()=>C.reviewHypothesis(j,"h-1","investigating","Проверка","2025-11-28T10:00:00.000Z"));
+ A.throws(()=>C.hypothesisJournal([...j,...j]));
+ A.throws(()=>C.hypothesisJournal([{...j[0],sources:[{...j[0].sources[0],href:"javascript:alert(1)"}]}]));
+ A.equal(C.hypothesisJournal(JSON.parse(JSON.stringify(updated)))[0].text,h.text);
+ A.throws(()=>C.hypothesisJournal([{...j[0],created:"2026-02-30T10:00:00.000Z"}]));
+ A.throws(()=>C.hypothesisJournal(Array(31).fill(j[0])));
+ console.log("18 hypothesis journal checks passed");
+}
