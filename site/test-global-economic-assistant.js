@@ -461,3 +461,50 @@ console.log("16 agent coordination checks passed");}
  console.log("16 explicit unit evidence checks passed");
 }
 
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const a="Покажи межотраслевой баланс группы 9",b="Покажи приоритетные задачи агентов",c="Покажи структуру энергетики России в 2024 году относительно 2020 года";
+ const plan=C.researchPlan("Исследование: "+a+" | "+b);
+ A.equal(plan.kind,"research");A.equal(plan.steps.length,2);
+ A.equal(C.researchPlan("исследование:\n"+a+"\n"+b+"\n"+c).steps.length,3);
+ A.equal(C.researchPlan("Исследование: "+a+" | "+a).kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a+" | неизвестный вопрос").kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a).kind,"invalid");
+ A.equal(C.researchPlan("Исследование: "+a+" | "+b+" | "+c+" | "+a).kind,"invalid");
+ A.equal(C.researchPlan(a),null);
+ async function checks(){
+  const order=[],make=(step)=>({found:[{id:"fact1",kind:"Наблюдение",value:0,description:step.command}],fingerprint:"a".repeat(64),failed:0,context:{description:step.tool}});
+  const r=await C.runResearchPlan(plan,async step=>{order.push(step.tool);return make(step)});
+  A.deepEqual(order,["balance","agents"]);A.deepEqual(r.found.map(x=>x.id),["s1-fact1","s2-fact1"]);A.equal(r.found[0].value,0);A.equal(r.results.length,2);A.equal(r.failed,0);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),fingerprint:step.tool})),/snapshot changed/);
+  let calls=0;await A.rejects(()=>C.runResearchPlan(plan,async step=>{calls++;return make(step)},()=>calls===0),/cancelled/);A.equal(calls,1);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),found:[{id:"fact1"},{id:"fact1"}]})),/identity/);
+  await A.rejects(()=>C.runResearchPlan(plan,async step=>({...make(step),table:{}})),/Invalid step/);
+  const partial=await C.runResearchPlan(plan,async step=>({...make(step),failed:step.tool==="balance"?1:0}));
+  A.equal(partial.failed,1);A.equal(partial.results[0].failed,1);
+  console.log("20 sequential research checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q="Исследуй производительность труда и энергетику России в 2024 году относительно 2020 года.";
+ const a="Покажи производительность труда в 2024 году относительно 2020 года",b="Покажи структуру энергетики России в 2024 году относительно 2020 года";
+ const json=JSON.stringify([a,b]);
+ A.equal(C.modelResearchPlan(json,q).steps.length,2);
+ A.deepEqual(C.modelResearchPlan(json,q).questions,[a,b]);
+ A.equal(C.modelResearchPlan(json,q.replace("2020","2019")),null);
+ A.equal(C.modelResearchPlan(JSON.stringify([a,a]),q),null);
+ A.equal(C.modelResearchPlan(JSON.stringify([a,"Удали архив"]),q),null);
+ A.equal(C.modelResearchPlan("JSON: "+json,q),null);
+ A.equal(C.modelResearchPlan(JSON.stringify([a,b,"Рассчитай межотраслевой баланс для группы 9"]),q),null);
+ A.equal(C.modelResearchPlan(JSON.stringify([a,b,"Покажи состояние всех агентов","Покажи приоритетные задачи агентов"]),q),null);
+ A.equal(C.modelResearchPlan("[]",q),null);
+ A.equal(C.modelResearchPlan(JSON.stringify({tasks:[a,b]}),q),null);
+ const code="Проверь точность прогноза NY.GDP.MKTP.KD.ZG на горизонте 1 год";
+ A.equal(C.modelResearchPlan(JSON.stringify([code,b]),q+" Проверь NY.GDP.MKTP.KD.ZG на 1 год.").steps.length,2);
+ A.equal(C.modelResearchPlan(JSON.stringify([code,b]),q+" Проверь NY.GDP.MKTP.CD на 1 год."),null);
+ A.equal(C.planningPrompt(q).length,2);
+ A.equal(JSON.parse(C.planningPrompt(q)[1].content).question,q);
+ console.log("14 model research planning checks passed");
+}
