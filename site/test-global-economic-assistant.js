@@ -1094,3 +1094,39 @@ console.log("16 agent coordination checks passed");}
   }
   literatureChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.18: federated search keeps independent provider status and evidence boundaries.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+  const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Planning"],type:"journal-article"}]}});
+  const fetcher=async url=>({ok:true,text:async()=>url.includes("crossref")?papers:wiki});
+  A.deepEqual(C.federatedReferencePlan("планирование"),[{language:"ru",query:"планирование"},{language:"crossref",query:"планирование"}]);
+  A.deepEqual(C.federatedReferencePlan("планирование","planning").map(r=>r.query),["планирование","planning","planning"]);
+  A.throws(()=>C.federatedReferencePlan("","planning"));
+  A.throws(()=>C.federatedReferencePlan("x",123));
+  A.throws(()=>C.federatedReferencePlan("x","a".repeat(241)));
+  A.equal(C.federatedReferenceRank([{title:"Other"},{title:"Planning"}],"planning")[0].title,"Planning");
+  A.equal(C.federatedReferenceRank([{title:"Other",doi:"x",description:"Planning"},{title:"Planning"}],"planning")[0].title,"Planning");
+  async function federatedChecks(){
+   const all=await C.fetchFederatedReferences("планирование","planning",fetcher,null,stamp);
+   A.deepEqual(all.rows.map(r=>r.id),["wiki-ru-1","wiki-en-1","crossref-1"]);
+   A.deepEqual(all.coverage.map(r=>r.status),["ok","ok","ok"]);
+   const partial=await C.fetchFederatedReferences("планирование","planning",async u=>u.includes("crossref")?{ok:false,status:429}:fetcher(u),null,stamp);
+   A.equal(partial.rows.length,2);A.equal(partial.coverage[2].status,"rate_limited");
+   const failed=await C.fetchFederatedReferences("планирование","planning",async()=>{throw Error("offline")},null,stamp);
+   A.equal(failed.rows.length,0);A.ok(failed.coverage.every(r=>r.status==="unavailable"));
+   const timed=await C.fetchFederatedReferences("планирование","",async()=>{throw Error("timeout")},{aborted:true},stamp);
+   A.ok(timed.coverage.every(r=>r.status==="timeout"));
+   const context=C.onlineReferenceContext("планирование",all.rows,all.coverage,"federated");
+   A.equal(context.selected.length,3);
+   A.ok(context.messages[0].content.includes("название не подтверждает содержание"));
+   A.equal(JSON.parse(context.messages[1].content).cards[2].kind,"Библиографическая запись Crossref");
+   A.equal(C.onlineReferenceContext("планирование",all.rows,all.coverage,"federated",1).selected.length,0);
+   A.ok(C.onlineReferenceContext("x",all.rows.filter(r=>r.doi),[],"papers").messages[0].content.includes("библиографических метаданных"));
+   A.ok(C.onlineReferenceContext("x",all.rows.filter(r=>!r.doi),[],"both").messages[0].content.includes("Википедии"));
+   console.log("v1.18 federated reference checks passed");
+  }
+  federatedChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
