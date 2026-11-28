@@ -15,8 +15,10 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",as
   add(section,"p","Рекомендации по состоянию модулей, не автоматический запуск действий. Зависимости обозначают предварительные проверки, а не доказанные причины.");
   const states={ready_for_review:"Готова к рассмотрению",blocked:"Сначала проверить зависимые модули",needs_data:"Ожидает данных"};
   if(!queue.tasks.length)add(section,"p","По текущим статусам задач нет; это не подтверждает полноту или истинность данных.");
+  const preflight=new Map((d.preflight?.rows||[]).map(r=>[r.id,r]));
   for(const task of queue.tasks){
    const item=add(section,"details","");add(item,"summary","Приоритет "+task.priority+" · "+task.title);add(item,"p",states[task.state]||"Неизвестный статус");
+   const check=preflight.get(task.id);if(check){add(item,"p","Автоматическая проверка файлов: "+({inputs_readable:"входы читаются",inputs_unavailable:"есть недоступные входы",deferred:"отложена"}[check.status]||"неизвестно")+". Читаемость не подтверждает полноту или истинность данных.");for(const f of check.files||[])add(item,"small",f.name+" · "+f.status+(f.sha256?" · SHA-256 "+f.sha256:""));}
    if(task.blockers?.length)add(item,"p","Предварительные проверки: "+task.blockers.map(k=>labels[k]||k).join(", "));
    add(item,"p","Состояние модуля сохраняется "+task.consecutive+" снимков, с "+task.since+".");
    if(/^[a-z0-9-]+\.(?:html|json)$/.test(task.href)){const link=add(item,"a","Открыть материалы");link.href=task.href}
