@@ -1784,3 +1784,51 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.researchExcludedNote({excluded:0}),"");A.ok(C.researchExcludedNote({excluded:2}).includes("охват неполный"));
  console.log("v1.72–1.74 research dialogue checks passed");
 }
+
+
+// v1.75–1.77: verified single-tool receipts, contextual routing, and plan previews.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function contextualToolChecks(){
+  const stamp="a".repeat(64),next="b".repeat(64);
+  const rec=C.researchArchiveReceipt("производительность труда: 2025; база=2019",stamp);
+  A.deepEqual(rec,{command:"производительность труда: 2025; база=2019",fingerprint:stamp});
+  A.equal(C.researchArchiveReceipt("мрб: 99",stamp),null);
+  A.equal(C.researchArchiveReceipt("мрб: 9","bad"),null);
+  A.equal(C.researchArchiveReceipt("исследование: Покажи межотраслевой баланс группы 9 | Покажи межотраслевой баланс группы 10",stamp),null);
+  const turn={mode:"research",question:"Производительность",answer:"Ответ",state:"complete",archiveReceipt:rec};
+  const f=C.researchFollowupArchive(turn,"А за 2024 год?");
+  A.equal(f.kind,"tool");A.equal(f.query,"производительность труда: 2024; база=2019");A.equal(f.previousSnapshot,stamp);
+  A.equal(C.researchFollowupArchive(turn,"А за 2018 год?").kind,"clarify");
+  A.equal(C.researchFollowupArchive({...turn,private:true},"А за 2024 год?").kind,"clarify");
+  A.equal(C.researchFollowupArchive(null,"А за 2024 год?").kind,"clarify");
+  A.equal(C.researchFollowupArchive(turn,"А за 2024 год?","мрб: 9").query,"мрб: 9");
+  A.equal(C.researchFollowupArchive(turn,"Уточни","А за 2024 год?").kind,"clarify");
+  A.equal(C.researchFollowupArchive(turn,"Инфляция").query,"Инфляция");
+  A.deepEqual(C.researchArchiveSteps("Покажи межотраслевой баланс группы 9 и покажи межотраслевой баланс группы 10"),["мрб: 9","мрб: 10"]);
+  A.deepEqual(C.researchArchiveSteps("мрб: 9"),["мрб: 9"]);
+  A.deepEqual(C.researchArchiveSteps("Инфляция"),[]);
+  A.throws(()=>C.researchArchiveSteps("Покажи рынок труда"));
+  const ar={fingerprint:next,failed:0,found:[{id:"obs",kind:"Наблюдение",title:"Выпуск",description:"100 тонн",value:100,unit:"тонн"}]};
+  const plan=C.unifiedResearchPlan("Сравни показатель",{archive:true,archiveQuery:f.query});
+  let received,query,raw=JSON.stringify([{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"limitation",text:"Нужна сверка.",refs:[]}]);
+  const r=await C.runUnifiedResearch(plan,{}, {archiveSearch:async q=>{query=q;return ar},generate:async messages=>{received=JSON.parse(messages[1].content);return raw}});
+  A.equal(r.state,"accepted");A.equal(query,f.query);A.equal(received.archiveQuery,f.query);
+  A.deepEqual(r.archiveReceipt,{command:f.query,fingerprint:next});
+  const t={...C.researchChatTurn(r),question:plan.question};
+  A.deepEqual(C.chatTranscript([t])[0].archiveReceipt,r.archiveReceipt);
+  A.equal(C.researchFollowupArchive(t,"А за 2023 год?").query,"производительность труда: 2023; база=2019");
+  A.equal(C.dialogueSnapshotNote(stamp,next).sameSnapshot,false);
+  A.equal(C.chatTranscript([{...t,private:true}])[0].archiveReceipt,undefined);
+  A.equal(C.researchChatTurn(r,true).archiveReceipt,undefined);
+  A.equal(C.chatTranscript([{...t,archiveReceipt:{...r.archiveReceipt,fingerprint:"bad"}}])[0].archiveReceipt,undefined);
+  const failed=await C.runUnifiedResearch(plan,{}, {archiveSearch:async()=>({...ar,failed:1}),generate:async()=>raw});
+  A.equal(failed.archiveReceipt,undefined);
+  const noData=await C.runUnifiedResearch(plan,{}, {archiveSearch:async()=>({...ar,found:[]}),generate:async()=>{throw Error("must not call")}});
+  A.equal(noData.archiveReceipt,undefined);
+  const privatePlan=C.unifiedResearchPlan("Локальная тема",{archive:true,archiveQuery:f.query,local:true});
+  const privateResult=await C.runUnifiedResearch(privatePlan,{}, {archiveSearch:async()=>ar,generate:async()=>raw});
+  A.equal(privateResult.archiveReceipt,undefined);
+  console.log("v1.75–1.77 contextual tool checks passed");
+ }
+ contextualToolChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
