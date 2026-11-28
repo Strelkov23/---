@@ -148,4 +148,30 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(z['status'],'diagnostic')
         self.assertFalse(z['advantage_changed'])
         self.assertEqual(z['revision_mae'],0)
+    def test_signal_memory(self):
+        from copy import deepcopy
+        stamp='2026-11-27T03:00:00+00:00'
+        def row(id,status='signal',year=2025,value=10,unit='%'):
+            return dict(id=id,title=id,unit=unit,year=year,value=value,status=status,formula='A-B',codes=['A','B'],sources=['https://example.org/a'],note='test')
+        before=[row('a'),row('b','ordinary'),row('c'),row('d'),row('e'),row('f'),row('removed')]
+        prior=dict(built=stamp,agents=[dict(id='diagnostics',items=before)])
+        current=[row('a',value=11),row('b'),row('c','ordinary'),row('d','missing',None,None),row('e',year=2026),row('f',unit='руб.'),row('new')]
+        m=signal_memory(current,prior);by={r['id']:r for r in m['rows']}
+        self.assertEqual(by['a']['transition'],'persistent')
+        self.assertEqual(by['a']['revision_delta'],1)
+        self.assertEqual(by['b']['transition'],'new_signal')
+        self.assertEqual(by['c']['transition'],'cleared')
+        self.assertEqual(by['d']['transition'],'lost_observation')
+        self.assertIsNone(by['d']['revision_delta'])
+        self.assertEqual(by['e']['transition'],'period_changed')
+        self.assertIsNone(by['e']['revision_delta'])
+        self.assertEqual(by['f']['transition'],'method_changed')
+        self.assertIsNone(by['f']['revision_delta'])
+        self.assertEqual(by['new']['transition'],'initial')
+        self.assertEqual(m['removed_ids'],['removed'])
+        self.assertEqual(sum(m['counts'].values()),len(current))
+        self.assertTrue(validate_signal_memory(dict(built=stamp,agents=[dict(id='diagnostics',items=current)],signal_memory=m)))
+        self.assertTrue(all(r['transition']=='initial' for r in signal_memory(current)['rows']))
+        bad=deepcopy(m);bad['rows'][0]['revision_delta']=99
+        with self.assertRaises(ValueError):validate_signal_memory(dict(built=stamp,agents=[dict(id='diagnostics',items=current)],signal_memory=bad))
 if __name__=="__main__":unittest.main()
