@@ -2491,6 +2491,25 @@ console.log("16 agent coordination checks passed");}
  // Compact chat profile and provenance-preserving local knowledge retrieval.
  {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
   async function knowledgeChecks(){
+   const Search=require("./economic-search.js");
+   const docs=[
+    {title:"Инфляция в России",description:"Динамика потребительских цен",kind:"series",href:"data-registry.html?id=cpi"},
+    {title:"Inflation dynamics",description:"Study of prices",kind:"paper",href:"https://example.com/inflation"},
+    {title:"Экономический обзор",description:"Краткое упоминание инфляции",kind:"news",href:"https://example.com/overview"},
+    {title:"Валовой внутренний продукт",description:"Динамика выпуска",kind:"series",href:"data-registry.html?id=gdp"},
+    {title:"Межотраслевой баланс",description:"Методика",kind:"tool",href:"scenario.html"}
+   ];
+   const postings=Object.create(null);for(const [i,d] of docs.entries()){for(const w of Search.words(d.title+" "+d.description))(postings[w]??=[]).push([i,2]);}
+   const index={docs,postings};
+   const simple=C.localKnowledgeLookup(index,"Что такое инфляция?",Search);
+   A.equal(simple.query,"инфляция");
+   A.deepEqual(new Set(simple.hits.map(x=>x.href)),new Set([docs[0].href,docs[1].href]));
+   A.equal(C.localKnowledgeCards(simple.hits).length,2);
+   A.equal(C.localKnowledgeLookup(index,"Explain GDP",Search).hits[0].href,docs[3].href);
+   A.equal(C.localKnowledgeLookup(index,"Объясни межотраслевой баланс",Search).hits[0].href,docs[4].href);
+   A.equal(C.localKnowledgeLookup(index,"Объясни физику",Search).hits.length,0);
+   A.equal(C.localKnowledgeLookup(index,"Что такое инфляция? Ответь только словом.",Search).hits.length,0);
+
    A.deepEqual(C.chatGenerationProfile("Что это?","fast"),{maxTokens:420,budget:5800});
    A.deepEqual(C.chatGenerationProfile("Вычисли 2+2. Ответь только числом.","fast"),{maxTokens:48,budget:4200});
    A.equal(C.chatGenerationProfile("Объясни подробно","fast").maxTokens,900);
