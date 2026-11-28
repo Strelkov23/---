@@ -984,3 +984,52 @@ console.log("16 agent coordination checks passed");}
  A.ok(y.limit.includes("не является независимым"));
  console.log("17 hypothesis run comparison checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,"Вопрос","h-1",at),input=C.hypothesisArgumentInput(j[0]);
+ A.equal(input.blocked,false);A.equal(input.cards.length,1);A.equal(input.cards[0].fingerprint,fp);A.ok(input.bytes<=input.budget);
+ A.equal(C.hypothesisArgumentInput(j[0],100).blocked,true);
+ const gap={type:"gap",text:"Необходима независимая проверка.",refs:[]},support={type:"support",text:"Выпуск 125 млн руб.",refs:["arg-1"]};
+ const check=(...a)=>C.validateHypothesisArguments(JSON.stringify(a),input.cards);
+ A.equal(check(gap,support).ok,true);
+ A.equal(check(gap).ok,true);
+ A.equal(check(support).reason,"missing_gap");
+ A.equal(check(gap,{...support,refs:[]}).reason,"missing_source");
+ A.equal(check(gap,{...support,refs:["bad"]}).reason,"unknown_source");
+ A.equal(check(gap,{...support,text:"Выпуск 999 млн руб."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,text:"Выпуск 125 тонн."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,type:"proven"}).reason,"shape");
+ A.equal(check(gap,support,support).reason,"duplicate_argument");
+ A.equal(check(gap,{type:"challenge",text:"Связь требует проверки.",refs:["arg-1"]}).ok,true);
+ A.equal(C.validateHypothesisArguments("invalid",input.cards).reason,"json");
+ A.equal(j[0].events.length,0);
+ console.log("17 hypothesis argument checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const at="2026-11-28T10:00:00.000Z";
+ A.ok(C.wikiSearchUrl("история & право","ru").includes("gsrsearch="+encodeURIComponent("история & право")));
+ A.ok(C.wikiSearchUrl("history","en").startsWith("https://en.wikipedia.org/"));
+ A.throws(()=>C.wikiSearchUrl("x","other"));A.throws(()=>C.wikiSearchUrl(" ", "ru"));A.throws(()=>C.wikiSearchUrl("x\nz","ru"));
+ const page={ns:0,pageid:12,lastrevid:34,title:"History",extract:"Historical research.",index:2};
+ const data={query:{pages:[page,{...page,pageid:13,lastrevid:35,title:"Law",index:1}]}};
+ const rows=C.wikiReferenceCards(data,"en",at);
+ A.equal(rows.length,2);A.equal(rows[0].id,"wiki-en-13");A.equal(rows[1].href,"https://en.wikipedia.org/w/index.php?oldid=34");
+ A.equal(rows[1].checked,at);A.ok(rows[1].limit.includes("CC BY-SA"));
+ A.deepEqual(C.wikiReferenceCards({batchcomplete:true},"ru",at),[]);
+ A.deepEqual(C.wikiReferenceCards({query:{pages:[{...page,extract:""}]}},"en",at),[]);
+ A.throws(()=>C.wikiReferenceCards({query:{pages:[page,page]}},"en",at));
+ A.throws(()=>C.wikiReferenceCards({query:{pages:[{...page,ns:1}]}},"en",at));
+ A.throws(()=>C.wikiReferenceCards({error:{code:"maxlag"}},"en",at));
+ A.ok(C.wikiExplanationPrompt("history",rows)[0].content.includes("не проверенная научная база"));
+ async function checks(){
+  const fetched=await C.fetchWikiReferences("history","en",async(url,options)=>{A.ok(url.startsWith("https://en.wikipedia.org/"));A.equal(options.credentials,"omit");A.equal(options.redirect,"error");return {ok:true,text:async()=>JSON.stringify(data)}},null,at);
+  A.equal(fetched.length,2);
+  await A.rejects(()=>C.fetchWikiReferences("history","en",async()=>({ok:false}),null,at));
+  await A.rejects(()=>C.fetchWikiReferences("history","en",async()=>({ok:true,text:async()=>"x".repeat(65537)}),null,at));
+  console.log("22 online reference checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}
