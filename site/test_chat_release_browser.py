@@ -118,6 +118,28 @@ def main():
             jump.click()
             assert log.evaluate("(e)=>e.scrollHeight-e.clientHeight-e.scrollTop<5")
             assert not jump.is_visible()
+            # User-owned gateway: exact consent, no network on dismissal, safe results.
+            gateway_requests=[]
+            def gateway_route(route):
+                gateway_requests.append(route.request.url)
+                route.fulfill(status=200,content_type="application/json",
+                              headers={"Access-Control-Allow-Origin":"*"},
+                              body='{"results":[{"url":"https://science.org/history","title":"История науки","content":"Учебная справка"},{"url":"javascript:alert(1)","title":"invalid"}]}')
+            page.route("https://search.mydomain.org/search?*",gateway_route)
+            page.get_by_text("Настроить веб-поиск через свой сервер",exact=True).click()
+            page.get_by_role("textbox",name="HTTPS-адрес поискового сервера").fill("https://search.mydomain.org/search")
+            page.get_by_role("button",name="Использовать веб-сервер",exact=True).click()
+            question.fill("История науки")
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            assert not gateway_requests,gateway_requests
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Найдены веб-страницы') && !document.querySelector('#gea-question').disabled")
+            assert len(gateway_requests)==1,gateway_requests
+            assert "format=json" in gateway_requests[0]
+            assert "invalid" not in log.inner_text()
+            assert log.locator("article").count()==4
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
