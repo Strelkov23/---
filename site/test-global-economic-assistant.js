@@ -614,3 +614,64 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.dossierLiterature("age-dependency",index,p,searcher,"2024-12").length,0);
  console.log("10 dossier literature checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q=C.parseLocalTable('\uFEFFПериод;Выпуск\r\n2024;10,5\r\n2025;20,5\r\n2026;\r\n2027;нет',';');
+ A.deepEqual(q.headers,["Период","Выпуск"]);
+ A.equal(q.rows.length,4);
+ A.deepEqual(C.summarizeLocalColumn(q,1,","),{column:"Выпуск",total:4,count:2,missing:1,invalid:1,min:10.5,max:20.5,mean:15.5,median:15.5});
+ A.equal(C.summarizeLocalColumn(q,1,".").count,0);
+ A.deepEqual(C.parseLocalTable('a,b\n"hello, world","a""b"\n"x\ny",3\n',",").rows,[["hello, world",'a"b'],["x\ny","3"]]);
+ A.deepEqual(C.parseLocalTable("a\tb\n1\t2","\t").rows,[["1","2"]]);
+ A.throws(()=>C.parseLocalTable('a,b\n"x,2',","));
+ A.throws(()=>C.parseLocalTable("a,a\n1,2",","));
+ A.throws(()=>C.parseLocalTable("a,b\n1",","));
+ A.throws(()=>C.parseLocalTable('a,b\n"x"z,2',","));
+ A.throws(()=>C.parseLocalTable("a,b\n1,2","|"));
+ A.throws(()=>C.parseLocalTable("a\n"+"x".repeat(4097),","));
+ A.throws(()=>C.parseLocalTable("a\n"+"1\n".repeat(5001),","));
+ const r=C.summarizeLocalColumn(C.parseLocalTable("a\n0\n-5\n=SUM(1)\n9007199254740992\n10\n",","),0,".");
+ A.equal(r.count,3);A.equal(r.invalid,2);A.equal(r.median,0);A.equal(r.min,-5);A.equal(r.max,10);
+ A.ok(Math.abs(r.mean-5/3)<1e-12);
+ console.log("19 local table checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q=C.parseLocalTable("year;value\n2025;120\n2022;100\n2023;110\n2027;0\n2028;5\n2029;-2\n2030;4\n2030;6\n2031;8\n2032;\n2033;bad\nwrong;3",";");
+ const r=C.localAnnualSeries(q,0,1,".");
+ const get=y=>r.rows.find(x=>x.year===y);
+ A.equal(r.invalidYears,1);A.equal(r.totalInputRows,12);
+ A.deepEqual(r.counts,{ok:7,missing:1,invalid:1,gap:2,duplicate:1});
+ A.equal(get(2023).delta,10);A.equal(get(2023).relativePercent,10);
+ A.equal(get(2024).state,"gap");A.equal(get(2025).delta,null);
+ A.equal(get(2027).delta,null);A.equal(get(2028).delta,5);A.equal(get(2028).relativePercent,null);
+ A.equal(get(2029).delta,-7);A.equal(get(2029).relativePercent,null);
+ A.equal(get(2030).state,"duplicate");A.equal(get(2030).value,null);A.equal(get(2031).delta,null);
+ A.equal(get(2032).state,"missing");A.equal(get(2033).state,"invalid");
+ A.equal(C.localAnnualSeries(C.parseLocalTable("y;v\n2024;2,5\n2025;5,0",";"),0,1,",").rows[1].relativePercent,100);
+ A.deepEqual(C.localAnnualSeries(C.parseLocalTable("y;v\n1899;5\n2101;2",";"),0,1,".").rows,[]);
+ A.throws(()=>C.localAnnualSeries(q,1,1,"."));
+ console.log("20 annual table checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const local=C.localAnnualSeries(C.parseLocalTable("y;v\n2020;10\n2021;15\n2022;5\n2023;0\n2024;12\n2025;14\n2025;15\n2026;",";"),0,1,".");
+ const registry={id:"wdi:TEST",group:"wdi",title:"Test",unit:"руб.",frequency:"годовая",territory:"Россия",mode:"auto",measurement_kind:"Факт"};
+ const obs=(year,value,patch={})=>({id:registry.id,territory:registry.territory,unit:registry.unit,kind:"Наблюдение",period:String(year),value,...patch});
+ const rows=[obs(2020,8),obs(2021,0),obs(2022,4),obs(2022,5),obs(2024,10),obs(2025,10)];
+ const r=C.localArchiveComparison(local,registry,rows,"руб.",true);
+ A.equal(r.matched,3);A.equal(r.rows[0].difference,2);A.equal(r.rows[0].relativePercent,25);
+ A.equal(r.rows[1].relativePercent,null);A.equal(r.rows[2].state,"archive_duplicate");
+ A.equal(r.rows[3].state,"archive_missing");A.equal(r.rows[3].difference,null);
+ A.equal(r.rows[5].state,"local_duplicate");A.equal(r.rows[6].state,"local_missing");
+ A.ok(Math.abs(r.meanAbsoluteDifference-19/3)<1e-12);
+ A.throws(()=>C.localArchiveComparison(local,registry,rows,"тыс. руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,rows,"руб.",false));
+ A.throws(()=>C.localArchiveComparison(local,{...registry,frequency:"месячная"},rows,"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs("2020-01",8)],"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs(2020,8,{unit:"USD"})],"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs(2020,8,{kind:"Цель"})],"руб.",true));
+ A.equal(C.localArchiveComparison(local,{...registry,unit:"%"},[obs(2020,8,{unit:"%"})],"%",true).rows[0].relativePercent,null);
+ A.equal(C.localArchiveComparison(local,registry,[],"руб.",true).meanAbsoluteDifference,null);
+ console.log("18 local archive comparison checks passed");
+}
