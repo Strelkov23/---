@@ -2093,3 +2093,42 @@ console.log("16 agent coordination checks passed");}
  A.ok(!JSON.stringify(plan("Найди в интернете новые статьи",[prior])).includes("PRIVATE_MARKER"));
  console.log("v1.93–1.95 dialogue orchestration checks passed");
 }
+
+
+// v1.96–1.98: model acceptance harness with deterministic synthetic responses.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function modelAcceptanceChecks(){
+  const cases=C.modelAcceptanceCases(),fact=JSON.stringify([{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"limitation",text:"Учебные данные.",refs:[]}]);
+  const responses={arithmetic:"42",context:"СЕВЕР",grounding:fact,insufficient:JSON.stringify([{type:"limitation",text:"Нет данных.",refs:[]}]),planning:JSON.stringify(["Покажи производительность труда в 2024 году относительно 2019 года","Рассчитай межотраслевой баланс для группы 9"]),injection:fact};
+  A.equal(cases.length,6);A.equal(new Set(cases.map(c=>c.id)).size,6);
+  A.ok(cases.every(c=>c.messages.length>=2&&c.maxTokens<=240));
+  A.equal(cases[0].check("41"),"wrong_answer");
+  A.equal(cases[1].check("ЮГ"),"wrong_context");
+  A.equal(cases[2].check(fact),"pass");
+  A.equal(cases[2].check(fact.replace("100","999")),"numeric_evidence");
+  A.equal(cases[3].check(fact),"source_class");
+  A.equal(cases[4].check(responses.planning),"pass");
+  A.equal(cases[4].check(responses.planning.replace("2019","2018")),"invalid_plan");
+  A.equal(cases[5].check(fact.replace("100","999")),"numeric_evidence");
+  let tick=0;const progress=[];
+  const good=await C.runModelAcceptance(async(m,t,id)=>responses[id],()=>true,(i,n,id)=>progress.push([i,n,id]),()=>{tick+=25;return tick;});
+  A.equal(good.state,"passed");A.equal(good.passed,6);A.equal(good.total,6);
+  A.equal(progress.length,6);A.equal(good.results[0].ms,25);A.equal(good.results[0].output,"42");
+  A.ok(good.scope.includes("не общая оценка"));
+  const wrong=await C.runModelAcceptance(async(m,t,id)=>id==="arithmetic"?"43":responses[id]);
+  A.equal(wrong.state,"needs_review");A.equal(wrong.passed,5);
+  let calls=0;
+  const off=await C.runModelAcceptance(async()=>{calls++;throw Error("offline")});
+  A.equal(off.state,"incomplete");A.equal(off.results[0].state,"model_unavailable");A.equal(calls,1);
+  const stopped=await C.runModelAcceptance(async()=>{calls++;return "42"},()=>false);
+  A.equal(stopped.state,"cancelled");A.equal(stopped.results.length,0);A.equal(calls,1);
+  let active=true;
+  const late=await C.runModelAcceptance(async()=>{active=false;return "42"},()=>active);
+  A.equal(late.state,"cancelled");A.equal(late.results.length,0);
+  const noTime=await C.runModelAcceptance(async(m,t,id)=>responses[id],()=>true,()=>{},()=>NaN);
+  A.equal(noTime.results[0].ms,null);
+  await A.rejects(()=>C.runModelAcceptance(null));
+  console.log("v1.96–1.98 model acceptance checks passed");
+ }
+ modelAcceptanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
