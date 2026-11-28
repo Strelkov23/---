@@ -65,11 +65,11 @@ with tempfile.TemporaryDirectory() as tmp:
     docx = {"word/document.xml": f'<w:document xmlns:w="{wordns}"><w:body><w:p><w:r><w:t>Экономика</w:t></w:r></w:p><w:p><w:r><w:t>Данные</w:t></w:r><w:del><w:r><w:t>Удалено</w:t></w:r></w:del></w:p></w:body></w:document>'}
 
     # A two-page PDF with proper byte offsets and an embedded text stream.
-    def pdf_fixture():
+    def pdf_fixture(blank_second=False):
         stream = io.BytesIO()
         stream.write(b"%PDF-1.4\n")
         content1 = b"BT /F1 12 Tf 40 700 Td (Production 125) Tj ET"
-        content2 = b"BT /F1 12 Tf 40 700 Td (Employment 50) Tj ET"
+        content2 = b"" if blank_second else b"BT /F1 12 Tf 40 700 Td (Employment 50) Tj ET"
         objects = [
             b"<< /Type /Catalog /Pages 2 0 R >>",
             b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
@@ -178,6 +178,18 @@ with tempfile.TemporaryDirectory() as tmp:
             assert result["parsed"]["text"]=="Production 125\n\nEmployment 50", result
             assert result["parsed"]["emptyPages"]==0 and len(result["parsed"]["pages"])==2, result
             assert len(result["hits"])==1 and result["hits"][0]["page"]==2, result
+            scanned = page.evaluate("""async data=>{
+                const assets=new URL("pdf-runtime/",location.href).href;
+                const lib=await import(assets+"pdf.mjs");lib.GlobalWorkerOptions.workerSrc=assets+"pdf.worker.mjs";
+                const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));
+                const calls=[];
+                const parsed=await GlobalEconomicAssistant.parseLocalPdf(bytes.buffer,lib,assets,()=>true,async (page,n)=>{
+                    calls.push(n);return {text:"Scan 150",confidence:80,language:"eng"};
+                });
+                return {parsed,calls};
+            }""",pdf_fixture(True))
+            assert scanned["calls"]==[2] and scanned["parsed"]["ocrPages"]==1, scanned
+            assert scanned["parsed"]["pages"][1]["origin"]=="ocr" and scanned["parsed"]["text"]=="Production 125\n\nScan 150", scanned
             # Actual local OCR over a synthetic raster, no external image or document.
             page.add_script_tag(url=f"http://127.0.0.1:{server.server_port}/ocr-runtime/tesseract.min.js")
             result = page.evaluate("""async ()=>{
