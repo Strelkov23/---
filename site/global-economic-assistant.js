@@ -567,7 +567,7 @@ function chatPerformanceNote(m){
     }finally{onPending(false);}
    });
    if(loaded.stopped)return stopped();
-   if(loaded.error||!loaded.value?.chat?.completions?.create)return failure("engine");
+   if(loaded.error||typeof loaded.value?.chat?.completions?.create!=="function"){if(loaded.value){try{await loaded.value.unload?.();}catch{}}return failure("engine");}
    return {state:"ready",profile,engine:loaded.value};
   }finally{finished=true;if(timer!==null)timers.clear(timer);if(deadline!==null)timers.clear(deadline);signal?.removeEventListener("abort",abort);}
  }
@@ -4636,7 +4636,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  // The startup card is next to the primary chat controls, not buried in settings.
  const startupBox=add(panel,"section","");startupBox.className="gea-model-startup";startupBox.hidden=true;startupBox.setAttribute("aria-label","Запуск локального ИИ");status.after(startupBox);
  const startupTitle=add(startupBox,"strong","Запуск локального ИИ"),startupText=add(startupBox,"p",""),startupProgress=add(startupBox,"progress",""),startupHelp=add(startupBox,"small","");startupProgress.max=1;startupProgress.setAttribute("aria-label","Ход загрузки модели");startupText.setAttribute("role","status");startupText.setAttribute("aria-live","polite");startupProgress.hidden=true;
- function showStartup(title,message,progress=null,help=""){startupBox.hidden=false;startupTitle.textContent=title;startupText.textContent=message;startupProgress.hidden=progress===null;if(progress===null)startupProgress.removeAttribute("value");else startupProgress.value=progress;startupHelp.textContent=help;}
+ function showStartup(title,message,progress=null,help=""){startupBox.hidden=false;startupTitle.textContent=title;startupText.textContent=message;startupProgress.hidden=progress===null&&title!=="Запуск локального ИИ"&&title!=="Загрузка локального ИИ";if(progress===null)startupProgress.removeAttribute("value");else startupProgress.value=progress;startupHelp.textContent=help;}
  function syncStartupButton(){model.disabled=busy||!!engine||modelStartupPending;model.textContent=engine?"ИИ загружен":modelStartupAbort?"Загрузка ИИ…":modelStartupPending?"Завершение отменённой загрузки…":"Загрузить ИИ";}
  model.onclick=async()=>{
   if(busy||engine||modelStartupPending)return;
@@ -4644,7 +4644,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   lock(true);syncStartupButton();status.textContent="Запуск локального ИИ…";
   showStartup("Запуск локального ИИ","Проверка устройства…",null,"Не нужно открывать новое окно. Чат находится здесь. Первичная загрузка требует сети.");
   try{
-   const r=await C.runLocalModelStartup(key,{secure:window.isSecureContext,gpu:navigator.gpu,signal:controller.signal,loadRuntime:()=>import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.86/+esm"),onProgress:p=>{status.textContent=(profile?.label||"ИИ")+" · "+p.message;showStartup("Загрузка локального ИИ",p.message,p.progress,"Можно остановить загрузку. Вопросы и файлы не отправляются библиотеке при запуске.");},onPending:value=>{modelStartupPending=value;syncStartupButton();if(!value&&!modelStartupAbort&&!engine&&startupHelp.textContent.includes("фоновая"))startupHelp.textContent="Можно повторить загрузку.";}});
+   const r=await C.runLocalModelStartup(key,{secure:window.isSecureContext,gpu:navigator.gpu,signal:controller.signal,loadRuntime:()=>import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.86/+esm"),onProgress:p=>{status.textContent=(profile?.label||"ИИ")+" · "+p.message;showStartup("Загрузка локального ИИ",(p.progress===null?"":Math.round(p.progress*100)+"% · ")+p.message,p.progress,"Можно остановить загрузку. Вопросы и файлы не отправляются библиотеке при запуске.");},onPending:value=>{modelStartupPending=value;syncStartupButton();if(!value&&!modelStartupAbort&&!engine&&startupHelp.textContent.includes("фоновая"))startupHelp.textContent="Можно повторить загрузку.";}});
    if(r.state==="ready"){engine=r.engine;loadedProfile=r.profile;showStartup("ИИ готов",C.modelStartupMessage(r),1,"Общий чат работает локально. Интернет-поиск требует отдельного подтверждения.");}
    else{engine=null;loadedProfile=null;showStartup(r.state==="cancelled"?"Загрузка остановлена":"ИИ не запущен",C.modelStartupMessage(r),null,modelStartupPending?"Предыдущая фоновая операция ещё завершается; для немедленного повтора перезагрузите страницу.":"Можно повторить загрузку или пользоваться поиском без модели.");}
    status.textContent=C.modelStartupMessage(r);
