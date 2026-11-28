@@ -55,7 +55,8 @@ def main():
             # A missing GPU must be visibly diagnosed and must not lock the chat.
             page.evaluate("window.__aiAdapterMissing=true")
             page.locator("#gea-model").click()
-            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('не обнаружил совместимое') && !document.querySelector('#gea-question').disabled")
+            page.wait_for_function("!document.querySelector('#gea-question').disabled")
+            assert "не обнаружил совместимое" in page.locator("#gea-status").inner_text(), (page.locator("#gea-status").inner_text(),errors,page.evaluate("({secure:isSecureContext,gpu:typeof navigator.gpu?.requestAdapter,missing:window.__aiAdapterMissing})"))
             startup=page.locator(".gea-model-startup")
             assert startup.is_visible()
             assert "ИИ не запущен" in startup.inner_text()
@@ -63,7 +64,8 @@ def main():
             # Cancel a pending engine download; late engines must be unloaded.
             page.evaluate("window.__aiAdapterMissing=false;window.__aiStartupMode='pending'")
             page.locator("#gea-model").click()
-            page.wait_for_function("typeof window.__aiReleaseStartup==='function'")
+            page.wait_for_function("typeof window.__aiReleaseStartup==='function' || !document.querySelector('#gea-question').disabled")
+            assert page.evaluate("typeof window.__aiReleaseStartup==='function'"), (page.locator("#gea-status").inner_text(),errors)
             assert startup.get_by_role("progressbar").is_visible()
             assert startup.get_by_role("progressbar").get_attribute("value")=="0.25"
             assert page.locator("#gea-stop").is_enabled()
