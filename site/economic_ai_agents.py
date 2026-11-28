@@ -1,7 +1,7 @@
 """Deterministic agent coordinator for every scheduled economic build.
 Agents are bounded analytical routines, not autonomous LLM processes.
 """
-import json,math
+import json,math,re
 import provenance
 from collections import Counter
 from datetime import datetime
@@ -116,6 +116,59 @@ def research_queue(agents, continuity_report):
     return dict(schema=1, mode='recommendations_only', tasks=tasks,
                 counts={k:sum(t['state']==k for t in tasks) for k in ('ready_for_review','blocked','needs_data')})
 
+# Automatic local preflight: measure actual availability of the fixed inputs.
+# A successful check is not the completion of a substantive research task.
+PREFLIGHT_INPUTS = {
+    'quality': ('freshness.json','source-pipeline.json'),
+    'discovery': ('economic-ai-discovery.json','economic-corporate-discovery.json'),
+    'search': ('economic-search-audit.json','economic-search-index.json'),
+    'coverage': ('data-registry.json','economic-ai-physical.json'),
+    'diagnostics': ('economic-ai-diagnostics.json',),
+    'forecast': ('economic-ai-forecast-memory.json','economic-ai-forecast-tournament.json'),
+    'planning': ('economic-ai-planning.json',),
+    'research': ('archive.json','literature.json'),
+}
+def preflight(out, queue, stamp):
+    rows=[]
+    for task in queue['tasks']:
+        if task['state']=='blocked':
+            rows.append(dict(id=task['id'],status='deferred',files=[]))
+            continue
+        files=[]
+        for name in PREFLIGHT_INPUTS[task['owner']]:
+            try:
+                path=out/name
+                if not path.is_file():
+                    files.append(dict(name=name,status='missing'));continue
+                raw=path.read_bytes()
+                value=json.loads(raw)
+                if not isinstance(value,(dict,list)) or not value:
+                    files.append(dict(name=name,status='empty_or_invalid'));continue
+                files.append(dict(name=name,status='readable',bytes=len(raw),sha256=provenance.sha(raw)))
+            except (OSError,ValueError,TypeError):
+                files.append(dict(name=name,status='unreadable'))
+        rows.append(dict(id=task['id'],status='inputs_readable' if all(f['status']=='readable' for f in files) else 'inputs_unavailable',files=files))
+    return dict(schema=1, mode='local_preflight_only', checked=stamp, rows=rows,
+                counts={k:sum(r['status']==k for r in rows) for k in ('inputs_readable','inputs_unavailable','deferred')})
+
+def validate_preflight(d):
+    p=d['preflight'];q=d['research_queue']
+    if p['schema']!=1 or p['mode']!='local_preflight_only' or p['checked']!=d['built'] or [r['id'] for r in p['rows']]!=[t['id'] for t in q['tasks']]:
+        raise ValueError('Invalid preflight report')
+    for row,task in zip(p['rows'],q['tasks']):
+        if task['state']=='blocked':
+            if row['status']!='deferred' or row['files']:raise ValueError('Blocked preflight')
+            continue
+        if [f['name'] for f in row['files']]!=list(PREFLIGHT_INPUTS[task['owner']]):raise ValueError('Invalid preflight inputs')
+        for f in row['files']:
+            if f['status']=='readable':
+                if type(f['bytes']) is not int or f['bytes']<1 or not re.fullmatch(r'[a-f0-9]{64}',f['sha256']):raise ValueError('Invalid preflight hash')
+            elif f['status'] not in ('missing','empty_or_invalid','unreadable'):raise ValueError('Invalid preflight state')
+        expected='inputs_readable' if all(f['status']=='readable' for f in row['files']) else 'inputs_unavailable'
+        if row['status']!=expected:raise ValueError('Invalid preflight result')
+    if p['counts']!={k:sum(r['status']==k for r in p['rows']) for k in ('inputs_readable','inputs_unavailable','deferred')}:raise ValueError('Invalid preflight counts')
+    return True
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
@@ -190,6 +243,7 @@ def build(out,previous,stamp,refresh):
     prior,baseline=prior_agent_report(previous,stamp)
     data['continuity']=continuity(agents,stamp,prior,baseline)
     data['research_queue']=research_queue(agents,data['continuity'])
+    data['preflight']=preflight(out,data['research_queue'],stamp)
     validate(data)
     return data
 def validate(d):
@@ -200,6 +254,7 @@ def validate(d):
     if 'continuity' in d:validate_continuity(d)
     if 'research_queue' in d:
         if 'continuity' not in d or d['research_queue']!=research_queue(d['agents'],d['continuity']):raise ValueError('Invalid research queue')
+    if 'preflight' in d:validate_preflight(d)
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
