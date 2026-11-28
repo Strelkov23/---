@@ -201,6 +201,13 @@ jobs:
           python3 -m unittest test_economic_vector_public.py
           node test-economic-vector.js
           ECONOMIC_SOURCE_REVISION=$(cat /tmp/economic-source-revision) python3 build.py --refresh
+          # Optional local document reader; publication continues if the runtime is unavailable.
+          if timeout 180 npm install --prefix "$RUNNER_TEMP/pdf-runtime" --ignore-scripts --omit=optional --no-audit --no-fund pdfjs-dist@6.5.438 && python3 stage_pdf_runtime.py "$RUNNER_TEMP/pdf-runtime/node_modules/pdfjs-dist" public/pdf-runtime; then
+            echo "Pinned PDF runtime staged"
+          else
+            rm -rf public/pdf-runtime
+            echo "PDF runtime unavailable; local PDF import disabled by missing module"
+          fi
           node test-economic-search-index.js public/economic-search-index.json
           python3 -c "import json,economic_search as a; from pathlib import Path; p=Path('public'); print(a.validate(json.loads((p/a.FILE).read_text()))); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
           python3 -c "import json,economic_ai_agents as a; from pathlib import Path; p=Path('public'); assert a.validate(json.loads((p/a.FILE).read_text())); assert a.FILE in json.loads((p/'data-manifest.json').read_text())['files']"
