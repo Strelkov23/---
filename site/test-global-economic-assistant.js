@@ -694,3 +694,23 @@ console.log("16 agent coordination checks passed");}
  A.ok(!C.localTableEvidence("summary",{count:0,min:null,mean:NaN}).some(x=>x.id==="local-mean"));
  console.log("16 local model table checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ A.deepEqual(C.xlsxCellColumn("A1"),{column:0,row:1});A.deepEqual(C.xlsxCellColumn("AN5001"),{column:39,row:5001});
+ A.throws(()=>C.xlsxCellColumn("AO1"));A.throws(()=>C.xlsxCellColumn("A5002"));A.throws(()=>C.xlsxCellColumn("A0"));A.throws(()=>C.xlsxCellColumn("$A$1"));
+ const r=C.xlsxGrid([{ref:"A1",value:"Год"},{ref:"B1",value:"Выпуск"},{ref:"B3",value:"20"},{ref:"A3",value:"2025"},{ref:"A4",value:"2026"},{ref:"B4",value:"[формула не вычислена]"}]);
+ A.deepEqual(r.headers,["Год","Выпуск"]);A.deepEqual(r.rows,[["",""],["2025","20"],["2026","[формула не вычислена]"]]);
+ A.equal(C.summarizeLocalColumn(r,1,".").invalid,1);A.equal(C.summarizeLocalColumn(r,1,".").missing,1);
+ A.throws(()=>C.xlsxGrid([{ref:"A1",value:"x"},{ref:"A1",value:"y"},{ref:"A2",value:"1"}]));
+ A.throws(()=>C.xlsxGrid([{ref:"A1",value:"x"},{ref:"B2",value:"1"}]));
+ A.throws(()=>C.xlsxGrid([{ref:"A1",value:"x"},{ref:"B1",value:"x"},{ref:"B2",value:"1"}]));
+ A.equal(C.xlsxCrc(new Uint8Array([49,50,51,52,53,54,55,56,57])),0xcbf43926);
+ A.throws(()=>C.xlsxDirectory(new Uint8Array(22)));
+ const name=[97],payload=[49],b=new Uint8Array(30+name.length+payload.length+46+name.length+22),v=new DataView(b.buffer),u16=(p,x)=>v.setUint16(p,x,true),u32=(p,x)=>v.setUint32(p,x,true),central=32,end=79;
+ u32(0,0x04034b50);u16(26,1);b[30]=97;b[31]=49;
+ u32(central,0x02014b50);u32(central+16,C.xlsxCrc(new Uint8Array(payload)));u32(central+20,1);u32(central+24,1);u16(central+28,1);b[central+46]=97;
+ u32(end,0x06054b50);u16(end+8,1);u16(end+10,1);u32(end+12,47);u32(end+16,central);
+ const entry=C.xlsxDirectory(b).get("a");A.equal(entry.data,31);A.equal(entry.length,1);
+ b[central+46]=98;A.throws(()=>C.xlsxDirectory(b));
+ console.log("18 XLSX grid and directory checks passed");
+}
