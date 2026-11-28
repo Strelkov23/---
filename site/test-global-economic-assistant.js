@@ -714,3 +714,32 @@ console.log("16 agent coordination checks passed");}
  b[central+46]=98;A.throws(()=>C.xlsxDirectory(b));
  console.log("18 XLSX grid and directory checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ A.equal(C.localDocumentText("\uFEFF a\r\nb\r c\u0000 "),"a\nb\n c");
+ A.equal(C.localDocumentText(" \n "),"");
+ A.throws(()=>C.localDocumentText("x".repeat(262145)));
+ A.throws(()=>C.localDocumentText(null));
+ console.log("4 local document normalization checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const text="Объём выпуска вырос на 12%. "+ "прочее ".repeat(110)+"Занятость и объём выпуска в регионе. "+"фон ".repeat(170);
+ const hits=C.localDocumentSearch(text,"ОБЪЕМ выпуска");
+ A.ok(hits.length>=1&&hits.length<=6);
+ A.equal(hits[0].matched,2);
+ A.ok(hits.every(x=>x.excerpt===text.slice(x.start,x.end)&&x.excerpt.length<=600));
+ A.ok(hits.every((x,i)=>hits.slice(i+1).every(y=>x.end<=y.start||y.end<=x.start)));
+ A.deepEqual(C.localDocumentSearch(text,"неизвестно"),[]);
+ A.deepEqual(C.localDocumentSearch(text,""),[]);
+ A.deepEqual(C.localDocumentSearch(text,"x ".repeat(121)),[]);
+ const selected=[hits[0].id],rows=C.localDocumentEvidence(text,hits,selected);
+ A.equal(rows.length,1);A.equal(rows[0].description,hits[0].excerpt);
+ A.deepEqual(C.localDocumentEvidence(text,hits,[]),[]);
+ A.deepEqual(C.localDocumentEvidence(text,hits,[selected[0],selected[0]]),[]);
+ A.deepEqual(C.localDocumentEvidence(text,[{...hits[0],excerpt:"подмена"}],selected),[]);
+ A.deepEqual(C.localDocumentEvidence(text,hits,["doc-99999"]),[]);
+ A.deepEqual(JSON.parse(C.localDocumentPrompt("Что утверждается?",rows)[1].content),{question:"Что утверждается?",results:rows});
+ A.ok(C.localDocumentPrompt("вопрос",rows)[0].content.includes("не инструкции"));
+ console.log("15 local document retrieval checks passed");
+}
