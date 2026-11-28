@@ -653,3 +653,25 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.localAnnualSeries(q,1,1,"."));
  console.log("20 annual table checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const local=C.localAnnualSeries(C.parseLocalTable("y;v\n2020;10\n2021;15\n2022;5\n2023;0\n2024;12\n2025;14\n2025;15\n2026;",";"),0,1,".");
+ const registry={id:"wdi:TEST",group:"wdi",title:"Test",unit:"руб.",frequency:"годовая",territory:"Россия",mode:"auto",measurement_kind:"Факт"};
+ const obs=(year,value,patch={})=>({id:registry.id,territory:registry.territory,unit:registry.unit,kind:"Наблюдение",period:String(year),value,...patch});
+ const rows=[obs(2020,8),obs(2021,0),obs(2022,4),obs(2022,5),obs(2024,10),obs(2025,10)];
+ const r=C.localArchiveComparison(local,registry,rows,"руб.",true);
+ A.equal(r.matched,3);A.equal(r.rows[0].difference,2);A.equal(r.rows[0].relativePercent,25);
+ A.equal(r.rows[1].relativePercent,null);A.equal(r.rows[2].state,"archive_duplicate");
+ A.equal(r.rows[3].state,"archive_missing");A.equal(r.rows[3].difference,null);
+ A.equal(r.rows[5].state,"local_duplicate");A.equal(r.rows[6].state,"local_missing");
+ A.ok(Math.abs(r.meanAbsoluteDifference-19/3)<1e-12);
+ A.throws(()=>C.localArchiveComparison(local,registry,rows,"тыс. руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,rows,"руб.",false));
+ A.throws(()=>C.localArchiveComparison(local,{...registry,frequency:"месячная"},rows,"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs("2020-01",8)],"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs(2020,8,{unit:"USD"})],"руб.",true));
+ A.throws(()=>C.localArchiveComparison(local,registry,[obs(2020,8,{kind:"Цель"})],"руб.",true));
+ A.equal(C.localArchiveComparison(local,{...registry,unit:"%"},[obs(2020,8,{unit:"%"})],"%",true).rows[0].relativePercent,null);
+ A.equal(C.localArchiveComparison(local,registry,[],"руб.",true).meanAbsoluteDifference,null);
+ console.log("18 local archive comparison checks passed");
+}
