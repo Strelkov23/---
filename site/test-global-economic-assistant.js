@@ -2329,3 +2329,54 @@ console.log("16 agent coordination checks passed");}
  }
  webInvestigationChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v2.21–2.25: explicit per-thread memory and locally proposed task drafts.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function dialoguePlanningChecks(){
+  const m={notes:"  Отвечай кратко.  ",relevant:true};
+  A.deepEqual(C.chatMemory(null),{notes:"",relevant:false});
+  A.deepEqual(C.chatMemory(m),{notes:"Отвечай кратко.",relevant:true});
+  for(const x of [{notes:"x".repeat(1501),relevant:true},{notes:"x",relevant:1},{notes:"\u0000",relevant:false},[],{notes:"x"}])A.throws(()=>C.chatMemory(x));
+  let w=C.newChatWorkspace("chat-a");
+  A.equal(w.threads[0].memory,undefined);
+  w=C.setChatMemory(w,"chat-a",m);A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  w=C.addChatThread(w,"chat-b");A.equal(w.threads[1].memory,undefined);A.equal(w.threads[0].memory.relevant,true);
+  w=C.setChatMemory(w,"chat-b",{notes:"Другая задача",relevant:false});
+  w=C.selectChatThread(w,"chat-a");A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  const t=(question,answer,more={})=>({mode:"general",state:"complete",question,answer,...more});
+  const turns=[t("Межотраслевой баланс","Непроверенный ответ о балансе"),t("Межотраслевой баланс PRIVATE","PRIVATE secret",{private:true}),...Array.from({length:7},(_,i)=>t("Тема "+i,"Ответ "+i)),t("Сегодняшний вопрос","Последний ответ"),t("Межотраслевой баланс","Архив",{mode:"archive"}),t("Межотраслевой баланс","Ошибка",{state:"error"})];
+  w=C.updateChatThread(w,"chat-a",turns,[]);
+  A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  const persisted=C.persistedChatWorkspace(w);A.ok(!JSON.stringify(persisted).includes("PRIVATE"));A.equal(persisted.threads[0].memory.notes,"Отвечай кратко.");A.deepEqual(C.chatWorkspace(JSON.parse(JSON.stringify(persisted))),persisted);
+  A.throws(()=>C.setChatMemory(w,"chat-unknown",m));
+  const q="Объясни межотраслевой баланс";
+  const legacy=C.generalChatPrompt(q,turns);
+  A.equal(legacy.used,6);A.ok(!JSON.stringify(legacy.messages).includes("Непроверенный ответ о балансе"));
+  const p=C.generalChatPrompt(q,turns,9500,w.threads[0].memory);
+  A.equal(p.used,3);A.equal(p.notesUsed,true);A.ok(JSON.stringify(p.messages).includes("Непроверенный ответ о балансе"));A.ok(!JSON.stringify(p.messages).includes("PRIVATE"));A.ok(!JSON.stringify(p.messages).includes("Другая задача"));A.ok(!p.messages.some(x=>x.content==="Архив"||x.content==="Ошибка"));
+  A.deepEqual(JSON.parse(p.messages.at(-1).content),{question:q,userNotes:"Отвечай кратко."});
+  A.ok(p.messages.slice(1).every((x,i)=>x.role===(i%2===0?"user":"assistant")));
+  A.ok(C.utf8Size(JSON.stringify(p.messages))<=9500);
+  const tiny=C.generalChatPrompt(q,[],2000,{notes:"я".repeat(1500),relevant:false});
+  A.equal(tiny.blocked,false);A.equal(tiny.notesUsed,false);A.equal(tiny.messages.at(-1).content,q);
+  const old=C.generalChatPrompt(q,[t("Межотраслевой баланс","Короткий ответ"),t("Иная тема","я".repeat(6000)),t("Последняя тема","Кратко")],2500,{notes:"",relevant:true});
+  A.equal(old.used,2);A.ok(old.messages.some(x=>x.content==="Короткий ответ"));
+  const rr=await C.runGeneralChat(q,turns,async messages=>{A.equal(JSON.parse(messages.at(-1).content).userNotes,"Отвечай кратко.");return "Ответ";},()=>true,9500,m);A.equal(rr.state,"complete");A.equal(rr.notesUsed,true);
+  w=C.setChatMemory(w,"chat-a",{notes:"",relevant:false});A.equal(w.threads[0].memory,undefined);A.equal(w.threads[1].memory.notes,"Другая задача");
+  const steps=[{mode:"general",title:"Уточнить понятие",query:"Объясни понятие межотраслевого баланса"},{mode:"web",title:"Найти материалы",query:"Межотраслевой баланс научные статьи"}];
+  const raw=JSON.stringify(steps);
+  A.deepEqual(C.taskPlan(raw),steps);
+  A.equal(C.taskPlan("[]"),null);A.equal(C.taskPlan("bad"),null);
+  for(const bad of [{...steps[0],mode:"execute"},{...steps[0],query:"https://alpha.org/a"},{...steps[0],query:"api_key: abc"},{...steps[0],title:"x".repeat(81)},{...steps[0],query:"x\nz"},{...steps[0],query:"x".repeat(241)},{...steps[0],secret:true},{...steps[0],query:steps[1].query.toUpperCase()}])A.equal(C.taskPlan(JSON.stringify([bad,steps[1]])),null);
+  A.throws(()=>C.taskPlanningPrompt(""));A.throws(()=>C.taskPlanningPrompt("x".repeat(601)));
+  const task=C.taskPlanningPrompt("Подготовить исследование");A.equal(JSON.parse(task[1].content).question,"Подготовить исследование");A.ok(!JSON.stringify(task).includes("Отвечай кратко."));
+  let calls=0;const draft=await C.runTaskPlanning("Подготовить исследование",async messages=>{calls++;A.equal(messages.length,2);return raw;});A.equal(draft.state,"draft");A.equal(calls,1);A.deepEqual(draft.steps,steps);
+  A.equal((await C.runTaskPlanning("Задача",async()=>"bad")).state,"invalid");
+  A.equal((await C.runTaskPlanning("Задача",async()=>{throw Error("offline")})).state,"unavailable");
+  A.equal((await C.runTaskPlanning("Задача",async()=>{calls++;return raw},()=>false)).state,"cancelled");A.equal(calls,1);
+  let live=true;const stopped=await C.runTaskPlanning("Задача",async()=>{live=false;return raw},()=>live);A.equal(stopped.state,"cancelled");A.deepEqual(stopped.steps,[]);
+  console.log("v2.21–2.25 dialogue planning checks passed");
+ }
+ dialoguePlanningChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
