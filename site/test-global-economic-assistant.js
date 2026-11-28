@@ -829,3 +829,27 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.chartResearchPrompt([])[0].content.includes("X может не быть временем"));
  console.log("17 chart research summary checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const row=(id,value,patch={})=>({id,kind:"Наблюдение",registryId:"wdi:TEST",title:"Ряд",period:"2025",unit:"руб.",href:"https://example.org/a",value,...patch});
+ const a=row("s1-a",10),b=row("s1-b",11),c=row("s2-c",20,{period:"2024"}),d={id:"s2-status",kind:"Статус проверки",title:"Нет данных"},e={id:"auto-route",kind:"Выбранный инструмент"};
+ A.deepEqual(C.sameSeriesDisagreements([a,b,c]),[["s1-a","s1-b"]]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,registryId:"other"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,unit:"USD"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,href:"https://example.org/b"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,value:10}]),[]);
+ A.equal(C.researchCardClass({kind:"Наблюдение",value:null}),"other");
+ A.equal(C.researchCardClass({kind:"Условный расчёт",value:10}),"scenario");
+ const scope=C.researchScope([a,b,c,d,e],[a,d],1,[{failed:0},{failed:1}]);
+ A.equal(scope.omitted,3);A.equal(scope.transmitted_by_kind.observation,1);A.equal(scope.steps[1].observations,0);A.equal(scope.steps[1].unavailable_archives,1);
+ A.deepEqual(scope.same_series_disagreements,[]);
+ A.equal(C.researchScope([d],[d]).no_transmitted_observations,true);
+ A.throws(()=>C.researchScope([a],[b]));
+ const input=C.prepareResearchInput("вопрос",{research_steps:[{failed:0},{failed:1}]},[a,b,c,d,e],1);
+ A.equal(input.blocked,false);A.ok(input.bytes<=input.budget);
+ A.equal(input.context.research_scope.transmitted,input.rows.length);
+ A.equal(input.bytes,C.utf8Size(JSON.stringify(C.prompt("вопрос",input.context,input.rows))));
+ A.deepEqual(input.scope.same_series_disagreements,[["s1-a","s1-b"]]);
+ A.equal(C.prepareResearchInput("вопрос",{},[a],1,100).blocked,true);
+ console.log("20 research scope and conflict checks passed");
+}
