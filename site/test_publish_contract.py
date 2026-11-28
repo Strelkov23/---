@@ -20,5 +20,22 @@ class PublishContractTests(unittest.TestCase):
         self.assertEqual(generated,verified)
         self.assertTrue({"style.css","interface.js","papers.html","literature.json","journal-evidence.json","literature-journals.csv","literature-years.csv","literature-topics.csv"}<=verified)
 
+    def test_assistant_release_gate(self):
+        root=Path(__file__).resolve().parents[1]
+        source=(root/".github/workflows/publish.yml").read_text(encoding="utf-8")
+        self.assertIn("node test-global-economic-assistant.js",source)
+        browser=source.index("python3 ../test_chat_release_browser.py")
+        self.assertLess(browser,source.index("uses: actions/upload-pages-artifact@v3"))
+        self.assertLess(browser,source.index("uses: actions/deploy-pages@v4"))
+        required={"global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js","index.html","historical.html"}
+        for key in ("names","expected_names"):
+            found=re.findall(r"^\s*"+key+r"=(\[\"analyst-cockpit\.html\".*\])$",source,re.M)
+            self.assertEqual(len(found),1,key)
+            self.assertTrue(required<=set(ast.literal_eval(found[0])))
+        self.assertTrue((root/"site/test_chat_release_browser.py").is_file())
+        shell=(root/"site/shell.html").read_text(encoding="utf-8")
+        for name in ("global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js"):
+            self.assertIn('src="'+name+'"',shell)
+
 if __name__=="__main__":
     unittest.main()
