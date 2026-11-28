@@ -46,4 +46,23 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(prior_agent_report(root,stamp),(None,'missing'))
             (root/FILE).write_text('{}',encoding='utf-8')
             self.assertEqual(prior_agent_report(root,stamp),(None,'unverified'))
+    def test_research_queue(self):
+        stamp='2026-11-28T03:00:00+00:00'
+        ids=[r[0] for r in TASK_RULES]
+        def make(**states):
+            agents=[dict(id=k,state=states.get(k,'ok')) for k in ids]
+            return research_queue(agents,continuity(agents,stamp))
+        self.assertEqual(make()['tasks'],[])
+        q=make(quality='attention',planning='attention',forecast='waiting',research='waiting')
+        self.assertEqual(q['counts'],dict(ready_for_review=1,blocked=2,needs_data=1))
+        by={r['owner']:r for r in q['tasks']}
+        self.assertEqual(by['quality']['state'],'ready_for_review')
+        self.assertEqual(by['planning']['blockers'],['quality'])
+        self.assertEqual(by['forecast']['state'],'blocked')
+        self.assertEqual(by['research']['state'],'needs_data')
+        self.assertEqual(q['tasks'][0]['owner'],'quality')
+        self.assertEqual(q['mode'],'recommendations_only')
+        self.assertEqual(by['quality']['consecutive'],1)
+        self.assertEqual(make(planning='attention')['tasks'][0]['state'],'ready_for_review')
+        self.assertEqual(make(coverage='waiting',diagnostics='attention')['tasks'][1]['blockers'],['coverage'])
 if __name__=="__main__":unittest.main()
