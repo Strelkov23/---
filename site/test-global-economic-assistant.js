@@ -1697,3 +1697,34 @@ console.log("16 agent coordination checks passed");}
   }
   streamChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.66–1.68: actual citation coverage, insufficient evidence and repeated findings.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const ar={fingerprint:"a".repeat(64),failed:0,found:[{id:"obs",kind:"Наблюдение",title:"Выпуск",description:"100 тонн",value:100,unit:"тонн",period:"2025"}]};
+  const online=[{id:"wiki-ru-1",title:"Справка",description:"Справка"}];
+  const evidence=C.hybridEvidence(ar,online),limit={type:"limitation",text:"Нужна сверка.",refs:[]},fact={type:"observation",text:"100 тонн",refs:["arc-1"]};
+  const checked=C.validateHybridFindings(JSON.stringify([fact,limit]),evidence.rows);
+  const audit=C.researchCitationCoverage(evidence.rows,checked);
+  A.equal(audit.cited,1);A.deepEqual(audit.missingOrigins,["online"]);A.deepEqual(audit.uncitedCategories,["reference"]);
+  A.ok(C.citationCoverageNote(audit).includes("внешние источники 0/1"));
+  A.equal(C.validateHybridFindings(JSON.stringify([fact,fact,limit]),evidence.rows).reason,"duplicate_finding");
+  A.equal(C.hybridEvidence(ar,[null,...online]).rows.length,2);
+  async function coverageChecks(){
+   const insufficient=await C.runHybridResearch("Выпуск","мрб: 9",online,[],async()=>ar,async()=>JSON.stringify([limit]));
+   A.equal(insufficient.state,"insufficient");A.equal(insufficient.partial,true);A.equal(insufficient.citationCoverage.cited,0);
+   A.equal(C.researchChatTurn(insufficient).state,"notice");A.ok(C.researchChatTurn(insufficient).answer.includes("Нужна сверка."));
+   const one=await C.runHybridResearch("Выпуск","мрб: 9",online,[],async()=>ar,async()=>JSON.stringify([fact,limit]));
+   A.equal(one.state,"accepted");A.equal(one.partial,true);A.deepEqual(one.citationCoverage.missingOrigins,["online"]);
+   const both=await C.runHybridResearch("Выпуск","мрб: 9",online,[],async()=>ar,async()=>JSON.stringify([fact,{type:"reference",text:"Справка",refs:["web-2"]},limit]));
+   A.equal(both.state,"accepted");A.equal(both.partial,false);A.equal(both.citationCoverage.cited,2);
+   const basket={document:[{id:"doc-0",kind:"Фрагмент пользовательского документа",title:"Документ",description:"Текст",limit:"Не проверено"}]};
+   const local=await C.runMultimodalResearch("Вопрос",basket,[],[],null,async()=>JSON.stringify([limit]));
+   A.equal(local.state,"insufficient");A.equal(local.partial,true);
+   const plan=C.unifiedResearchPlan("Вопрос",{local:true});
+   const unified=await C.runUnifiedResearch(plan,basket,{generate:async()=>JSON.stringify([limit])});
+   A.equal(unified.state,"insufficient");A.equal(unified.partial,true);A.equal(C.researchChatTurn(unified,true).private,true);
+   console.log("v1.66–1.68 research coverage checks passed");
+  }
+  coverageChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
