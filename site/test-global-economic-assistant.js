@@ -572,3 +572,35 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.prepareEvidence(q,{heading:"Я".repeat(10000)},[a]).blocked);
  console.log("15 context budget checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const [amount,physical,compare,missing,causal]=C.benchmarkCases();
+ const good=["Учебный выпуск 125 млн рублей [b-output].","Учебная отгрузка 80 тонн [b-physical].","В 2022 году 40 человек [b-old]. В 2024 году 55 человек [b-new].","Данных нет.","Причинность не доказана."];
+ A.equal(C.benchmarkCases().length,5);
+ A.ok(C.benchmarkCases().every(c=>c.rows.every(r=>r.limit)));
+ A.ok(C.benchmarkScore(amount,good[0]).pass);
+ A.ok(!C.benchmarkScore(amount,"125 млн долларов [b-output].").pass);
+ A.ok(!C.benchmarkScore(amount,"125 млн рублей [fake].").pass);
+ A.ok(!C.benchmarkScore(amount,"Всё нормально.").pass);
+ A.ok(C.benchmarkScore(physical,good[1]).pass);
+ A.ok(!C.benchmarkScore(physical,"80 кг [b-physical].").pass);
+ A.ok(C.benchmarkScore(compare,good[2]).pass);
+ A.ok(!C.benchmarkScore(compare,"2022: 40 человек [b-new]. 2024: 55 человек [b-old].").pass);
+ A.ok(C.benchmarkScore(missing,good[3]).pass);
+ A.ok(!C.benchmarkScore(missing,"Данных нет, значит 0.").pass);
+ A.ok(!C.benchmarkScore(missing,"Всё в порядке.").pass);
+ A.ok(C.benchmarkScore(causal,good[4]).pass);
+ A.ok(!C.benchmarkScore(causal,"Да, инвестиции доказали причинность.").pass);
+ A.ok(!C.benchmarkScore(causal,"").pass);
+ async function checks(){
+  let i=0,now=0;
+  const full=await C.runModelBenchmark(async ()=>good[i++],()=>true,()=>{},()=>now+=10);
+  A.equal(full.complete,true);A.equal(full.results.length,5);A.ok(full.results.every(x=>x.pass));A.equal(full.results[0].elapsedMs,10);
+  let calls=0;const stopped=await C.runModelBenchmark(async()=>{calls++;return good[0]},()=>calls<1);
+  A.equal(stopped.complete,false);A.equal(stopped.results.length,0);
+  const fail=await C.runModelBenchmark(async()=>{throw Error("test")});
+  A.equal(fail.results.length,5);A.ok(fail.results.every(x=>!x.pass&&x.error));
+  console.log("24 synthetic benchmark checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}
