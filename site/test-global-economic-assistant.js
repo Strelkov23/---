@@ -1322,3 +1322,49 @@ console.log("16 agent coordination checks passed");}
   }
   agentTeamChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.30–1.32: typed synthesis of internal economics and external literature.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const ar={fingerprint:"a".repeat(64),failed:0,found:[{id:"obs",kind:"Наблюдение",title:"Выпуск",description:"2025 · 100 тонн",value:100,period:"2025",unit:"тонн"},{id:"sc",kind:"Условный расчёт",title:"Сценарий",description:"120 тонн"},{id:"calc",kind:"Историческая проверка",title:"Ошибка прогноза",description:"5%"},{id:"status",kind:"Статус расчёта",title:"Нет данных",description:"Недоступно"}]};
+  const ext=[{id:"wiki-ru-1",title:"Производство",description:"Справка"},{id:"obs",title:"Публикация",description:"2024",abstractAvailable:false}];
+  const ev=C.hybridEvidence(ar,ext);
+  A.equal(ev.rows.length,5);A.equal(ev.excluded,1);A.equal(ev.fingerprint,ar.fingerprint);
+  A.deepEqual(ev.rows.map(r=>r.category),["observation","scenario","calculation","reference","bibliography"]);
+  A.equal(new Set(ev.rows.map(r=>r.id)).size,5);A.equal(ev.rows[4].originalId,"obs");
+  A.throws(()=>C.hybridEvidence({...ar,fingerprint:"bad"},ext));
+  A.throws(()=>C.hybridEvidence(ar,[ext[0],ext[0]]));
+  const context=C.hybridResearchContext("Выпуск","мрб: 9",ev,[]);
+  A.equal(context.rows.length,5);A.equal(context.omitted,0);
+  A.equal(C.hybridResearchContext("Выпуск","мрб: 9",ev,[],1).rows.length,0);
+  const limit={type:"limitation",text:"Сценарий не является фактом.",refs:[]};
+  const items=[{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"scenario",text:"120 тонн",refs:["arc-2"]},{type:"calculation",text:"5%",refs:["arc-3"]},{type:"reference",text:"Справка",refs:["web-4"]},limit];
+  const raw=JSON.stringify(items);
+  A.equal(C.validateHybridFindings(raw,ev.rows).ok,true);
+  A.equal(C.validateHybridFindings(JSON.stringify([{...items[1],type:"observation"},limit]),ev.rows).reason,"source_class");
+  A.equal(C.validateHybridFindings(JSON.stringify([{...items[0],refs:["web-5"]},limit]),ev.rows).reason,"source_class");
+  A.equal(C.validateHybridFindings(JSON.stringify([{...items[0],text:"120 тонн"},limit]),ev.rows).reason,"numeric_evidence");
+  A.equal(C.validateHybridFindings(JSON.stringify([{...items[0],text:"100 кг"},limit]),ev.rows).reason,"numeric_evidence");
+  A.equal(C.validateHybridFindings(JSON.stringify([items[0]]),ev.rows).reason,"missing_limitation");
+  A.equal(C.validateHybridFindings(JSON.stringify([{...limit,refs:["arc-1"]}]),ev.rows).reason,"source_count");
+  A.equal(C.validateHybridFindings("invalid",ev.rows).reason,"json");
+  async function hybridChecks(){
+   const progress=[];let query="";
+   const result=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async q=>{query=q;return ar},async m=>{A.ok(m[0].content.includes("не прогноз и не факт"));return raw},()=>true,x=>progress.push(x));
+   A.equal(result.state,"accepted");A.equal(result.partial,false);A.equal(query,"мрб: 9");A.deepEqual(progress,["archive","synthesis"]);
+   const failed=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async()=>{throw Error("offline")},async()=>raw);
+   A.equal(failed.state,"archive_unavailable");
+   const partial=await C.runHybridResearch("Выпуск","мрб: 9",ext,[{status:"timeout"}],async()=>({...ar,failed:1}),async()=>raw);
+   A.equal(partial.partial,true);
+   const rejected=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async()=>ar,async()=>JSON.stringify([items[0]]));
+   A.equal(rejected.state,"rejected");
+   const empty=await C.runHybridResearch("Выпуск","мрб: 9",[],[],async()=>({...ar,found:[]}),async()=>{throw Error("must not call")});
+   A.equal(empty.state,"no_evidence");
+   const cancelled=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async()=>ar,async()=>raw,()=>false);
+   A.equal(cancelled.state,"cancelled");
+   const broken=await C.runHybridResearch("Выпуск","мрб: 9",ext,[],async()=>ar,async()=>{throw Error("offline")});
+   A.equal(broken.state,"model_unavailable");
+   console.log("v1.30–1.32 hybrid economic research checks passed");
+  }
+  hybridChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
