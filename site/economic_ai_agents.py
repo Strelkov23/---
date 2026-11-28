@@ -214,12 +214,46 @@ def validate_preflight_history(data):
             raise ValueError('Invalid history counts')
     return True
 
+# Matched-sample sensitivity to statistical revisions, not retrospective tuning.
+def forecast_revision_audit(rows):
+    groups={}
+    for r in rows:
+        key=(r['code'],r['source'],r['unit'],r['horizon'])
+        groups.setdefault(key,[]).append(r)
+    result=[]
+    for (code,source,unit,horizon),xs in sorted(groups.items()):
+        first=[r for r in xs if finite(r.get('first_actual'))]
+        paired=[r for r in first if finite(r.get('latest_actual'))]
+        if len({r['target'] for r in paired})!=len(paired):
+            # Repeated targets must not masquerade as independent observations.
+            result.append(dict(code=code,source=source,unit=unit,horizon=horizon,
+                               frozen=len(xs),first_scored=len(first),paired=len(paired),status='duplicate_targets',
+                               first_mae=None,latest_mae=None,first_naive_mae=None,latest_naive_mae=None,
+                               revised=None,revision_mae=None,advantage_changed=None))
+            continue
+        def mae(actual,forecast):
+            return sum(abs(r[forecast]-r[actual]) for r in paired)/len(paired) if paired else None
+        a,b=mae('first_actual','point'),mae('latest_actual','point')
+        c,d=mae('first_actual','naive'),mae('latest_actual','naive')
+        result.append(dict(code=code,source=source,unit=unit,horizon=horizon,
+                           frozen=len(xs),first_scored=len(first),paired=len(paired),
+                           status='waiting' if not paired else 'small_sample' if len(paired)<10 else 'diagnostic',
+                           first_mae=a,latest_mae=b,first_naive_mae=c,latest_naive_mae=d,
+                           revised=sum(r['first_actual']!=r['latest_actual'] for r in paired),
+                           revision_mae=mae('first_actual','latest_actual'),
+                           advantage_changed=(a<c)!=(b<d) if paired else None))
+    return dict(schema=1,method='matched_first_latest',rows=result,
+                note='MAE на одной выборке целевых периодов. Пересмотр факта не означает ошибку источника; преимущество перед наивным прогнозом не является статистически доказанным. При выборке менее 10 вывод предварительный. Методы прогнозирования не меняются.')
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
     discovery=read(out,"economic-ai-discovery.json");dr=discovery["rows"]
     ready=[r for r in dr.values() if r["values"] and r["status"] in ("ok","error")]
     forecast=read(out,"economic-ai-forecast-memory.json")
+    from economic_ai_forecast_memory import validate as validate_forecast
+    validate_forecast(forecast)
+    revision_audit=forecast_revision_audit(forecast["rows"])
     fs=forecast["summary"]
     assessed=[r for r in fs if r["n"]>=10]
     # Diagnostics only: no tuning against the future evaluation set.
@@ -269,6 +303,7 @@ def build(out,previous,stamp,refresh):
     agents[2]["metrics"]["comparability"]=comp
     agents[2]["links"].append("economic-ai-comparability.json")
     if comp["counts"]["unknown"]:agents[2]["state"]="attention"
+    agents[4]["metrics"]["revision_audit"]=revision_audit
     tournament=read(out,"economic-ai-forecast-tournament.json")
     agents[4]["metrics"]["tournament"]={"frozen":len(tournament["rows"]),"scored":sum(r["actual"] is not None for r in tournament["rows"]),"candidates":sum(r["recommendation"] is not None for r in tournament["summary"])}
     agents[4]["links"].append("economic-ai-forecast-tournament.json")
