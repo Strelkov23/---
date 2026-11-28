@@ -21,7 +21,7 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=os.environ.get("CHROME_BIN") or None, headless=True,
                                     args=["--no-sandbox", "--disable-gpu"])
-        for width in (1280, 390):
+        for width in (1280, 390, 320):
             page = browser.new_page(viewport={"width":width,"height":844})
             errors, external = [], []
             page.on("pageerror", lambda e: errors.append(str(e)))
@@ -41,6 +41,9 @@ def main():
                 assert page.locator(".gea-chat-actions #gea-stop").is_visible()
                 assert page.locator(".gea-chat-actions").evaluate("(e)=>e.nextElementSibling.id==='gea-status'")
                 assert page.locator("#gea-panel").evaluate("(e)=>e.getBoundingClientRect().right<=innerWidth+2 && e.getBoundingClientRect().left>=-2")
+                assert page.locator("#gea-panel").evaluate("(e)=>e.scrollWidth<=e.clientWidth+3"), (width,route,"panel overflow")
+                assert page.locator(".gea-chat-toolbar").evaluate("(e)=>[...e.children].every(c=>c.getBoundingClientRect().right<=e.getBoundingClientRect().right+2)")
+                assert page.locator(".gea-chat-actions").evaluate("(e)=>[...e.children].every(c=>c.getBoundingClientRect().right<=e.getBoundingClientRect().right+2)")
                 page.locator("#gea-close").click()
             page.goto("http://localhost:8765/index.html",wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
@@ -79,8 +82,11 @@ def main():
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
             send.click()
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога') && !document.querySelector('#gea-question').disabled")
+            assert "Локальный замер: первый текст" not in log.inner_text()
+            log.get_by_text("Подробнее об ответе",exact=True).click()
             assert "Локальный замер: первый текст" in log.inner_text()
             assert "симв." in log.inner_text()
+            log.get_by_text("Подробнее об ответе",exact=True).click()
             # The mocked transport cannot establish model intelligence. The diagnostic
             # must report failed synthetic cases, not a misleading all-green result.
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
@@ -96,7 +102,7 @@ def main():
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога | Уточнение') && !document.querySelector('#gea-question').disabled")
             assert log.locator("article").count()==2
             original=chats.input_value()
-            page.get_by_role("checkbox",name="Сохранять диалоги в этой вкладке").check()
+            page.get_by_role("checkbox",name="Сохранять историю чатов").check()
             page.get_by_role("button",name="Новый чат",exact=True).click()
             assert log.locator("article").count()==0
             question.fill("Независимый вопрос")
@@ -105,6 +111,7 @@ def main():
             assert "Проверка первого диалога" not in log.inner_text()
             chats.select_option(original)
             assert log.locator("article").count()==2
+            page.locator("#gea-panel").get_by_text("Дополнительные инструменты",exact=True).click()
             page.get_by_role("button",name="Повторить последний вопрос",exact=True).click()
             assert question.input_value()=="Уточнение"
             # Explicit web search preview; no external request before confirmation.
@@ -124,6 +131,21 @@ def main():
             page.reload(wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
             assert page.get_by_role("log",name="Сообщения диалога").locator("article").count()==2
+            # A new browser context restored from persistent storage has no sessionStorage.
+            restored=browser.new_context(viewport={"width":width,"height":844},storage_state=page.context.storage_state())
+            restored_page=restored.new_page()
+            restored_page.goto("http://localhost:8765/historical.html",wait_until="domcontentloaded")
+            restored_page.locator("#gea-toggle").click()
+            assert restored_page.get_by_role("checkbox",name="Сохранять историю чатов").is_checked()
+            assert restored_page.get_by_role("log",name="Сообщения диалога").locator("article").count()==2
+            assert restored_page.get_by_role("combobox",name="Выберите диалог").input_value()==original
+            assert "Проверка первого диалога" in restored_page.get_by_role("log",name="Сообщения диалога").inner_text()
+            restored_page.get_by_role("checkbox",name="Сохранять историю чатов").uncheck()
+            restored_page.reload(wait_until="domcontentloaded")
+            restored_page.locator("#gea-toggle").click()
+            assert not restored_page.get_by_role("checkbox",name="Сохранять историю чатов").is_checked()
+            assert restored_page.get_by_role("log",name="Сообщения диалога").locator("article").count()==0
+            restored.close()
             # Automatic routing must preview the approved query and never send before consent.
             question = page.locator("#gea-question")
             question.fill("Найди в интернете историю науки")
@@ -139,6 +161,7 @@ def main():
             page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===3 && !document.querySelector('#gea-question').disabled")
             log = page.get_by_role("log",name="Сообщения диалога")
             assert log.evaluate("(e)=>e.scrollHeight>e.clientHeight+80")
+            assert log.evaluate("(e)=>e.scrollWidth<=e.clientWidth+3"), (width,"long chat overflow")
             assert log.get_attribute("tabindex")=="0"
             log.evaluate("(e)=>{e.scrollTop=0;e.dispatchEvent(new Event('scroll'))}")
             jump=page.get_by_role("button",name="К последнему сообщению",exact=True)
@@ -218,6 +241,7 @@ def main():
             chats.select_option(active_thread)
             assert memory.input_value()=="Память контрольного диалога"
             question.fill("Подготовить исследование")
+            page.locator("#gea-panel").get_by_text("Дополнительные инструменты",exact=True).click()
             page.get_by_role("button",name="Составить план задачи",exact=True).click()
             page.get_by_role("button",name="Подготовить шаг 2",exact=True).wait_for(state="visible")
             before=log.locator("article").count()
@@ -231,18 +255,19 @@ def main():
             page.locator(".gea-chat-toolbar select").filter(has=page.locator("option[value='general']")).select_option("general")
             question.fill("Контроль обрыва ответа")
             send.click()
-            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Получен неполный ответ') && !document.querySelector('#gea-question').disabled")
-            assert "Ответ достиг лимита генерации" in log.locator("article").last.inner_text()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ неполный') && !document.querySelector('#gea-question').disabled")
+            assert "Ответ требует уточнения или проверки" in log.locator("article").last.inner_text()
+            assert "Ответ достиг лимита генерации" in log.locator("article").last.text_content()
             assert question.input_value()=="Контроль обрыва ответа"
             question.fill("Контроль нового сообщения")
             send.click()
-            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ общего чата готов') && !document.querySelector('#gea-question').disabled")
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Готово') && !document.querySelector('#gea-question').disabled")
             last=log.locator("article").last.inner_text()
             assert "Контроль нового сообщения" in last and "Контроль обрыва ответа" not in last
             question.fill("Вычисли 2+2. Ответь только числом.")
             send.click()
-            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('заданный формат не соблюдён') && !document.querySelector('#gea-question').disabled")
-            assert "Модель не соблюла явно заданный формат ответа" in log.locator("article").last.inner_text()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ не соблюдает заданный формат') && !document.querySelector('#gea-question').disabled")
+            assert "Модель не соблюла явно заданный формат ответа" in log.locator("article").last.text_content()
             assert question.input_value()=="Вычисли 2+2. Ответь только числом."
             assert len(gateway_requests)==3 and not external
             assert not errors,errors
