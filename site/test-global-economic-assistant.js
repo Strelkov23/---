@@ -1640,3 +1640,39 @@ console.log("16 agent coordination checks passed");}
   A.equal(C.chatModeRoute("Привет!",[h],true),"general");
   console.log("v1.51–1.53 chat workspace checks passed");
  }
+
+
+ // v1.54–1.56: research messages and private local evidence exclusion.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const source={id:"loc-1",origin:"local",title:"PRIVATE TITLE",description:"PRIVATE TEXT",limit:"Не проверено"};
+  const result={state:"accepted",checked:{ok:true,findings:[{type:"local_document",text:"PRIVATE FINDING",refs:["loc-1"]},{type:"limitation",text:"Нужна сверка.",refs:[]}]},context:{rows:[source],omitted:0},partial:true,stages:[{stage:"local",status:"ok",count:1}]};
+  const turn=C.researchChatTurn(result);
+  A.equal(turn.mode,"research");A.equal(turn.state,"complete");A.equal(turn.private,true);A.ok(turn.answer.includes("[loc-1]"));A.ok(turn.note.includes("Неполное покрытие"));A.ok(turn.note.includes("Локальные материалы"));
+  A.equal(C.researchChatTurn({...result,state:"rejected"}).state,"notice");
+  A.ok(!C.researchChatTurn({...result,state:"rejected"}).answer.includes("PRIVATE FINDING"));
+  A.equal(C.researchChatTurn({state:"cancelled"},true).private,true);
+  A.equal(C.researchChatTurn({state:"cancelled"}).state,"cancelled");
+  let w=C.newChatWorkspace("chat-a");
+  w=C.updateChatThread(w,"chat-a",[{...turn,question:"PRIVATE QUESTION"}],[]);
+  A.equal(w.threads[0].title,"Новый чат");A.equal(w.threads[0].turns.length,1);
+  A.equal(C.persistedChatWorkspace(w).threads[0].turns.length,0);
+  A.ok(!JSON.stringify(C.persistedChatWorkspace(w)).includes("PRIVATE"));
+  const ordinary={mode:"general",question:"Public",answer:"Answer",state:"complete"};
+  w=C.updateChatThread(w,"chat-a",[...w.threads[0].turns,ordinary],[]);
+  A.equal(w.threads[0].title,"Public");A.equal(C.persistedChatWorkspace(w).threads[0].turns.length,1);
+  A.equal(C.chatWorkspace(JSON.parse(JSON.stringify(w))).threads[0].turns[0].private,true);
+  A.ok(!JSON.stringify(C.generalChatPrompt("Continue",w.threads[0].turns)).includes("PRIVATE"));
+  const publicSource={id:"web-1",origin:"online",title:"Public work",description:"Metadata",href:"https://doi.org/10.1234/abc"};
+  const publicResult={state:"accepted",checked:{ok:true,findings:[{type:"bibliography",text:"Public work",refs:["web-1"]}]},context:{rows:[publicSource],omitted:0}};
+  const publicTurn=C.researchChatTurn(publicResult);
+  A.equal(publicTurn.private,false);
+  w=C.updateChatThread(w,"chat-a",[...w.threads[0].turns,{...publicTurn,question:"Public research"}],[]);
+  A.equal(C.persistedChatWorkspace(w).threads[0].turns.length,2);
+  A.equal(C.persistedChatWorkspace(w).threads[0].turns[1].sources[0].href,publicSource.href);
+  const lots=Array.from({length:30},(_,i)=>({...publicSource,id:"web-"+i}));
+  const priority=C.researchChatTurn({...publicResult,checked:{ok:true,findings:[{type:"bibliography",text:"Public work",refs:["web-29"]}]},context:{rows:lots,omitted:0}});
+  A.equal(priority.sources.length,24);A.equal(priority.sources[0].id,"web-29");A.ok(priority.note.includes("24 карточек"));
+  A.equal(C.chatTranscript([{...priority,question:"Sources"}])[0].sources.length,24);
+  A.equal(C.researchChatTurn(publicResult,true).private,true);
+  console.log("v1.54–1.56 chat research checks passed");
+ }
