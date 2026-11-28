@@ -811,3 +811,21 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.chartTrace(raster,{...c,b:{x:101,y:0}},"#2563eb",0,5));
  console.log("12 chart color tracing checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const p=(x,y)=>({x,y,onePixelX:1,onePixelY:2});
+ const r=C.chartResearchSummary([p(2025,120),p(2020,100),p(2022,500),p(2022,501)]);
+ A.equal(r.unique,2);A.equal(r.duplicateX,2);A.equal(r.delta,20);A.equal(r.relativePercent,20);A.equal(r.max,120);A.equal(r.first.x,2020);
+ A.equal(C.chartResearchSummary([p(1,10),p(2,11)]).relativePercent,null);
+ A.equal(C.chartResearchSummary([p(1,10),p(2,11)]).belowPixelScale,true);
+ A.equal(C.chartResearchSummary([p(1,0),p(2,10)]).relativePercent,null);
+ A.equal(C.chartResearchSummary([p(1,10),p(1,20)]).unique,0);
+ A.throws(()=>C.chartResearchSummary([p(1,NaN)]));
+ A.throws(()=>C.chartResearchSummary([p(1,10)],{sampled:2,skipped:[]}));
+ A.deepEqual(C.chartResearchSummary([p(1,10)],{sampled:2,skipped:[{reason:"ambiguous"}]}).coverage,{sampled:2,missing:0,ambiguous:1});
+ A.deepEqual(C.chartResearchEvidence(r,"руб.",false),[]);
+ A.ok(C.chartResearchEvidence(r,"руб.",true).every(x=>x.kind==="Оценка по изображению"));
+ A.ok(!C.chartResearchEvidence(r,"%",true).some(x=>x.id==="chart-relative"));
+ A.ok(C.chartResearchPrompt([])[0].content.includes("X может не быть временем"));
+ console.log("17 chart research summary checks passed");
+}
