@@ -604,3 +604,24 @@ console.log("16 agent coordination checks passed");}
  }
  checks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"rub",title:"Выпуск",description:"2024: 80 млн рублей",value:80,unit:"млн рублей"},{id:"usd",title:"Импорт",description:"2024: 80 млн долл. США",value:80,unit:"млн долл. США"},{id:"mass",title:"Отгрузка",description:"80 тонн",value:80,unit:"тонн"},{id:"kg",title:"Проба",description:"80 кг",value:80,unit:"кг"}];
+ A.deepEqual(C.citationUnitAudit("80 млн рублей [rub].",rows),[]);
+ A.deepEqual(C.citationUnitAudit("80 млн USD [rub].",rows),[{part:1,units:["80 млн USD"],refs:["rub"]}]);
+ A.deepEqual(C.unitEvidenceAudit("80 млн USD [rub].",rows),[]);
+ A.deepEqual(C.citationUnitAudit("80 кг [mass].",rows),[{part:1,units:["80 кг"],refs:["mass"]}]);
+ A.deepEqual(C.citationUnitAudit("80 тонн [mass]. 80 кг [kg].",rows),[]);
+ A.deepEqual(C.citationUnitAudit("80 тонн.",rows),[{part:1,units:["80 тонн"],refs:[]}]);
+ A.deepEqual(C.citationUnitAudit("80 тонн [fake].",rows),[{part:1,units:["80 тонн"],refs:[]}]);
+ A.deepEqual(C.citationUnitAudit("80 тонн [mass] и 80 кг [kg].",rows),[]);
+ A.deepEqual(C.citationUnitAudit("Нет наблюдений.",rows),[]);
+ A.deepEqual(C.citationUnitAudit("80 тонн [mass].\n80 кг [mass].",rows),[{part:2,units:["80 кг"],refs:["mass"]}]);
+ const c={rows,required:["80 млн руб.","80 млн USD"],refs:["rub","usd"],units:true};
+ A.ok(C.benchmarkScore(c,"80 млн рублей [rub]. 80 млн USD [usd].").pass);
+ const swapped=C.benchmarkScore(c,"80 млн рублей [usd]. 80 млн USD [rub].");
+ A.ok(!swapped.pass);A.equal(swapped.flags.citedUnits.length,2);
+ A.equal(swapped.flags.mismatched.length,0);
+ A.equal(swapped.flags.units.length,0);
+ console.log("15 cited-unit checks passed");
+}
