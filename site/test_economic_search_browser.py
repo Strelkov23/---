@@ -1,5 +1,6 @@
 """Offline browser regression: real IndexedDB and provenance, deterministic mocked encoder."""
 import hashlib
+import os
 import io
 import zipfile
 import base64
@@ -19,6 +20,7 @@ def sha(data):
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
+    shutil.copytree(Path(os.environ["ECONOMIC_PDF_RUNTIME"]), root / "pdf-runtime")
     for name in ("economic-search.html", "economic-search.js", "provenance.js", "global-economic-assistant.js"):
         shutil.copy(HERE / name, root / name)
     # The production shell provides load/root/pinned; reproduce that contract here.
@@ -60,6 +62,32 @@ with tempfile.TemporaryDirectory() as tmp:
     }
     wordns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     docx = {"word/document.xml": f'<w:document xmlns:w="{wordns}"><w:body><w:p><w:r><w:t>Экономика</w:t></w:r></w:p><w:p><w:r><w:t>Данные</w:t></w:r><w:del><w:r><w:t>Удалено</w:t></w:r></w:del></w:p></w:body></w:document>'}
+
+    # A two-page PDF with proper byte offsets and an embedded text stream.
+    def pdf_fixture():
+        stream = io.BytesIO()
+        stream.write(b"%PDF-1.4\n")
+        content1 = b"BT /F1 12 Tf 40 700 Td (Production 125) Tj ET"
+        content2 = b"BT /F1 12 Tf 40 700 Td (Employment 50) Tj ET"
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 6 0 R >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            b"<< /Length "+str(len(content1)).encode()+b" >>\nstream\n"+content1+b"\nendstream",
+            b"<< /Length "+str(len(content2)).encode()+b" >>\nstream\n"+content2+b"\nendstream",
+        ]
+        offsets = [0]
+        for i,obj in enumerate(objects,1):
+            offsets.append(stream.tell())
+            stream.write(str(i).encode()+b" 0 obj\n"+obj+b"\nendobj\n")
+        xref=stream.tell()
+        stream.write(b"xref\n0 8\n0000000000 65535 f \n")
+        for offset in offsets[1:]:
+            stream.write(f"{offset:010d} 00000 n \n".encode())
+        stream.write(f"trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+        return base64.b64encode(stream.getvalue()).decode("ascii")
     server = ThreadingHTTPServer(("127.0.0.1",0),partial(SimpleHTTPRequestHandler,directory=tmp))
     threading.Thread(target=server.serve_forever,daemon=True).start()
     try:
@@ -139,6 +167,16 @@ with tempfile.TemporaryDirectory() as tmp:
             for invalid in [{"data":package(bad),"sheet":1,"kind":"xlsx"},{"data":package(workbook),"sheet":3,"kind":"xlsx"},{"data":package({"word/document.xml":"<!DOCTYPE x><x/>"}),"sheet":1,"kind":"docx"}]:
                 rejected = page.evaluate("""async ({data,sheet,kind})=>{try{const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));if(kind==="docx")await GlobalEconomicAssistant.parseLocalDocx(bytes.buffer);else await GlobalEconomicAssistant.parseLocalXlsx(bytes.buffer,sheet);return false}catch{return true}}""",invalid)
                 assert rejected, invalid["kind"]
+            result = page.evaluate("""async data=>{
+                const assets=new URL("pdf-runtime/",location.href).href;
+                const lib=await import(assets+"pdf.mjs");lib.GlobalWorkerOptions.workerSrc=assets+"pdf.worker.mjs";
+                const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));
+                const parsed=await GlobalEconomicAssistant.parseLocalPdf(bytes.buffer,lib,assets);
+                return {parsed,hits:GlobalEconomicAssistant.localPdfSearch(parsed.text,parsed.pages,"Employment")};
+            }""",pdf_fixture())
+            assert result["parsed"]["text"]=="Production 125\n\nEmployment 50", result
+            assert result["parsed"]["emptyPages"]==0 and len(result["parsed"]["pages"])==2, result
+            assert len(result["hits"])==1 and result["hits"][0]["page"]==2, result
             assert not errors, errors
             browser.close()
     finally:
