@@ -1493,3 +1493,47 @@ console.log("16 agent coordination checks passed");}
   }
   multimodalChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.42–1.44: approved unified research, separate public queries and partial failures.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const basket={document:[{id:"doc-0",kind:"Фрагмент пользовательского документа",title:"Документ",description:"PRIVATE_LOCAL_TEXT",limit:"Не проверено"}]};
+  const raw=JSON.stringify([{type:"local_document",text:"PRIVATE_LOCAL_TEXT",refs:["loc-1"]},{type:"limitation",text:"Нужна сверка.",refs:[]}]);
+  const p=C.unifiedResearchPlan("Частный вопрос",{archive:true,archiveQuery:"мрб: 9",local:true});
+  A.equal(p.archiveQuery,"мрб: 9");A.equal(p.online,null);A.equal(p.local,true);
+  A.throws(()=>C.unifiedResearchPlan("x",{}));
+  A.throws(()=>C.unifiedResearchPlan("x",{web:true}));
+  A.throws(()=>C.unifiedResearchPlan("x",{web:true,webQuery:""}));
+  A.throws(()=>C.unifiedResearchPlan("Покажи рынок труда",{archive:true}));
+  const w=C.unifiedResearchPlan("PRIVATE_QUESTION",{web:true,webQuery:"planning",englishQuery:"planning",local:true});
+  A.equal(w.online.maxRequests,8);A.equal(w.online.steps.length,2);
+  A.equal(C.unifiedResearchPlan("x",{web:true,webQuery:"planning"}).online.maxRequests,6);
+  A.ok(!JSON.stringify(w.online).includes("PRIVATE_QUESTION"));
+  async function unifiedChecks(){
+   const failed=await C.runUnifiedResearch(p,basket,{archiveSearch:async()=>{throw Error("offline")},generate:async()=>raw});
+   A.equal(failed.state,"accepted");A.equal(failed.partial,true);A.equal(failed.stages[0].status,"unavailable");
+   A.equal(failed.stages[1].status,"ok");
+   const local=C.unifiedResearchPlan("x",{local:true});
+   const localResult=await C.runUnifiedResearch(local,basket,{fetcher:async()=>{throw Error("no network")},generate:async()=>raw});
+   A.equal(localResult.state,"accepted");A.equal(localResult.partial,false);
+   const urls=[];
+   const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+   const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[]}});
+   const empty=JSON.stringify({hitCount:0,resultList:{result:[]}});
+   const web=await C.runUnifiedResearch(w,basket,{stamp,fetcher:async url=>{urls.push(url);return {ok:true,text:async()=>url.includes("europepmc")?empty:url.includes("crossref")?papers:wiki}},generate:async m=>{const r=JSON.parse(m[1].content).rows.find(x=>x.category==="local_document");return JSON.stringify([{type:"local_document",text:"PRIVATE_LOCAL_TEXT",refs:[r.id]},{type:"limitation",text:"Нужна сверка.",refs:[]}]);}});
+   A.equal(web.state,"accepted");A.equal(web.partial,true);
+   A.equal(urls.length,8);A.ok(urls.every(u=>!u.includes("PRIVATE_LOCAL_TEXT")&&!u.includes("PRIVATE_QUESTION")));
+   A.equal(web.stages[0].stage,"online");
+   await A.rejects(()=>C.runUnifiedResearch({...w,online:{...w.online,maxRequests:99}},basket,{generate:async()=>raw}));
+   const cancelled=await C.runUnifiedResearch(w,basket,{active:()=>false,generate:async()=>{throw Error("must not call")}});
+   A.equal(cancelled.state,"cancelled");
+   const emptyResult=await C.runUnifiedResearch(local,{}, {generate:async()=>{throw Error("must not call")}});
+   A.equal(emptyResult.state,"no_evidence");A.equal(emptyResult.partial,true);
+   const denied=C.unifiedResearchPlan("x",{archive:true});
+   const notLocal=await C.runUnifiedResearch(denied,basket,{archiveSearch:async()=>({fingerprint:"a".repeat(64),found:[],failed:0}),generate:async()=>{throw Error("must not call")}});
+   A.equal(notLocal.state,"no_evidence");
+   console.log("v1.42–1.44 unified research checks passed");
+  }
+  unifiedChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
