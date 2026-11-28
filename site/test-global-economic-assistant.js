@@ -675,3 +675,22 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.localArchiveComparison(local,registry,[],"руб.",true).meanAbsoluteDifference,null);
  console.log("18 local archive comparison checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q=C.parseLocalTable("secret_year;secret_value\n2020;10\n2021;20\n2022;30\n2023;40\n2024;50\n2025;60",";");
+ const a=C.localTableEvidence("summary",C.summarizeLocalColumn(q,1,"."));
+ A.equal(a.length,7);A.equal(a.find(x=>x.id==="local-mean").value,35);
+ A.ok(!JSON.stringify(a).includes("secret"));A.ok(a.every(x=>x.limit.includes("Не официальная статистика")));
+ const b=C.localTableEvidence("annual",C.localAnnualSeries(q,0,1,"."));
+ A.equal(b.filter(x=>x.id.startsWith("local-value-")).length,5);
+ A.ok(!b.some(x=>x.period==="2020"));A.ok(b.some(x=>x.id==="local-rate-2021"&&x.value===100));
+ A.ok(!JSON.stringify(C.localTablePrompt(b)).includes("secret"));
+ A.equal(C.localTablePrompt(b)[0].role,"system");
+ A.deepEqual(JSON.parse(C.localTablePrompt(b)[1].content).results,b);
+ const c=C.localTableEvidence("comparison",{title:"secret",unit:"secret",matched:2,meanAbsoluteDifference:3,rows:[{year:2025,state:"matched",local:10,archive:7,difference:3},{year:2026,state:"archive_missing",local:100,archive:null}]});
+ A.equal(c.length,5);A.ok(!JSON.stringify(c).includes("secret"));A.ok(!c.some(x=>x.period==="2026"));
+ A.deepEqual(C.localTableEvidence("unknown",{}),[]);
+ A.deepEqual(C.localTableEvidence("summary",{}),[]);
+ A.ok(!C.localTableEvidence("summary",{count:0,min:null,mean:NaN}).some(x=>x.id==="local-mean"));
+ console.log("16 local model table checks passed");
+}
