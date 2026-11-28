@@ -9,6 +9,17 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",as
  $("status").textContent="Автоматический обзор · "+d.built+" · "+(d.mode==="scheduled_refresh"?"сборка с обновлением":"офлайн-сборка");
  const continuity=d.continuity;const continuityRows=new Map((continuity?.rows||[]).map(r=>[r.id,r]));
  if(continuity)add($("cards"),"p",continuity.baseline==="verified"?"Сопоставление с предыдущим проверенным отчётом.":"История состояний начинается заново: предыдущий отчёт "+(continuity.baseline==="missing"?"отсутствует.":"не прошёл проверку."));
+ const history=d.preflight_history;
+ if(history?.schema===1&&Array.isArray(history.snapshots)){
+  const section=add($("cards"),"details","");section.className="ac-panel";add(section,"summary","История автоматических проверок · "+history.snapshots.length+" снимков");
+  add(section,"p","Журнал читаемости входных файлов, а не доказательство корректности статистики или завершения исследования. Хеши отражают байты на момент проверки.");
+  for(const snapshot of history.snapshots){
+   const item=add(section,"details","");const c=snapshot.counts;
+   add(item,"summary",snapshot.checked+" · читаются "+c.inputs_readable+" · недоступны "+c.inputs_unavailable+" · отложены "+c.deferred);
+   add(item,"p",snapshot.mode==="scheduled_refresh"?"Сборка с обновлением":"Офлайн-сборка");
+   for(const r of snapshot.rows){const box=add(item,"div","");add(box,"strong",r.id+" · "+r.status);for(const f of r.files)add(box,"p",f.name+" · "+f.status+(f.sha256?" · SHA-256 "+f.sha256:""));}
+  }
+ }
  const queue=d.research_queue;
  if(queue?.schema===1&&queue.mode==="recommendations_only"&&Array.isArray(queue.tasks)){
   const section=add($("cards"),"article","");section.className="ac-panel";add(section,"h3","Очередь исследовательских задач");
