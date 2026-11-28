@@ -94,4 +94,33 @@ class AgentTests(unittest.TestCase):
             (root/'source-pipeline.json').write_text('[]',encoding='utf-8')
             p=preflight(root,q,stamp);by={r['id']:r for r in p['rows']}
             self.assertEqual(by['review-quality']['files'][1]['status'],'empty_or_invalid')
+    def test_preflight_history(self):
+        from datetime import timedelta
+        from copy import deepcopy
+        stamp=datetime.fromisoformat('2026-10-01T03:00:00+00:00')
+        prior=None
+        for i in range(35):
+            checked=(stamp+timedelta(days=i)).isoformat()
+            row=dict(id='review-quality',status='deferred',files=[])
+            current=dict(built=checked,mode='scheduled_refresh',preflight=dict(rows=[row],counts=dict(inputs_readable=0,inputs_unavailable=0,deferred=1)))
+            current['preflight_history']=preflight_history(current,prior)
+            prior=current
+        h=current['preflight_history']
+        self.assertEqual(len(h['snapshots']),30)
+        self.assertEqual(h['snapshots'][0]['checked'],current['built'])
+        self.assertEqual(h['snapshots'][-1]['checked'],(stamp+timedelta(days=5)).isoformat())
+        self.assertTrue(validate_preflight_history(current))
+        self.assertEqual(preflight_history(current,current),h)
+        self.assertEqual(len(preflight_history(current,None)['snapshots']),1)
+        old=deepcopy(current);old.pop('preflight_history')
+        old['built']=stamp.isoformat()
+        self.assertEqual(len(preflight_history(current,old)['snapshots']),2)
+        for field in ('time','counts','id','files'):
+            bad=deepcopy(current)
+            row=bad['preflight_history']['snapshots'][1]
+            if field=='time':row['checked']=current['built']
+            elif field=='counts':row['counts']['deferred']=2
+            elif field=='id':row['rows'][0]['id']='review-other'
+            else:row['rows'][0]['files']=[dict(name='freshness.json',status='missing')]
+            with self.assertRaises(ValueError):validate_preflight_history(bad)
 if __name__=="__main__":unittest.main()
