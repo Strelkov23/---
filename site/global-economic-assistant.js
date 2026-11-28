@@ -101,6 +101,45 @@ const GlobalEconomicAssistant=(function core(){
   }
   return {rows:selected,omitted:rows.length-selected.length,bytes:size(selected),budget,blocked:!selected.length};
  }
+ // Fixed synthetic fixtures: no real economic claims, no user data, no network search.
+ function benchmarkCases(){
+  const fact=(id,title,description,value,unit,period)=>({id,kind:"Учебное наблюдение",title,description,value,unit,period,limit:"Искусственный пример для теста, не реальная статистика."});
+  return [
+   {id:"amount",title:"Сумма и валюта",question:"Каков объём выпуска в учебном примере? Назови сумму, единицу и ссылку.",rows:[fact("b-output","Учебный выпуск","2024 · 125 млн рублей",125,"млн рублей","2024")],required:["125 млн руб."],refs:["b-output"],units:true},
+   {id:"physical",title:"Физические единицы",question:"Сколько продукции выпущено в учебном примере? Назови количество в исходных единицах и ссылку.",rows:[fact("b-physical","Учебная отгрузка","2024 · 80 тонн",80,"тонн","2024")],required:["80 тонн"],refs:["b-physical"],units:true},
+   {id:"compare",title:"Раздельные периоды",question:"Назови оба значения занятости, их периоды и соответствующие ссылки, без вычисления темпа.",rows:[fact("b-old","Учебная занятость","2022 · 40 человек",40,"человек","2022"),fact("b-new","Учебная занятость","2024 · 55 человек",55,"человек","2024")],required:["40 чел.","55 чел."],refs:["b-old","b-new"],units:true,periods:["2022","2024"]},
+   {id:"missing",title:"Недоступное наблюдение",question:"Каково точное значение учебного показателя? Если его нет, прямо сообщи, что данных нет.",rows:[{id:"b-missing",kind:"Статус проверки",title:"Учебный показатель",description:"Числовых наблюдений нет.",limit:"Не подставлять ноль и не оценивать значение."}],required:[],refs:[],abstain:true},
+   {id:"causal",title:"Ограничение причинности",question:"Доказывают ли эти учебные наблюдения, что рост выпуска вызван инвестициями? Прямо укажи, что причинность не доказана.",rows:[fact("b-invest","Учебные инвестиции","Рост инвестиций 6%",6,"%",""),fact("b-growth","Учебный выпуск","Рост выпуска 4%",4,"%","")],required:[],refs:[],causal:true}
+  ];
+ }
+ function benchmarkScore(c,answer){
+  const text=String(answer??"").trim(),rows=c.rows;
+  const report=answerEvidenceAudit(text,rows),citations=citationEvidenceAudit(text,rows),units=unitEvidenceAudit(text,rows);
+  const citedUnits=citationUnitAudit(text,rows);
+  const knownRefs=new Set([...text.matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi)].map(m=>m[1]));
+  const tokens=c.units?explicitUnitTokens(text):quantityTokens(text),missingRequired=c.required.filter(x=>!tokens.has(x)),missingRefs=c.refs.filter(x=>!knownRefs.has(x));
+  const missingPeriods=(c.periods||[]).filter(x=>!quantityTokens(text).has(x));
+  const abstentionOK=!c.abstain||(!quantityTokens(text).size&&/(?:нет\s+(?:достаточных\s+)?данных|данных\s+нет|нет\s+(?:числовых\s+)?наблюдений|(?:значение|показатель)\s+неизвестн|не\s+(?:указано|представлено|приведено|доступно)|недостаточно\s+данных)/iu.test(text));
+  const causalOK=!c.causal||/(?:не\s+доказыва|не\s+доказан|не\s+установлен|не\s+(?:позволяет|позволяют)\s+(?:доказать|установить|сделать вывод)|нельзя\s+(?:доказать|установить|утверждать)|недостаточно\s+данных)/iu.test(text);
+  const flags={unknown:report.unknown,unsupported:report.missing,unlinked:citations.unlinked,mismatched:citations.mismatched,units,citedUnits,missingRequired,missingRefs,missingPeriods,abstentionOK,causalOK,noCitation:report.noCitation,empty:!text};
+  return {pass:!!text&&!report.noCitation&&abstentionOK&&causalOK&&[report.unknown,report.missing,citations.unlinked,citations.mismatched,units,citedUnits,missingRequired,missingRefs,missingPeriods].every(x=>!x.length),flags};
+ }
+ async function runModelBenchmark(generate,active=()=>true,progress=()=>{},clock=()=>Date.now()){
+  const cases=benchmarkCases(),results=[];
+  for(const [i,c] of cases.entries()){
+   if(!active())return {complete:false,results,total:cases.length};
+   progress(i+1,cases.length,c.title);
+   const started=clock();let reply;
+   try{reply=await generate(prompt(c.question,{heading:"Синтетический контрольный пример",description:"Все данные условные."},c.rows))}catch(e){
+    if(!active())return {complete:false,results,total:cases.length};
+    results.push({id:c.id,title:c.title,answer:"",error:"Генерация не завершена",elapsedMs:Math.max(0,clock()-started),pass:false});continue
+   }
+   if(!active())return {complete:false,results,total:cases.length};
+   const answer=typeof reply==="string"?reply.slice(0,6000):"";
+   results.push({id:c.id,title:c.title,answer,elapsedMs:Math.max(0,clock()-started),...benchmarkScore(c,answer)});
+  }
+  return {complete:true,results,total:cases.length};
+ }
  function audit(answer,rows){const known=new Set(rows.map(r=>r.id));return [...new Set(Array.from(String(answer||"").matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi),m=>m[1]))].filter(id=>!known.has(id))}
  // Lexical check only: does not establish that the indicator or period is correct.
  // Check explicitly written units separately from the older quantity audit.
@@ -142,6 +181,18 @@ const GlobalEconomicAssistant=(function core(){
    if(number)out.add(number+" "+({"₽":"руб.","€":"EUR","$":"долл."}[m[1]]));
   }
   return out;
+ }
+ function citationUnitAudit(answer,rows){
+  const byId=new Map(rows.map(r=>[r.id,r]));
+  const passages=String(answer??"").split(/\r?\n+|(?<=[.!?…])\s+(?=[А-ЯЁA-Z0-9«])/u).map(x=>x.trim()).filter(Boolean),issues=[];
+  for(const [i,passage] of passages.entries()){
+   const claims=explicitUnitTokens(passage);
+   if(!claims.size)continue;
+   const refs=[...new Set([...passage.matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi)].map(m=>m[1]).filter(x=>byId.has(x)))];
+   const missing=unitEvidenceAudit(passage,refs.map(id=>byId.get(id)));
+   if(missing.length)issues.push({part:i+1,units:missing,refs});
+  }
+  return issues;
  }
  function unitEvidenceAudit(answer,rows){
   const known=new Set();
@@ -941,13 +992,13 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,benchmarkCases,benchmarkScore,runModelBenchmark,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,citationUnitAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
  const $=id=>document.getElementById("gea-"+id),toggle=$("toggle"),panel=$("panel");if(!toggle||!panel)return;
  const C=GlobalEconomicAssistant,q=$("question"),status=$("status"),results=$("results"),answer=$("answer"),search=$("search"),ask=$("ask"),model=$("model"),clear=$("clear"),stop=$("stop"),full=$("full"),ctx=$("context");
- let busy=false,engine=null,epoch=0,last=null,loadedProfile=null;const modelChoice=$("model-choice"),modelInfo=$("model-info"),modelUnload=$("model-unload");let proposed=null,approved=null;const planButton=$("plan-model"),planAccept=$("plan-accept"),planPreview=$("plan-preview");const include=$("include-context"),preview=$("preview-context"),previewHost=$("parameters"),exportButton=$("export");const scripts=new Map(),storageKey="economic-ai-draft-v1";
+ let busy=false,engine=null,epoch=0,last=null,loadedProfile=null;const modelChoice=$("model-choice"),modelInfo=$("model-info"),modelUnload=$("model-unload"),benchmarkButton=$("benchmark"),benchmarkView=$("benchmark-view");let proposed=null,approved=null;const planButton=$("plan-model"),planAccept=$("plan-accept"),planPreview=$("plan-preview");const include=$("include-context"),preview=$("preview-context"),previewHost=$("parameters"),exportButton=$("export");const scripts=new Map(),storageKey="economic-ai-draft-v1";
  const historyKey="economic-ai-dialogue-v1",historyOpt=$("history-opt"),historyFollow=$("history-follow"),historyClear=$("history-clear"),historyView=$("history-view");
  let history=[];
  if(historyOpt){try{const stored=JSON.parse(sessionStorage.getItem(historyKey)||"null");if(stored?.enabled===true){historyOpt.checked=true;history=C.dialogueHistory(stored.rows)}}catch{}}
@@ -977,7 +1028,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
  const close=()=>{panel.hidden=true;toggle.setAttribute("aria-expanded","false");toggle.focus()};
  toggle.onclick=()=>panel.hidden?open():close();$("close").onclick=close;
  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!panel.hidden&&panel.contains(document.activeElement)){e.preventDefault();close()}});
- function lock(v){busy=v;if(modelChoice)modelChoice.disabled=v||!!engine;if(modelUnload)modelUnload.disabled=v||!engine;if(historyOpt)historyOpt.disabled=v;if(historyClear)historyClear.disabled=v;if(historyFollow)historyFollow.disabled=v||!historyOpt.checked||!history.length;if(planButton)planButton.disabled=v||!engine;if(planAccept)planAccept.disabled=v||!proposed;search.disabled=v;ask.disabled=v||!engine;model.disabled=v||!!engine;q.disabled=v;clear.disabled=v;stop.disabled=!v||!engine;include.disabled=v;preview.disabled=v;exportButton.disabled=v||!last}
+ function lock(v){busy=v;if(benchmarkButton)benchmarkButton.disabled=v||!engine;if(modelChoice)modelChoice.disabled=v||!!engine;if(modelUnload)modelUnload.disabled=v||!engine;if(historyOpt)historyOpt.disabled=v;if(historyClear)historyClear.disabled=v;if(historyFollow)historyFollow.disabled=v||!historyOpt.checked||!history.length;if(planButton)planButton.disabled=v||!engine;if(planAccept)planAccept.disabled=v||!proposed;search.disabled=v;ask.disabled=v||!engine;model.disabled=v||!!engine;q.disabled=v;clear.disabled=v;stop.disabled=!v||!engine;include.disabled=v;preview.disabled=v;exportButton.disabled=v||!last}
  function loadScript(name,ready){
   if(ready())return Promise.resolve();
   if(!scripts.has(name)){const p=new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=name;s.onload=()=>ready()?resolve():reject(Error("Module unavailable"));s.onerror=()=>reject(Error("Script unavailable"));document.head.append(s)});scripts.set(name,p);p.catch(()=>scripts.delete(name))}
@@ -1437,6 +1488,27 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    status.textContent="Модель выгружена из рабочего сеанса. Кеш браузера может сохраняться. Выберите другой профиль.";
   }catch{status.textContent="Выгрузка не подтверждена. Перезагрузите страницу перед сменой модели."}
   finally{renderModelInfo();lock(false)}
+ };
+ if(benchmarkButton)benchmarkButton.onclick=async()=>{
+  if(busy||!engine)return;
+  const token=++epoch,profile=loadedProfile?.id||"неизвестно";lock(true);
+  benchmarkView.replaceChildren();status.textContent="Запуск синтетической проверки модели…";
+  try{
+   const report=await C.runModelBenchmark(async messages=>{
+    const reply=await engine.chat.completions.create({messages,temperature:0,max_tokens:220});
+    return reply.choices?.[0]?.message?.content||"";
+   },()=>token===epoch,(i,n,title)=>{status.textContent="Проверка "+i+" / "+n+" · "+title});
+   const pass=report.results.filter(r=>r.pass).length;
+   add(benchmarkView,"p",profile+" · "+pass+" из "+report.total+" контрольных примеров без выявленных расхождений"+(report.complete?".":"; проверка остановлена."));
+   for(const r of report.results){
+    const item=add(benchmarkView,"article","");add(item,"strong",r.title+" · "+(r.pass?"Пройдено":"Требуется проверка")+" · "+Math.round(r.elapsedMs)+" мс");
+    add(item,"p",r.answer||r.error||"Пустой ответ");
+    if(r.flags&&!r.pass)add(item,"small",JSON.stringify(r.flags));
+   }
+   add(benchmarkView,"p","Лексическая проверка синтетических примеров, не оценка общей экономической компетентности. Ответы необходимо читать: правила могут пропустить смысловую ошибку.");
+   status.textContent=report.complete?"Проверка завершена. Смените модель и повторите тест для сравнения.":"Проверка остановлена.";
+  }catch{if(token===epoch)status.textContent="Не удалось выполнить проверку."}
+  finally{lock(false)}
  };
  renderModelInfo();
  stop.onclick=()=>{epoch++;if(engine)engine.interruptGenerate();status.textContent="Запрошена остановка."};
