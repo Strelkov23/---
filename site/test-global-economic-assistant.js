@@ -2053,3 +2053,43 @@ console.log("16 agent coordination checks passed");}
  }
  searchRelevanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.93–1.95: unified chat routing without unapproved network execution.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const stamp="a".repeat(64),prior={mode:"research",state:"complete",question:"Производительность",answer:"PRIVATE_MARKER",archiveReceipt:{command:"производительность труда: 2025; база=2019",fingerprint:stamp}};
+ const search={mode:"research",state:"search",question:"Планирование",answer:"Каталог",publicSearch:{query:"Планирование",profile:"wide"}};
+ const plan=(q,turns=[],mode="auto")=>C.chatActionPlan(q,turns,[],false,mode);
+ A.equal(plan("").kind,"empty");A.equal(plan("x".repeat(601)).kind,"empty");
+ A.equal(plan("Привет").kind,"general");A.equal(plan("мрб: 9").kind,"archive");
+ A.equal(plan("Найди в интернете планирование").kind,"web");
+ A.equal(plan("Найди в интернете планирование").query,"планирование");
+ A.equal(plan("Найди в интернете планирование").requiresApproval,true);
+ A.equal(plan("Поищи онлайн: история").query,"история");
+ A.equal(plan("Найди в интернете").kind,"clarify");
+ A.equal(plan("Найди в интернете "+ "x".repeat(241)).kind,"clarify");
+ A.equal(plan("Найди наборы данных по промышленности").profile,"wide");
+ A.equal(plan("Какие последние новости науки?").kind,"web");
+ A.equal(plan("Исследуй структуру российской экономики").kind,"research");
+ A.equal(plan("Проведи комплексное исследование промышленности").kind,"research");
+ A.equal(plan("Напиши текст об интернете").kind,"general");
+ A.equal(plan("Найди в интернете историю",[],"general").kind,"general");
+ A.equal(plan("Привет",[],"archive").kind,"archive");
+ A.equal(plan("Привет",[],"research").kind,"research");
+ A.equal(plan("Привет",[],"web-wide").profile,"wide");
+ A.throws(()=>plan("Привет",[],"invalid"));
+ const f=plan("А за 2024 год?",[prior]);
+ A.equal(f.kind,"followup");A.equal(f.command,"производительность труда: 2024; база=2019");
+ A.equal(f.prior.archiveReceipt.fingerprint,stamp);
+ A.equal(plan("А за 2018 год?",[prior]).kind,"clarify");
+ A.equal(plan("А за 2024 год?",[{...prior,private:true}]).kind,"general");
+ A.equal(plan("А за 2024 год?",[prior,{mode:"general",state:"complete",question:"Привет",answer:"Привет"}]).kind,"general");
+ A.equal(plan("А за 2024 год?",[{...prior,state:"cancelled"}]).kind,"general");
+ const w=plan("А за 2024 год?",[search]);
+ A.equal(w.kind,"web-refine");A.equal(w.query,"Планирование");A.equal(w.profile,"wide");
+ A.equal(w.draft,"Планирование А за 2024 год?");A.equal(w.requiresApproval,undefined);
+ A.equal(plan("А за 2024 год?",[{...search,private:true}]).kind,"general");
+ A.equal(plan("Найди в интернете новые статьи",[prior]).query,"новые статьи");
+ A.ok(!JSON.stringify(plan("Найди в интернете новые статьи",[prior])).includes("PRIVATE_MARKER"));
+ console.log("v1.93–1.95 dialogue orchestration checks passed");
+}
