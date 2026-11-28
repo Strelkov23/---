@@ -1399,3 +1399,5 @@ console.log("16 agent coordination checks passed");}
   A.equal(C.modelResearchPlan(JSON.stringify([a,"Найди предприятие по ИНН 7707083893"]),a+" 7707083893"),null);
   console.log("v1.33–1.35 intent routing checks passed");
  }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");const q="Сравни компании по ИНН 7707083893 и 7704211201";A.equal(C.economicIntent(q).kind,"tool");A.equal(C.researchPlan("Исследование: "+q+" | Покажи межотраслевой баланс группы 9").kind,"invalid");}
