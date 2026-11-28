@@ -11,7 +11,7 @@ export async function CreateMLCEngine(){
  const context=messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
  if(!stream && messages[0]?.content?.startsWith('Разложи задачу на 2–4')) return {choices:[{message:{content:JSON.stringify([{mode:'general',title:'Объяснение',query:'Объясни межотраслевой баланс'},{mode:'web',title:'Поиск',query:'Межотраслевой баланс статьи'}])}}]};
  if(!stream) return {choices:[{message:{content:'Тестовый ответ'}}]};
- return (async function*(){yield {choices:[{delta:{content:'Тест: '}}]};yield {choices:[{delta:{content:context}}]};})();
+ return (async function*(){if(context.includes('Контроль обрыва ответа')){yield {choices:[{delta:{content:'Неполный контрольный текст'}}]};yield {choices:[{delta:{},finish_reason:'length'}]};return;}yield {choices:[{delta:{content:'Тест: '}}]};yield {choices:[{delta:{content:context}}]};})();
  }}}};
 }"""
 
@@ -54,6 +54,8 @@ def main():
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
             send.click()
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога') && !document.querySelector('#gea-question').disabled")
+            assert "Локальный замер: первый текст" in log.inner_text()
+            assert "симв." in log.inner_text()
             # The mocked transport cannot establish model intelligence. The diagnostic
             # must report failed synthetic cases, not a misleading all-green result.
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
@@ -200,6 +202,19 @@ def main():
             assert len(gateway_requests)==3 and not external
             page.get_by_role("button",name="Очистить заметки диалога",exact=True).click()
             assert memory.input_value()==""
+            # Truncation must remain visible and must not enter future chat context.
+            page.locator(".gea-chat-toolbar select").filter(has=page.locator("option[value='general']")).select_option("general")
+            question.fill("Контроль обрыва ответа")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Получен неполный ответ') && !document.querySelector('#gea-question').disabled")
+            assert "Ответ достиг лимита генерации" in log.locator("article").last.inner_text()
+            assert question.input_value()=="Контроль обрыва ответа"
+            question.fill("Контроль нового сообщения")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ общего чата готов') && !document.querySelector('#gea-question').disabled")
+            last=log.locator("article").last.inner_text()
+            assert "Контроль нового сообщения" in last and "Контроль обрыва ответа" not in last
+            assert len(gateway_requests)==3 and not external
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
