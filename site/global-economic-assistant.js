@@ -902,6 +902,33 @@ const GlobalEconomicAssistant=(function core(){
   r.runs.push(hypothesisReceipt(r,plan,result,stamp));
   return hypothesisJournal(rows);
  }
+ // Compare archived excerpts, not unobserved values or independent confirmations.
+ function compareHypothesisRuns(entry){
+  const r=hypothesisJournal([entry])[0],runs=r.runs;
+  if(runs.length<2)return {state:"insufficient_runs",comparisons:[]};
+  const commands=x=>modelResearchPlan(JSON.stringify(x.questions),r.question).steps.map(v=>v.command);
+  const identity=x=>JSON.stringify([Number(x.id[1]),x.class,x.title,x.href]);
+  const payload=x=>JSON.stringify([x.description,x.limit]);
+  const index=cards=>{const m=new Map();for(const c of cards){const k=identity(c);if(!m.has(k))m.set(k,[]);m.get(k).push(c)}return m};
+  const comparisons=[];
+  for(let i=1;i<runs.length;i++){
+   const now=runs[i],plan=JSON.stringify(commands(now));
+   let j=i-1;while(j>=0&&JSON.stringify(commands(runs[j]))!==plan)j--;
+   if(j<0){comparisons.push({current:i+1,previous:null,state:"different_plan"});continue}
+   const old=runs[j],a=index(old.cards),b=index(now.cards),changes=[];
+   const counts={unchanged:0,changed_excerpt:0,only_previous_sample:0,only_current_sample:0,ambiguous:0};
+   for(const k of new Set([...a.keys(),...b.keys()])){
+    const before=a.get(k)||[],after=b.get(k)||[];
+    const state=before.length>1||after.length>1?"ambiguous":!before.length?"only_current_sample":!after.length?"only_previous_sample":payload(before[0])===payload(after[0])?"unchanged":"changed_excerpt";
+    counts[state]++;
+    if(state!=="unchanged")changes.push({state,title:(after[0]||before[0]).title,previous:before.map(x=>x.id),current:after.map(x=>x.id)});
+   }
+   const sameSnapshot=old.fingerprint===now.fingerprint;
+   const completeSamples=old.eligible===old.cards.length&&now.eligible===now.cards.length;
+   comparisons.push({current:i+1,previous:j+1,state:sameSnapshot?"same_snapshot":"different_snapshot",sameSnapshot,completeSamples,failedPrevious:old.failed,failedCurrent:now.failed,counts,changes,coverage:now.steps.map((v,k)=>({step:v.step,retrievedBefore:old.steps[k].retrieved,retrievedAfter:v.retrieved,observationsBefore:old.steps[k].observations,observationsAfter:v.observations,calculationsBefore:old.steps[k].calculations,calculationsAfter:v.calculations})),limit:"Сравниваются только сохранённые сокращённые карточки при одинаковых командах. Изменение текста не означает пересмотр числа; другой SHA-256 не доказывает обновление конкретного показателя. Отсутствие карточки не означает исчезновение наблюдения. Повторный запуск не является независимым подтверждением гипотезы."});
+  }
+  return {state:"compared",comparisons};
+ }
  function seriesEvidence(x,id){
   if(!x||!Number.isFinite(x.value)||typeof x.unit!=="string"||typeof x.period!=="string")return null;
   let description=x.period+" · "+x.value+" "+x.unit;
@@ -1707,7 +1734,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,hypothesisJournal,addHypothesis,reviewHypothesis,hypothesisPlanPrompt,hypothesisPlan,hypothesisReceipt,appendHypothesisRun,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,parseLocalTable,summarizeLocalColumn,localAnnualSeries,localArchiveComparison,localTableEvidence,localTablePrompt,xlsxDirectory,xlsxCrc,xlsxReadEntry,xlsxCellColumn,xlsxGrid,parseLocalXlsx,localDocumentText,parseLocalDocx,localDocumentSearch,localDocumentEvidence,localDocumentPrompt,parseLocalPdf,localPdfSearch,scanViewport,recognizePdfPage,localImageHeader,localOcrResult,recognizeLocalImage,chartCalibration,chartPoint,chartPointsCsv,chartTrace,chartResearchSummary,chartResearchEvidence,chartResearchPrompt,prompt,utf8Size,prepareEvidence,researchCardClass,sameSeriesDisagreements,researchScope,prepareResearchInput,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,citedUnitAudit,researchAnswerCheck,repairResearchPrompt,reviewResearchAnswer,structuredResearchPrompt,structuredResearchInput,validateResearchFindings,formatResearchFindings,hypothesisJournal,addHypothesis,reviewHypothesis,hypothesisPlanPrompt,hypothesisPlan,hypothesisReceipt,appendHypothesisRun,compareHypothesisRuns,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -2188,6 +2215,20 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
     }catch{if(token===epoch)proposal.textContent="Исследование не сохранено: недоступные данные, смена снимка или лимит."}
     finally{lock(false)}
    };
+   if(r.runs.length>=2){
+    const comparison=add(research,"details","");add(comparison,"summary","Сопоставление повторных исследований");
+    const report=C.compareHypothesisRuns(r);
+    const labels={same_snapshot:"Один и тот же снимок",different_snapshot:"Разные снимки",different_plan:"Нет более раннего сопоставимого плана",changed_excerpt:"Изменился сохранённый фрагмент",only_previous_sample:"Только в предыдущей сохранённой выборке",only_current_sample:"Только в текущей сохранённой выборке",ambiguous:"Неоднозначная идентичность карточки"};
+    for(const c of report.comparisons.slice().reverse()){
+     const section=add(comparison,"article","");add(section,"strong","Исследование "+c.current+(c.previous?" относительно "+c.previous:"")+" · "+labels[c.state]);
+     if(!c.previous)continue;
+     add(section,"p","Без изменений: "+c.counts.unchanged+"; изменённых фрагментов: "+c.counts.changed_excerpt+"; только в текущей выборке: "+c.counts.only_current_sample+"; только в предыдущей: "+c.counts.only_previous_sample+"; неоднозначных: "+c.counts.ambiguous+".");
+     add(section,"small",(c.completeSamples?"Все подходящие карточки сохранены в сокращённом виде.":"Сохранена только часть подходящих карточек.")+" Недоступных архивов: "+c.failedPrevious+" → "+c.failedCurrent+".");
+     for(const step of c.coverage)add(section,"p","Шаг "+step.step+": карточки "+step.retrievedBefore+" → "+step.retrievedAfter+"; наблюдения "+step.observationsBefore+" → "+step.observationsAfter+"; расчёты "+step.calculationsBefore+" → "+step.calculationsAfter+".");
+     for(const x of c.changes)add(section,"p",labels[x.state]+" · "+x.title+" · "+x.previous.join(", ")+" → "+x.current.join(", "));
+     add(section,"small",c.limit);
+    }
+   }
    for(const run of r.runs.slice().reverse()){
     const receipt=add(research,"details","");add(receipt,"summary",run.at+" · "+(run.same_snapshot?"исходный снимок":"другой снимок"));
     add(receipt,"small","SHA-256: "+run.fingerprint);
