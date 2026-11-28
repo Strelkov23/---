@@ -1033,3 +1033,38 @@ console.log("16 agent coordination checks passed");}
  }
  checks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+ // v1.16: two language editions, independent transport failures and context budget.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const plan=C.wikiReferencePlan("история","both","history");
+  A.deepEqual(plan,[{language:"ru",query:"история"},{language:"en",query:"history"}]);
+  A.deepEqual(C.wikiReferencePlan(" history ","en"),[{language:"en",query:"history"}]);
+  A.throws(()=>C.wikiReferencePlan("история","both",""));
+  A.throws(()=>C.wikiReferencePlan("history","xx",""));
+  const body=(lang)=>JSON.stringify({query:{pages:[1,2].map(i=>({ns:0,pageid:i,lastrevid:i+10,title:lang+i,extract:"Reference "+i,index:i}))}});
+  const ok=async(url,options)=>{A.equal(options.credentials,"omit");A.equal(options.redirect,"error");return {ok:true,text:async()=>body(url.includes("//ru.")?"ru":"en")}};
+  async function bilingualChecks(){
+   const both=await C.fetchWikiComparison(plan,ok,null,stamp);
+   A.deepEqual(both.rows.map(r=>r.id),["wiki-ru-1","wiki-en-1","wiki-ru-2","wiki-en-2"]);
+   A.deepEqual(both.coverage.map(r=>[r.status,r.count]),[["ok",2],["ok",2]]);
+   const partial=await C.fetchWikiComparison(plan,async(url,o)=>url.includes("//en.")?{ok:false}:ok(url,o),null,stamp);
+   A.equal(partial.rows.length,2);A.equal(partial.coverage[1].status,"unavailable");
+   const empty=await C.fetchWikiComparison(plan,async()=>({ok:true,text:async()=>JSON.stringify({batchcomplete:true})}),null,stamp);
+   A.equal(empty.rows.length,0);A.ok(empty.coverage.every(r=>r.status==="empty"));
+   const timed=await C.fetchWikiComparison(plan,async()=>{throw Error("aborted")},{aborted:true},stamp);
+   A.ok(timed.coverage.every(r=>r.status==="timeout"));
+   await A.rejects(()=>C.fetchWikiComparison([plan[0],plan[0]],ok,null,stamp));
+   const full=C.wikiBudgetSelection("история",both.rows,both.coverage);
+   A.equal(full.length,4);
+   const max=C.utf8Size(JSON.stringify(C.wikiExplanationPrompt("история",both.rows.slice(0,2),both.coverage)));
+   const selected=C.wikiBudgetSelection("история",both.rows,both.coverage,max);
+   A.equal(selected.length,2);A.deepEqual(selected.map(r=>r.id),["wiki-ru-1","wiki-en-1"]);
+   A.equal(C.wikiBudgetSelection("история",both.rows,both.coverage,1).length,0);
+   A.ok(C.wikiExplanationPrompt("история",partial.rows,partial.coverage)[0].content.includes("не считай их независимыми подтверждениями"));
+   A.equal(JSON.parse(C.wikiExplanationPrompt("история",partial.rows,partial.coverage)[1].content).coverage[1].status,"unavailable");
+   console.log("v1.16 bilingual reference checks passed");
+  }
+  bilingualChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
