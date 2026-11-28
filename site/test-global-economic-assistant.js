@@ -550,3 +550,25 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.modelHint("unknown").includes("Неизвестный"));
  console.log("15 local model profile checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q="Сравни показатели",ctx={heading:"Экономика"};
+ const row=(id,value,description="Наблюдение")=>({id,title:"Ряд",kind:"Наблюдение",value,unit:"руб.",description,limit:"Ограничение источника"});
+ const a=row("s1-fact1",100),b=row("s2-fact1",200),c=row("s1-fact2",300),huge=row("s1-huge",999,"Я".repeat(15000));
+ const size=rows=>C.utf8Size(JSON.stringify(C.prompt(q,ctx,rows)));
+ A.equal(C.utf8Size("AЯ😀"),7);
+ A.deepEqual(C.prepareEvidence(q,ctx,[a,b],size([a,b])).rows,[a,b]);
+ A.equal(C.prepareEvidence(q,ctx,[a],size([])-1).blocked,true);
+ A.equal(C.prepareEvidence(q,ctx,[a],size([])).blocked,true);
+ const r=C.prepareEvidence(q,ctx,[a,c,b],size([a,b]));
+ A.deepEqual(r.rows,[a,b]);A.equal(r.omitted,1);A.ok(r.bytes<=r.budget);
+ A.deepEqual(C.prepareEvidence(q,ctx,[huge,b],size([b])).rows,[b]);
+ A.deepEqual(C.prepareEvidence(q,ctx,[a,{id:"auto-route",kind:"Выбранный инструмент"}],size([a])).rows,[a]);
+ A.deepEqual(C.prepareEvidence(q,ctx,[a],size([a])).rows[0],a);
+ A.deepEqual(C.audit("[s1-fact2]",r.rows),["s1-fact2"]);
+ A.deepEqual(C.answerEvidenceAudit("300 [s1-fact1]",r.rows).missing,["300"]);
+ A.throws(()=>C.prepareEvidence(q,ctx,[a,a]),/identity/);
+ A.throws(()=>C.prepareEvidence(q,ctx,[a],-1),/budget/);
+ A.ok(C.prepareEvidence(q,{heading:"Я".repeat(10000)},[a]).blocked);
+ console.log("15 context budget checks passed");
+}
