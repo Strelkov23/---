@@ -2004,3 +2004,52 @@ console.log("16 agent coordination checks passed");}
  }
  publicChatSearchChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.90–1.92: expanded search profile, lexical relevance, explicit public-query memory.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function searchRelevanceChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",q="Экономическое планирование",plan=C.publicChatSearchPlan(q,"wide");
+  A.equal(plan.profile,"wide");A.equal(plan.maxRequests,8);A.equal(C.publicChatSearchPlan(q).maxRequests,6);
+  A.throws(()=>C.publicChatSearchPlan(q,"private"));
+  const ranked=C.publicSearchRank([
+   {id:"source-run-1",title:"Биология",description:"Экономическое планирование",abstractAvailable:false},
+   {id:"wiki-run-2",title:"Общие сведения",description:"Экономическое планирование"},
+   {id:"source-run-3",title:"Экономическое планирование",description:"Каталог"}
+  ],q);
+  A.deepEqual(ranked.map(x=>x.row.id),["source-run-3","wiki-run-2","source-run-1"]);
+  A.equal(ranked[2].matched,0);
+  const wiki={query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Планирование",extract:"Экономическое планирование",index:1}]}};
+  const papers={status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/one",title:["Планирование"],type:"journal-article"}]}};
+  const epmc={hitCount:1,resultList:{result:[{source:"MED",id:"123",title:"Планирование",isOpenAccess:"Y",license:"cc by",abstractText:"Экономическое планирование"}]}};
+  const datasets={data:[{type:"dois",id:"10.1234/dataset",attributes:{doi:"10.1234/dataset",titles:[{title:"Экономическое планирование"}],types:{resourceTypeGeneral:"Dataset"},publicationYear:2025}}]};
+  const calls=[];
+  const fetcher=async(url,options)=>{calls.push({url,options});return {ok:true,text:async()=>JSON.stringify(url.includes("datacite")?datasets:url.includes("europepmc")?epmc:url.includes("crossref")?papers:wiki)}};
+  const wide=await C.runPublicChatSearch(plan,{fetcher,stamp});
+  A.equal(wide.state,"search");A.equal(calls.length,4);A.ok(wide.sources.some(x=>x.href.includes("dataset")));A.ok(wide.note.includes("datacite"));
+  A.deepEqual(wide.publicSearch,{query:q,profile:"wide"});
+  A.ok(calls.every(c=>c.options.credentials==="omit"&&c.options.referrerPolicy==="no-referrer"));
+  const standard=await C.runPublicChatSearch(C.publicChatSearchPlan(q),{fetcher,stamp});
+  A.equal(standard.publicSearch.profile,"standard");A.equal(calls.length,7);
+  const lost=await C.runPublicChatSearch(plan,{stamp,fetcher:async(url,options)=>url.includes("datacite")?{ok:false,status:429}:fetcher(url,options)});
+  A.ok(lost.note.includes("лимит запросов"));A.equal(lost.state,"search");
+  const noMatch=await C.runPublicChatSearch(C.publicChatSearchPlan("Квазикристаллы"),{fetcher,stamp,generate:async()=>{throw Error("must not generate")}});
+  A.equal(noMatch.state,"search");A.ok(noMatch.note.includes("Релевантность не установлена"));
+  A.ok(noMatch.note.includes("Синтез ответа не выполнен"));
+  const turn={...wide,question:q};
+  A.deepEqual(C.chatTranscript([turn])[0].publicSearch,wide.publicSearch);
+  A.equal(C.chatTranscript([{...turn,private:true}])[0].publicSearch,undefined);
+  A.equal(C.chatTranscript([{...turn,publicSearch:{query:q,profile:"bad"}}])[0].publicSearch,undefined);
+  A.equal(C.chatTranscript([{...turn,mode:"general"}])[0].publicSearch,undefined);
+  A.equal(C.publicSearchReceipt("","wide"),null);
+  A.equal(C.publicSearchReceipt(q,"invalid"),null);
+  const current=calls.length;
+  await A.rejects(()=>C.runPublicChatSearch({...plan,maxRequests:99},{fetcher,stamp}));
+  await A.rejects(()=>C.runPublicChatSearch({...plan,profile:"standard"},{fetcher,stamp}));
+  A.equal(calls.length,current);
+  const cancelled=await C.runPublicChatSearch(plan,{fetcher,stamp,active:()=>false});
+  A.equal(cancelled.state,"cancelled");A.equal(calls.length,current);A.equal(cancelled.publicSearch,undefined);
+  console.log("v1.90–1.92 search relevance checks passed");
+ }
+ searchRelevanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
