@@ -40,6 +40,58 @@ const GlobalEconomicAssistant=(function core(){
  }
  function audit(answer,rows){const known=new Set(rows.map(r=>r.id));return [...new Set(Array.from(String(answer||"").matchAll(/\[([a-z][a-z0-9_-]{0,40})\]/gi),m=>m[1]))].filter(id=>!known.has(id))}
  // Lexical check only: does not establish that the indicator or period is correct.
+ // Check explicitly written units separately from the older quantity audit.
+ // No conversions, implicit currencies, or assumptions about an indicator.
+ function explicitUnitTokens(text){
+  const cleaned=String(text??"").replace(/\[[a-z][a-z0-9_-]{0,40}\]/gi," ").replace(/https?:\/\/\S+/gi," ");
+  const scale=String.raw`(?:тыс(?:яч(?:а|и|у|ей)?)?|млн|миллион(?:а|ов|ы)?|млрд|миллиард(?:а|ов|ы)?|трлн|триллион(?:а|ов|ы)?)(?![\p{L}\p{N}_])\.?`;
+  const num=String.raw`(?<![\p{L}\p{N}_])([+−-]?[ \t\u00a0\u202f]*(?:\d{1,3}(?:[ \u00a0\u202f]\d{3}(?!\d))+|\d+)(?:[.,]\d+)?)(?![\p{N}.,])`;
+  const gap=String.raw`[ \t\u00a0\u202f]*`;
+  const units=[
+   ["руб.",String.raw`(?:руб(?:ль|ля|лей|ли)?|рубл(?:ь|я|ей|и)|rub|₽)`],
+   ["USD",String.raw`(?:usd|долл(?:ар(?:а|ов|ы)?)?\.?[ \t]+сша)`],
+   ["долл.",String.raw`(?:долл(?:ар(?:а|ов|ы)?)?|\$)`],
+   ["EUR",String.raw`(?:eur|евро|€)`],
+   ["CNY",String.raw`(?:cny|юан(?:ь|я|ей|и))`],
+   ["чел.",String.raw`(?:чел(?:овек(?:а|у|ом)?)?|людей)`],
+   ["тонн",String.raw`(?:тонн(?:а|ы|у|е|ой)?|т)`],
+   ["кг",String.raw`(?:килограмм(?:а|ов|ы)?|кг)`],
+   ["м³",String.raw`(?:м³|м3|куб\.?[ \t]*м(?:етр(?:а|ов|ы)?)?)`],
+   ["м²",String.raw`(?:м²|м2|кв\.?[ \t]*м(?:етр(?:а|ов|ы)?)?)`],
+   ["кВт·ч",String.raw`квт[ \t]*[·⋅*×-]?[ \t]*ч`],
+   ["МВт·ч",String.raw`мвт[ \t]*[·⋅*×-]?[ \t]*ч`],
+   ["ГВт·ч",String.raw`гвт[ \t]*[·⋅*×-]?[ \t]*ч`],
+   ["ТВт·ч",String.raw`твт[ \t]*[·⋅*×-]?[ \t]*ч`],
+   ["кВт","квт"],["МВт","мвт"],["ГВт","гвт"],["ТВт","твт"]
+  ];
+  const pattern=new RegExp(num+gap+"("+scale+")?"+gap+"("+units.map(x=>x[1]).join("|")+")(?![\\p{L}\\p{N}_])","giu");
+  const matchers=units.map(([label,form])=>[label,new RegExp("^(?:"+form+")$","iu")]);
+  const out=new Set();
+  for(const m of cleaned.matchAll(pattern)){
+   const [number]=quantityTokens(m[1]+(m[2]?" "+m[2]:""));
+   const label=matchers.find(x=>x[1].test(m[3]))?.[0];
+   if(number&&label)out.add(number+" "+label);
+  }
+  // Prefix currency signs, preserving the original scale if present.
+  const prefix=new RegExp("([₽€$])"+gap+num+gap+"("+scale+")?","giu");
+  for(const m of cleaned.matchAll(prefix)){
+   const [number]=quantityTokens(m[2]+(m[3]?" "+m[3]:""));
+   if(number)out.add(number+" "+({"₽":"руб.","€":"EUR","$":"долл."}[m[1]]));
+  }
+  return out;
+ }
+ function unitEvidenceAudit(answer,rows){
+  const known=new Set();
+  for(const r of rows){
+   const fields=[r.title,r.description];
+   if(Number.isFinite(r.value))fields.push(String(r.value)+" "+String(r.unit||""));
+   for(const f of fields)for(const token of explicitUnitTokens(f))known.add(token);
+  }
+  return [...explicitUnitTokens(answer)].filter(token=>!known.has(token));
+ }
+ function unitEvidenceWarning(missing){
+  return missing.length?"Дополнительная сверка единиц: нет буквального совпадения «число + масштаб + единица»: "+missing.slice(0,12).join("; ")+(missing.length>12?" (ещё "+(missing.length-12)+")":"")+". Не выполнялись пересчёты валют или единиц.":"";
+ }
  function quantityTokens(text){
   const cleaned=String(text??"").replace(/\[[a-z][a-z0-9_-]{0,40}\]/gi," ").replace(/https?:\/\/\S+/gi," ");
   const re=/(?<![\p{L}\p{N}_])([+−-]?)[ \t\u00a0\u202f]*(\d{1,3}(?:[ \u00a0\u202f]\d{3}(?!\d))+|\d+)([.,]\d+)?(?:[ \t\u00a0\u202f]*(%|п\.[ \t]*п\.|процентн[а-яё]*[ \t]+пункт[а-яё]*|процент(?:а|ов|ы)?(?!\p{L})|(?:тыс(?:яч(?:а|и|у|ей)?)?|млн|миллион(?:а|ов|ы)?|млрд|миллиард(?:а|ов|ы)?|трлн|триллион(?:а|ов|ы)?)(?![\p{L}\p{N}_])\.?))?/giu;
@@ -780,7 +832,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,prompt,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -1192,8 +1244,9 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
    status.textContent="Локальная генерация…";
    const reply=await engine.chat.completions.create({messages:C.prompt(q.value,r.context,r.found),temperature:0.1,max_tokens:300});
    if(id!==epoch)return;answer.textContent=reply.choices?.[0]?.message?.content||"Ответ отсутствует.";const report=C.answerEvidenceAudit(answer.textContent,r.found),citations=C.citationEvidenceAudit(answer.textContent,r.found),warning=C.answerEvidenceWarning(report,citations);
-   last.answer=answer.textContent+"\n\n"+warning;
-   status.textContent="Черновик ИИ. "+warning;
+   const unitWarning=C.unitEvidenceWarning(C.unitEvidenceAudit(answer.textContent,r.found)),fullWarning=[warning,unitWarning].filter(Boolean).join(" ");
+   last.answer=answer.textContent+"\n\n"+fullWarning;
+   status.textContent="Черновик ИИ. "+fullWarning;
   }catch{if(id===epoch)status.textContent="Поиск или генерация недоступны. Проверьте соединение и целостность архива."}finally{lock(false)}
  }
  exportButton.onclick=()=>{if(!last||busy)return;const text=EconomicAIPageContext.note(last.question,last.context,last.rows,last.fingerprint,last.answer);const u=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=u;a.download="economic-research-note.txt";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)};
