@@ -559,6 +559,40 @@ const GlobalEconomicAssistant=(function core(){
  return m[2]?{kind:"agent-coordination",mode,id:m[2].toLowerCase()}:{kind:"agent-coordination",mode};
  }
  // Verified archive only; exact joins to the diagnostic record and planning route.
+ // Controlled topic vocabulary; no model-generated search terms or web claims.
+ const DOSSIER_TOPICS=Object.freeze({
+  manufacturing:"промышленное производство manufacturing output",
+  "industry-services":"отраслевая структура sectoral structure",
+  "manufacturing-share":"добавленная стоимость manufacturing share",
+  trade:"внешняя торговля trade balance",
+  "export-cover":"импорт экспорт import dependence",
+  saving:"сбережения инвестиции savings investment",
+  "investment-growth":"накопление капитала capital investment",
+  "fixed-savings":"накопление сбережения capital formation savings",
+  "productivity-ind":"производительность труда industrial productivity",
+  "productivity-agr":"производительность сельское хозяйство agricultural productivity",
+  "employment-youth":"молодежная безработица youth unemployment",
+  "age-dependency":"демографическая нагрузка старение населения ageing dependency",
+  "price-gap":"индексы цен price indices"
+ });
+ function dossierLiterature(id,index,papers,searcher,cutoff){
+  if(!Object.hasOwn(DOSSIER_TOPICS,id)||!Array.isArray(index?.docs)||!Array.isArray(papers)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff))return [];
+  const query=DOSSIER_TOPICS[id],by=new Map(),ambiguous=new Set(),out=[],seen=new Set();
+  for(const p of papers){if(typeof p?.doi!=="string")continue;if(by.has(p.doi))ambiguous.add(p.doi);by.set(p.doi,p)}
+  const accept=r=>{
+   const p=by.get(r.code),date=String(r.date||"");
+   return p&&!ambiguous.has(r.code)&&r.kind==="paper"&&/^10\.\d{4,9}\/\S+$/.test(r.code)&&r.href==="https://doi.org/"+r.code&&external(r.href)&&typeof p.title==="string"&&p.title.slice(0,350)===r.title&&String(p.published||"").slice(0,10)===date&&/^\d{4}(?:-(?:0[1-9]|1[0-2])(?:-\d{2})?)?$/.test(date)&&(date.length!==10||Number.isFinite(Date.parse(date))&&new Date(date).toISOString().slice(0,10)===date)&&(date.length===4?date+"-12":date.slice(0,7))<=cutoff&&!seen.has(r.code);
+  };
+  for(const r of searcher.researchEvidence(index,papers,query,cutoff,2)){
+   if(!accept(r))continue;
+   seen.add(r.code);out.push({id:"dossier-paper"+(out.length+1),kind:"Лицензированная аннотация",title:r.title,description:"Авторы: "+r.authors+" · "+r.date+" · Аннотация: "+r.text,href:r.href,limit:"Подбор по теме досье, не доказательство причины сигнала. Утверждения авторов; полный текст не проверен. Лицензия "+r.license+"; проверка "+r.checked+". Релевантность не означает качество или применимость к России."});
+  }
+  for(const r of searcher.search(index,query,{kind:"paper",expand:true})){
+   if(out.length>=4)break;if(!accept(r))continue;
+   seen.add(r.code);out.push({id:"dossier-paper"+(out.length+1),kind:"Научная статья · только метаданные",title:r.title,description:r.date+" · "+String(by.get(r.code).journal||""),href:r.href,limit:"Только заголовок и библиография, содержание и выводы не прочитаны. Подбор по теме досье; не доказательство причины сигнала."});
+  }
+  return out;
+ }
  function dossierEvidence(cmd,d){
   if(cmd?.kind!=="agent-coordination"||cmd.mode!=="dossiers"||d?.schema!==1||!Number.isFinite(Date.parse(d.built||""))||!["scheduled_refresh","offline_build"].includes(d.mode)||!Array.isArray(d.agents))return [];
   const status=(description)=>[{id:"dossier-status",kind:"Статус проверки",title:"Исследовательские досье",description,href:"economic-ai-agents.json",limit:"Статус наличия материалов, не экономическое наблюдение."}];
@@ -975,7 +1009,7 @@ const GlobalEconomicAssistant=(function core(){
  for(const [i,x] of [...verified,...rows.filter(x=>!x.known)].entries())found.push({id:"bottleneck"+(i+1),kind:"Условная мера",title:x.label,description:f(x.base)+" → "+f(x.value)+" "+x.unit+" · "+(x.known?"цель "+f(x.score)+" · изменение "+f(x.delta)+" млрд руб. · "+(x.delta>x.threshold?"эффект сверх погрешности":"эффект в пределах погрешности"):x.status==="unchanged"?"параметр не изменился":"оптимум не подтверждён")+(x.clamped?" · достигнута граница модели":""),href,limit:note});
  return {found,failed:rows.filter(x=>!x.known&&x.status!=="unchanged").length};
 }
- return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
+ return {words,rank,internal,external,dialogueHistory,dialogueAppend,dialogueQuery,modelProfile,modelHint,prompt,utf8Size,prepareEvidence,audit,researchDedup,quantityTokens,answerEvidenceAudit,citationEvidenceAudit,answerEvidenceWarning,explicitUnitTokens,unitEvidenceAudit,unitEvidenceWarning,seriesEvidence,tradeEvidence,naturalRoute,researchPlan,runResearchPlan,planningPrompt,modelResearchPlan,priceCommand,priceEvidence,partnerTradeCommand,partnerTradeEvidence,labourCommand,labourEvidence,outputCommand,outputEvidence,compositeCommand,compositeEvidence,energyCommand,energyEvidence,productivityCommand,productivityEvidence,technologyCommand,technologyEvidence,forecastAuditCommand,forecastAuditEvidence,agentCommand,agentEvidence,dossierEvidence,dossierLiterature,companyCommand,money,companyEvidence,comparison,profileEvidence,profileComparison,industryCommand,industryEvidence,balanceCommand,balanceEvidence,allocationCommand,allocationEvidence,horizonCommand,horizonHref,horizonEvidence,investmentComparisonCommand,investmentComparisonEvidence,laborPlanCommand,laborPlanEvidence,robustnessCommand,robustnessEvidence,bottleneckCommand,bottleneckEvidence}
 })();
 if(typeof module!=="undefined")module.exports=GlobalEconomicAssistant;
 if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()=>{
@@ -1301,7 +1335,17 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
   let found=[],failed=0;
   const note=description=>[{id:"agents-status",kind:"Статус",title:"Координация агентов",description,href:"economic-ai-agents.json"}];
   if(cmd.kind==="invalid")found=note("Пример: координация агентов: приоритеты. Для статусов всех восьми модулей: координация агентов: все. Для исследовательских досье: координация агентов: досье.");
-  else try{const d=(await Provenance.get(manifest,"economic-ai-agents.json",base)).data;found=C.agentEvidence(cmd,d);if(!found.length)found=note("Отчёт не прошёл проверку структуры и счётчиков.");}
+  else try{const d=(await Provenance.get(manifest,"economic-ai-agents.json",base)).data;found=C.agentEvidence(cmd,d);if(!found.length)found=note("Отчёт не прошёл проверку структуры и счётчиков.");
+   else if(cmd.mode==="dossiers"&&cmd.id&&found.some(r=>r.id==="dossier-"+cmd.id)){
+    try{
+     await loadScript("economic-search.js",()=>typeof EconomicSearch!=="undefined");
+     const [idx,lit]=await Promise.all([Provenance.get(manifest,"economic-search-index.json",base),Provenance.get(manifest,"literature.json",base)]);
+     const selected=C.dossierLiterature(cmd.id,idx.data,lit.data.articles,EconomicSearch,d.built.slice(0,7));
+     found.push(...selected);
+     if(!selected.length)found.push({id:"dossier-literature-status",kind:"Статус проверки",title:"Научные материалы",description:"В проверенном индексе не найдено подходящих записей.",limit:"Не означает отсутствия исследований в мире."});
+    }catch{failed++;found.push({id:"dossier-literature-status",kind:"Статус проверки",title:"Научные материалы",description:"Поиск литературы недоступен.",limit:"Досье сохранено; научные материалы не проверены."});}
+   }
+  }
   catch{failed=1;found=note("Проверенный отчёт агентов недоступен.");}
   return {found,context,failed,fingerprint:manifest.data_fingerprint};
  }
