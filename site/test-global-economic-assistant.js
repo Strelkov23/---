@@ -1579,3 +1579,33 @@ console.log("16 agent coordination checks passed");}
   }
   datasetChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.48–1.50: first-class chat transcript and bounded local dialogue.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const t=(question,answer,mode="general",state="complete")=>({question,answer,mode,state});
+  const turns=[t("Привет","Здравствуйте"),t("Что такое МРБ?","Архивное заключение 12345","archive"),t("Объясни проще","Пример"),t("Ошибка","Неверный ответ","general","error")];
+  const p=C.generalChatPrompt("Продолжи",turns);
+  A.equal(p.used,2);A.equal(p.messages.length,6);
+  A.deepEqual(p.messages.slice(1).map(x=>x.content),["Привет","Здравствуйте","Объясни проще","Пример","Продолжи"]);
+  A.ok(!JSON.stringify(p.messages).includes("12345"));A.ok(!JSON.stringify(p.messages).includes("Неверный ответ"));
+  A.equal(C.generalChatPrompt("Продолжи",turns,1).blocked,true);
+  A.throws(()=>C.generalChatPrompt("",[]));
+  A.equal(C.chatTranscript([{},...turns]).length,4);
+  A.equal(C.chatTranscript(Array.from({length:25},(_,i)=>t(String(i),"a"))).length,20);
+  A.equal(C.chatTranscript([t("a","x".repeat(7000))])[0].answer.length,6000);
+  A.equal(C.chatTranscript([{...t("a","b"),sources:[{id:"s",title:"Test",description:"text",href:"javascript:alert(1)"}]}])[0].sources[0].href,null);
+  A.equal(C.chatTranscript([{...t("a","b"),sources:[{id:"s",title:"Test",description:"text",href:"https://example.org/a"}]}])[0].sources[0].href,"https://example.org/a");
+  A.equal(C.generalChatPrompt("x",Array.from({length:10},(_,i)=>t(String(i),"a"))).used,6);
+  async function chatChecks(){
+   const r=await C.runGeneralChat("Продолжи",turns,async m=>{A.equal(m.length,6);return "Ответ";});
+   A.equal(r.state,"complete");A.equal(r.used,2);A.equal(r.answer,"Ответ");
+   const empty=await C.runGeneralChat("x",[],async()=>"");A.equal(empty.state,"notice");
+   const error=await C.runGeneralChat("x",[],async()=>{throw Error("offline")});A.equal(error.state,"error");
+   const cancel=await C.runGeneralChat("x",[],async()=>{throw Error("must not call")},()=>false);A.equal(cancel.state,"cancelled");
+   let active=true;const stopped=await C.runGeneralChat("x",[],async()=>{active=false;return "late"},()=>active);A.equal(stopped.state,"cancelled");A.equal(stopped.answer,"");
+   const blocked=await C.runGeneralChat("x",[],async()=>{throw Error("must not call")},()=>true,1);A.equal(blocked.state,"notice");
+   console.log("v1.48–1.50 chat checks passed");
+  }
+  chatChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
