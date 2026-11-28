@@ -2,6 +2,7 @@
 Agents are bounded analytical routines, not autonomous LLM processes.
 """
 import json,math
+import provenance
 from collections import Counter
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -32,6 +33,59 @@ def latest(rows,kind,old,limit=8):
     return result
 def agent(name,state,metrics,links,items=None):
     return dict(id=name,state=state,metrics=metrics,links=links,items=items or [])
+STATES = ('ok','attention','waiting')
+def continuity(agents, stamp, prior=None, baseline='missing'):
+    old = {r['id']:r for r in prior['agents']} if prior else {}
+    same = prior is not None and prior['built'] == stamp
+    result = []
+    for a in agents:
+        previous = old.get(a['id'])
+        previous_state = previous['state'] if previous else None
+        old_run = previous.get('continuity', {}) if previous else {}
+        unchanged = previous_state == a['state']
+        if unchanged:
+            count = old_run.get('consecutive', 1) + (0 if same else 1)
+            since = old_run.get('since', prior['built'])
+        else:
+            count, since = 1, stamp
+        result.append(dict(id=a['id'], state=a['state'], previous_state=previous_state,
+                           consecutive=count, since=since,
+                           transition='initial' if previous is None else 'unchanged' if unchanged else 'changed'))
+    return dict(baseline=baseline, previous_built=prior['built'] if prior else None, rows=result)
+
+def validate_continuity(d):
+    c=d['continuity']
+    if c['baseline'] not in ('verified','missing','unverified') or (c['baseline']=='verified') != bool(c['previous_built']):
+        raise ValueError('Invalid continuity baseline')
+    if [r['id'] for r in c['rows']] != [a['id'] for a in d['agents']]:
+        raise ValueError('Invalid continuity registry')
+    if c['previous_built'] and datetime.fromisoformat(c['previous_built']).tzinfo is None:
+        raise ValueError('Invalid previous time')
+    for r,a in zip(c['rows'],d['agents']):
+        if r['state']!=a['state'] or type(r['consecutive']) is not int or r['consecutive']<1 or r['previous_state'] not in (*STATES,None) or datetime.fromisoformat(r['since']).tzinfo is None:
+            raise ValueError('Invalid continuity row')
+        expected='initial' if r['previous_state'] is None else 'unchanged' if r['previous_state']==r['state'] else 'changed'
+        if r['transition']!=expected or (expected!='unchanged' and (r['consecutive']!=1 or r['since']!=d['built'])) or (c['baseline']!='verified' and expected!='initial'):
+            raise ValueError('Invalid continuity transition')
+    return True
+
+def prior_agent_report(previous, stamp):
+    if not (previous/FILE).is_file():
+        return None, 'missing'
+    try:
+        manifest=read(previous,'data-manifest.json')
+        if provenance.file_info(previous/FILE)!=manifest['files'].get(FILE):
+            raise ValueError('Previous report checksum mismatch')
+        prior=read(previous,FILE)
+        validate(prior)
+        if datetime.fromisoformat(prior['built'])>datetime.fromisoformat(stamp):
+            raise ValueError('Previous report is newer')
+        if 'continuity' in prior:
+            prior['agents']=[dict(a,continuity=r) for a,r in zip(prior['agents'],prior['continuity']['rows'])]
+        return prior,'verified'
+    except (OSError,ValueError,TypeError,KeyError,AttributeError):
+        return None,'unverified'
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
@@ -103,6 +157,8 @@ def build(out,previous,stamp,refresh):
     planning=read(out,"economic-ai-planning.json")
     agents.append(agent("planning","attention" if planning["counts"]["investigate"] else "waiting" if planning["counts"]["data_required"]+planning["counts"]["refresh_first"]+planning["counts"]["history_required"] else "ok",{"counts":planning["counts"],"note":planning["note"]},["planning-centre.html","economic-ai-planning.json"],planning["rows"]))
     data=dict(schema=1,built=stamp,mode="scheduled_refresh" if refresh else "offline_build",note=NOTE,agents=agents)
+    prior,baseline=prior_agent_report(previous,stamp)
+    data['continuity']=continuity(agents,stamp,prior,baseline)
     validate(data)
     return data
 def validate(d):
@@ -110,6 +166,7 @@ def validate(d):
     if [r["id"] for r in d["agents"]]!=["coverage","discovery","quality","research","forecast","search","diagnostics","planning"]:raise ValueError("Agent registry")
     for a in d["agents"]:
         if a["state"] not in ("ok","attention","waiting") or not isinstance(a["metrics"],dict) or not isinstance(a["items"],list):raise ValueError("Agent result")
+    if 'continuity' in d:validate_continuity(d)
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
