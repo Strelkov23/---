@@ -1963,3 +1963,44 @@ console.log("16 agent coordination checks passed");}
  }
  alternativeReviewChecks().catch(e=>{console.error(e);process.exitCode=1;});
 }
+
+
+// v1.87–1.89: explicit public chat search, no-model fallback and cancellation.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function publicChatSearchChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",q="Что такое планирование?",plan=C.publicChatSearchPlan(q);
+  A.equal(plan.query,q);A.equal(plan.steps.length,2);A.equal(plan.maxRequests,6);
+  A.throws(()=>C.publicChatSearchPlan(""));A.throws(()=>C.publicChatSearchPlan("x".repeat(241)));A.throws(()=>C.publicChatSearchPlan("вопрос\nсекрет"));
+  const wiki={query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Планирование",extract:"Экономическое планирование",index:1}]}};
+  const papers={status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/one",title:["One"],type:"journal-article"}]}};
+  const empty={hitCount:0,resultList:{result:[]}};
+  const calls=[];
+  const fetcher=async(url,options)=>{calls.push({url,options});return {ok:true,text:async()=>JSON.stringify(url.includes("europepmc")?empty:url.includes("crossref")?papers:wiki)}};
+  const r=await C.runPublicChatSearch(plan,{fetcher,stamp});
+  A.equal(r.state,"search");A.equal(r.mode,"research");A.equal(r.sources.length,2);A.equal(calls.length,6);
+  A.ok(r.note.includes("Синтез ответа не выполнен"));A.ok(r.answer.includes("Планирование"));A.ok(r.sources.every(s=>s.href.startsWith("https://")));
+  A.ok(calls.every(c=>c.options.credentials==="omit"&&c.options.referrerPolicy==="no-referrer"));
+  A.ok(calls.every(c=>!c.url.includes("PRIVATE")));
+  const accepted=await C.runPublicChatSearch(plan,{fetcher,stamp,generate:async messages=>{
+   const payload=JSON.parse(messages[1].content);const ref=payload.rows.find(x=>x.category==="reference");
+   return JSON.stringify([{type:"reference",text:"Экономическое планирование",refs:[ref.id]},{type:"limitation",text:"Нужна сверка.",refs:[]}]);
+  }});
+  A.equal(accepted.state,"complete");A.ok(accepted.answer.includes("Экономическое планирование"));A.ok(accepted.note.includes("не по всему интернету"));
+  const rejected=await C.runPublicChatSearch(plan,{fetcher,stamp,generate:async()=>"bad"});
+  A.equal(rejected.state,"search");A.ok(rejected.note.includes("Заключение не принято"));
+  const broken=await C.runPublicChatSearch(plan,{fetcher,stamp,generate:async()=>{throw Error("offline")}});
+  A.equal(broken.state,"search");A.equal(broken.sources.length,2);
+  const none=await C.runPublicChatSearch(plan,{stamp,fetcher:async url=>({ok:true,text:async()=>JSON.stringify(url.includes("europepmc")?empty:url.includes("crossref")?{...papers,message:{items:[]}}:{batchcomplete:true})}),generate:async()=>{throw Error("must not call")}});
+  A.equal(none.state,"notice");A.equal(none.sources.length,0);
+  const count=calls.length;
+  const cancelled=await C.runPublicChatSearch(plan,{fetcher,stamp,active:()=>false});
+  A.equal(cancelled.state,"cancelled");A.equal(calls.length,count);
+  const stopped=await C.runPublicChatSearch(plan,{fetcher,stamp,signal:{aborted:true}});
+  A.equal(stopped.state,"cancelled");A.equal(calls.length,count);
+  await A.rejects(()=>C.runPublicChatSearch({...plan,maxRequests:99},{fetcher,stamp}));
+  await A.rejects(()=>C.runPublicChatSearch({...plan,steps:[{...plan.steps[0],query:"PRIVATE"}]},{fetcher,stamp}));
+  A.equal(calls.length,count);
+  console.log("v1.87–1.89 public chat search checks passed");
+ }
+ publicChatSearchChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
