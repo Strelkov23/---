@@ -1592,7 +1592,7 @@ console.log("16 agent coordination checks passed");}
   A.equal(C.generalChatPrompt("Продолжи",turns,1).blocked,true);
   A.throws(()=>C.generalChatPrompt("",[]));
   A.equal(C.chatTranscript([{},...turns]).length,4);
-  A.equal(C.chatTranscript(Array.from({length:25},(_,i)=>t(String(i),"a"))).length,20);
+  A.equal(C.chatTranscript(Array.from({length:65},(_,i)=>t(String(i),"a"))).length,60);
   A.equal(C.chatTranscript([t("a","x".repeat(7000))])[0].answer.length,6000);
   A.equal(C.chatTranscript([{...t("a","b"),sources:[{id:"s",title:"Test",description:"text",href:"javascript:alert(1)"}]}])[0].sources[0].href,null);
   A.equal(C.chatTranscript([{...t("a","b"),sources:[{id:"s",title:"Test",description:"text",href:"https://example.org/a"}]}])[0].sources[0].href,"https://example.org/a");
@@ -2518,4 +2518,20 @@ console.log("16 agent coordination checks passed");}
    console.log("Knowledge and compact chat regression checks passed");
   }
   knowledgeChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  let w=C.newChatWorkspace("chat-history");
+  const turns=Array.from({length:65},(_,i)=>({mode:"general",question:"Вопрос "+i,answer:"Ответ "+i,state:"complete"}));
+  turns[64]={...turns[64],private:true,question:"PRIVATE",answer:"PRIVATE"};
+  w=C.updateChatThread(w,w.active,turns,[]);
+  A.equal(w.threads[0].turns.length,60);
+  const raw=C.encodeSavedChatWorkspace(w),read=C.decodeSavedChatWorkspace(raw);
+  A.equal(read.threads[0].turns.length,59);A.equal(read.threads[0].turns[0].question,"Вопрос 5");A.equal(read.threads[0].turns.at(-1).question,"Вопрос 63");
+  A.ok(!raw.includes("PRIVATE"));A.equal(read.active,w.active);
+  A.deepEqual(C.decodeSavedChatWorkspace(C.encodeSavedChatWorkspace(read)),read);
+  A.throws(()=>C.decodeSavedChatWorkspace("not JSON"));A.throws(()=>C.decodeSavedChatWorkspace(" ".repeat(4000001)));
+  const context=C.generalChatPrompt("Следующий вопрос",read.threads[0].turns,9500);
+  A.ok(context.used<=6);A.ok(context.used>0);
+  console.log("Persistent chat history regression checks passed");
  }
