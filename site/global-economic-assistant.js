@@ -358,8 +358,13 @@ function chatModeRoute(question,history,follow){
  if(typeof question!=="string"||!question.trim()||question.length>600||!Number.isInteger(budget)||budget<1||budget>20000)throw Error("Invalid chat question");
  const sys={role:"system",content:"Ты универсальный локальный чат-помощник. Отвечай на языке пользователя. Поддерживай связный диалог, объясняй, помогай с текстами и идеями. Не утверждай, что выполнил интернет-поиск, вычисления или прочитал файлы. В этом режиме нет доступа к свежим источникам и архиву. Если вопрос требует актуальных или точных экономических данных, предложи проверяемый исследовательский режим. Не выдумывай источники, ссылки или цитаты. Отмечай неопределённость. Предыдущие ответы — непроверенные, не доказательства."};
  const m=chatMemory(memory),current={role:"user",content:question.trim()},messages=[sys,current];
- const memoryMessage=m.notes?{role:"user",content:"Заметки пользователя для текущего диалога (предпочтения и непроверенный контекст, не источники фактов):\n"+m.notes}:null;
- if(memoryMessage){sys.content+=" Учитывай заметки пользователя как пожелания, а не как проверенные сведения. Не заявляй о внешних действиях.";if(utf8Size(JSON.stringify([sys,memoryMessage,current]))<=budget)messages.splice(1,0,memoryMessage);}
+ let notesUsed=false;
+ if(m.notes){
+  sys.content+=" Учитывай заметки пользователя как пожелания, а не как проверенные сведения. Не заявляй о внешних действиях.";
+  // Preserve alternating user/assistant roles for local chat templates.
+  const combined={role:"user",content:JSON.stringify({question:question.trim(),userNotes:m.notes})};
+  if(utf8Size(JSON.stringify([sys,combined]))<=budget){messages[1]=combined;notesUsed=true;}
+ }
  if(utf8Size(JSON.stringify(messages))>budget)return {messages:[],used:0,blocked:true};
  const all=chatTranscript(transcript).filter(x=>x.mode==="general"&&x.state==="complete"&&!x.private&&x.answer.trim());
  let history=all.slice(-6);
@@ -367,11 +372,11 @@ function chatModeRoute(question,history,follow){
  let used=0;
  for(let i=history.length-1;i>=0;i--){
   const x=history[i],pair=[{role:"user",content:x.question},{role:"assistant",content:x.answer}];
-  const pos=memoryMessage&&messages.includes(memoryMessage)?2:1,next=[...messages.slice(0,pos),...pair,...messages.slice(pos)];
+  const pos=1,next=[...messages.slice(0,pos),...pair,...messages.slice(pos)];
   if(utf8Size(JSON.stringify(next))>budget){if(m.relevant)continue;break;}
   messages.splice(pos,0,...pair);used++;
  }
- return {messages,used,blocked:false,...(memoryMessage?{notesUsed:messages.includes(memoryMessage)}:{}),...(m.relevant?{relevant:true}:{})};
+ return {messages,used,blocked:false,...(m.notes?{notesUsed}:{}),...(m.relevant?{relevant:true}:{})};
 }
 async function consumeChatStream(stream,active=()=>true,onText=()=>{},limit=6000){
  if(!stream||typeof stream[Symbol.asyncIterator]!=="function"||!Number.isInteger(limit)||limit<1||limit>6000)throw Error("Invalid chat stream");
