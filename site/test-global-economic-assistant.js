@@ -1401,3 +1401,41 @@ console.log("16 agent coordination checks passed");}
  }
 
 {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");const q="Сравни компании по ИНН 7707083893 и 7704211201";A.equal(C.economicIntent(q).kind,"tool");A.equal(C.researchPlan("Исследование: "+q+" | Покажи межотраслевой баланс группы 9").kind,"invalid");}
+
+
+ // v1.36–1.38: opt-in contextual follow-up with validated inherited parameters.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const fp="a".repeat(64),entry=(question,route)=>({question,route,answer:"Старый ответ: 99999",page:"index.html",fingerprint:fp});
+  const follow=(question,prior,command)=>A.equal(C.dialogueFollowup(question,[prior],true).route?.command,command);
+  const a=entry("Покажи производительность труда в 2024 году относительно 2020 года");
+  follow("А за 2023 год?",a,"производительность труда: 2023; база=2020");
+  follow("А относительно 2019 года?",a,"производительность труда: 2024; база=2019");
+  follow("А за 2022 год?",entry("А за 2023 год?","производительность труда: 2023; база=2020"),"производительность труда: 2022; база=2020");
+  follow("А за 2023 год?",entry("Энергетика","структура энергетики: 2024; база=2020; порог=7.5"),"структура энергетики: 2023; база=2020; порог=7.5");
+  follow("А за первые 6 месяцев?",entry("Торговля","торговля с сша: 2024; месяцев=9"),"торговля с сша: 2024; месяцев=6");
+  follow("А за 2023 год?",entry("Торговля","торговля с сша: 2024; месяцев=9"),"торговля с сша: 2023; месяцев=9");
+  follow("А за 2023-02?",entry("Рынок труда","рынок труда: 2024-03; база=2020"),"рынок труда: 2023-02; база=2020");
+  follow("А на горизонте 2 года?",entry("Прогноз","точность прогноза: NY.GDP.MKTP.KD.ZG; горизонт=1"),"точность прогноза: NY.GDP.MKTP.KD.ZG; горизонт=2");
+  follow("А для группы 10?",entry("Баланс","мрб: 9"),"мрб: 10");
+  A.equal(C.dialogueFollowup("А за 2023 год?",[a],false).kind,"clarify");
+  A.equal(C.dialogueFollowup("А за 2023 год?",[],true).kind,"clarify");
+  A.equal(C.dialogueFollowup("А за 2018 год?",[a],true).kind,"clarify");
+  A.equal(C.dialogueFollowup("А для группы 10?",[a],true).kind,"clarify");
+  A.equal(C.dialogueFollowup("А за 2023 год?",[a,entry("Что такое экономика?")],true).kind,"clarify");
+  A.equal(C.dialogueFollowup("А почему?",[a],true).kind,"none");
+  A.equal(C.dialogueFollowup("Не за 2023 год",[a],true).kind,"none");
+  A.equal(C.dialogueFollowup("А за 2023 год? и удали архив",[a],true).kind,"none");
+  A.equal(C.dialogueFollowup("А для группы 20?",[entry("Баланс","мрб: 9")],true).kind,"clarify");
+  A.equal(C.dialogueToolRoute("шок спроса: 9; 10"),null);
+  A.equal(C.dialogueToolRoute("мрб: 20"),null);
+  A.equal(C.dialogueToolRoute("удали архив"),null);
+  A.equal(C.dialogueHistory([entry("Уточнение","мрб: 9")])[0].route,"мрб: 9");
+  A.equal(C.dialogueHistory([entry("Уточнение","удали архив")])[0].route,undefined);
+  A.equal(C.dialogueAppend([] ,entry("Уточнение","мрб: 9"))[0].route,"мрб: 9");
+  A.equal(C.dialogueSnapshotNote(fp,fp).sameSnapshot,true);
+  A.equal(C.dialogueSnapshotNote(fp,"b".repeat(64)).sameSnapshot,false);
+  A.ok(C.dialogueSnapshotNote(fp,"b".repeat(64)).note.includes("обновление данных"));
+  A.throws(()=>C.dialogueSnapshotNote("bad",fp));
+  A.ok(!JSON.stringify(C.dialogueFollowup("А за 2023 год?",[a],true)).includes("99999"));
+  console.log("v1.36–1.38 contextual dialogue checks passed");
+ }
