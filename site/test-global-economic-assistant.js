@@ -984,3 +984,260 @@ console.log("16 agent coordination checks passed");}
  A.ok(y.limit.includes("не является независимым"));
  console.log("17 hypothesis run comparison checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,"Вопрос","h-1",at),input=C.hypothesisArgumentInput(j[0]);
+ A.equal(input.blocked,false);A.equal(input.cards.length,1);A.equal(input.cards[0].fingerprint,fp);A.ok(input.bytes<=input.budget);
+ A.equal(C.hypothesisArgumentInput(j[0],100).blocked,true);
+ const gap={type:"gap",text:"Необходима независимая проверка.",refs:[]},support={type:"support",text:"Выпуск 125 млн руб.",refs:["arg-1"]};
+ const check=(...a)=>C.validateHypothesisArguments(JSON.stringify(a),input.cards);
+ A.equal(check(gap,support).ok,true);
+ A.equal(check(gap).ok,true);
+ A.equal(check(support).reason,"missing_gap");
+ A.equal(check(gap,{...support,refs:[]}).reason,"missing_source");
+ A.equal(check(gap,{...support,refs:["bad"]}).reason,"unknown_source");
+ A.equal(check(gap,{...support,text:"Выпуск 999 млн руб."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,text:"Выпуск 125 тонн."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,type:"proven"}).reason,"shape");
+ A.equal(check(gap,support,support).reason,"duplicate_argument");
+ A.equal(check(gap,{type:"challenge",text:"Связь требует проверки.",refs:["arg-1"]}).ok,true);
+ A.equal(C.validateHypothesisArguments("invalid",input.cards).reason,"json");
+ A.equal(j[0].events.length,0);
+ console.log("17 hypothesis argument checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const at="2026-11-28T10:00:00.000Z";
+ A.ok(C.wikiSearchUrl("история & право","ru").includes("gsrsearch="+encodeURIComponent("история & право")));
+ A.ok(C.wikiSearchUrl("history","en").startsWith("https://en.wikipedia.org/"));
+ A.throws(()=>C.wikiSearchUrl("x","other"));A.throws(()=>C.wikiSearchUrl(" ", "ru"));A.throws(()=>C.wikiSearchUrl("x\nz","ru"));
+ const page={ns:0,pageid:12,lastrevid:34,title:"History",extract:"Historical research.",index:2};
+ const data={query:{pages:[page,{...page,pageid:13,lastrevid:35,title:"Law",index:1}]}};
+ const rows=C.wikiReferenceCards(data,"en",at);
+ A.equal(rows.length,2);A.equal(rows[0].id,"wiki-en-13");A.equal(rows[1].href,"https://en.wikipedia.org/w/index.php?oldid=34");
+ A.equal(rows[1].checked,at);A.ok(rows[1].limit.includes("CC BY-SA"));
+ A.deepEqual(C.wikiReferenceCards({batchcomplete:true},"ru",at),[]);
+ A.deepEqual(C.wikiReferenceCards({query:{pages:[{...page,extract:""}]}},"en",at),[]);
+ A.throws(()=>C.wikiReferenceCards({query:{pages:[page,page]}},"en",at));
+ A.throws(()=>C.wikiReferenceCards({query:{pages:[{...page,ns:1}]}},"en",at));
+ A.throws(()=>C.wikiReferenceCards({error:{code:"maxlag"}},"en",at));
+ A.ok(C.wikiExplanationPrompt("history",rows)[0].content.includes("не проверенная научная база"));
+ async function checks(){
+  const fetched=await C.fetchWikiReferences("history","en",async(url,options)=>{A.ok(url.startsWith("https://en.wikipedia.org/"));A.equal(options.credentials,"omit");A.equal(options.redirect,"error");return {ok:true,text:async()=>JSON.stringify(data)}},null,at);
+  A.equal(fetched.length,2);
+  await A.rejects(()=>C.fetchWikiReferences("history","en",async()=>({ok:false}),null,at));
+  await A.rejects(()=>C.fetchWikiReferences("history","en",async()=>({ok:true,text:async()=>"x".repeat(65537)}),null,at));
+  console.log("22 online reference checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+
+ // v1.16: two language editions, independent transport failures and context budget.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const plan=C.wikiReferencePlan("история","both","history");
+  A.deepEqual(plan,[{language:"ru",query:"история"},{language:"en",query:"history"}]);
+  A.deepEqual(C.wikiReferencePlan(" history ","en"),[{language:"en",query:"history"}]);
+  A.throws(()=>C.wikiReferencePlan("история","both",""));
+  A.throws(()=>C.wikiReferencePlan("history","xx",""));
+  const body=(lang)=>JSON.stringify({query:{pages:[1,2].map(i=>({ns:0,pageid:i,lastrevid:i+10,title:lang+i,extract:"Reference "+i,index:i}))}});
+  const ok=async(url,options)=>{A.equal(options.credentials,"omit");A.equal(options.redirect,"error");return {ok:true,text:async()=>body(url.includes("//ru.")?"ru":"en")}};
+  async function bilingualChecks(){
+   const both=await C.fetchWikiComparison(plan,ok,null,stamp);
+   A.deepEqual(both.rows.map(r=>r.id),["wiki-ru-1","wiki-en-1","wiki-ru-2","wiki-en-2"]);
+   A.deepEqual(both.coverage.map(r=>[r.status,r.count]),[["ok",2],["ok",2]]);
+   const partial=await C.fetchWikiComparison(plan,async(url,o)=>url.includes("//en.")?{ok:false}:ok(url,o),null,stamp);
+   A.equal(partial.rows.length,2);A.equal(partial.coverage[1].status,"unavailable");
+   const empty=await C.fetchWikiComparison(plan,async()=>({ok:true,text:async()=>JSON.stringify({batchcomplete:true})}),null,stamp);
+   A.equal(empty.rows.length,0);A.ok(empty.coverage.every(r=>r.status==="empty"));
+   const timed=await C.fetchWikiComparison(plan,async()=>{throw Error("aborted")},{aborted:true},stamp);
+   A.ok(timed.coverage.every(r=>r.status==="timeout"));
+   await A.rejects(()=>C.fetchWikiComparison([plan[0],plan[0]],ok,null,stamp));
+   const full=C.wikiBudgetSelection("история",both.rows,both.coverage);
+   A.equal(full.length,4);
+   const max=C.utf8Size(JSON.stringify(C.wikiExplanationPrompt("история",both.rows.slice(0,2),both.coverage)));
+   const selected=C.wikiBudgetSelection("история",both.rows,both.coverage,max);
+   A.equal(selected.length,2);A.deepEqual(selected.map(r=>r.id),["wiki-ru-1","wiki-en-1"]);
+   A.equal(C.wikiBudgetSelection("история",both.rows,both.coverage,1).length,0);
+   A.ok(C.wikiExplanationPrompt("история",partial.rows,partial.coverage)[0].content.includes("не считай их независимыми подтверждениями"));
+   A.equal(JSON.parse(C.wikiExplanationPrompt("история",partial.rows,partial.coverage)[1].content).coverage[1].status,"unavailable");
+   console.log("v1.16 bilingual reference checks passed");
+  }
+  bilingualChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+
+ // v1.17: live bibliographic search; never treat metadata as findings.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const item={DOI:"10.1234/Example(1)",title:["Economic planning"],author:[{given:"A",family:"B"}],published:{"date-parts":[[2025]]},"container-title":["Journal"],type:"journal-article"};
+  const data={status:"ok","message-type":"work-list",message:{items:[item,{...item,DOI:"10.1234/example(1)"},{...item,DOI:"https://bad.org"},{...item,DOI:"10.1234/no-title",title:[]}]}};
+  A.ok(C.crossrefSearchUrl("экономика & право").endsWith(encodeURIComponent("экономика & право")));
+  A.throws(()=>C.crossrefSearchUrl(""));A.throws(()=>C.crossrefSearchUrl("x\ny"));A.throws(()=>C.crossrefSearchUrl("a".repeat(241)));
+  const cards=C.crossrefReferenceCards(data,stamp);
+  A.equal(cards.length,1);A.equal(cards[0].doi,"10.1234/example(1)");A.ok(cards[0].href.startsWith("https://doi.org/10.1234/"));
+  A.ok(cards[0].description.includes("2025"));A.ok(cards[0].description.includes("A B"));A.ok(cards[0].limit.includes("Аннотация и полный текст не получены"));
+  A.throws(()=>C.crossrefReferenceCards(data,"invalid"));A.throws(()=>C.crossrefReferenceCards({status:"failed"},stamp));
+  A.deepEqual(C.crossrefReferenceCards({...data,message:{items:[]}},stamp),[]);
+  A.ok(C.literatureExplanationPrompt("x",cards)[0].content.includes("нельзя утверждать результаты"));
+  A.equal(JSON.parse(C.literatureExplanationPrompt("x",cards)[1].content).cards[0].id,"crossref-1");
+  async function literatureChecks(){
+   const found=await C.fetchCrossrefReferences("planning",async(url,opts)=>{A.ok(url.startsWith("https://api.crossref.org/works?"));A.equal(opts.credentials,"omit");A.equal(opts.redirect,"error");return {ok:true,text:async()=>JSON.stringify(data)}},null,stamp);
+   A.equal(found.length,1);
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:false,status:429}),null,stamp));
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:true,text:async()=>"{invalid"}),null,stamp));
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:true,text:async()=>"x".repeat(262145)}),null,stamp));
+   console.log("v1.17 live literature checks passed");
+  }
+  literatureChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+
+ // v1.18: federated search keeps independent provider status and evidence boundaries.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+  const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Planning"],type:"journal-article"}]}});
+  const fetcher=async url=>({ok:true,text:async()=>url.includes("crossref")?papers:wiki});
+  A.deepEqual(C.federatedReferencePlan("планирование"),[{language:"ru",query:"планирование"},{language:"crossref",query:"планирование"}]);
+  A.deepEqual(C.federatedReferencePlan("планирование","planning").map(r=>r.query),["планирование","planning","planning"]);
+  A.throws(()=>C.federatedReferencePlan("","planning"));
+  A.throws(()=>C.federatedReferencePlan("x",123));
+  A.throws(()=>C.federatedReferencePlan("x","a".repeat(241)));
+  A.equal(C.federatedReferenceRank([{title:"Other"},{title:"Planning"}],"planning")[0].title,"Planning");
+  A.equal(C.federatedReferenceRank([{title:"Other",doi:"x",description:"Planning"},{title:"Planning"}],"planning")[0].title,"Planning");
+  async function federatedChecks(){
+   const all=await C.fetchFederatedReferences("планирование","planning",fetcher,null,stamp);
+   A.deepEqual(all.rows.map(r=>r.id),["wiki-ru-1","wiki-en-1","crossref-1"]);
+   A.deepEqual(all.coverage.map(r=>r.status),["ok","ok","ok"]);
+   const partial=await C.fetchFederatedReferences("планирование","planning",async u=>u.includes("crossref")?{ok:false,status:429}:fetcher(u),null,stamp);
+   A.equal(partial.rows.length,2);A.equal(partial.coverage[2].status,"rate_limited");
+   const failed=await C.fetchFederatedReferences("планирование","planning",async()=>{throw Error("offline")},null,stamp);
+   A.equal(failed.rows.length,0);A.ok(failed.coverage.every(r=>r.status==="unavailable"));
+   const timed=await C.fetchFederatedReferences("планирование","",async()=>{throw Error("timeout")},{aborted:true},stamp);
+   A.ok(timed.coverage.every(r=>r.status==="timeout"));
+   const context=C.onlineReferenceContext("планирование",all.rows,all.coverage,"federated");
+   A.equal(context.selected.length,3);
+   A.ok(context.messages[0].content.includes("название не подтверждает содержание"));
+   A.equal(JSON.parse(context.messages[1].content).cards[2].kind,"Библиографическая запись Crossref");
+   A.equal(C.onlineReferenceContext("планирование",all.rows,all.coverage,"federated",1).selected.length,0);
+   A.ok(C.onlineReferenceContext("x",all.rows.filter(r=>r.doi),[],"papers").messages[0].content.includes("библиографических метаданных"));
+   A.ok(C.onlineReferenceContext("x",all.rows.filter(r=>!r.doi),[],"both").messages[0].content.includes("Википедии"));
+   console.log("v1.18 federated reference checks passed");
+  }
+  federatedChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+
+ // v1.19: Europe PMC excerpts, licensing, deduplication and partial failure.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const row={source:"MED",id:"123",title:"Health economics",doi:"10.1234/plan",authorString:"A B",pubYear:"2025",isOpenAccess:"Y",license:"cc by",abstractText:"<b>Economic</b> study"};
+  const data={hitCount:4,resultList:{result:[row,{...row,id:"124",license:"unknown",doi:"10.1234/other"},{...row,id:"125",isOpenAccess:"N",doi:null},{...row,id:"../bad"}]}};
+  A.ok(C.epmcSearchUrl("health & economics").endsWith(encodeURIComponent("health & economics")));
+  A.throws(()=>C.epmcSearchUrl(""));A.throws(()=>C.epmcSearchUrl("x\ny"));
+  const cards=C.epmcReferenceCards(data,stamp);
+  A.equal(cards.length,3);A.equal(cards[0].abstractAvailable,true);A.ok(cards[0].description.includes("Economic study"));
+  A.equal(cards[0].href,"https://europepmc.org/article/MED/123");
+  A.equal(cards[1].abstractAvailable,false);A.equal(cards[2].abstractAvailable,false);A.ok(!cards[1].description.includes("study"));
+  A.equal(C.epmcReferenceCards({hitCount:1,resultList:{result:[{...row,abstractText:"x".repeat(1200)}]}},stamp)[0].description.endsWith("x".repeat(900)),true);
+  A.throws(()=>C.epmcReferenceCards(data,"invalid"));A.throws(()=>C.epmcReferenceCards({hitCount:-1},stamp));
+  A.deepEqual(C.epmcReferenceCards({hitCount:0,resultList:{result:[]}},stamp),[]);
+  const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+  const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Planning"],type:"journal-article"}]}});
+  const fetcher=async url=>({ok:true,text:async()=>url.includes("europepmc")?JSON.stringify(data):url.includes("crossref")?papers:wiki});
+  async function extendedChecks(){
+   const all=await C.fetchExtendedResearch("экономика","health economics",fetcher,null,stamp);
+   A.equal(all.coverage.length,4);A.equal(all.rows.length,5);
+   const merged=all.rows.find(r=>r.doi==="10.1234/plan");
+   A.equal(merged.abstractAvailable,true);A.deepEqual(merged.providers,["Crossref","Europe PMC"]);
+   A.ok(merged.limit.includes("не является независимым подтверждением"));
+   const partial=await C.fetchExtendedResearch("экономика","health economics",async u=>u.includes("europepmc")?{ok:false,status:429}:fetcher(u),null,stamp);
+   A.equal(partial.rows.length,3);A.equal(partial.coverage[3].status,"rate_limited");
+   const direct=await C.fetchEpmcReferences("health",async(u,o)=>{A.equal(o.credentials,"omit");A.equal(o.redirect,"error");return fetcher(u)},null,stamp);
+   A.equal(direct.length,3);
+   await A.rejects(()=>C.fetchEpmcReferences("x",async()=>({ok:true,text:async()=>"{invalid"}),null,stamp));
+   await A.rejects(()=>C.fetchEpmcReferences("x",async()=>({ok:true,text:async()=>"x".repeat(1048577)}),null,stamp));
+   const ctx=C.onlineReferenceContext("экономика",all.rows,all.coverage,"research");
+   A.ok(ctx.selected.length>0);A.ok(ctx.messages[0].content.includes("Препринты"));
+   A.ok(ctx.messages[0].content.includes("не проверенные выводы"));
+   console.log("v1.19 extended research checks passed");
+  }
+  extendedChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+
+ // v1.20 source suitability and catalog metadata discrepancy checks.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const a=C.crossrefReferenceCards({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Economic planning"],published:{"date-parts":[[2024]]},type:"posted-content"}]}},stamp)[0];
+  const b=C.epmcReferenceCards({hitCount:1,resultList:{result:[{source:"MED",id:"123",title:"Health economics",doi:"10.1234/plan",pubYear:"2025",isOpenAccess:"Y",license:"cc by",abstractText:"Study"}]}},stamp)[0];
+  A.equal(a.publicationYear,2024);A.equal(b.publicationYear,2025);
+  A.equal(a.preprint,true);
+  const merged=C.mergeResearchReferences([a,b]);
+  A.equal(merged.length,1);A.equal(merged[0].abstractAvailable,true);
+  A.equal(merged[0].preprint,true);
+  A.deepEqual(merged[0].metadataDifferences.map(d=>d.field),["title","year"]);
+  A.equal(merged[0].metadataRecords.length,2);
+  A.equal(merged[0].metadataDifferences[0].values[0].href,a.href);
+  A.deepEqual(C.referenceMetadataDifferences([{title:"Economic planning!",year:2024},{title:" ECONOMIC planning ",year:null}]),[]);
+  A.deepEqual(C.referenceMetadataDifferences([{title:"Same",year:2024},{title:"Same",year:2025}]).map(d=>d.field),["year"]);
+  const report=C.onlineSourceAudit([...merged,{id:"wiki-ru-1"},{id:"crossref-2"}],[{status:"timeout"}]);
+  A.deepEqual(report.counts,{reference:1,abstract:1,metadata:1,preprint:1,merged:1,disputed:1});
+  A.equal(report.fullTextVerified,false);A.equal(report.independentFindingsVerified,false);
+  A.ok(report.gaps.some(x=>x.includes("неполное")));A.ok(report.gaps.some(x=>x.includes("издателя")));
+  A.ok(C.onlineSourceAudit([],[]).gaps.some(x=>x.includes("Нет доступных аннотаций")));
+  A.ok(C.extendedResearchPrompt("x",merged)[0].content.includes("без проверки у издателя"));
+  A.deepEqual(C.epmcReferenceCards({hitCount:1,resultList:{result:[{source:"MED",id:"..",title:"Invalid"}]}},stamp),[]);
+  console.log("v1.20 source suitability checks passed");
+ }
+
+
+ // v1.21–1.23 automatic research, run-local citations, bounded repair.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const plan=C.automaticOnlinePlan("Что такое планирование?","what is planning?");
+  A.equal(plan.length,2);A.equal(plan[1].query,"планирование");A.equal(plan[1].english,"planning");
+  A.equal(C.automaticOnlinePlan("экономика")[1].query,"экономика исследования");
+  A.throws(()=>C.automaticOnlinePlan(""));A.throws(()=>C.automaticOnlinePlan("x","a".repeat(241)));
+  const wiki={id:"wiki-ru-1",href:"https://ru.wikipedia.org/w/index.php?oldid=3",revision:3,title:"Planning",description:"Planning",limit:"Reference"};
+  const a={id:"crossref-1",href:"https://doi.org/10.1234/one",doi:"10.1234/one",title:"One",description:"2025",limit:"Metadata"};
+  const b={...a,href:"https://doi.org/10.1234/two",doi:"10.1234/two",title:"Two"};
+  const unique=C.consolidateOnlineRuns([{rows:[wiki,a]},{rows:[wiki,b]}]);
+  A.equal(unique.length,3);A.equal(new Set(unique.map(r=>r.id)).size,3);
+  A.equal(unique[0].id,"wiki-run-1");A.equal(unique[2].id,"source-run-3");
+  A.equal(C.onlineDraftAudit("Planning [wiki-run-1]",unique).passed,true);
+  A.equal(C.onlineDraftAudit("Planning",unique).passed,false);
+  A.ok(C.onlineDraftAudit("Planning [fake]",unique).flags.includes("unknown_ids"));
+  const wikiJSON=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+  const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/one",title:["One"],type:"journal-article"}]}});
+  const empty=JSON.stringify({hitCount:0,resultList:{result:[]}});
+  const epmc=JSON.stringify({hitCount:1,resultList:{result:[{source:"MED",id:"123",title:"Study",isOpenAccess:"Y",license:"cc by",abstractText:"Planning study"}]}});
+  async function autoChecks(){
+   let calls=0;
+   const fetcher=async url=>{calls++;return {ok:true,text:async()=>url.includes("europepmc")?empty:url.includes("crossref")?papers:wikiJSON}};
+   const run=await C.runAutomaticOnlineResearch("Что такое планирование?","what is planning?",fetcher,null,stamp);
+   A.equal(run.completed,2);A.equal(calls,8);A.equal(run.coverage.length,8);A.equal(run.rows.length,3);
+   A.equal(new Set(run.rows.map(r=>r.id)).size,run.rows.length);
+   A.equal(run.coverage[4].step,2);
+   const satisfied=await C.runAutomaticOnlineResearch("планирование","planning",async url=>({ok:true,text:async()=>url.includes("europepmc")?epmc:url.includes("crossref")?papers:wikiJSON}),null,stamp);
+   A.equal(satisfied.completed,1);A.equal(satisfied.cancelled,false);
+   const cancelled=await C.runAutomaticOnlineResearch("планирование","",fetcher,{aborted:true},stamp);
+   A.equal(cancelled.completed,0);A.equal(cancelled.cancelled,true);
+   const selected=[unique[0]],good="Planning [wiki-run-1]";
+   let generated=0;const fix=async m=>{generated++;A.ok(m[0].content.includes("Исправь черновик"));return good;};
+   A.equal((await C.repairOnlineDraft(good,"x",selected,[],"auto",fix)).state,"initial_pass");
+   A.equal(generated,0);
+   const repaired=await C.repairOnlineDraft("Planning","x",selected,[],"auto",fix);
+   A.equal(repaired.state,"repaired");A.equal(repaired.answer,good);A.equal(generated,1);
+   A.equal((await C.repairOnlineDraft("Planning","x",selected,[],"auto",async()=>"bad")).state,"repair_failed");
+   A.equal((await C.repairOnlineDraft("Planning","x",selected,[],"auto",fix,()=>false)).state,"cancelled");
+   A.equal((await C.repairOnlineDraft("Planning","x",selected,[],"auto",fix,()=>true,1)).state,"budget_exceeded");
+   A.equal((await C.repairOnlineDraft("Planning","x",selected,[],"auto",async()=>{throw Error("offline")})).state,"repair_unavailable");
+   console.log("v1.21–1.23 automatic research checks passed");
+  }
+  autoChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
