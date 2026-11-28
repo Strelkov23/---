@@ -1062,7 +1062,7 @@ function literatureExplanationPrompt(question,cards,coverage=[]){
 function federatedReferenceRank(rows,query){
  const terms=words(query);
  return rows.map((row,index)=>{
-  const title=new Set(words(row.title)),body=new Set(words(row.doi?"":row.description));
+  const title=new Set(words(row.title)),body=new Set(words(row.doi&&!row.abstractAvailable?"":row.description));
   const score=terms.reduce((n,t)=>n+(title.has(t)?3:0)+(body.has(t)?1:0),0);
   return {row,index,score};
  }).sort((a,b)=>b.score-a.score||a.index-b.index).map(x=>x.row);
@@ -1100,7 +1100,7 @@ function epmcReferenceCards(data,checked){
   const license=typeof r.license==="string"?r.license.trim().toLowerCase():"";
   const permitted=r.isOpenAccess==="Y"&&["cc by","cc-by","cc by 4.0","cc-by-4.0","cc0","cc0 1.0"].includes(license);
   const abstract=permitted?plain(r.abstractText,900):"";
-  const preprint=source==="PPR"||/preprint/i.test(r.pubTypeList?.pubType?.join(" ")||"");
+  const preprint=source==="PPR"||/preprint/i.test(Array.isArray(r.pubTypeList?.pubType)?r.pubTypeList.pubType.join(" "):"");
   const href="https://europepmc.org/article/"+source+"/"+id;
   out.push({id:"epmc-"+source.toLowerCase()+"-"+id,kind:abstract?"Фрагмент открытой аннотации Europe PMC":"Библиографическая запись Europe PMC",title,description:"Авторы: "+(plain(r.authorString,250)||"не указаны")+" · Год: "+(plain(r.pubYear,4)||"не указан")+" · Издание: "+(plain(r.journalInfo?.journal?.title||r.journalTitle,180)||"не указано")+(doi?" · DOI: "+doi:"")+(preprint?" · Препринт":"")+(abstract?" · Сокращённая аннотация: "+abstract:""),href,doi,checked,source:"epmc",abstractAvailable:!!abstract,license:abstract?license:null,limit:abstract?"Сокращённый текст аннотации, заявленная лицензия "+license+". Это утверждения авторов; полный текст, методика и выводы не проверены. Изменения: удалено форматирование, текст ограничен 900 символами.":"Только метаданные: аннотация отсутствует или разрешение на повторное использование не подтверждено. Полный текст не получен."});
  }
@@ -2415,7 +2415,7 @@ if(typeof document!=="undefined")document.addEventListener("DOMContentLoaded",()
      const link=add(article,"a",r.source==="epmc"?"Открыть запись Europe PMC":r.doi?"Открыть публикацию по DOI":"Версия статьи");link.href=r.href;link.target="_blank";link.rel="noopener noreferrer";
      if(r.id.startsWith("wiki-")){const history=add(article,"a"," · Авторы и история правок");history.href=r.history;history.target="_blank";history.rel="noopener noreferrer";
      const license=add(article,"a"," · CC BY-SA 4.0");license.href="https://creativecommons.org/licenses/by-sa/4.0/";license.target="_blank";license.rel="noopener noreferrer";}
-     if(r.source==="epmc"&&r.license){const a=add(article,"a"," · Лицензия (по метаданным)");a.href=r.license.startsWith("cc0")?"https://creativecommons.org/publicdomain/zero/1.0/":"https://creativecommons.org/licenses/by/4.0/";a.target="_blank";a.rel="noopener noreferrer";}add(article,"small",r.limit+" Получено: "+r.checked);
+     if(r.source==="epmc"&&r.license){const a=add(article,"a"," · Лицензия (по метаданным)");a.href=r.license.startsWith("cc0")?"https://creativecommons.org/publicdomain/zero/1.0/":r.license.endsWith("4.0")?"https://creativecommons.org/licenses/by/4.0/":"https://creativecommons.org/share-your-work/cclicenses/";a.target="_blank";a.rel="noopener noreferrer";}add(article,"small",r.limit+" Получено: "+r.checked);
     }
     explain.disabled=!rows.length;
    }catch{if(version===revision)state.textContent="Внешний источник недоступен, запрос отменён или ответ не прошёл проверку. Локальный поиск остаётся доступен."}
