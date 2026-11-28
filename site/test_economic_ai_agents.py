@@ -123,4 +123,29 @@ class AgentTests(unittest.TestCase):
             elif field=='id':row['rows'][0]['id']='review-other'
             else:row['rows'][0]['files']=[dict(name='freshness.json',status='missing')]
             with self.assertRaises(ValueError):validate_preflight_history(bad)
+    def test_forecast_revision_audit(self):
+        def row(target,first,latest,point=10,naive=14,unit='руб.',code='GDP'):
+            return dict(code=code,source='https://example.org/series',unit=unit,horizon=1,
+                        target=target,first_actual=first,latest_actual=latest,point=point,naive=naive)
+        d=forecast_revision_audit([row('2024',10,14),row('2025',10,14),row('2026',None,None),row('2023',8,None)])
+        x=d['rows'][0]
+        self.assertEqual((x['frozen'],x['first_scored'],x['paired']),(4,3,2))
+        self.assertEqual((x['first_mae'],x['latest_mae']),(0,4))
+        self.assertEqual((x['first_naive_mae'],x['latest_naive_mae']),(4,0))
+        self.assertEqual(x['revised'],2)
+        self.assertEqual(x['revision_mae'],4)
+        self.assertTrue(x['advantage_changed'])
+        self.assertEqual(x['status'],'small_sample')
+        y=forecast_revision_audit([row('2025',None,None)])['rows'][0]
+        self.assertEqual(y['status'],'waiting')
+        self.assertIsNone(y['latest_mae'])
+        self.assertIsNone(y['advantage_changed'])
+        z=forecast_revision_audit([row('2025',0,0),row('2025',0,0)])['rows'][0]
+        self.assertEqual(z['status'],'duplicate_targets')
+        self.assertIsNone(z['first_mae'])
+        self.assertEqual(len(forecast_revision_audit([row('2025',1,1),row('2025',1,1,unit='тонн')])['rows']),2)
+        z=forecast_revision_audit([row(str(2000+i),10,10) for i in range(10)])['rows'][0]
+        self.assertEqual(z['status'],'diagnostic')
+        self.assertFalse(z['advantage_changed'])
+        self.assertEqual(z['revision_mae'],0)
 if __name__=="__main__":unittest.main()
