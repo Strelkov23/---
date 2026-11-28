@@ -614,3 +614,24 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.dossierLiterature("age-dependency",index,p,searcher,"2024-12").length,0);
  console.log("10 dossier literature checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const q=C.parseLocalTable('\uFEFFПериод;Выпуск\r\n2024;10,5\r\n2025;20,5\r\n2026;\r\n2027;нет',';');
+ A.deepEqual(q.headers,["Период","Выпуск"]);
+ A.equal(q.rows.length,4);
+ A.deepEqual(C.summarizeLocalColumn(q,1,","),{column:"Выпуск",total:4,count:2,missing:1,invalid:1,min:10.5,max:20.5,mean:15.5,median:15.5});
+ A.equal(C.summarizeLocalColumn(q,1,".").count,0);
+ A.deepEqual(C.parseLocalTable('a,b\n"hello, world","a""b"\n"x\ny",3\n',",").rows,[["hello, world",'a"b'],["x\ny","3"]]);
+ A.deepEqual(C.parseLocalTable("a\tb\n1\t2","\t").rows,[["1","2"]]);
+ A.throws(()=>C.parseLocalTable('a,b\n"x,2',","));
+ A.throws(()=>C.parseLocalTable("a,a\n1,2",","));
+ A.throws(()=>C.parseLocalTable("a,b\n1",","));
+ A.throws(()=>C.parseLocalTable('a,b\n"x"z,2',","));
+ A.throws(()=>C.parseLocalTable("a,b\n1,2","|"));
+ A.throws(()=>C.parseLocalTable("a\n"+"x".repeat(4097),","));
+ A.throws(()=>C.parseLocalTable("a\n"+"1\n".repeat(5001),","));
+ const r=C.summarizeLocalColumn(C.parseLocalTable("a\n0\n-5\n=SUM(1)\n9007199254740992\n10\n",","),0,".");
+ A.equal(r.count,3);A.equal(r.invalid,2);A.equal(r.median,0);A.equal(r.min,-5);A.equal(r.max,10);
+ A.ok(Math.abs(r.mean-5/3)<1e-12);
+ console.log("19 local table checks passed");
+}
