@@ -61,7 +61,7 @@ def main():
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
             quality = page.get_by_role("button",name="Проверить загруженную модель",exact=True)
             quality.click()
-            page.wait_for_function("document.body.textContent.includes('0/6 · нужна проверка') && !document.querySelector('#gea-question').disabled")
+            page.wait_for_function("document.body.textContent.includes('0/9 · нужна проверка') && !document.querySelector('#gea-question').disabled")
             assert log.locator("article").count()==1
             assert not external,external
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
@@ -214,6 +214,11 @@ def main():
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ общего чата готов') && !document.querySelector('#gea-question').disabled")
             last=log.locator("article").last.inner_text()
             assert "Контроль нового сообщения" in last and "Контроль обрыва ответа" not in last
+            question.fill("Вычисли 2+2. Ответь только числом.")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('заданный формат не соблюдён') && !document.querySelector('#gea-question').disabled")
+            assert "Модель не соблюла явно заданный формат ответа" in log.locator("article").last.inner_text()
+            assert question.input_value()=="Вычисли 2+2. Ответь только числом."
             assert len(gateway_requests)==3 and not external
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
