@@ -2402,3 +2402,27 @@ console.log("16 agent coordination checks passed");}
   }
   answerPerformanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+ // v2.27: deterministic stream diagnostics; no actual GPU benchmark.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function performanceDiagnosticsChecks(){
+   const stream=async()=>(async function*(){yield {choices:[]};yield {choices:[{delta:{content:"А😀"}}]};yield {choices:[{delta:{content:"Б"}}]};})();
+   const clock=values=>()=>values.shift();
+   const observed=[];
+   const r=await C.measureChatGeneration(stream,()=>true,x=>observed.push(x),clock([100,300,600]));
+   A.deepEqual(r.metrics,{firstMs:200,totalMs:500,characters:3,charsPerSecond:6});
+   A.deepEqual(observed,["А😀","А😀Б"]);A.equal(r.text,"А😀Б");
+   A.ok(C.chatPerformanceNote(r.metrics).includes("6 симв./с"));
+   A.equal(C.chatPerformanceNote(null),"");
+   const fast=await C.measureChatGeneration(stream,()=>true,()=>{},clock([0,5,10]));
+   A.equal(fast.metrics.charsPerSecond,null);A.ok(!C.chatPerformanceNote(fast.metrics).includes("симв./с"));
+   const empty=await C.measureChatGeneration(async()=>(async function*(){yield {choices:[]};})(),()=>true,()=>{},clock([0,10]));A.equal(empty.metrics,null);
+   let active=true;const stopped=await C.measureChatGeneration(stream,()=>active,()=>{active=false;},clock([0,10,20]));A.equal(stopped.state,"cancelled");A.equal(stopped.metrics,null);
+   const notStarted=await C.measureChatGeneration(async()=>{throw Error("must not open")},()=>false);A.equal(notStarted.metrics,null);
+   const badClock=await C.measureChatGeneration(stream,()=>true,()=>{},clock([10,9,20]));A.equal(badClock.metrics,null);
+   await A.rejects(()=>C.measureChatGeneration(async()=>{throw Error("offline")}));
+   const truncated=await C.measureChatGeneration(async()=>(async function*(){yield {choices:[{delta:{content:"Начало"},finish_reason:"length"}]};})(),()=>true,()=>{},clock([0,100,200]));A.equal(truncated.truncated,true);A.equal(truncated.metrics.characters,6);
+   console.log("v2.27 performance diagnostics checks passed");
+  }
+  performanceDiagnosticsChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
