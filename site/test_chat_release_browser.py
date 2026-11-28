@@ -53,6 +53,16 @@ def main():
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
             send.click()
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога') && !document.querySelector('#gea-question').disabled")
+            # The mocked transport cannot establish model intelligence. The diagnostic
+            # must report failed synthetic cases, not a misleading all-green result.
+            page.get_by_text("Диагностика качества локальной модели",exact=True).click()
+            quality = page.get_by_role("button",name="Проверить загруженную модель",exact=True)
+            quality.click()
+            page.wait_for_function("document.body.textContent.includes('0/6 · нужна проверка') && !document.querySelector('#gea-question').disabled")
+            assert log.locator("article").count()==1
+            assert not external,external
+            page.get_by_text("Диагностика качества локальной модели",exact=True).click()
+
             question.fill("Уточнение")
             question.press("Enter")
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога | Уточнение') && !document.querySelector('#gea-question').disabled")
