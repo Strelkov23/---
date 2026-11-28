@@ -23,8 +23,10 @@ const EconomicAIPageContext=(function pageContext(){
   for(const p of context.parameters||[])lines.push(p.label+": "+p.value);
   if(!context.parameters?.length)lines.push("Не переданы.");
   if(context.model_input){const m=context.model_input;lines.push("","Контекст модели: "+m.included.length+" карточек; не передано "+m.omitted,"Переданные ID: "+m.included.join(", "),"Размер сообщения (оценка байт): "+m.bytes+" / "+m.budget);}
+  if(context.research_scope){const r=context.research_scope;lines.push("","Охват исследования (счётчики карточек, не статистика):",JSON.stringify(r,null,2));}
   lines.push("","Результаты поиска (включая не переданные модели):");
   for(const r of rows)lines.push("["+r.id+"] "+r.kind+" — "+r.title,r.description||"",r.limit||"",r.href||"","");
+  if(context.answer_review)lines.push("","Протокол повторной буквальной сверки:",JSON.stringify(context.answer_review,null,2));
   if(answer)lines.push("Черновик ИИ (не подтверждённая аналитика):",answer);
   return lines.join("\n");
  }

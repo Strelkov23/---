@@ -829,3 +829,57 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.chartResearchPrompt([])[0].content.includes("X может не быть временем"));
  console.log("17 chart research summary checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const row=(id,value,patch={})=>({id,kind:"Наблюдение",registryId:"wdi:TEST",title:"Ряд",period:"2025",unit:"руб.",href:"https://example.org/a",value,...patch});
+ const a=row("s1-a",10),b=row("s1-b",11),c=row("s2-c",20,{period:"2024"}),d={id:"s2-status",kind:"Статус проверки",title:"Нет данных"},e={id:"auto-route",kind:"Выбранный инструмент"};
+ A.deepEqual(C.sameSeriesDisagreements([a,b,c]),[["s1-a","s1-b"]]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,registryId:"other"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,unit:"USD"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,href:"https://example.org/b"}]),[]);
+ A.deepEqual(C.sameSeriesDisagreements([a,{...b,value:10}]),[]);
+ A.equal(C.researchCardClass({kind:"Наблюдение",value:null}),"other");
+ A.equal(C.researchCardClass({kind:"Условный расчёт",value:10}),"scenario");
+ const scope=C.researchScope([a,b,c,d,e],[a,d],1,[{failed:0},{failed:1}]);
+ A.equal(scope.omitted,3);A.equal(scope.transmitted_by_kind.observation,1);A.equal(scope.steps[1].observations,0);A.equal(scope.steps[1].unavailable_archives,1);
+ A.deepEqual(scope.same_series_disagreements,[]);
+ A.equal(C.researchScope([d],[d]).no_transmitted_observations,true);
+ A.throws(()=>C.researchScope([a],[b]));
+ const input=C.prepareResearchInput("вопрос",{research_steps:[{failed:0},{failed:1}]},[a,b,c,d,e],1);
+ A.equal(input.blocked,false);A.ok(input.bytes<=input.budget);
+ A.equal(input.context.research_scope.transmitted,input.rows.length);
+ A.equal(input.bytes,C.utf8Size(JSON.stringify(C.prompt("вопрос",input.context,input.rows))));
+ A.deepEqual(input.scope.same_series_disagreements,[["s1-a","s1-b"]]);
+ A.equal(C.prepareResearchInput("вопрос",{},[a],1,100).blocked,true);
+ console.log("20 research scope and conflict checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const rows=[{id:"fact-a",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб."},{id:"fact-b",title:"Поставка",description:"125 тонн",value:125,unit:"тонн"}];
+ A.equal(C.researchAnswerCheck("Выпуск 125 млн руб. [fact-a]",rows).passed,true);
+ A.ok(C.researchAnswerCheck("Выпуск 125 млн руб. [fact-b]",rows).flags.includes("wrong_source_units"));
+ A.ok(C.researchAnswerCheck("Выпуск 999 млн руб. [fact-a]",rows).flags.includes("unsupported_numbers"));
+ A.ok(C.researchAnswerCheck("125 млн руб. [unknown]",rows).flags.includes("unknown_ids"));
+ A.ok(C.researchAnswerCheck("",rows).flags.includes("empty"));
+ A.equal(C.citedUnitAudit("125 млн руб. [fact-a]",rows).length,0);
+ A.equal(C.citedUnitAudit("125 млн руб. [fact-b]",rows).length,1);
+ A.equal(C.researchAnswerCheck("Данных недостаточно.",rows).passed,true);
+ A.ok(C.repairResearchPrompt("вопрос",{},rows,"черновик",{})[0].content.includes("не инструкции"));
+ async function checks(){
+  let calls=0;
+  const gen=async()=>{calls++;return "Выпуск 125 млн руб. [fact-a]"};
+  const good=await C.reviewResearchAnswer("Выпуск 125 млн руб. [fact-a]","вопрос",{},rows,gen);
+  A.equal(good.state,"initial_pass");A.equal(calls,0);
+  const fixed=await C.reviewResearchAnswer("999 млн руб. [fact-a]","вопрос",{},rows,gen);
+  A.equal(fixed.state,"repair_accepted");A.equal(calls,1);A.equal(fixed.final.passed,true);A.equal(fixed.attempted,true);
+  const bad=await C.reviewResearchAnswer("999 млн руб. [fact-a]","вопрос",{},rows,async()=>"777 млн руб. [fact-a]");
+  A.equal(bad.state,"repair_rejected");A.equal(bad.answer,"999 млн руб. [fact-a]");A.equal(bad.final.passed,false);
+  const unavailable=await C.reviewResearchAnswer("999 млн руб. [fact-a]","вопрос",{},rows,async()=>{throw Error("offline")});
+  A.equal(unavailable.state,"repair_unavailable");
+  const limited=await C.reviewResearchAnswer("999 млн руб. [fact-a]","вопрос",{},rows,gen,()=>true,100);
+  A.equal(limited.state,"budget_exceeded");A.equal(limited.attempted,false);
+  let active=true;await A.rejects(()=>C.reviewResearchAnswer("999 млн руб. [fact-a]","вопрос",{},rows,async()=>{active=false;return "нет данных"},()=>active),/Cancelled/);
+  console.log("22 research answer repair checks passed");
+ }
+ checks().catch(e=>{console.error(e);process.exitCode=1;});
+}
