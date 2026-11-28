@@ -1,0 +1,53 @@
+name: AI live release probe checks
+on:
+  push:
+    branches: [economic-ai-v207-live-acceptance]
+    paths: ['site/probe_ai_public_release.py', 'site/test_probe_ai_public_release.py', '.github/workflows/ai-live-probe.yml']
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: 'Exact 40-character deployed source commit (source-version.txt)'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest -v test_probe_ai_public_release.py
+        working-directory: site
+  public-observation:
+    needs: probe
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    # This observation is independent of the production deployment. A stale
+    # site is reported as a failed probe, not as a failed offline unit test.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the exact deployed assistant release
+        env:
+          EXPECTED_REVISION: ${{ inputs.revision }}
+          PUBLIC_BASE: https://strelkov23.github.io/---/
+        run: |
+          set -o pipefail
+          python3 site/probe_ai_public_release.py --base "$PUBLIC_BASE" --revision "$EXPECTED_REVISION" | tee public-ai-release-report.json
+      - name: Save independent live observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-ai-release-report
+          path: public-ai-release-report.json
+          if-no-files-found: warn
+          retention-days: 14

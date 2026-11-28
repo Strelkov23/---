@@ -9,8 +9,9 @@ MODEL = """export const prebuiltAppConfig={model_list:[{model_id:'Qwen2.5-1.5B-I
 export async function CreateMLCEngine(){
  return {interruptGenerate(){},async unload(){},chat:{completions:{async create({messages,stream}){
  const context=messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
+ if(!stream && messages[0]?.content?.startsWith('Разложи задачу на 2–4')) return {choices:[{message:{content:JSON.stringify([{mode:'general',title:'Объяснение',query:'Объясни межотраслевой баланс'},{mode:'web',title:'Поиск',query:'Межотраслевой баланс статьи'}])}}]};
  if(!stream) return {choices:[{message:{content:'Тестовый ответ'}}]};
- return (async function*(){yield {choices:[{delta:{content:'Тест: '}}]};yield {choices:[{delta:{content:context}}]};})();
+ return (async function*(){if(context.includes('Контроль обрыва ответа')){yield {choices:[{delta:{content:'Неполный контрольный текст'}}]};yield {choices:[{delta:{},finish_reason:'length'}]};return;}yield {choices:[{delta:{content:'Тест: '}}]};yield {choices:[{delta:{content:context}}]};})();
  }}}};
 }"""
 
@@ -53,12 +54,14 @@ def main():
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
             send.click()
             page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Тест: Проверка первого диалога') && !document.querySelector('#gea-question').disabled")
+            assert "Локальный замер: первый текст" in log.inner_text()
+            assert "симв." in log.inner_text()
             # The mocked transport cannot establish model intelligence. The diagnostic
             # must report failed synthetic cases, not a misleading all-green result.
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
             quality = page.get_by_role("button",name="Проверить загруженную модель",exact=True)
             quality.click()
-            page.wait_for_function("document.body.textContent.includes('0/6 · нужна проверка') && !document.querySelector('#gea-question').disabled")
+            page.wait_for_function("document.body.textContent.includes('0/9 · нужна проверка') && !document.querySelector('#gea-question').disabled")
             assert log.locator("article").count()==1
             assert not external,external
             page.get_by_text("Диагностика качества локальной модели",exact=True).click()
@@ -118,6 +121,105 @@ def main():
             jump.click()
             assert log.evaluate("(e)=>e.scrollHeight-e.clientHeight-e.scrollTop<5")
             assert not jump.is_visible()
+            # User-owned gateway: exact consent, no network on dismissal, safe results.
+            gateway_requests=[]
+            def gateway_route(route):
+                gateway_requests.append(route.request.url)
+                route.fulfill(status=200,content_type="application/json",
+                              headers={"Access-Control-Allow-Origin":"*"},
+                              body='{"results":[{"url":"https://science.org/history","title":"История науки","content":"Учебная справка"},{"url":"javascript:alert(1)","title":"invalid"}]}')
+            page.route(lambda url: url.startswith("https://search.mydomain.org/search?"),gateway_route)
+            page.get_by_text("Настроить веб-поиск через свой сервер",exact=True).click()
+            page.get_by_role("textbox",name="HTTPS-адрес поискового сервера").fill("https://search.mydomain.org/search")
+            page.get_by_role("button",name="Использовать веб-сервер",exact=True).click()
+            question.fill("История науки")
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            assert not gateway_requests,gateway_requests
+            # Match the URL using a predicate: the literal ? in glob syntax is ambiguous.
+            assert question.input_value()=="История науки"
+            assert page.locator("#gea-question").is_enabled()
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===4 && !document.querySelector('#gea-question').disabled")
+            assert "Найдены веб-страницы" in log.inner_text(), (page.locator("#gea-status").inner_text(), log.inner_text(), gateway_requests, errors)
+            assert len(gateway_requests)==1,gateway_requests
+            assert "format=json" in gateway_requests[0]
+            assert "invalid" not in log.inner_text()
+            assert log.locator("article").count()==4
+            # Explicit page read, not automatic fetching of search hits.
+            read_requests=[]
+            def page_route(route):
+                read_requests.append(route.request.url)
+                route.fulfill(status=200,content_type="text/html; charset=utf-8",
+                              headers={"Access-Control-Allow-Origin":"*"},
+                              body="<script>hidden test 999</script><p>История науки: учебный материал для проверки содержания страницы, не проверенный научный факт.</p>")
+            page.route("https://science.org/history",page_route)
+            page.get_by_text("Прочитать выбранные веб-страницы",exact=True).click()
+            page.get_by_role("checkbox",name="История науки",exact=True).check()
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Получить и проанализировать текст",exact=True).click()
+            assert not read_requests,read_requests
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Получить и проанализировать текст",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===5 && !document.querySelector('#gea-question').disabled")
+            assert read_requests==["https://science.org/history"],read_requests
+            assert "Получены фрагменты выбранных страниц" in log.inner_text()
+            assert "hidden test 999" not in log.text_content()
+            # Multi-step search retains consent for every exact query and deduplicates results.
+            question.fill("История науки")
+            page.get_by_role("textbox",name="Дополнительные поисковые запросы").fill("История техники")
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Многоступенчатый веб-поиск",exact=True).click()
+            assert len(gateway_requests)==1,gateway_requests
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Многоступенчатый веб-поиск",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===6 && !document.querySelector('#gea-question').disabled")
+            assert "Многоступенчатый поиск завершён" in log.inner_text(), (page.locator("#gea-status").inner_text(), log.inner_text(), gateway_requests, errors)
+            assert len(gateway_requests)==3,gateway_requests
+            assert "1, 2" in log.text_content()
+            # Memory is explicit and scoped to one thread. Task drafts never execute automatically.
+            page.get_by_text("Память и контекст этого диалога",exact=True).click()
+            memory=page.get_by_role("textbox",name="Заметки диалога")
+            memory.fill("Память контрольного диалога")
+            page.get_by_role("checkbox",name="Подбирать релевантные ранние сообщения").check()
+            page.get_by_role("button",name="Сохранить настройки памяти",exact=True).click()
+            question.fill("Объясни межотраслевой баланс")
+            page.get_by_role("button",name="Проверить контекст следующего вопроса",exact=True).click()
+            assert "заметки: включены" in page.locator("#gea-panel").inner_text()
+            active_thread=chats.input_value()
+            page.get_by_role("button",name="Новый чат",exact=True).click()
+            assert memory.input_value()==""
+            chats.select_option(active_thread)
+            assert memory.input_value()=="Память контрольного диалога"
+            question.fill("Подготовить исследование")
+            page.get_by_role("button",name="Составить план задачи",exact=True).click()
+            page.get_by_role("button",name="Подготовить шаг 2",exact=True).wait_for(state="visible")
+            before=log.locator("article").count()
+            page.get_by_role("button",name="Подготовить шаг 2",exact=True).click()
+            assert question.input_value()=="Межотраслевой баланс статьи"
+            assert log.locator("article").count()==before
+            assert len(gateway_requests)==3 and not external
+            page.get_by_role("button",name="Очистить заметки диалога",exact=True).click()
+            assert memory.input_value()==""
+            # Truncation must remain visible and must not enter future chat context.
+            page.locator(".gea-chat-toolbar select").filter(has=page.locator("option[value='general']")).select_option("general")
+            question.fill("Контроль обрыва ответа")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Получен неполный ответ') && !document.querySelector('#gea-question').disabled")
+            assert "Ответ достиг лимита генерации" in log.locator("article").last.inner_text()
+            assert question.input_value()=="Контроль обрыва ответа"
+            question.fill("Контроль нового сообщения")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Ответ общего чата готов') && !document.querySelector('#gea-question').disabled")
+            last=log.locator("article").last.inner_text()
+            assert "Контроль нового сообщения" in last and "Контроль обрыва ответа" not in last
+            question.fill("Вычисли 2+2. Ответь только числом.")
+            send.click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('заданный формат не соблюдён') && !document.querySelector('#gea-question').disabled")
+            assert "Модель не соблюла явно заданный формат ответа" in log.locator("article").last.inner_text()
+            assert question.input_value()=="Вычисли 2+2. Ответь только числом."
+            assert len(gateway_requests)==3 and not external
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()

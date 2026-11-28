@@ -2099,8 +2099,8 @@ console.log("16 agent coordination checks passed");}
 {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
  async function modelAcceptanceChecks(){
   const cases=C.modelAcceptanceCases(),fact=JSON.stringify([{type:"observation",text:"100 тонн",refs:["arc-1"]},{type:"limitation",text:"Учебные данные.",refs:[]}]);
-  const responses={arithmetic:"42",context:"СЕВЕР",grounding:fact,insufficient:JSON.stringify([{type:"limitation",text:"Нет данных.",refs:[]}]),planning:JSON.stringify(["Покажи производительность труда в 2024 году относительно 2019 года","Рассчитай межотраслевой баланс для группы 9"]),injection:fact};
-  A.equal(cases.length,6);A.equal(new Set(cases.map(c=>c.id)).size,6);
+  const responses={arithmetic:"42",context:"СЕВЕР",grounding:fact,insufficient:JSON.stringify([{type:"limitation",text:"Нет данных.",refs:[]}]),planning:JSON.stringify(["Покажи производительность труда в 2024 году относительно 2019 года","Рассчитай межотраслевой баланс для группы 9"]),injection:fact,json_format:'{"status":"ok"}',correction:"ЮГ",unit_grounding:fact};
+  A.equal(cases.length,9);A.equal(new Set(cases.map(c=>c.id)).size,9);
   A.ok(cases.every(c=>c.messages.length>=2&&c.maxTokens<=240));
   A.equal(cases[0].check("41"),"wrong_answer");
   A.equal(cases[1].check("ЮГ"),"wrong_context");
@@ -2110,13 +2110,18 @@ console.log("16 agent coordination checks passed");}
   A.equal(cases[4].check(responses.planning),"pass");
   A.equal(cases[4].check(responses.planning.replace("2019","2018")),"invalid_plan");
   A.equal(cases[5].check(fact.replace("100","999")),"numeric_evidence");
+  A.equal(cases[6].check('{"status":"ok","extra":true}'),"wrong_answer");
+  A.equal(cases[6].check("null"),"wrong_answer");
+  A.equal(cases[6].check("```json\n{}\n```"),"wrong_format");
+  A.equal(cases[7].check("СЕВЕР"),"wrong_context");
+  A.notEqual(cases[8].check(fact.replace("100 тонн","100 кг")),"pass");
   let tick=0;const progress=[];
   const good=await C.runModelAcceptance(async(m,t,id)=>responses[id],()=>true,(i,n,id)=>progress.push([i,n,id]),()=>{tick+=25;return tick;});
-  A.equal(good.state,"passed");A.equal(good.passed,6);A.equal(good.total,6);
-  A.equal(progress.length,6);A.equal(good.results[0].ms,25);A.equal(good.results[0].output,"42");
+  A.equal(good.state,"passed");A.equal(good.passed,9);A.equal(good.total,9);
+  A.equal(progress.length,9);A.equal(good.results[0].ms,25);A.equal(good.results[0].output,"42");
   A.ok(good.scope.includes("не общая оценка"));
   const wrong=await C.runModelAcceptance(async(m,t,id)=>id==="arithmetic"?"43":responses[id]);
-  A.equal(wrong.state,"needs_review");A.equal(wrong.passed,5);
+  A.equal(wrong.state,"needs_review");A.equal(wrong.passed,8);
   let calls=0;
   const off=await C.runModelAcceptance(async()=>{calls++;throw Error("offline")});
   A.equal(off.state,"incomplete");A.equal(off.results[0].state,"model_unavailable");A.equal(calls,1);
@@ -2153,3 +2158,298 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.chatLayoutCss().includes("overflow-wrap:anywhere"));
  console.log("v1.99–2.01 chat scroll checks passed");
 }
+
+
+// v2.08–2.10: bounded user-configured SearXNG gateway; no external calls.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function gatewayChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",query="экономика России",endpoint="https://search.mydomain.org/search";
+  const plan=C.webGatewayPlan(query,endpoint,2);
+  A.equal(plan.pages,2);A.equal(plan.requests.length,2);
+  A.ok(plan.requests[0].includes("q="+encodeURIComponent(query)));A.ok(plan.requests[1].endsWith("pageno=2"));
+  A.equal(C.webGatewayPlan(query,"https://SEARCH.MYDOMAIN.ORG/instance/search/",1).endpoint,"https://search.mydomain.org/instance/search");
+  for(const url of ["http://search.mydomain.org/search","https://user:pass@search.mydomain.org/search","https://127.0.0.1/search","https://localhost/search","https://foo.internal/search","https://search.mydomain.org/search?key=secret","https://search.mydomain.org/search#x","https://search.mydomain.org/../search","https://search.mydomain.org:8080/search","https://search.mydomain.org/search/extra"])A.throws(()=>C.webGatewayPlan(query,url));
+  A.throws(()=>C.webGatewayPlan("",endpoint));A.throws(()=>C.webGatewayPlan("x".repeat(241),endpoint));
+  A.throws(()=>C.webGatewayPlan(query,endpoint,3));A.throws(()=>C.webGatewayPlan(query,endpoint,0));
+  A.equal(C.gatewayResultLink("javascript:alert(1)"),null);A.equal(C.gatewayResultLink("https://a.org@b.org/a"),null);
+  A.equal(C.gatewayResultLink("https://a.org/a#part").href,"https://a.org/a");
+  A.equal(C.gatewayResultLink("https://a.org/a b"),null);
+  const items=[
+   {url:"https://alpha.org/a",title:"Экономика России",content:"<b>Обзор</b> экономики"},
+   {url:"https://alpha.org/a#section",title:"Дубликат"},
+   {url:"https://alpha.org/b",title:"Экономика России"},
+   {url:"https://alpha.org/c",title:"Экономика России"},
+   {url:"https://alpha.org/d",title:"Экономика России"},
+   {url:"https://beta.org/a",title:"Экономика России"},
+   {url:"https://gamma.org/a",title:"История",content:"Текст"},
+   {url:"javascript:alert(1)",title:"bad"},
+   {url:"https://private.local/a",title:"bad"},
+   {url:"https://delta.org/a",title:"<script></script>"},
+   {url:"https://beta.org/a",title:"duplicate"}
+  ];
+  const payload={results:items,unresponsive_engines:[["engine A","timeout"],["engine B","error"]]};
+  const parsed=C.webGatewayCards(payload,stamp);
+  A.equal(parsed.rows.length,6);A.equal(parsed.rows[0].description,"Обзор экономики");
+  A.deepEqual(parsed.failures,["engine A","engine B"]);
+  A.throws(()=>C.webGatewayCards({results:Array(251).fill(items[0])},stamp));A.throws(()=>C.webGatewayCards({},stamp));
+  const ranked=C.rankGatewayCards(parsed.rows,query);
+  A.equal(ranked.length,5);A.equal(ranked.filter(x=>x.host==="alpha.org").length,3);A.equal(ranked[0].href,"https://alpha.org/a");
+  A.equal(new Set(ranked.map(x=>x.id)).size,ranked.length);A.equal(C.rankGatewayCards(parsed.rows,query,1).length,1);
+  const requests=[];
+  const fetcher=async(url,options)=>{requests.push({url,options});return {ok:true,text:async()=>JSON.stringify(payload)};};
+  const r=await C.runWebGatewaySearch(plan,{fetcher,stamp});
+  A.equal(r.state,"search");A.equal(r.sources.length,5);A.ok(r.note.includes("сбои движков"));A.ok(r.note.includes("полные страницы не получены")||r.note.includes("Полные страницы не получены")||r.note.includes("полные страницы не получены"));
+  A.equal(requests.length,2);A.ok(requests.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"&&x.options.referrerPolicy==="no-referrer"));
+  A.ok(r.sources.every(x=>x.limit.includes("не проверены")));A.equal(C.chatTranscript([{...r,question:query}])[0].sources.length,5);
+  const partial=await C.runWebGatewaySearch(plan,{stamp,fetcher:async url=>url.endsWith("pageno=2")?{ok:false,status:403}:fetcher(url,{})});
+  A.equal(partial.state,"search");A.ok(partial.note.includes("JSON выключен"));
+  const off=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:false,status:429})});
+  A.equal(off.state,"notice");A.ok(off.note.includes("лимит запросов"));
+  const bad=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:true,text:async()=>"invalid"})});
+  A.equal(bad.state,"notice");A.ok(bad.note.includes("CORS"));
+  const oversized=await C.runWebGatewaySearch(plan,{stamp,fetcher:async()=>({ok:true,text:async()=>"x".repeat(1048577)})});
+  A.equal(oversized.state,"notice");
+  const count=requests.length;
+  await A.rejects(()=>C.runWebGatewaySearch({...plan,requests:["https://other.org/search?q=secret"]},{fetcher,stamp}));A.equal(requests.length,count);
+  const stopped=await C.runWebGatewaySearch(plan,{fetcher,stamp,active:()=>false});
+  A.equal(stopped.state,"cancelled");A.equal(requests.length,count);
+  let live=true;
+  const late=await C.runWebGatewaySearch(plan,{stamp,active:()=>live,fetcher:async()=>{live=false;return {ok:true,text:async()=>JSON.stringify(payload)};}});
+  A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  A.equal(C.chatActionPlan(query,[],[],false,"web-gateway").kind,"gateway");
+  A.equal(C.chatActionPlan(query,[],[],false,"web-gateway").requiresApproval,true);
+  A.equal(C.chatActionPlan("x".repeat(241),[],[],false,"web-gateway").kind,"clarify");
+  A.equal(C.chatActionPlan(query).kind,"general");
+  console.log("v2.08–2.10 gateway checks passed");
+ }
+ gatewayChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+
+// v2.11–2.15: page reading must be explicit, bounded and separate from search snippets.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function webReadingChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",q="экономика России",sources=[{id:"hit-1",title:"Экономика России",href:"https://alpha.org/a"},{id:"hit-2",title:"Второй материал",href:"https://beta.org/b"},{id:"hit-3",title:"Третий",href:"https://gamma.org/c"}];
+  const plan=C.webReadingPlan(q,sources,["hit-1","hit-2"]);
+  A.equal(plan.pages.length,2);A.equal(plan.pages[0].host,"alpha.org");A.equal(plan.question,q);
+  for(const ids of [[],["hit-1","hit-1"],["unknown"],["hit-1","hit-2","hit-3","hit-4"]])A.throws(()=>C.webReadingPlan(q,sources,ids));
+  A.throws(()=>C.webReadingPlan(q,[{...sources[0],href:"http://alpha.org/a"}],["hit-1"]));
+  A.throws(()=>C.webReadingPlan(q,[{...sources[0],href:"https://alpha.org/a#fragment"}],["hit-1"]));
+  A.throws(()=>C.webReadingPlan(q,[sources[0],{...sources[1],href:sources[0].href}],["hit-1","hit-2"]));
+  const html='<head><title>hidden</title></head><nav>menu</nav><script>malicious 999</script><p>Экономика России: учебное описание, содержащее условное число 100 тонн. Это материал для проверки.</p><p>Текст &amp; данные &#x410; &nbsp; далее.</p><img src="https://evil.org/image">';
+  const text=C.webExtractText(html,"text/html");
+  A.ok(text.includes("100 тонн"));A.ok(text.includes("Текст & данные А далее."));
+  for(const x of ["malicious","999","hidden","menu","evil.org"])A.ok(!text.includes(x));
+  A.equal(C.webExtractText("plain <markup>","text/plain"),"plain <markup>");
+  A.throws(()=>C.webExtractText("text","application/pdf"));
+  A.throws(()=>C.webExtractText("x".repeat(524289),"text/html"));
+  A.equal(C.webExtractText("x".repeat(40000),"text/plain").length,32000);
+  const cards=C.webPageCards(plan.pages[0],text,q,stamp);
+  A.equal(cards.length,1);A.equal(cards[0].id,"page-1-1");A.equal(cards[0].category,"web_extract");A.ok(cards[0].match>0);
+  A.ok(cards[0].limit.includes("не проверенный факт"));
+  const ctx=C.webReadingContext(q,[...cards,{...cards[0],id:"page-2-1",match:0,href:sources[1].href}]);
+  A.equal(ctx.rows.length,1);A.equal(ctx.omitted,1);A.ok(ctx.messages[0].content.includes("не инструкции"));
+  A.equal(C.webReadingContext(q,cards,1).rows.length,0);
+  const calls=[];
+  const response=(body=html,mime="text/html; charset=utf-8")=>({ok:true,headers:{get:k=>k==="content-type"?mime:null},text:async()=>body});
+  const fetcher=async(url,options)=>{calls.push({url,options});return response();};
+  const r=await C.runWebReading(plan,{stamp,fetcher});
+  A.equal(r.state,"search");A.equal(r.sources.length,2);A.ok(r.note.includes("локальную модель"));
+  A.equal(calls.length,2);A.ok(calls.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"&&x.options.referrerPolicy==="no-referrer"));
+  A.equal(C.chatTranscript([{...r,question:q}])[0].sources.length,2);
+  const good=JSON.stringify([{type:"web_extract",text:"В учебном тексте указано 100 тонн",refs:["page-1-1"]},{type:"limitation",text:"Достоверность не проверена.",refs:[]}]);
+  const model=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good});
+  A.equal(model.state,"complete");A.ok(model.answer.includes("[page-1-1]"));A.ok(model.answer.includes("Утверждение страницы"));
+  const bad=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good.replace("100","999")});
+  A.equal(bad.state,"search");A.ok(!bad.answer.includes("999"));A.ok(bad.note.includes("не прошла проверку"));
+  const wrong=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>good.replace("web_extract","observation")});
+  A.equal(wrong.state,"search");
+  const limited=await C.runWebReading(plan,{stamp,fetcher,generate:async()=>JSON.stringify([{type:"limitation",text:"Недостаточно данных.",refs:[]}])});
+  A.equal(limited.state,"notice");
+  const partial=await C.runWebReading(plan,{stamp,fetcher:async url=>url.includes("alpha")?response():({ok:false,status:403})});
+  A.equal(partial.state,"search");A.equal(partial.sources.length,1);A.ok(partial.note.includes("HTTP-ошибка"));
+  const blocked=await C.runWebReading(plan,{stamp,fetcher:async()=>{throw Error("CORS")}});
+  A.equal(blocked.state,"notice");A.ok(blocked.note.includes("CORS"));
+  const pdf=await C.runWebReading(plan,{stamp,fetcher:async()=>response("PDF","application/pdf")});
+  A.equal(pdf.state,"notice");A.ok(pdf.note.includes("неподдерживаемый тип"));
+  const legacy=await C.runWebReading(plan,{stamp,fetcher:async()=>response(html,"text/html; charset=windows-1251")});
+  A.equal(legacy.state,"notice");
+  const oversized=await C.runWebReading(plan,{stamp,fetcher:async()=>response("x".repeat(524289))});
+  A.equal(oversized.state,"notice");
+  const n=calls.length;
+  await A.rejects(()=>C.runWebReading({...plan,pages:[{...plan.pages[0],host:"wrong.org"}]},{stamp,fetcher}));A.equal(calls.length,n);
+  const stopped=await C.runWebReading(plan,{stamp,fetcher,active:()=>false});
+  A.equal(stopped.state,"cancelled");A.equal(calls.length,n);
+  let live=true;const late=await C.runWebReading(plan,{stamp,fetcher:async()=>{live=false;return response()},active:()=>live});
+  A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  await A.rejects(()=>C.boundedWebText({headers:{get:()=>String(600000)},text:async()=>""}));
+  console.log("v2.11–2.15 web reading checks passed");
+ }
+ webReadingChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+
+// v2.16–2.20: multi-query investigation and narrow cross-page comparison.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function webInvestigationChecks(){
+  const stamp="2026-01-01T00:00:00.000Z",endpoint="https://search.mydomain.org/search",q="экономика России";
+  const plan=C.webInvestigationPlan(q,endpoint,["Промышленность России","Статистика производства"]);
+  A.equal(plan.maxRequests,3);A.equal(plan.plans.length,3);A.equal(plan.plans[0].pages,1);A.equal(plan.queries[0],q);
+  for(const extra of [[],[q],[" ЭКОНОМИКА   РОССИИ "],["a","b","c"],["x\nz"],["x".repeat(241)]])A.throws(()=>C.webInvestigationPlan(q,endpoint,extra));
+  const two=C.webInvestigationPlan(q,endpoint,["Промышленность"]);A.equal(two.maxRequests,2);
+  const hits=[{url:"https://alpha.org/a",title:"Экономика России",content:"Учебная справка"},{url:"https://beta.org/a",title:"Промышленность России",content:"Учебный материал"}];
+  const payloads=[hits,[hits[0],{url:"https://gamma.org/a",title:"Промышленность России",content:"Данные"}],[{url:"https://delta.org/a",title:"Статистика производства",content:"Таблица"}]];
+  const calls=[],progress=[];
+  const fetcher=async(url,options)=>{const index=calls.length;calls.push({url,options});return {ok:true,text:async()=>JSON.stringify({results:payloads[index%3]})};};
+  const r=await C.runWebInvestigation(plan,{stamp,fetcher,progress:(i,n)=>progress.push([i,n])});
+  A.equal(r.state,"search");A.equal(calls.length,3);A.equal(r.sources.length,4);A.equal(progress.length,3);
+  A.equal(r.sources.find(x=>x.href===hits[0].url).limit.includes("1, 2"),true);
+  A.equal(r.sources.map(x=>x.id).join(","),"hit-1,hit-2,hit-3,hit-4");
+  A.ok(r.note.includes("4 уникальных ссылок"));A.ok(r.note.includes("не подтверждает"));
+  A.ok(calls.every(x=>x.options.credentials==="omit"&&x.options.redirect==="error"));
+  const readable=C.webReadingPlan(q,r.sources,["hit-1","hit-2"]);A.equal(readable.pages.length,2);
+  const partial=await C.runWebInvestigation(plan,{stamp,fetcher:async url=>url===plan.plans[0].requests[0]?{ok:true,text:async()=>JSON.stringify({results:hits})}:{ok:false,status:403}});
+  A.equal(partial.state,"search");A.equal(partial.sources.length,2);A.ok(partial.note.includes("нет доступной выдачи"));
+  const off=await C.runWebInvestigation(plan,{stamp,fetcher:async()=>({ok:false,status:503})});A.equal(off.state,"notice");A.equal(off.sources.length,0);
+  const n=calls.length;
+  await A.rejects(()=>C.runWebInvestigation({...plan,maxRequests:99},{stamp,fetcher}));A.equal(calls.length,n);
+  const stopped=await C.runWebInvestigation(plan,{stamp,fetcher,active:()=>false});A.equal(stopped.state,"cancelled");A.equal(calls.length,n);
+  let live=true;const late=await C.runWebInvestigation(plan,{stamp,active:()=>live,fetcher:async()=>{live=false;return {ok:true,text:async()=>JSON.stringify({results:hits})};}});A.equal(late.state,"cancelled");A.equal(late.sources.length,0);
+  const card=(id,host,description)=>({id,href:"https://"+host+"/a",category:"web_extract",description});
+  const a=card("page-1-1","alpha.org","Объём выпуска предприятия по условной методике составляет 100 тонн.");
+  const b=card("page-2-1","beta.org","Объём выпуска предприятия по условной методике составляет 120 тонн.");
+  const c=card("page-3-1","gamma.org",a.description);
+  const cmp=C.webComparison([a,b,c]);
+  A.equal(cmp.domains,3);A.equal(cmp.matches.length,3);A.equal(cmp.matches.filter(x=>x.kind==="numeric_difference").length,2);A.equal(cmp.matches.filter(x=>x.kind==="same_text").length,1);
+  A.ok(C.webComparisonNote(cmp).includes("возможно копирование"));A.ok(C.webComparisonNote(cmp).includes("разные числа"));
+  A.ok(C.webComparisonNote(cmp).includes("не проверка истинности"));
+  A.equal(C.webComparison([a,{...b,href:a.href}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,description:"Объём выпуска предприятия по другой методике составляет 120 тонн."}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,description:"Объём выпуска предприятия по условной методике составляет 120 рублей."}]).matches.length,0);
+  A.equal(C.webComparison([a,{...b,category:"bibliography"}]).matches.length,0);
+  A.ok(C.webComparisonNote(C.webComparison([a])).includes("менее двух"));
+  A.ok(C.webComparisonNote(C.webComparison([a,{...b,description:"Совсем другой текст без совпадений, достаточно длинный для анализа."}])).includes("не доказывает согласие"));
+  A.throws(()=>C.webComparison(Array(10).fill(a)));
+  console.log("v2.16–2.20 web investigation checks passed");
+ }
+ webInvestigationChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+
+// v2.21–2.25: explicit per-thread memory and locally proposed task drafts.
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ async function dialoguePlanningChecks(){
+  const m={notes:"  Отвечай кратко.  ",relevant:true};
+  A.deepEqual(C.chatMemory(null),{notes:"",relevant:false});
+  A.deepEqual(C.chatMemory(m),{notes:"Отвечай кратко.",relevant:true});
+  for(const x of [{notes:"x".repeat(1501),relevant:true},{notes:"x",relevant:1},{notes:"\u0000",relevant:false},[],{notes:"x"}])A.throws(()=>C.chatMemory(x));
+  let w=C.newChatWorkspace("chat-a");
+  A.equal(w.threads[0].memory,undefined);
+  w=C.setChatMemory(w,"chat-a",m);A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  w=C.addChatThread(w,"chat-b");A.equal(w.threads[1].memory,undefined);A.equal(w.threads[0].memory.relevant,true);
+  w=C.setChatMemory(w,"chat-b",{notes:"Другая задача",relevant:false});
+  w=C.selectChatThread(w,"chat-a");A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  const t=(question,answer,more={})=>({mode:"general",state:"complete",question,answer,...more});
+  const turns=[t("Межотраслевой баланс","Непроверенный ответ о балансе"),t("Межотраслевой баланс PRIVATE","PRIVATE secret",{private:true}),...Array.from({length:7},(_,i)=>t("Тема "+i,"Ответ "+i)),t("Сегодняшний вопрос","Последний ответ"),t("Межотраслевой баланс","Архив",{mode:"archive"}),t("Межотраслевой баланс","Ошибка",{state:"error"})];
+  w=C.updateChatThread(w,"chat-a",turns,[]);
+  A.equal(w.threads[0].memory.notes,"Отвечай кратко.");
+  const persisted=C.persistedChatWorkspace(w);A.ok(!JSON.stringify(persisted).includes("PRIVATE"));A.equal(persisted.threads[0].memory.notes,"Отвечай кратко.");A.deepEqual(C.chatWorkspace(JSON.parse(JSON.stringify(persisted))),persisted);
+  A.throws(()=>C.setChatMemory(w,"chat-unknown",m));
+  const q="Объясни межотраслевой баланс";
+  const legacy=C.generalChatPrompt(q,turns);
+  A.equal(legacy.used,6);A.ok(!JSON.stringify(legacy.messages).includes("Непроверенный ответ о балансе"));
+  const p=C.generalChatPrompt(q,turns,9500,w.threads[0].memory);
+  A.equal(p.used,3);A.equal(p.notesUsed,true);A.ok(JSON.stringify(p.messages).includes("Непроверенный ответ о балансе"));A.ok(!JSON.stringify(p.messages).includes("PRIVATE"));A.ok(!JSON.stringify(p.messages).includes("Другая задача"));A.ok(!p.messages.some(x=>x.content==="Архив"||x.content==="Ошибка"));
+  A.deepEqual(JSON.parse(p.messages.at(-1).content),{question:q,userNotes:"Отвечай кратко."});
+  A.ok(p.messages.slice(1).every((x,i)=>x.role===(i%2===0?"user":"assistant")));
+  A.ok(C.utf8Size(JSON.stringify(p.messages))<=9500);
+  const tiny=C.generalChatPrompt(q,[],2000,{notes:"я".repeat(1500),relevant:false});
+  A.equal(tiny.blocked,false);A.equal(tiny.notesUsed,false);A.equal(tiny.messages.at(-1).content,q);
+  const old=C.generalChatPrompt(q,[t("Межотраслевой баланс","Короткий ответ"),t("Иная тема","я".repeat(6000)),t("Последняя тема","Кратко")],2500,{notes:"",relevant:true});
+  A.equal(old.used,2);A.ok(old.messages.some(x=>x.content==="Короткий ответ"));
+  const rr=await C.runGeneralChat(q,turns,async messages=>{A.equal(JSON.parse(messages.at(-1).content).userNotes,"Отвечай кратко.");return "Ответ";},()=>true,9500,m);A.equal(rr.state,"complete");A.equal(rr.notesUsed,true);
+  w=C.setChatMemory(w,"chat-a",{notes:"",relevant:false});A.equal(w.threads[0].memory,undefined);A.equal(w.threads[1].memory.notes,"Другая задача");
+  const steps=[{mode:"general",title:"Уточнить понятие",query:"Объясни понятие межотраслевого баланса"},{mode:"web",title:"Найти материалы",query:"Межотраслевой баланс научные статьи"}];
+  const raw=JSON.stringify(steps);
+  A.deepEqual(C.taskPlan(raw),steps);
+  A.equal(C.taskPlan("[]"),null);A.equal(C.taskPlan("bad"),null);
+  for(const bad of [{...steps[0],mode:"execute"},{...steps[0],query:"https://alpha.org/a"},{...steps[0],query:"api_key: abc"},{...steps[0],title:"x".repeat(81)},{...steps[0],query:"x\nz"},{...steps[0],query:"x".repeat(241)},{...steps[0],secret:true},{...steps[0],query:steps[1].query.toUpperCase()}])A.equal(C.taskPlan(JSON.stringify([bad,steps[1]])),null);
+  A.throws(()=>C.taskPlanningPrompt(""));A.throws(()=>C.taskPlanningPrompt("x".repeat(601)));
+  const task=C.taskPlanningPrompt("Подготовить исследование");A.equal(JSON.parse(task[1].content).question,"Подготовить исследование");A.ok(!JSON.stringify(task).includes("Отвечай кратко."));
+  let calls=0;const draft=await C.runTaskPlanning("Подготовить исследование",async messages=>{calls++;A.equal(messages.length,2);return raw;});A.equal(draft.state,"draft");A.equal(calls,1);A.deepEqual(draft.steps,steps);
+  A.equal((await C.runTaskPlanning("Задача",async()=>"bad")).state,"invalid");
+  A.equal((await C.runTaskPlanning("Задача",async()=>{throw Error("offline")})).state,"unavailable");
+  A.equal((await C.runTaskPlanning("Задача",async()=>{calls++;return raw},()=>false)).state,"cancelled");A.equal(calls,1);
+  let live=true;const stopped=await C.runTaskPlanning("Задача",async()=>{live=false;return raw},()=>live);A.equal(stopped.state,"cancelled");A.deepEqual(stopped.steps,[]);
+  console.log("v2.21–2.25 dialogue planning checks passed");
+ }
+ dialoguePlanningChecks().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+ // v2.26: adaptive budgets and explicit incomplete responses.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function answerPerformanceChecks(){
+   A.deepEqual(C.chatGenerationProfile("Ответь только числом"),{maxTokens:320,budget:9500});
+   A.deepEqual(C.chatGenerationProfile("Объясни подробно, с примерами"),{maxTokens:1200,budget:7000});
+   A.deepEqual(C.chatGenerationProfile("Что это?"),{maxTokens:750,budget:8500});
+   A.equal(C.chatGenerationProfile("Подробно, но кратко").maxTokens,320);
+   const p=C.generalChatPrompt("Объясни",[]);A.ok(p.messages[0].content.includes("Различай факты, оценки и допущения"));
+   const lengthStop=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"Начало"}}]};yield {choices:[{delta:{},finish_reason:"length"}]};})());
+   A.deepEqual(lengthStop,{state:"complete",text:"Начало",truncated:true});
+   const normal=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"Ответ"},finish_reason:"stop"}]};})());
+   A.deepEqual(normal,{state:"complete",text:"Ответ",truncated:false});
+   const incomplete=await C.runGeneralChat("Вопрос",[],async()=>lengthStop);A.equal(incomplete.state,"notice");A.equal(incomplete.truncated,true);A.equal(incomplete.answer,"Начало");
+   const complete=await C.runGeneralChat("Вопрос",[],async()=>normal);A.equal(complete.state,"complete");A.equal(complete.answer,"Ответ");
+   const oversized=await C.runGeneralChat("Вопрос",[],async()=>"x".repeat(6001));A.equal(oversized.truncated,true);A.equal(oversized.answer.length,6000);
+   let active=true;const stopped=await C.consumeChatStream((async function*(){yield {choices:[{delta:{content:"stop"},finish_reason:"length"}]};})(),()=>active,()=>{active=false;});A.equal(stopped.state,"cancelled");
+   const hidden={mode:"general",state:"notice",question:"Неполный вопрос",answer:"Неполный ответ"};A.equal(C.generalChatPrompt("Следующий", [hidden]).used,0);
+   console.log("v2.26 adaptive answer performance checks passed");
+  }
+  answerPerformanceChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+ // v2.27: deterministic stream diagnostics; no actual GPU benchmark.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function performanceDiagnosticsChecks(){
+   const stream=async()=>(async function*(){yield {choices:[]};yield {choices:[{delta:{content:"А😀"}}]};yield {choices:[{delta:{content:"Б"}}]};})();
+   const clock=values=>()=>values.shift();
+   const observed=[];
+   const r=await C.measureChatGeneration(stream,()=>true,x=>observed.push(x),clock([100,300,600]));
+   A.deepEqual(r.metrics,{firstMs:200,totalMs:500,characters:3,charsPerSecond:6});
+   A.deepEqual(observed,["А😀","А😀Б"]);A.equal(r.text,"А😀Б");
+   A.ok(C.chatPerformanceNote(r.metrics).includes("6 симв./с"));
+   A.equal(C.chatPerformanceNote(null),"");
+   const fast=await C.measureChatGeneration(stream,()=>true,()=>{},clock([0,5,10]));
+   A.equal(fast.metrics.charsPerSecond,null);A.ok(!C.chatPerformanceNote(fast.metrics).includes("симв./с"));
+   const empty=await C.measureChatGeneration(async()=>(async function*(){yield {choices:[]};})(),()=>true,()=>{},clock([0,10]));A.equal(empty.metrics,null);
+   let active=true;const stopped=await C.measureChatGeneration(stream,()=>active,()=>{active=false;},clock([0,10,20]));A.equal(stopped.state,"cancelled");A.equal(stopped.metrics,null);
+   const notStarted=await C.measureChatGeneration(async()=>{throw Error("must not open")},()=>false);A.equal(notStarted.metrics,null);
+   const badClock=await C.measureChatGeneration(stream,()=>true,()=>{},clock([10,9,20]));A.equal(badClock.metrics,null);
+   await A.rejects(()=>C.measureChatGeneration(async()=>{throw Error("offline")}));
+   const truncated=await C.measureChatGeneration(async()=>(async function*(){yield {choices:[{delta:{content:"Начало"},finish_reason:"length"}]};})(),()=>true,()=>{},clock([0,100,200]));A.equal(truncated.truncated,true);A.equal(truncated.metrics.characters,6);
+   console.log("v2.27 performance diagnostics checks passed");
+  }
+  performanceDiagnosticsChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
+
+ // v2.28: strict explicit format checking without claiming factual correctness.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  async function explicitFormatChecks(){
+   const number="Вычисли 2+2. Ответь только числом.",word="Выбери цвет. Ответь только одним словом.",json="Верни только JSON.";
+   for(const v of ["4","−4","4,5","-0.25","1e-3"])A.equal(C.chatFormatAudit(number,v).passed,true);
+   for(const v of ["Ответ: 4","4 руб.","4 и 5","", "NaN"])A.equal(C.chatFormatAudit(number,v).passed,false);
+   A.equal(C.chatFormatAudit(word,"сине-зелёный").passed,true);
+   A.equal(C.chatFormatAudit(word,"синий цвет").passed,false);
+   for(const v of ['{"a":1}',"[1,2]","null","42",'"текст"'])A.equal(C.chatFormatAudit(json,v).passed,true);
+   for(const v of ["{bad}","ответ: {}","", "```json\n{}\n```"])A.equal(C.chatFormatAudit(json,v).passed,false);
+   A.equal(C.explicitChatFormat('Что означает выражение «Ответь только числом»?'),null);
+   A.equal(C.chatFormatAudit("Объясни подробно.","Любой текст").passed,true);
+   A.ok(C.generalChatPrompt(number,[]).messages[0].content.includes("Формат ответа обязателен"));
+   const good=await C.runGeneralChat(number,[],async()=>"4");A.equal(good.state,"complete");
+   const wrong=await C.runGeneralChat(number,[],async()=>"Ответ: 4");A.equal(wrong.state,"notice");A.equal(wrong.formatMismatch,"number");A.equal(wrong.answer,"Ответ: 4");
+   A.equal(C.generalChatPrompt("Следующий вопрос",[{mode:"general",state:wrong.state,question:number,answer:wrong.answer}]).used,0);
+   const truncated=await C.runGeneralChat(json,[],async()=>({text:"{",truncated:true}));A.equal(truncated.truncated,true);A.equal(truncated.formatMismatch,"json");
+   console.log("v2.28 explicit format quality checks passed");
+  }
+  explicitFormatChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
