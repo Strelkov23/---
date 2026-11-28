@@ -140,6 +140,25 @@ def main():
             assert "format=json" in gateway_requests[0]
             assert "invalid" not in log.inner_text()
             assert log.locator("article").count()==4
+            # Explicit page read, not automatic fetching of search hits.
+            read_requests=[]
+            def page_route(route):
+                read_requests.append(route.request.url)
+                route.fulfill(status=200,content_type="text/html; charset=utf-8",
+                              headers={"Access-Control-Allow-Origin":"*"},
+                              body="<script>hidden test 999</script><p>История науки: учебный материал для проверки содержания страницы, не проверенный научный факт.</p>")
+            page.route("https://science.org/history",page_route)
+            page.get_by_text("Прочитать выбранные веб-страницы",exact=True).click()
+            page.get_by_role("checkbox",name="История науки",exact=True).check()
+            page.once("dialog",lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Получить и проанализировать текст",exact=True).click()
+            assert not read_requests,read_requests
+            page.once("dialog",lambda dialog: dialog.accept())
+            page.get_by_role("button",name="Получить и проанализировать текст",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===5 && !document.querySelector('#gea-question').disabled")
+            assert read_requests==["https://science.org/history"],read_requests
+            assert "Получены фрагменты выбранных страниц" in log.inner_text()
+            assert "hidden test 999" not in log.text_content()
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
