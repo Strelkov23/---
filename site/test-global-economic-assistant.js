@@ -1168,3 +1168,29 @@ console.log("16 agent coordination checks passed");}
   }
   extendedChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.20 source suitability and catalog metadata discrepancy checks.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const a=C.crossrefReferenceCards({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Economic planning"],published:{"date-parts":[[2024]]},type:"posted-content"}]}},stamp)[0];
+  const b=C.epmcReferenceCards({hitCount:1,resultList:{result:[{source:"MED",id:"123",title:"Health economics",doi:"10.1234/plan",pubYear:"2025",isOpenAccess:"Y",license:"cc by",abstractText:"Study"}]}},stamp)[0];
+  A.equal(a.publicationYear,2024);A.equal(b.publicationYear,2025);
+  A.equal(a.preprint,true);
+  const merged=C.mergeResearchReferences([a,b]);
+  A.equal(merged.length,1);A.equal(merged[0].abstractAvailable,true);
+  A.equal(merged[0].preprint,true);
+  A.deepEqual(merged[0].metadataDifferences.map(d=>d.field),["title","year"]);
+  A.equal(merged[0].metadataRecords.length,2);
+  A.equal(merged[0].metadataDifferences[0].values[0].href,a.href);
+  A.deepEqual(C.referenceMetadataDifferences([{title:"Economic planning!",year:2024},{title:" ECONOMIC planning ",year:null}]),[]);
+  A.deepEqual(C.referenceMetadataDifferences([{title:"Same",year:2024},{title:"Same",year:2025}]).map(d=>d.field),["year"]);
+  const report=C.onlineSourceAudit([...merged,{id:"wiki-ru-1"},{id:"crossref-2"}],[{status:"timeout"}]);
+  A.deepEqual(report.counts,{reference:1,abstract:1,metadata:1,preprint:1,merged:1,disputed:1});
+  A.equal(report.fullTextVerified,false);A.equal(report.independentFindingsVerified,false);
+  A.ok(report.gaps.some(x=>x.includes("неполное")));A.ok(report.gaps.some(x=>x.includes("издателя")));
+  A.ok(C.onlineSourceAudit([],[]).gaps.some(x=>x.includes("Нет доступных аннотаций")));
+  A.ok(C.extendedResearchPrompt("x",merged)[0].content.includes("без проверки у издателя"));
+  A.deepEqual(C.epmcReferenceCards({hitCount:1,resultList:{result:[{source:"MED",id:"..",title:"Invalid"}]}},stamp),[]);
+  console.log("v1.20 source suitability checks passed");
+ }
