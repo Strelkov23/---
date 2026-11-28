@@ -96,6 +96,28 @@ def main():
             page.reload(wait_until="domcontentloaded")
             page.locator("#gea-toggle").click()
             assert page.get_by_role("log",name="Сообщения диалога").locator("article").count()==2
+            # Automatic routing must preview the approved query and never send before consent.
+            question = page.locator("#gea-question")
+            question.fill("Найди в интернете историю науки")
+            page.once("dialog", lambda dialog: dialog.dismiss())
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            assert question.input_value()=="Найди в интернете историю науки"
+            assert not external,external
+            # A long transcript can be navigated with a visible return-to-latest control.
+            page.locator("#gea-model").click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
+            question.fill("Длинный учебный ответ " + "экономика " * 45)
+            page.get_by_role("button",name="Отправить сообщение",exact=True).click()
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===3 && !document.querySelector('#gea-question').disabled")
+            log = page.get_by_role("log",name="Сообщения диалога")
+            assert log.evaluate("(e)=>e.scrollHeight>e.clientHeight+80")
+            assert log.get_attribute("tabindex")=="0"
+            log.evaluate("(e)=>{e.scrollTop=0;e.dispatchEvent(new Event('scroll'))}")
+            jump=page.get_by_role("button",name="К последнему сообщению",exact=True)
+            assert jump.is_visible()
+            jump.click()
+            assert log.evaluate("(e)=>e.scrollHeight-e.clientHeight-e.scrollTop<5")
+            assert not jump.is_visible()
             assert not errors,errors
             print(f"Chat release browser regression passed: {width}",flush=True)
             page.close()
