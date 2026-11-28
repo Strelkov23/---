@@ -1278,3 +1278,47 @@ console.log("16 agent coordination checks passed");}
   A.equal(subset.missing.length,1);A.ok(subset.note.includes("не означают"));
   console.log("v1.24–1.26 research memory checks passed");
  }
+
+
+ // v1.27–1.29: coordinated local model roles, evidence scope and failure isolation.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const rows=[{id:"wiki-ru-1",title:"Planning",description:"Planning",kind:"Reference",limit:"Limited"},{id:"source-run-2",title:"Study",description:"Study",abstractAvailable:true,kind:"Abstract",limit:"Limited"},{id:"crossref-1",title:"Work",description:"Work",kind:"Metadata",limit:"Limited"}];
+  const drafts={reference:"Planning [wiki-ru-1]",abstract:"Study [source-run-2]",bibliography:"Work [crossref-1]",synthesis:"Planning [wiki-ru-1]. Study [source-run-2]. Work [crossref-1]"};
+  const plan=C.onlineAgentPlan(rows,"planning");
+  A.deepEqual(plan.map(p=>p.role),["reference","abstract","bibliography"]);
+  A.deepEqual(plan.map(p=>p.selected.map(r=>r.id)),[["wiki-ru-1"],["source-run-2"],["crossref-1"]]);
+  A.throws(()=>C.onlineAgentPlan([...rows,rows[0]],"planning"));
+  A.throws(()=>C.onlineAgentPlan(rows,""));
+  A.throws(()=>C.onlineAgentPrompt("x","invalid",rows));
+  A.ok(C.onlineAgentPrompt("x","bibliography",[rows[2]])[0].content.includes("Не утверждай их содержание"));
+  A.ok(C.onlineAgentPrompt("x","abstract",[rows[1]])[0].content.includes("только утверждения авторов"));
+  async function agentTeamChecks(){
+   const progress=[],calls=[];
+   const result=await C.runOnlineAgentTeam("planning",rows,[],async(m,role)=>{calls.push(role);return drafts[role];},()=>true,r=>progress.push(r));
+   A.equal(result.state,"accepted");A.equal(result.partial,false);A.equal(result.answer,drafts.synthesis);
+   A.equal(result.reports.length,3);A.equal(result.rolesUsed.length,3);
+   A.deepEqual(calls,["reference","abstract","bibliography","synthesis"]);A.deepEqual(progress,calls);
+   A.deepEqual(result.selected,rows.map(r=>r.id));
+   const crossRole=await C.runOnlineAgentTeam("planning",rows,[],async(m,role)=>role==="reference"?"Work [crossref-1]":role==="synthesis"?"Study [source-run-2]":drafts[role]);
+   A.equal(crossRole.reports[0].status,"rejected");A.equal(crossRole.reports[0].answer,null);
+   A.equal(crossRole.state,"accepted");A.equal(crossRole.partial,true);
+   const broken=await C.runOnlineAgentTeam("planning",rows,[],async(m,role)=>{if(role==="abstract")throw Error("offline");return role==="synthesis"?"Planning [wiki-ru-1]":drafts[role];});
+   A.equal(broken.reports[1].status,"unavailable");A.equal(broken.state,"accepted");
+   const fake=await C.runOnlineAgentTeam("planning",rows,[],async(m,role)=>role==="synthesis"?"Unknown [invented]":drafts[role]);
+   A.equal(fake.state,"synthesis_rejected");A.equal(fake.answer,null);
+   const noCite=await C.runOnlineAgentTeam("planning",rows,[],async()=>"No citation");
+   A.equal(noCite.state,"no_accepted_drafts");A.equal(noCite.answer,null);
+   let count=0;const cancelled=await C.runOnlineAgentTeam("planning",rows,[],async()=>{count++;return drafts.reference;},()=>count===0);
+   A.equal(cancelled.state,"cancelled");A.equal(count,1);
+   const small=await C.runOnlineAgentTeam("planning",rows,[],async()=>{throw Error("must not call")},()=>true,()=>{},1);
+   A.equal(small.state,"no_accepted_drafts");A.ok(small.reports.every(r=>r.status==="budget_exceeded"));
+   const empty=await C.runOnlineAgentTeam("planning",[],[],async()=>{throw Error("must not call")});
+   A.equal(empty.state,"no_accepted_drafts");A.ok(empty.reports.every(r=>r.status==="no_evidence"));
+   const failed=await C.runOnlineAgentTeam("planning",rows,[],async(m,role)=>{if(role==="synthesis")throw Error("offline");return drafts[role];});
+   A.equal(failed.state,"synthesis_unavailable");
+   const synthesis=C.onlineTeamSynthesis("planning",rows,[],result.reports,1);
+   A.equal(synthesis.notes.length,0);
+   console.log("v1.27–1.29 agent coordination checks passed");
+  }
+  agentTeamChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
