@@ -1068,3 +1068,29 @@ console.log("16 agent coordination checks passed");}
   }
   bilingualChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.17: live bibliographic search; never treat metadata as findings.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const item={DOI:"10.1234/Example(1)",title:["Economic planning"],author:[{given:"A",family:"B"}],published:{"date-parts":[[2025]]},"container-title":["Journal"],type:"journal-article"};
+  const data={status:"ok","message-type":"work-list",message:{items:[item,{...item,DOI:"10.1234/example(1)"},{...item,DOI:"https://bad.org"},{...item,DOI:"10.1234/no-title",title:[]}]}};
+  A.ok(C.crossrefSearchUrl("экономика & право").endsWith(encodeURIComponent("экономика & право")));
+  A.throws(()=>C.crossrefSearchUrl(""));A.throws(()=>C.crossrefSearchUrl("x\ny"));A.throws(()=>C.crossrefSearchUrl("a".repeat(241)));
+  const cards=C.crossrefReferenceCards(data,stamp);
+  A.equal(cards.length,1);A.equal(cards[0].doi,"10.1234/example(1)");A.ok(cards[0].href.startsWith("https://doi.org/10.1234/"));
+  A.ok(cards[0].description.includes("2025"));A.ok(cards[0].description.includes("A B"));A.ok(cards[0].limit.includes("Аннотация и полный текст не получены"));
+  A.throws(()=>C.crossrefReferenceCards(data,"invalid"));A.throws(()=>C.crossrefReferenceCards({status:"failed"},stamp));
+  A.deepEqual(C.crossrefReferenceCards({...data,message:{items:[]}},stamp),[]);
+  A.ok(C.literatureExplanationPrompt("x",cards)[0].content.includes("нельзя утверждать результаты"));
+  A.equal(JSON.parse(C.literatureExplanationPrompt("x",cards)[1].content).cards[0].id,"crossref-1");
+  async function literatureChecks(){
+   const found=await C.fetchCrossrefReferences("planning",async(url,opts)=>{A.ok(url.startsWith("https://api.crossref.org/works?"));A.equal(opts.credentials,"omit");A.equal(opts.redirect,"error");return {ok:true,text:async()=>JSON.stringify(data)}},null,stamp);
+   A.equal(found.length,1);
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:false,status:429}),null,stamp));
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:true,text:async()=>"{invalid"}),null,stamp));
+   await A.rejects(()=>C.fetchCrossrefReferences("x",async()=>({ok:true,text:async()=>"x".repeat(262145)}),null,stamp));
+   console.log("v1.17 live literature checks passed");
+  }
+  literatureChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
