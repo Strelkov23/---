@@ -297,6 +297,35 @@ def validate_signal_memory(data):
         raise ValueError('Diagnostic history without baseline')
     return True
 
+# Join diagnostic observations and planning routes by exact record identity.
+# A dossier prepares a research question, not a causal explanation.
+def signal_dossiers(agents, memory):
+    by={a['id']:a for a in agents}
+    diagnostics=by['diagnostics']['items']
+    plans=by['planning']['items']
+    routes={r['id']:r for r in plans}
+    changes={r['id']:r for r in memory['rows']}
+    if len(routes)!=len(plans) or len(changes)!=len(memory['rows']):
+        raise ValueError('Duplicate dossier identity')
+    rows=[]
+    for r in diagnostics:
+        change=changes[r['id']]
+        if r['status']!='signal' and change['transition'] not in ('cleared','lost_observation'):
+            continue
+        p=routes.get(r['id'])
+        match=bool(p and p['status']==r['status'] and p['year']==r['year'] and p['inputs']==r['codes'])
+        blockers=[k for k in ('quality','coverage') if by[k]['state']!='ok']
+        state='unmatched_route' if not match else 'review_transition' if r['status']!='signal' else 'refresh_first' if p['priority']=='refresh_first' else 'needs_data' if p['priority']!='investigate' else 'check_inputs' if blockers else 'ready_for_review'
+        rows.append(dict(id=r['id'],title=r['title'],state=state,transition=change['transition'],
+                         year=r['year'],value=r['value'],unit=r['unit'],score=r.get('score'),
+                         formula=r['formula'],codes=r['codes'],sources=[x for x in r['sources'] if safe_url(x)],
+                         limit=r['note'],blockers=blockers,
+                         route=dict(title=p['title'],href=p['href'],action=p['action'],priority=p['priority']) if match else None))
+    order={'unmatched_route':0,'needs_data':1,'refresh_first':2,'check_inputs':3,'ready_for_review':4,'review_transition':5}
+    rows.sort(key=lambda r:(order[r['state']],r['id']))
+    return dict(schema=1,rows=rows,counts={k:sum(r['state']==k for r in rows) for k in order},
+                note='Исследовательские досье по диагностическим сигналам. Сопоставление по идентификатору, периоду, статусу и кодам рядов; ссылки ведут к исходным рядам. Не доказательство причинности, не результат оптимизации и не автоматическое изменение параметров.')
+
 def build(out,previous,stamp,refresh):
     if datetime.fromisoformat(stamp).tzinfo is None:raise ValueError("Invalid build time")
     memory=read(out,"economic-ai-memory.json");m=memory["latest"]
@@ -378,6 +407,7 @@ def build(out,previous,stamp,refresh):
     data['preflight']=preflight(out,data['research_queue'],stamp)
     data['preflight_history']=preflight_history(data,prior)
     data['signal_memory']=signal_memory(diag['rows'],prior)
+    data['signal_dossiers']=signal_dossiers(agents,data['signal_memory'])
     validate(data)
     return data
 def validate(d):
@@ -393,6 +423,8 @@ def validate(d):
         if 'preflight' not in d:raise ValueError('History without current check')
         validate_preflight_history(d)
     if 'signal_memory' in d:validate_signal_memory(d)
+    if 'signal_dossiers' in d:
+        if 'signal_memory' not in d or d['signal_dossiers']!=signal_dossiers(d['agents'],d['signal_memory']):raise ValueError('Invalid signal dossiers')
     for d in d["agents"][3]["items"]:
         if not safe_url(d["url"]) or d["kind"] not in ("news","papers"):raise ValueError("Unsafe document")
     return True
