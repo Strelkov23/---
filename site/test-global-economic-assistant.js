@@ -508,3 +508,25 @@ console.log("16 agent coordination checks passed");}
  A.equal(JSON.parse(C.planningPrompt(q)[1].content).question,q);
  console.log("14 model research planning checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),entry=(n,answer="Черновик")=>({question:"Вопрос "+n,answer,page:"labor.html",fingerprint:fp});
+ A.deepEqual(C.dialogueHistory(null),[]);
+ A.deepEqual(C.dialogueHistory([{},entry(1),{...entry(2),fingerprint:"invalid"}]),[entry(1)]);
+ A.equal(C.dialogueHistory([entry(1,"a".repeat(2000))])[0].answer.length,1800);
+ A.equal(C.dialogueHistory([{...entry(1),question:"x".repeat(700)}])[0].question.length,600);
+ A.deepEqual(C.dialogueHistory([1,2,3,4,5].map(x=>entry(x))).map(x=>x.question),["Вопрос 2","Вопрос 3","Вопрос 4","Вопрос 5"]);
+ A.equal(C.dialogueAppend([entry(1)],entry(1,"новый")).length,1);
+ A.equal(C.dialogueAppend([entry(1)],entry(1,"новый"))[0].answer,"новый");
+ A.equal(C.dialogueAppend([entry(1)],{...entry(1),fingerprint:"b".repeat(64)}).length,2);
+ A.equal(C.dialogueAppend([entry(1)],{}).length,1);
+ A.deepEqual(C.dialogueQuery("Почему?",[entry(1)],false),{query:"Почему?",context:null});
+ const follow=C.dialogueQuery("Почему?",[entry(1),entry(2,"неверные 987654")],true);
+ A.equal(follow.query,"Почему? Вопрос 2");
+ A.equal(follow.context.previous_snapshot,fp);
+ A.equal(follow.context.previous_question,"Вопрос 2");
+ A.ok(!JSON.stringify(follow).includes("987654"));
+ A.deepEqual(C.dialogueQuery("Почему?",[],true),{query:"Почему?",context:null});
+ A.deepEqual(C.dialogueQuery("",[entry(1)],true),{query:"",context:null});
+ console.log("16 dialogue history checks passed");
+}
