@@ -125,7 +125,7 @@ def main():
                 route.fulfill(status=200,content_type="application/json",
                               headers={"Access-Control-Allow-Origin":"*"},
                               body='{"results":[{"url":"https://science.org/history","title":"История науки","content":"Учебная справка"},{"url":"javascript:alert(1)","title":"invalid"}]}')
-            page.route("https://search.mydomain.org/search?*",gateway_route)
+            page.route(lambda url: url.startswith("https://search.mydomain.org/search?"),gateway_route)
             page.get_by_text("Настроить веб-поиск через свой сервер",exact=True).click()
             page.get_by_role("textbox",name="HTTPS-адрес поискового сервера").fill("https://search.mydomain.org/search")
             page.get_by_role("button",name="Использовать веб-сервер",exact=True).click()
@@ -133,9 +133,13 @@ def main():
             page.once("dialog",lambda dialog: dialog.dismiss())
             page.get_by_role("button",name="Отправить сообщение",exact=True).click()
             assert not gateway_requests,gateway_requests
+            # Match the URL using a predicate: the literal ? in glob syntax is ambiguous.
+            assert question.input_value()=="История науки"
+            assert page.locator("#gea-question").is_enabled()
             page.once("dialog",lambda dialog: dialog.accept())
             page.get_by_role("button",name="Отправить сообщение",exact=True).click()
-            page.wait_for_function("document.querySelector('.gea-chat-scroll').textContent.includes('Найдены веб-страницы') && !document.querySelector('#gea-question').disabled")
+            page.wait_for_function("document.querySelectorAll('.gea-chat-scroll article').length===4 && !document.querySelector('#gea-question').disabled")
+            assert "Найдены веб-страницы" in log.inner_text(), (page.locator("#gea-status").inner_text(), log.inner_text(), gateway_requests, errors)
             assert len(gateway_requests)==1,gateway_requests
             assert "format=json" in gateway_requests[0]
             assert "invalid" not in log.inner_text()
