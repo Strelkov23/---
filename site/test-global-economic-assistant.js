@@ -766,3 +766,13 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.localOcrResult({text:"x",confidence:101},"rus"));A.throws(()=>C.localOcrResult({text:"x",confidence:NaN},"eng"));A.throws(()=>C.localOcrResult({text:"x",confidence:50},"unknown"));
  console.log("11 OCR input/result contract checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ A.equal(C.scanViewport(600,800),2.5);
+ A.ok(C.scanViewport(2000,3000)<=1);
+ const scale=C.scanViewport(1000,1000);A.ok(1000000*scale*scale<=6000000.00001);
+ A.throws(()=>C.scanViewport(0,100));A.throws(()=>C.scanViewport(Infinity,100));A.throws(()=>C.scanViewport(1e-100,1e100));
+ const text="Выпуск 12\n\nВыпуск 15",pages=[{page:1,start:0,end:9,origin:"text",confidence:null},{page:2,start:11,end:20,origin:"ocr",confidence:80}];
+ const hits=C.localPdfSearch(text,pages,"выпуск");A.equal(hits[1].page,2);A.equal(hits[1].excerpt,"Выпуск 15");
+ console.log("8 scan viewport and page identity checks passed");
+}
