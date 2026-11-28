@@ -437,3 +437,27 @@ console.log("16 agent coordination checks passed");}
  A.equal(C.productivityCommand(C.naturalRoute("Покажи производительность труда в 2024 году относительно 2020 года").command).year,2024);
  console.log("18 natural-language routing checks passed");
 }
+
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const tokens=x=>[...C.explicitUnitTokens(x)];
+ A.deepEqual(tokens("1 250,50 млн рублей; −7 тыс. тонн; 30 человек"),["1250.5 млн руб.","-7 тыс тонн","30 чел."]);
+ A.deepEqual(tokens("5 млн долл. США; 6 USD; 7 евро; 8 юаней"),["5 млн USD","6 USD","7 EUR","8 CNY"]);
+ A.deepEqual(tokens("100 МВт·ч; 30 МВт; 20 кВтч; 12 ГВт·ч"),["100 МВт·ч","30 МВт","20 кВт·ч","12 ГВт·ч"]);
+ A.deepEqual(tokens("5 млн м³; 8 кв. м; 10 кг"),["5 млн м³","8 м²","10 кг"]);
+ A.deepEqual(tokens("₽100; € 200; $ 5 млн"),["100 руб.","200 EUR","5 млн долл."]);
+ A.deepEqual(tokens("100 инвестиций; 2025 год; 2%"),[]);
+ A.deepEqual(tokens("100 рублёвых облигаций; 20 тоннель"),[]);
+ A.deepEqual(tokens("https://example.org/90 [fact1]"),[]);
+ const rows=[{id:"fact1",title:"Выпуск",description:"100 млн рублей; 20 тонн; 7 МВт·ч",value:100,unit:"млн руб."},{id:"fact2",title:"Оплата",description:"10 000 руб."}];
+ A.deepEqual(C.unitEvidenceAudit("Выпуск 100 млн RUB, 20 т, 7 МВт·ч [fact1].",rows),[]);
+ A.deepEqual(C.unitEvidenceAudit("Выпуск 100 млн USD, 20 кг, 7 МВт [fact1].",rows),["100 млн USD","20 кг","7 МВт"]);
+ A.deepEqual(C.unitEvidenceAudit("10 тыс. руб. [fact2]",rows),["10 тыс руб."]);
+ A.deepEqual(C.unitEvidenceAudit("Выпуск 100 млн [fact1].",rows),[]);
+ A.deepEqual(C.unitEvidenceAudit("Выпуск 20 тонн [fact1].",[{...rows[0],description:"20",value:20,unit:"тонн"}]),[]);
+ A.deepEqual(C.unitEvidenceAudit("20 тонн [fact1]",[{...rows[0],description:"20",unit:"",value:20,limit:"20 тонн"}]),["20 тонн"]);
+ A.ok(C.unitEvidenceWarning(["20 кг"]).includes("нет буквального совпадения"));
+ A.equal(C.unitEvidenceWarning([]),"");
+ console.log("16 explicit unit evidence checks passed");
+}
+
