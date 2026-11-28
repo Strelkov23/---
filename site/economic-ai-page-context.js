@@ -22,7 +22,8 @@ const EconomicAIPageContext=(function pageContext(){
   const lines=["Экономический обзор России — исследовательская заметка","Вопрос: "+question,"Раздел: "+context.heading,"Отпечаток набора SHA-256: "+fingerprint,"","Параметры страницы (не статистические факты):"];
   for(const p of context.parameters||[])lines.push(p.label+": "+p.value);
   if(!context.parameters?.length)lines.push("Не переданы.");
-  lines.push("","Результаты поиска:");
+  if(context.model_input){const m=context.model_input;lines.push("","Контекст модели: "+m.included.length+" карточек; не передано "+m.omitted,"Переданные ID: "+m.included.join(", "),"Размер сообщения (оценка байт): "+m.bytes+" / "+m.budget);}
+  lines.push("","Результаты поиска (включая не переданные модели):");
   for(const r of rows)lines.push("["+r.id+"] "+r.kind+" — "+r.title,r.description||"",r.limit||"",r.href||"","");
   if(answer)lines.push("Черновик ИИ (не подтверждённая аналитика):",answer);
   return lines.join("\n");
