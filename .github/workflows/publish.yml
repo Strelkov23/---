@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 40
     outputs:
       version: ${{ steps.archive.outputs.version }}
+      source_revision: ${{ steps.archive.outputs.source_revision }}
       manifest_sha256: ${{ steps.archive.outputs.manifest_sha256 }}
       analytics_sha256: ${{ steps.archive.outputs.analytics_sha256 }}
     permissions:
@@ -427,6 +428,7 @@ jobs:
           PY
           git rev-parse HEAD > monitor/public/version.txt
           echo "version=$(cat monitor/public/version.txt)" >> "$GITHUB_OUTPUT"
+          echo "source_revision=$(cat monitor/public/source-version.txt)" >> "$GITHUB_OUTPUT"
           echo "manifest_sha256=$(sha256sum monitor/public/data-manifest.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
           analytics_sha256=$(python3 - <<'PY'
           import hashlib,json
@@ -456,6 +458,7 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+          EXPECTED_SOURCE_REVISION: ${{ needs.build.outputs.source_revision }}
           EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
           EXPECTED_ANALYTICS_SHA256: ${{ needs.build.outputs.analytics_sha256 }}
         run: |
@@ -469,6 +472,9 @@ jobs:
             sleep 10
           done
           test "$actual" = "$EXPECTED_VERSION"
+          test -n "$EXPECTED_SOURCE_REVISION"
+          actual_source=$(curl --retry 3 --retry-all-errors --silent --show-error --fail --max-time 25 "${base}source-version.txt?build=$EXPECTED_VERSION")
+          test "$actual_source" = "$EXPECTED_SOURCE_REVISION"
           for route in normalized-data.html normalized-observations.json source-journal.html source-journal.json source-pipeline.html source-pipeline.json data-infrastructure.html data-infrastructure.json journal-evidence.html journal-evidence.json research-projects.html research-projects.js literature-quality.html literature-quality.json literature-journals.csv literature-years.csv literature-topics.csv diagnostic-backtest.html diagnostic-backtest.js investment-diagnostics.js dependency-diagnostics.js planning-centre.html balance-audit.html balance-audit.json balance-audit.csv plan-feasibility.html plan-feasibility.js horizon-feasibility.html horizon-feasibility.js cost-decomposition.html cost-decomposition.js territorial-plan.html territorial-plan.js; do
             curl --retry 2 --retry-all-errors --max-time 25 --silent --show-error --fail "${base}$route?build=$EXPECTED_VERSION" > /dev/null
           done
@@ -486,6 +492,7 @@ jobs:
           import hashlib,json,os,time
           from urllib.request import urlopen,Request
           from urllib.parse import urljoin
+          from html.parser import HTMLParser
           base=os.environ["VERIFY_BASE"]
           version=os.environ["EXPECTED_VERSION"]
           def get(name,expected_hash,expected_size=None):
@@ -525,8 +532,24 @@ jobs:
           analytics=json.loads(os.environ["EXPECTED_ANALYTICS_SHA256"])
           expected_names=["analyst-cockpit.html","analyst-cockpit.js","plan-register.html","plan-register.js","public-plan-fact.html","public-plan-fact.js","deviation-monitor.html","deviation-monitor.js","plan-comparison.html","plan-comparison.js","plan-diagnostics.html","plan-diagnostics.js","plan-report.html","plan-report.js","chart-export.js","style.css","interface.js","layout.js","papers.html","papers.js","literature.json","literature-quality.html","literature-quality.json","literature-journals.csv","literature-years.csv","literature-topics.csv","journal-evidence.json","iv-lab.html","independent-statistics.html","iv-comparison.html","iv-lab-nav.js","iv-scenario-store.js","iv-energy-structure.js","iv-origin.js","iv-ember.js","iv-methods.js","iv-tech.js","iv-trajectory.js","iv-allocation.js","iv-workspaces.js","iv-physical-composite.js","iv-physical.js","iv-comparison.js","iv-evidence.js","iv-policy.js","iv-prices.js","iv-labour.js","iv-trade.js","iv-pulse.js","iv-lab.js","independent-trade.json","independent-ember.json","independent-prices.json","independent-labour.json","independent-physical.json","global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js","index.html","historical.html"]
           assert set(analytics)==set(expected_names),"Incomplete analytics hash manifest"
+          class AssistantShell(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.ids=set()
+                  self.scripts=set()
+              def handle_starttag(self,tag,attrs):
+                  attrs=dict(attrs)
+                  if attrs.get("id"):self.ids.add(attrs["id"])
+                  if tag=="script" and attrs.get("src"):self.scripts.add(attrs["src"])
+          assistant_pages={"index.html","historical.html","papers.html","analyst-cockpit.html"}
           for name in expected_names:
-              get(name,analytics[name])
+              raw=get(name,analytics[name])
+              if name in assistant_pages:
+                  parser=AssistantShell()
+                  parser.feed(raw.decode("utf-8"))
+                  assert {"gea-toggle","gea-panel","gea-question","gea-model"}<=parser.ids,name
+                  assert {"global-economic-assistant.js","economic-ai-page-context.js","economic-ai-scenario.js"}<=parser.scripts,name
+          print("Exact public assistant source and shells verified:",os.environ["EXPECTED_SOURCE_REVISION"],len(assistant_pages))
           print("Exact public analytics files verified:",len(analytics))
           print("Exact public manifest and atlas files verified:",len(names)+7)
           PY
