@@ -932,3 +932,78 @@ console.log("16 agent coordination checks passed");}
  A.throws(()=>C.hypothesisJournal(Array(31).fill(j[0])));
  console.log("18 hypothesis journal checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),next="b".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const question="Производительность и энергетика России в 2025 году относительно 2020 года";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"Данные",value:10,unit:"руб."};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,question,"h-1",at),r=j[0];
+ A.deepEqual(r.runs,[]);
+ const questions=["Покажи производительность труда в 2025 году относительно 2020 года","Покажи структуру энергетики России в 2025 году относительно 2020 года"];
+ const plan=C.hypothesisPlan(JSON.stringify(questions),r);A.equal(plan.kind,"research");
+ A.equal(C.hypothesisPlan(JSON.stringify([questions[0],questions[1].replace("2025","2026")]),r),null);
+ A.ok(C.hypothesisPlanPrompt(r)[0].content.includes("не доказана"));
+ const result={fingerprint:next,failed:1,found:[{...source,id:"s1-fact"},{id:"s2-status",kind:"Статус проверки",title:"Нет данных"}],results:plan.steps.map((s,i)=>({step:i+1,command:s.command,count:1,failed:i}))};
+ const receipt=C.hypothesisReceipt(r,plan,result,at);A.equal(receipt.same_snapshot,false);A.equal(receipt.eligible,1);A.equal(receipt.cards.length,1);A.equal(receipt.steps[1].observations,0);
+ A.equal(C.hypothesisReceipt(r,plan,{...result,fingerprint:fp},at).same_snapshot,true);
+ const saved=C.appendHypothesisRun(j,"h-1",plan,result,at);
+ A.equal(saved[0].runs.length,1);A.equal(saved[0].events.length,0);A.equal(j[0].runs.length,0);
+ A.throws(()=>C.hypothesisReceipt(r,plan,{...result,failed:0},at));
+ A.throws(()=>C.hypothesisReceipt(r,plan,{...result,fingerprint:"bad"},at));
+ A.throws(()=>C.hypothesisReceipt(r,{...plan,steps:plan.steps.slice().reverse()},result,at));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:[{...receipt,same_snapshot:true}]}]));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:[{...receipt,eligible:2}]}]));
+ A.throws(()=>C.hypothesisJournal([{...saved[0],runs:Array(6).fill(receipt)}]));
+ A.equal(C.hypothesisJournal(JSON.parse(JSON.stringify(saved)))[0].runs[0].fingerprint,next);
+ console.log("19 hypothesis research receipt checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),next="b".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const question="Производительность и энергетика России в 2025 году относительно 2020 года";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"Данные",value:10,unit:"руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,question,"h-1",at);
+ const questions=["Покажи производительность труда в 2025 году относительно 2020 года","Покажи структуру энергетики России в 2025 году относительно 2020 года"];
+ const plan=C.hypothesisPlan(JSON.stringify(questions),j[0]);
+ const result=(fingerprint,found,p=plan)=>({fingerprint,failed:0,found,results:p.steps.map((s,i)=>({step:i+1,command:s.command,count:found.filter(x=>x.id.startsWith("s"+(i+1)+"-")).length,failed:0}))});
+ const a={...source,id:"s1-a"},b={...source,id:"s2-b",title:"Энергетика"},c={...a,description:"Другой текст"};
+ const append=(journal,res,p=plan)=>C.appendHypothesisRun(journal,"h-1",p,res,at);
+ A.equal(C.compareHypothesisRuns(j[0]).state,"insufficient_runs");
+ const first=append(j,result(fp,[a,b]));const same=append(first,result(fp,[a,b]));
+ const x=C.compareHypothesisRuns(same[0]).comparisons[0];A.equal(x.state,"same_snapshot");A.equal(x.counts.unchanged,2);A.equal(x.previous,1);
+ const changed=append(same,result(next,[c,{...b,title:"Новая карточка"}]));
+ const y=C.compareHypothesisRuns(changed[0]).comparisons[1];A.equal(y.state,"different_snapshot");A.equal(y.counts.changed_excerpt,1);A.equal(y.counts.only_previous_sample,1);A.equal(y.counts.only_current_sample,1);A.equal(y.previous,2);A.equal(y.completeSamples,true);
+ const reverse=C.hypothesisPlan(JSON.stringify(questions.slice().reverse()),j[0]);
+ const diff=append(first,result(next,[a,b],reverse),reverse);
+ A.equal(C.compareHypothesisRuns(diff[0]).comparisons[0].state,"different_plan");
+ const again=append(diff,result(next,[a,b]));A.equal(C.compareHypothesisRuns(again[0]).comparisons[1].previous,1);
+ const amb=append(first,result(next,[a,{...a,id:"s1-a2"},b]));A.equal(C.compareHypothesisRuns(amb[0]).comparisons[0].counts.ambiguous,1);
+ const many=Array.from({length:9},(_,i)=>({...a,id:"s1-a"+i,title:"Ряд "+i}));
+ const partial=append(first,result(next,many));A.equal(C.compareHypothesisRuns(partial[0]).comparisons[0].completeSamples,false);
+ A.equal(changed[0].events.length,0);
+ A.ok(y.limit.includes("не является независимым"));
+ console.log("17 hypothesis run comparison checks passed");
+}
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,"Вопрос","h-1",at),input=C.hypothesisArgumentInput(j[0]);
+ A.equal(input.blocked,false);A.equal(input.cards.length,1);A.equal(input.cards[0].fingerprint,fp);A.ok(input.bytes<=input.budget);
+ A.equal(C.hypothesisArgumentInput(j[0],100).blocked,true);
+ const gap={type:"gap",text:"Необходима независимая проверка.",refs:[]},support={type:"support",text:"Выпуск 125 млн руб.",refs:["arg-1"]};
+ const check=(...a)=>C.validateHypothesisArguments(JSON.stringify(a),input.cards);
+ A.equal(check(gap,support).ok,true);
+ A.equal(check(gap).ok,true);
+ A.equal(check(support).reason,"missing_gap");
+ A.equal(check(gap,{...support,refs:[]}).reason,"missing_source");
+ A.equal(check(gap,{...support,refs:["bad"]}).reason,"unknown_source");
+ A.equal(check(gap,{...support,text:"Выпуск 999 млн руб."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,text:"Выпуск 125 тонн."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,type:"proven"}).reason,"shape");
+ A.equal(check(gap,support,support).reason,"duplicate_argument");
+ A.equal(check(gap,{type:"challenge",text:"Связь требует проверки.",refs:["arg-1"]}).ok,true);
+ A.equal(C.validateHypothesisArguments("invalid",input.cards).reason,"json");
+ A.equal(j[0].events.length,0);
+ console.log("17 hypothesis argument checks passed");
+}
