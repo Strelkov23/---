@@ -598,3 +598,19 @@ console.log("16 agent coordination checks passed");}
  A.ok(C.agentEvidence(cmd,edit({route:null})).every(x=>x.id!=="route-age-dependency"));
  console.log("19 dossier assistant checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const paper=(id,date="2025-01-01")=>({doi:"10.1234/"+id,title:"Тема "+id,published:date,journal:"J"});
+ const p=[paper("a"),paper("b"),paper("c","2027-01-01"),paper("d")];
+ const doc=p=>({kind:"paper",code:p.doi,title:p.title,date:p.published,href:"https://doi.org/"+p.doi});
+ const a={...doc(p[0]),authors:"Автор",text:"Текст",license:"CC BY",checked:"2026-01-01"};
+ const index={docs:p.map(doc)},searcher={researchEvidence:(i,ps,q,c,n)=>[a],search:()=>[doc(p[0]),doc(p[1]),doc(p[2]),{...doc(p[3]),title:"Подмена"}]};
+ const r=C.dossierLiterature("age-dependency",index,p,searcher,"2026-11");
+ A.equal(r.length,2);A.equal(r[0].kind,"Лицензированная аннотация");A.ok(r[1].kind.includes("только метаданные"));A.ok(r[1].limit.includes("не прочитаны"));A.equal(r[1].href,"https://doi.org/10.1234/b");
+ A.deepEqual(C.dossierLiterature("unknown",index,p,searcher,"2026-11"),[]);
+ A.deepEqual(C.dossierLiterature("age-dependency",index,p,searcher,"bad"),[]);
+ A.equal(C.dossierLiterature("age-dependency",index,[...p,p[0]],searcher,"2026-11").length,1);
+ A.equal(C.dossierLiterature("age-dependency",index,p,{...searcher,researchEvidence:()=>[],search:()=>[] },"2026-11").length,0);
+ A.equal(C.dossierLiterature("age-dependency",index,p,searcher,"2024-12").length,0);
+ console.log("10 dossier literature checks passed");
+}
