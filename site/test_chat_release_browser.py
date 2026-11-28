@@ -6,8 +6,10 @@ import os
 from playwright.sync_api import sync_playwright
 
 MODEL = """export const prebuiltAppConfig={model_list:[{model_id:'Qwen2.5-1.5B-Instruct-q4f16_1-MLC'}]};
-export async function CreateMLCEngine(){
- return {interruptGenerate(){},async unload(){},chat:{completions:{async create({messages,stream}){
+export async function CreateMLCEngine(id,opts){
+ opts?.initProgressCallback?.({text:'Контрольная загрузка',progress:0.25});
+ if(globalThis.__aiStartupMode==='pending') await new Promise(resolve=>{globalThis.__aiReleaseStartup=resolve;});
+ return {interruptGenerate(){},async unload(){globalThis.__aiUnloadCount=(globalThis.__aiUnloadCount||0)+1;},chat:{completions:{async create({messages,stream}){
  const context=messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
  if(!stream && messages[0]?.content?.startsWith('Разложи задачу на 2–4')) return {choices:[{message:{content:JSON.stringify([{mode:'general',title:'Объяснение',query:'Объясни межотраслевой баланс'},{mode:'web',title:'Поиск',query:'Межотраслевой баланс статьи'}])}}]};
  if(!stream) return {choices:[{message:{content:'Тестовый ответ'}}]};
@@ -25,7 +27,7 @@ def main():
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.on("request", lambda r: external.append(r.url) if
                     any(host in r.url for host in ("wikipedia.org", "api.crossref.org", "api.datacite.org", "europepmc.org")) else None)
-            page.add_init_script("if (!navigator.gpu) Object.defineProperty(navigator,'gpu',{value:{},configurable:true});")
+            page.add_init_script("Object.defineProperty(navigator,'gpu',{value:{requestAdapter:async()=>window.__aiAdapterMissing?null:{}},configurable:true});")
             page.route("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.86/+esm",
                        lambda route: route.fulfill(status=200,content_type="text/javascript",
                        headers={"Access-Control-Allow-Origin":"*"},body=MODEL))
@@ -49,6 +51,27 @@ def main():
             question.fill("Проверка первого диалога")
             send.click()
             assert "загрузите локальную модель" in page.locator("#gea-status").inner_text()
+            assert question.input_value()=="Проверка первого диалога"
+            # A missing GPU must be visibly diagnosed and must not lock the chat.
+            page.evaluate("window.__aiAdapterMissing=true")
+            page.locator("#gea-model").click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('не обнаружил совместимое') && !document.querySelector('#gea-question').disabled")
+            startup=page.locator(".gea-model-startup")
+            assert startup.is_visible()
+            assert "ИИ не запущен" in startup.inner_text()
+            assert question.input_value()=="Проверка первого диалога"
+            # Cancel a pending engine download; late engines must be unloaded.
+            page.evaluate("window.__aiAdapterMissing=false;window.__aiStartupMode='pending'")
+            page.locator("#gea-model").click()
+            page.wait_for_function("typeof window.__aiReleaseStartup==='function'")
+            assert startup.get_by_role("progressbar").is_visible()
+            assert startup.get_by_role("progressbar").get_attribute("value")=="0.25"
+            assert page.locator("#gea-stop").is_enabled()
+            page.locator("#gea-stop").click()
+            page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Загрузка отменена') && !document.querySelector('#gea-question').disabled")
+            assert page.locator("#gea-model").is_disabled()
+            page.evaluate("window.__aiStartupMode='normal';window.__aiReleaseStartup()")
+            page.wait_for_function("window.__aiUnloadCount===1 && !document.querySelector('#gea-model').disabled")
             assert question.input_value()=="Проверка первого диалога"
             page.locator("#gea-model").click()
             page.wait_for_function("document.querySelector('#gea-status').textContent.includes('Модель загружена')")
