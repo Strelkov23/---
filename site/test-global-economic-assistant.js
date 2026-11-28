@@ -1130,3 +1130,41 @@ console.log("16 agent coordination checks passed");}
   }
   federatedChecks().catch(e=>{console.error(e);process.exitCode=1;});
  }
+
+
+ // v1.19: Europe PMC excerpts, licensing, deduplication and partial failure.
+ {const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+  const stamp="2026-11-28T10:00:00.000Z";
+  const row={source:"MED",id:"123",title:"Health economics",doi:"10.1234/plan",authorString:"A B",pubYear:"2025",isOpenAccess:"Y",license:"cc by",abstractText:"<b>Economic</b> study"};
+  const data={hitCount:4,resultList:{result:[row,{...row,id:"124",license:"unknown",doi:"10.1234/other"},{...row,id:"125",isOpenAccess:"N",doi:null},{...row,id:"../bad"}]}};
+  A.ok(C.epmcSearchUrl("health & economics").endsWith(encodeURIComponent("health & economics")));
+  A.throws(()=>C.epmcSearchUrl(""));A.throws(()=>C.epmcSearchUrl("x\ny"));
+  const cards=C.epmcReferenceCards(data,stamp);
+  A.equal(cards.length,3);A.equal(cards[0].abstractAvailable,true);A.ok(cards[0].description.includes("Economic study"));
+  A.equal(cards[0].href,"https://europepmc.org/article/MED/123");
+  A.equal(cards[1].abstractAvailable,false);A.equal(cards[2].abstractAvailable,false);A.ok(!cards[1].description.includes("study"));
+  A.equal(C.epmcReferenceCards({hitCount:1,resultList:{result:[{...row,abstractText:"x".repeat(1200)}]}},stamp)[0].description.endsWith("x".repeat(900)),true);
+  A.throws(()=>C.epmcReferenceCards(data,"invalid"));A.throws(()=>C.epmcReferenceCards({hitCount:-1},stamp));
+  A.deepEqual(C.epmcReferenceCards({hitCount:0,resultList:{result:[]}},stamp),[]);
+  const wiki=JSON.stringify({query:{pages:[{ns:0,pageid:1,lastrevid:3,title:"Planning",extract:"Economic planning",index:1}]}});
+  const papers=JSON.stringify({status:"ok","message-type":"work-list",message:{items:[{DOI:"10.1234/plan",title:["Planning"],type:"journal-article"}]}});
+  const fetcher=async url=>({ok:true,text:async()=>url.includes("europepmc")?JSON.stringify(data):url.includes("crossref")?papers:wiki});
+  async function extendedChecks(){
+   const all=await C.fetchExtendedResearch("экономика","health economics",fetcher,null,stamp);
+   A.equal(all.coverage.length,4);A.equal(all.rows.length,5);
+   const merged=all.rows.find(r=>r.doi==="10.1234/plan");
+   A.equal(merged.abstractAvailable,true);A.deepEqual(merged.providers,["Crossref","Europe PMC"]);
+   A.ok(merged.limit.includes("не является независимым подтверждением"));
+   const partial=await C.fetchExtendedResearch("экономика","health economics",async u=>u.includes("europepmc")?{ok:false,status:429}:fetcher(u),null,stamp);
+   A.equal(partial.rows.length,3);A.equal(partial.coverage[3].status,"rate_limited");
+   const direct=await C.fetchEpmcReferences("health",async(u,o)=>{A.equal(o.credentials,"omit");A.equal(o.redirect,"error");return fetcher(u)},null,stamp);
+   A.equal(direct.length,3);
+   await A.rejects(()=>C.fetchEpmcReferences("x",async()=>({ok:true,text:async()=>"{invalid"}),null,stamp));
+   await A.rejects(()=>C.fetchEpmcReferences("x",async()=>({ok:true,text:async()=>"x".repeat(1048577)}),null,stamp));
+   const ctx=C.onlineReferenceContext("экономика",all.rows,all.coverage,"research");
+   A.ok(ctx.selected.length>0);A.ok(ctx.messages[0].content.includes("Препринты"));
+   A.ok(ctx.messages[0].content.includes("не проверенные выводы"));
+   console.log("v1.19 extended research checks passed");
+  }
+  extendedChecks().catch(e=>{console.error(e);process.exitCode=1;});
+ }
