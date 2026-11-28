@@ -984,3 +984,26 @@ console.log("16 agent coordination checks passed");}
  A.ok(y.limit.includes("не является независимым"));
  console.log("17 hypothesis run comparison checks passed");
 }
+
+{const A=require("node:assert/strict"),C=require("./global-economic-assistant.js");
+ const fp="a".repeat(64),at="2026-11-28T10:00:00.000Z";
+ const source={id:"fact",kind:"Наблюдение",title:"Выпуск",description:"125 млн руб.",value:125,unit:"млн руб.",href:"https://example.org/a"};
+ const j=C.addHypothesis([],{type:"hypothesis",text:"Возможна связь с выпуском.",refs:["fact"]},[source],fp,"Вопрос","h-1",at),input=C.hypothesisArgumentInput(j[0]);
+ A.equal(input.blocked,false);A.equal(input.cards.length,1);A.equal(input.cards[0].fingerprint,fp);A.ok(input.bytes<=input.budget);
+ A.equal(C.hypothesisArgumentInput(j[0],100).blocked,true);
+ const gap={type:"gap",text:"Необходима независимая проверка.",refs:[]},support={type:"support",text:"Выпуск 125 млн руб.",refs:["arg-1"]};
+ const check=(...a)=>C.validateHypothesisArguments(JSON.stringify(a),input.cards);
+ A.equal(check(gap,support).ok,true);
+ A.equal(check(gap).ok,true);
+ A.equal(check(support).reason,"missing_gap");
+ A.equal(check(gap,{...support,refs:[]}).reason,"missing_source");
+ A.equal(check(gap,{...support,refs:["bad"]}).reason,"unknown_source");
+ A.equal(check(gap,{...support,text:"Выпуск 999 млн руб."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,text:"Выпуск 125 тонн."}).reason,"numeric_evidence");
+ A.equal(check(gap,{...support,type:"proven"}).reason,"shape");
+ A.equal(check(gap,support,support).reason,"duplicate_argument");
+ A.equal(check(gap,{type:"challenge",text:"Связь требует проверки.",refs:["arg-1"]}).ok,true);
+ A.equal(C.validateHypothesisArguments("invalid",input.cards).reason,"json");
+ A.equal(j[0].events.length,0);
+ console.log("17 hypothesis argument checks passed");
+}
